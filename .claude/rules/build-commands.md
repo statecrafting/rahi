@@ -34,8 +34,7 @@ Rules:
   library code denies `unwrap_used`, `expect_used`, `indexing_slicing`, and
   `float_arithmetic`.
 - Every crate manifest carries `[package.metadata.spec-spine] spec =
-  "<founding spec id>"`; `web/package.json` carries `"spec-spine": { "spec":
-  "095-web-review-ui" }`.
+  "<founding spec id>"`.
 - Claim every new file in the spec you are implementing (its
   `establishes` list) in the same change: `require_ownership` is on and
   `C-002` refuses an unclaimed source file at PR time. Touching a file

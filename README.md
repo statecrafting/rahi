@@ -86,6 +86,6 @@ human review; drafts are visible as blockers and never scheduled.
 
 ## License
 
-Apache-2.0, see [`LICENSE`](LICENSE). The products that consume this
-chassis are Apache-2.0 as well, so a crate can move in either direction
-across the family without a licence review.
+Apache-2.0, see [`LICENSE`](LICENSE). `aicortex` is Apache-2.0 and
+`hqgit` is AGPL-3.0; Apache-2.0 into AGPL-3.0 is the sanctioned direction,
+so both consume this chassis and both may contribute back under Apache-2.0.
