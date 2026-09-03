@@ -93,7 +93,7 @@ jobs:
       # (spec-spine spec 023): the repo's own ledger seal, published as a
       # build artifact so a later steward can `verify-attestation --recompute`.
       - run: spec-spine attest --with-coupling > corpus-attestation.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: corpus-attestation-${{ github.sha }}
           path: corpus-attestation.json
