@@ -1,0 +1,108 @@
+# spec-spine.toml governs this repository.
+#
+# rahi is specified before it is built: the corpus under specs/ is the whole
+# design, and the code under crates/ and apps/ arrives one spec per driven
+# session (AGENTS.md, "Working the backlog"). Every knob below is deliberate.
+
+[manifest]
+# Cargo `[package.metadata.spec-spine].spec` names each crate's founding spec.
+metadata_namespace = "spec-spine"
+
+[domains]
+# The `domain` of a spec is the chassis responsibility it serves (spec 002 §2).
+# Closed enum: a spec outside the responsibility list is a compile error
+# (V-005), and a spec without a domain is a lint warning (L-002) that fails
+# the gate.
+allowed = [
+  "governance",
+  "types",
+  "store",
+  "ledger",
+  "kernel",
+  "identity",
+  "edge",
+  "ops",
+]
+
+[kind]
+# Closed enum (V-006 / L-003). `kernel` specs are load-bearing chassis
+# contracts; `feature` specs are replaceable above them; `tooling` is repo
+# and deployment machinery.
+allowed = [
+  "constitutional-bootstrap",
+  "thesis",
+  "governance",
+  "kernel",
+  "feature",
+  "tooling",
+]
+
+[layout]
+specs_dir     = "specs"
+derived_dir   = ".derived"
+standards_dir = "standards/spec"
+schemas_dir   = "standards/schemas"
+cargo_workspace = "Cargo.toml"
+standalone_rust_workspaces = []
+# No npm anywhere in this repository (spec 001 D-1).
+npm_workspaces = []
+standalone_npm_packages = []
+
+[index]
+# Beyond the always-hashed core (manifests, specs, span-backing sources): the
+# surfaces that steer driven sessions, the deployment files, and the design
+# notes the thesis cites.
+extra_hashed_inputs = [
+  "standards/**",
+  ".github/workflows/**",
+  ".claude/agents/**",
+  ".claude/rules/**",
+  ".claude/skills/**",
+  ".claude/settings.json",
+  "AGENTS.md",
+  "CLAUDE.md",
+  "Makefile",
+  "docs/design/**",
+  "docker/**",
+  "deploy/**",
+]
+resolver_exclusions = ["target", "node_modules", ".derived", "dist", "build", "data"]
+
+# Named hash slices (spec-spine spec 012): a PR that touches only one
+# surface can be gated on that slice alone.
+[index.slices]
+governance = [
+  "standards/**",
+  ".claude/settings.json",
+  ".claude/agents/**",
+  ".claude/rules/**",
+  ".claude/skills/**",
+  "AGENTS.md",
+  "CLAUDE.md",
+  ".github/workflows/**",
+]
+deployment = ["docker/**", "deploy/**"]
+
+[branding]
+compiler_id = "spec-spine"
+indexer_id  = "spec-spine"
+
+[coupling]
+waiver_keyword = "Spec-Drift-Waiver:"
+# Additive to the built-in floor (docs/, README.md, LICENSE, .derived/, lockfiles).
+bypass_prefixes = ["**/README.md", "**/CHANGELOG.md"]
+# The ownership ratchet is on from day one: greenfield, so every source file
+# a session adds must be claimed by the spec it implements (C-002).
+require_ownership = true
+# Dependabot-class version-pin bumps self-waive (spec-spine spec 030).
+auto_waive_dependency_only = true
+
+[provenance.uri_schemes]
+knowledge        = "knowledge://"
+code-fingerprint = "fingerprint://"
+# Decisions carried over from the enrahitu corpus are cited by this scheme.
+enrahitu         = "enrahitu://"
+
+[frontmatter]
+# `wave` is the build-order wave a spec belongs to (spec 002 §5).
+extra_known_keys = ["wave"]

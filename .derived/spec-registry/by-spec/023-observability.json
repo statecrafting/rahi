@@ -1,0 +1,89 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-03",
+    "dependsOn": [
+      "020-edge-server"
+    ],
+    "domain": "edge",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/src/obs/mod.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/src/obs/metrics.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/src/obs/tracer.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/src/obs/ring.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/src/obs/layer.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/tests/obs.rs"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "020-edge-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "020-edge-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/middleware/mod.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "010-workspace-and-core-types",
+        "unit": {
+          "anchor": "workspace.dependencies",
+          "file": "Cargo.toml",
+          "kind": "section"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 2
+    },
+    "id": "023-observability",
+    "implementation": "pending",
+    "kind": "feature",
+    "risk": "medium",
+    "sectionHeadings": [
+      "023: Observability",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/023-observability/spec.md",
+    "status": "approved",
+    "summary": "The substrate contract every cell exposes: Prometheus text on /metrics from an in-process registry (process metrics, HTTP counters and duration histograms labeled by route pattern and status class, store operation counters, kernel decisions and ledger failures), and an OTel tracer with a span per request and per store operation that exports OTLP only when an endpoint is configured and always retains a bounded ring buffer of recent traces queryable in-process. Kernel decisions attach their id to the active span through the observe hook. Carries enrahitu://022.\n",
+    "title": "Observability: /metrics always on, an in-process OTel tracer with a ring buffer, decisions on spans"
+  },
+  "shardHash": "7e79d61c06ff89afd196b66464504856e722f5fd3a687d7be6dc77eba2844abb",
+  "specVersion": "1.1.0"
+}

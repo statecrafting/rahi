@@ -1,0 +1,81 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-03",
+    "dependsOn": [
+      "013-ledger-decision-chain"
+    ],
+    "domain": "ledger",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "crates/rahi-ledger/src/seal.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ledger/src/segment.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ledger/src/archive.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ledger/tests/seal.rs"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "013-ledger-decision-chain",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "013-ledger-decision-chain",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/Cargo.toml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "010-workspace-and-core-types",
+        "unit": {
+          "anchor": "workspace.dependencies",
+          "file": "Cargo.toml",
+          "kind": "section"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 1
+    },
+    "id": "014-ledger-sealing-and-archive",
+    "implementation": "pending",
+    "kind": "feature",
+    "risk": "high",
+    "sectionHeadings": [
+      "014: Ledger sealing and archive",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/014-ledger-sealing-and-archive/spec.md",
+    "status": "approved",
+    "summary": "hiqlite replicates the whole database to every node, so an unbounded audit history cannot live in it; the head and a hot window do. When the window exceeds its bound the oldest contiguous run is sealed into an immutable segment (first id, last id, count, segment hash, previous segment hash), written to an object store behind a trait with an S3 implementation, and deleted from the hot table. Segments link to their predecessor and the head links to the last segment, so the chain verifies end to end without archived history resident. Archive is never conflated with backup. Carries enrahitu://032 §3.7 and §3.9.\n",
+    "title": "Ledger sealing: a resident hot window, immutable segments archived to object storage"
+  },
+  "shardHash": "85bc213199a1a7178063d9a65ea9ad4826b7458d1100159b681b631e60017dbb",
+  "specVersion": "1.1.0"
+}

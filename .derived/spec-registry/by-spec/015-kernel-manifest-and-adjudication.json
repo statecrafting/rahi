@@ -1,0 +1,103 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "constrains": [
+      {
+        "flavor": "invariant-freeze",
+        "note": "deny by default; constitution X",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/adjudicate.rs"
+        }
+      }
+    ],
+    "created": "2026-09-03",
+    "dependsOn": [
+      "013-ledger-decision-chain"
+    ],
+    "domain": "kernel",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "crates/rahi-kernel/Cargo.toml"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-kernel/src/lib.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-kernel/src/manifest.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-kernel/src/capability.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-kernel/src/verify.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-kernel/src/adjudicate.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-kernel/src/facade.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-kernel/src/observe.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-kernel/tests/manifest.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-kernel/tests/adjudicate.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-kernel/testdata/manifests/"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "010-workspace-and-core-types",
+        "unit": {
+          "anchor": "workspace.dependencies",
+          "file": "Cargo.toml",
+          "kind": "section"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 1
+    },
+    "id": "015-kernel-manifest-and-adjudication",
+    "implementation": "pending",
+    "kind": "kernel",
+    "risk": "critical",
+    "sectionHeadings": [
+      "015: The kernel",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/015-kernel-manifest-and-adjudication/spec.md",
+    "status": "approved",
+    "summary": "The governance seam. An app declares a manifest (TOML, embedded at compile time): identity, services, resources by name, a capability catalog, per service grants, the gate roster, ledger and observability policy. The kernel canonicalizes and hashes it, verifies at build that every governed facade the app links is covered by a grant, adjudicates every store, lock, notify, secret, and egress operation at runtime through the action-gate primitive, denies anything not granted, and appends a Decision for every denial without the request path awaiting the ledger. Carries enrahitu://020 and enrahitu://021 with the parser-based extractor replaced by a declared manifest.\n",
+    "title": "The kernel: a declared capability ceiling, verified at build, enforced at runtime, denials ledgered"
+  },
+  "shardHash": "3a69715302c205d99493a74a5f97737e225b658efcf1f4a20b8650e73c1ec25e",
+  "specVersion": "1.1.0"
+}

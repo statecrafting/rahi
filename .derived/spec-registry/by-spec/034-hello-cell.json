@@ -1,0 +1,79 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-03",
+    "dependsOn": [
+      "033-dev-substrate-and-harness",
+      "032-cluster-topology"
+    ],
+    "domain": "edge",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "apps/hello-cell/Cargo.toml"
+      },
+      {
+        "kind": "file",
+        "path": "apps/hello-cell/manifest.toml"
+      },
+      {
+        "kind": "file",
+        "path": "apps/hello-cell/src/main.rs"
+      },
+      {
+        "kind": "file",
+        "path": "apps/hello-cell/src/cell.rs"
+      },
+      {
+        "kind": "file",
+        "path": "apps/hello-cell/src/notes.rs"
+      },
+      {
+        "kind": "file",
+        "path": "apps/hello-cell/src/migrations.rs"
+      },
+      {
+        "kind": "file",
+        "path": "apps/hello-cell/web/index.html"
+      },
+      {
+        "kind": "file",
+        "path": "apps/hello-cell/web/app.js"
+      },
+      {
+        "kind": "file",
+        "path": "apps/hello-cell/tests/e2e.rs"
+      },
+      {
+        "kind": "file",
+        "path": "apps/hello-cell/README.md"
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 3
+    },
+    "id": "034-hello-cell",
+    "implementation": "pending",
+    "kind": "feature",
+    "risk": "medium",
+    "sectionHeadings": [
+      "034: hello-cell",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/034-hello-cell/spec.md",
+    "status": "approved",
+    "summary": "The smallest complete governed cell and the thing consumers copy from: a manifest declaring one table, one kv prefix, and the grants a notes service needs; a Cell implementation whose main is one line; a notes resource with create, list, and delete behind login, each write staged with an outbox row and stamped with a revision, each denial ledgered; a static page that logs in through the proxy and lists notes; an operator route exposing the trace ring; and an end-to-end test through the harness that logs in, writes, reads, is denied an ungranted operation, verifies the ledger, takes a backup, and restores it into a fresh directory.\n",
+    "title": "hello-cell: the reference app that composes every crate and proves the chassis end to end"
+  },
+  "shardHash": "6bba2a8b06cbb839ba41d812bbfcf9a44e345abb761211ba5953851e41aaf068",
+  "specVersion": "1.1.0"
+}

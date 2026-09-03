@@ -1,0 +1,52 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-03",
+    "domain": "governance",
+    "extraFrontmatter": {
+      "wave": 1
+    },
+    "id": "000-rahi-bootstrap",
+    "implementation": "n-a",
+    "kind": "constitutional-bootstrap",
+    "origin": {
+      "retroactive": true
+    },
+    "risk": "critical",
+    "sectionHeadings": [
+      "000: Bootstrap spec system for rahi",
+      "1. The authoring / derived boundary",
+      "2. Identity: directory name equals id",
+      "3. The typed authority graph",
+      "4. Determinism",
+      "5. The refusal rule",
+      "6. The frozen chassis invariants",
+      "7. Corpus conventions",
+      "8. Lifecycle as scheduling",
+      "9. Bootstrap order"
+    ],
+    "specPath": "specs/000-rahi-bootstrap/spec.md",
+    "status": "approved",
+    "summary": "Foundational contract for the rahi corpus. Authored truth lives only in markdown with YAML frontmatter; machine-consumable truth about the corpus is compiler-emitted JSON read only through spec-spine; every artifact is a deterministic function of (config, file contents); and a typed authority graph governs who owns what. rahi is specified in full before a line of it is built: the corpus is the design, spec numbers are the build order, and an orchestrator drives one spec per fresh session through build, ship, shepherd, and verify. This spec also freezes the seven chassis invariants (constitution VI through XI and XIV) that no later spec may amend.\n",
+    "title": "Bootstrap spec system for rahi (specify first, build by spec)",
+    "unamendable": [
+      "markdown-truth-boundary",
+      "json-truth-boundary",
+      "determinism-requirement",
+      "directory-name-equals-id",
+      "typed-authority-graph",
+      "refusal-rule",
+      "one-deployment-unit",
+      "idp-authority",
+      "store-separation",
+      "txn-atomicity",
+      "deny-by-default",
+      "chain-linear",
+      "layer-direction"
+    ]
+  },
+  "shardHash": "97b6401e6a1110f8491fb5e8d268a45350cec2d873915380841f481e50fabd00",
+  "specVersion": "1.1.0"
+}

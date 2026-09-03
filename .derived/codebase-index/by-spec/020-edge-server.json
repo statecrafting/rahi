@@ -1,0 +1,216 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/Cargo.toml' does not exist",
+        "path": "crates/rahi-edge/Cargo.toml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/src/lib.rs' does not exist",
+        "path": "crates/rahi-edge/src/lib.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/src/router.rs' does not exist",
+        "path": "crates/rahi-edge/src/router.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/src/state.rs' does not exist",
+        "path": "crates/rahi-edge/src/state.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/src/middleware/mod.rs' does not exist",
+        "path": "crates/rahi-edge/src/middleware/mod.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/src/middleware/security_headers.rs' does not exist",
+        "path": "crates/rahi-edge/src/middleware/security_headers.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/src/middleware/csrf.rs' does not exist",
+        "path": "crates/rahi-edge/src/middleware/csrf.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/src/middleware/rate_limit.rs' does not exist",
+        "path": "crates/rahi-edge/src/middleware/rate_limit.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/src/probes.rs' does not exist",
+        "path": "crates/rahi-edge/src/probes.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/src/static_files.rs' does not exist",
+        "path": "crates/rahi-edge/src/static_files.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/src/error.rs' does not exist",
+        "path": "crates/rahi-edge/src/error.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/tests/probes.rs' does not exist",
+        "path": "crates/rahi-edge/tests/probes.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/tests/middleware.rs' does not exist",
+        "path": "crates/rahi-edge/tests/middleware.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '020-edge-server' section unit 'workspace.dependencies' not found in Cargo.toml",
+        "path": "Cargo.toml"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "015-kernel-manifest-and-adjudication"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/Cargo.toml"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/error.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/lib.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/middleware/csrf.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/middleware/mod.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/middleware/rate_limit.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/middleware/security_headers.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/probes.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/router.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/state.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/static_files.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/tests/middleware.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/tests/probes.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "anchor": "workspace.dependencies",
+          "file": "Cargo.toml",
+          "kind": "section"
+        }
+      }
+    ],
+    "specId": "020-edge-server",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "05dcaf77d0c336284b3a6afe87e3f77b0e47219b860bbd3f35d64a094b52b121"
+}

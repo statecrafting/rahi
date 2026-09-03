@@ -1,0 +1,73 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-03",
+    "dependsOn": [
+      "022-session-and-principal",
+      "023-observability"
+    ],
+    "domain": "edge",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/src/client_identity.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/src/operator.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/src/exposure.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/tests/hardening.rs"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "020-edge-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "020-edge-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/middleware/rate_limit.rs"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 2
+    },
+    "id": "024-hardening",
+    "implementation": "pending",
+    "kind": "feature",
+    "risk": "high",
+    "sectionHeadings": [
+      "024: Hardening",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/024-hardening/spec.md",
+    "status": "approved",
+    "summary": "X-Forwarded-For is evidence, not identity: it becomes identity only when the operator states how many hops in front of the cell are theirs. This spec adds the client identity resolver the rate limiter keys on, the operator role gate that internal surfaces (the trace ring, ledger inspection, backup triggers) sit behind with no rate limiter on top, and an exposure table that every mounted route must appear in with its authentication class, asserted by a test so an unreviewed public route cannot land. Carries enrahitu://025.\n",
+    "title": "Hardening: trusted client identity, the operator role gate, exposure review of every route"
+  },
+  "shardHash": "e186c769a446e09176049621ee68ffa6313992554603a8e4ec81b25a3b37e02e",
+  "specVersion": "1.1.0"
+}

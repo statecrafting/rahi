@@ -1,0 +1,191 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '031-single-container-packaging' file unit 'crates/rahi-ops/src/first_boot.rs' does not exist",
+        "path": "crates/rahi-ops/src/first_boot.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '031-single-container-packaging' file unit 'crates/rahi-ops/src/keys.rs' does not exist",
+        "path": "crates/rahi-ops/src/keys.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '031-single-container-packaging' file unit 'crates/rahi-ops/src/supervise.rs' does not exist",
+        "path": "crates/rahi-ops/src/supervise.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '031-single-container-packaging' file unit 'crates/rahi-ops/src/rauthy_env.rs' does not exist",
+        "path": "crates/rahi-ops/src/rauthy_env.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '031-single-container-packaging' file unit 'crates/rahi-ops/tests/first_boot.rs' does not exist",
+        "path": "crates/rahi-ops/tests/first_boot.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '031-single-container-packaging' file unit 'crates/rahi-ops/tests/supervise.rs' does not exist",
+        "path": "crates/rahi-ops/tests/supervise.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '031-single-container-packaging' file unit 'docker/Dockerfile' does not exist",
+        "path": "docker/Dockerfile"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '031-single-container-packaging' file unit 'docker/entrypoint.sh' does not exist",
+        "path": "docker/entrypoint.sh"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '031-single-container-packaging' file unit 'docker/rauthy.env.template' does not exist",
+        "path": "docker/rauthy.env.template"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '031-single-container-packaging' file unit '.github/workflows/image.yml' does not exist",
+        "path": ".github/workflows/image.yml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '031-single-container-packaging' file unit 'crates/rahi-ops/src/lib.rs' does not exist",
+        "path": "crates/rahi-ops/src/lib.rs"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "030-operational-verbs"
+    ],
+    "implementingPaths": [
+      {
+        "path": ".github/workflows/govern.yml",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/image.yml"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/first_boot.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/keys.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_env.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/supervise.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/first_boot.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/supervise.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "docker/Dockerfile"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "docker/entrypoint.sh"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "docker/rauthy.env.template"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": ".github/workflows/govern.yml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/govern.yml"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/lib.rs"
+        }
+      }
+    ],
+    "specId": "031-single-container-packaging",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "a992e0878e81de858a73467ad440b736e0fc147bdb6f71a33e2db6eba7e0844f"
+}

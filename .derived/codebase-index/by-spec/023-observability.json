@@ -1,0 +1,146 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '023-observability' file unit 'crates/rahi-edge/src/obs/mod.rs' does not exist",
+        "path": "crates/rahi-edge/src/obs/mod.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '023-observability' file unit 'crates/rahi-edge/src/obs/metrics.rs' does not exist",
+        "path": "crates/rahi-edge/src/obs/metrics.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '023-observability' file unit 'crates/rahi-edge/src/obs/tracer.rs' does not exist",
+        "path": "crates/rahi-edge/src/obs/tracer.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '023-observability' file unit 'crates/rahi-edge/src/obs/ring.rs' does not exist",
+        "path": "crates/rahi-edge/src/obs/ring.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '023-observability' file unit 'crates/rahi-edge/src/obs/layer.rs' does not exist",
+        "path": "crates/rahi-edge/src/obs/layer.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '023-observability' file unit 'crates/rahi-edge/tests/obs.rs' does not exist",
+        "path": "crates/rahi-edge/tests/obs.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '023-observability' file unit 'crates/rahi-edge/src/lib.rs' does not exist",
+        "path": "crates/rahi-edge/src/lib.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '023-observability' file unit 'crates/rahi-edge/src/middleware/mod.rs' does not exist",
+        "path": "crates/rahi-edge/src/middleware/mod.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '023-observability' section unit 'workspace.dependencies' not found in Cargo.toml",
+        "path": "Cargo.toml"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "020-edge-server"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/obs/layer.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/obs/metrics.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/obs/mod.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/obs/ring.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/obs/tracer.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/tests/obs.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/lib.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/middleware/mod.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "anchor": "workspace.dependencies",
+          "file": "Cargo.toml",
+          "kind": "section"
+        }
+      }
+    ],
+    "specId": "023-observability",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "8d59b88732f3cdac88b9d7abb64de9fd0567dcd6d05d1e8aa7c084d684fedcdc"
+}

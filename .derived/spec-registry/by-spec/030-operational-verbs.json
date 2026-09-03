@@ -1,0 +1,118 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-03",
+    "dependsOn": [
+      "014-ledger-sealing-and-archive",
+      "024-hardening"
+    ],
+    "domain": "ops",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/Cargo.toml"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/src/lib.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/src/preflight.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/src/migrate.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/src/backup.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/src/restore.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/src/archive.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/src/rauthy_api.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/tests/backup.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/tests/restore.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-cli/Cargo.toml"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-cli/src/main.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-cli/src/lib.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-cli/src/cell.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-cli/src/serve.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-cli/src/verbs.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-cli/tests/cli.rs"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "010-workspace-and-core-types",
+        "unit": {
+          "anchor": "workspace.dependencies",
+          "file": "Cargo.toml",
+          "kind": "section"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 3
+    },
+    "id": "030-operational-verbs",
+    "implementation": "pending",
+    "kind": "kernel",
+    "risk": "critical",
+    "sectionHeadings": [
+      "030: The verbs and the binary composer",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/030-operational-verbs/spec.md",
+    "status": "approved",
+    "summary": "Operations that exist. rahi-ops implements preflight (config, keys, both stores' health, disk), migrate (spec 011's migrations as a deploy step, leader-only), backup (one encrypted archive holding the app's hiqlite snapshot taken through the addon, rauthy's snapshot taken through rauthy's own API, and the key material that decrypts both), restore (a cluster reset that refuses partial input and is single-shot by a marker), and ledger verify (spec 013 over an exported chain). rahi-cli is the binary composer: an app implements the Cell trait and its main is rahi_cli::run(cell), which yields serve plus every verb with the four exit codes. Carries enrahitu://027.\n",
+    "title": "The verbs and the binary composer: preflight, migrate, backup, restore, ledger verify"
+  },
+  "shardHash": "a12476d2cf444c537bd5cb2b41b0eadf2c62380d7e2ea80fd02d0ac872d590a8",
+  "specVersion": "1.1.0"
+}

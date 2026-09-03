@@ -1,0 +1,160 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '034-hello-cell' file unit 'apps/hello-cell/Cargo.toml' does not exist",
+        "path": "apps/hello-cell/Cargo.toml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '034-hello-cell' file unit 'apps/hello-cell/manifest.toml' does not exist",
+        "path": "apps/hello-cell/manifest.toml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '034-hello-cell' file unit 'apps/hello-cell/src/main.rs' does not exist",
+        "path": "apps/hello-cell/src/main.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '034-hello-cell' file unit 'apps/hello-cell/src/cell.rs' does not exist",
+        "path": "apps/hello-cell/src/cell.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '034-hello-cell' file unit 'apps/hello-cell/src/notes.rs' does not exist",
+        "path": "apps/hello-cell/src/notes.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '034-hello-cell' file unit 'apps/hello-cell/src/migrations.rs' does not exist",
+        "path": "apps/hello-cell/src/migrations.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '034-hello-cell' file unit 'apps/hello-cell/web/index.html' does not exist",
+        "path": "apps/hello-cell/web/index.html"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '034-hello-cell' file unit 'apps/hello-cell/web/app.js' does not exist",
+        "path": "apps/hello-cell/web/app.js"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '034-hello-cell' file unit 'apps/hello-cell/tests/e2e.rs' does not exist",
+        "path": "apps/hello-cell/tests/e2e.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '034-hello-cell' file unit 'apps/hello-cell/README.md' does not exist",
+        "path": "apps/hello-cell/README.md"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "033-dev-substrate-and-harness",
+      "032-cluster-topology"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/Cargo.toml"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/README.md"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/manifest.toml"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/src/cell.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/src/main.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/src/migrations.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/src/notes.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/tests/e2e.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/web/app.js"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/web/index.html"
+        }
+      }
+    ],
+    "specId": "034-hello-cell",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "adb03f0b437e23a9461336990f8d202ba27c1c24b3a1d0a910c29102da9a1984"
+}

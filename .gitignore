@@ -19,3 +19,12 @@ target
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+
+# spec-spine: only the wall-clock build metadata is derived-and-ignored
+.derived/**/build-meta.json
+.derived/attestation/
+# claude-observatory state root for this project
+data/
+# local overlays
+.idea/
+.DS_Store

@@ -1,0 +1,9 @@
+{
+  "mapping": {
+    "implementingPaths": [],
+    "specId": "000-rahi-bootstrap",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "98891f46946ad144f0695fddaa396cc8c5feacee9716f9039c5a8b9407675318"
+}

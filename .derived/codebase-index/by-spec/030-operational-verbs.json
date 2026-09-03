@@ -1,0 +1,273 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '030-operational-verbs' file unit 'crates/rahi-ops/Cargo.toml' does not exist",
+        "path": "crates/rahi-ops/Cargo.toml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '030-operational-verbs' file unit 'crates/rahi-ops/src/lib.rs' does not exist",
+        "path": "crates/rahi-ops/src/lib.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '030-operational-verbs' file unit 'crates/rahi-ops/src/preflight.rs' does not exist",
+        "path": "crates/rahi-ops/src/preflight.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '030-operational-verbs' file unit 'crates/rahi-ops/src/migrate.rs' does not exist",
+        "path": "crates/rahi-ops/src/migrate.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '030-operational-verbs' file unit 'crates/rahi-ops/src/backup.rs' does not exist",
+        "path": "crates/rahi-ops/src/backup.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '030-operational-verbs' file unit 'crates/rahi-ops/src/restore.rs' does not exist",
+        "path": "crates/rahi-ops/src/restore.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '030-operational-verbs' file unit 'crates/rahi-ops/src/archive.rs' does not exist",
+        "path": "crates/rahi-ops/src/archive.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '030-operational-verbs' file unit 'crates/rahi-ops/src/rauthy_api.rs' does not exist",
+        "path": "crates/rahi-ops/src/rauthy_api.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '030-operational-verbs' file unit 'crates/rahi-ops/tests/backup.rs' does not exist",
+        "path": "crates/rahi-ops/tests/backup.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '030-operational-verbs' file unit 'crates/rahi-ops/tests/restore.rs' does not exist",
+        "path": "crates/rahi-ops/tests/restore.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '030-operational-verbs' file unit 'crates/rahi-cli/Cargo.toml' does not exist",
+        "path": "crates/rahi-cli/Cargo.toml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '030-operational-verbs' file unit 'crates/rahi-cli/src/main.rs' does not exist",
+        "path": "crates/rahi-cli/src/main.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '030-operational-verbs' file unit 'crates/rahi-cli/src/lib.rs' does not exist",
+        "path": "crates/rahi-cli/src/lib.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '030-operational-verbs' file unit 'crates/rahi-cli/src/cell.rs' does not exist",
+        "path": "crates/rahi-cli/src/cell.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '030-operational-verbs' file unit 'crates/rahi-cli/src/serve.rs' does not exist",
+        "path": "crates/rahi-cli/src/serve.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '030-operational-verbs' file unit 'crates/rahi-cli/src/verbs.rs' does not exist",
+        "path": "crates/rahi-cli/src/verbs.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '030-operational-verbs' file unit 'crates/rahi-cli/tests/cli.rs' does not exist",
+        "path": "crates/rahi-cli/tests/cli.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '030-operational-verbs' section unit 'workspace.dependencies' not found in Cargo.toml",
+        "path": "Cargo.toml"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "014-ledger-sealing-and-archive",
+      "024-hardening"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/Cargo.toml"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/cell.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/lib.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/main.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/verbs.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/cli.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/Cargo.toml"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/archive.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/backup.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/lib.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/migrate.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/preflight.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_api.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/restore.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/backup.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/restore.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "anchor": "workspace.dependencies",
+          "file": "Cargo.toml",
+          "kind": "section"
+        }
+      }
+    ],
+    "specId": "030-operational-verbs",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "76c7ded9b4b9074b18466e99a861186909f9866cc036d792f31971c671836679"
+}

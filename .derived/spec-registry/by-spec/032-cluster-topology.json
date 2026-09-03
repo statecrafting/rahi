@@ -1,0 +1,74 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-03",
+    "dependsOn": [
+      "031-single-container-packaging"
+    ],
+    "domain": "ops",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "deploy/k8s/kustomization.yaml"
+      },
+      {
+        "kind": "file",
+        "path": "deploy/k8s/statefulset.yaml"
+      },
+      {
+        "kind": "file",
+        "path": "deploy/k8s/service.yaml"
+      },
+      {
+        "kind": "file",
+        "path": "deploy/k8s/ingress.yaml"
+      },
+      {
+        "kind": "file",
+        "path": "deploy/k8s/backup-cronjob.yaml"
+      },
+      {
+        "kind": "file",
+        "path": "deploy/k8s/servicemonitor.yaml"
+      },
+      {
+        "kind": "file",
+        "path": "deploy/k8s/secret.example.yaml"
+      },
+      {
+        "kind": "file",
+        "path": "deploy/README.md"
+      },
+      {
+        "kind": "file",
+        "path": "scripts/k8s-validate.sh"
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 3
+    },
+    "id": "032-cluster-topology",
+    "implementation": "pending",
+    "kind": "tooling",
+    "risk": "high",
+    "sectionHeadings": [
+      "032: Cluster topology",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/032-cluster-topology/spec.md",
+    "status": "approved",
+    "summary": "What multiplies and what does not. At N=1 nothing changes. At N=3 every replica is identical: a StatefulSet pod running the supervisor, with its own volume, two Raft clusters per replica (rauthy's and the app's), peers discovered by stable pod DNS, one key set injected as a Secret and custodied once, the public origin on an Ingress that terminates TLS and keeps /metrics off it, a CronJob that runs backup --to s3:// against the leader, and a ServiceMonitor example. Rate limiting is per node and says so. A shared volume between Raft members is refused by the manifests themselves. Carries enrahitu://030.\n",
+    "title": "Cluster topology: N=1 primary, N=3 StatefulSet on Kubernetes, one key set, S3 backups"
+  },
+  "shardHash": "dcddaa8ccf51754b7c2a2934cfd0e6d2fa5fbdcae9dbef9010d9b5b732fcebaf",
+  "specVersion": "1.1.0"
+}

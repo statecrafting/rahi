@@ -1,0 +1,32 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "000-rahi-bootstrap"
+    ],
+    "implementingPaths": [
+      {
+        "path": "docs/design/00-lineage.md",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "docs/design/00-lineage.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/00-lineage.md"
+        }
+      }
+    ],
+    "specId": "002-chassis-thesis",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "8d336feb4a52c96a97b6043b95e5a7c8c5c80c8e12878e15c9f2945c29af8847"
+}

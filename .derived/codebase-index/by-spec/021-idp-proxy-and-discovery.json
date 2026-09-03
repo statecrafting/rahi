@@ -1,0 +1,174 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '021-idp-proxy-and-discovery' file unit 'crates/rahi-idp/Cargo.toml' does not exist",
+        "path": "crates/rahi-idp/Cargo.toml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '021-idp-proxy-and-discovery' file unit 'crates/rahi-idp/src/lib.rs' does not exist",
+        "path": "crates/rahi-idp/src/lib.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '021-idp-proxy-and-discovery' file unit 'crates/rahi-idp/src/config.rs' does not exist",
+        "path": "crates/rahi-idp/src/config.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '021-idp-proxy-and-discovery' file unit 'crates/rahi-idp/src/proxy.rs' does not exist",
+        "path": "crates/rahi-idp/src/proxy.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '021-idp-proxy-and-discovery' file unit 'crates/rahi-idp/src/discovery.rs' does not exist",
+        "path": "crates/rahi-idp/src/discovery.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '021-idp-proxy-and-discovery' file unit 'crates/rahi-idp/src/jwks.rs' does not exist",
+        "path": "crates/rahi-idp/src/jwks.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '021-idp-proxy-and-discovery' file unit 'crates/rahi-idp/src/bootstrap.rs' does not exist",
+        "path": "crates/rahi-idp/src/bootstrap.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '021-idp-proxy-and-discovery' file unit 'crates/rahi-idp/tests/proxy.rs' does not exist",
+        "path": "crates/rahi-idp/tests/proxy.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '021-idp-proxy-and-discovery' file unit 'crates/rahi-idp/tests/discovery.rs' does not exist",
+        "path": "crates/rahi-idp/tests/discovery.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '021-idp-proxy-and-discovery' file unit 'crates/rahi-idp/testdata/discovery/' does not exist",
+        "path": "crates/rahi-idp/testdata/discovery/"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '021-idp-proxy-and-discovery' section unit 'workspace.dependencies' not found in Cargo.toml",
+        "path": "Cargo.toml"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "020-edge-server"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/Cargo.toml"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/bootstrap.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/config.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/discovery.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/jwks.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/lib.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/proxy.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/testdata/discovery/"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/discovery.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/proxy.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "anchor": "workspace.dependencies",
+          "file": "Cargo.toml",
+          "kind": "section"
+        }
+      }
+    ],
+    "specId": "021-idp-proxy-and-discovery",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "1dfbe89de6eef8588db76e6c67bd05dd3bae4861014d8910d1d9a46255b4e714"
+}

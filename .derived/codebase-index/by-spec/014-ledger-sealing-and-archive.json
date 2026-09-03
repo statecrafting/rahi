@@ -1,0 +1,118 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '014-ledger-sealing-and-archive' file unit 'crates/rahi-ledger/src/seal.rs' does not exist",
+        "path": "crates/rahi-ledger/src/seal.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '014-ledger-sealing-and-archive' file unit 'crates/rahi-ledger/src/segment.rs' does not exist",
+        "path": "crates/rahi-ledger/src/segment.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '014-ledger-sealing-and-archive' file unit 'crates/rahi-ledger/src/archive.rs' does not exist",
+        "path": "crates/rahi-ledger/src/archive.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '014-ledger-sealing-and-archive' file unit 'crates/rahi-ledger/tests/seal.rs' does not exist",
+        "path": "crates/rahi-ledger/tests/seal.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '014-ledger-sealing-and-archive' file unit 'crates/rahi-ledger/src/lib.rs' does not exist",
+        "path": "crates/rahi-ledger/src/lib.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '014-ledger-sealing-and-archive' file unit 'crates/rahi-ledger/Cargo.toml' does not exist",
+        "path": "crates/rahi-ledger/Cargo.toml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '014-ledger-sealing-and-archive' section unit 'workspace.dependencies' not found in Cargo.toml",
+        "path": "Cargo.toml"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "013-ledger-decision-chain"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/src/archive.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/src/seal.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/src/segment.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/tests/seal.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/Cargo.toml"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/src/lib.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "anchor": "workspace.dependencies",
+          "file": "Cargo.toml",
+          "kind": "section"
+        }
+      }
+    ],
+    "specId": "014-ledger-sealing-and-archive",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "eff6ba16da4d7087485a488baccfa247c4ba978c36ea93b699c1b4e57eda6565"
+}

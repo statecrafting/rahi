@@ -1,0 +1,99 @@
+# The governed gate, re-run in CI exactly as `make ci` runs it locally
+# (spec 001 B-3). claude-observatory's shepherd stage watches this workflow.
+name: govern
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  # Pinned to the version AGENTS.md names; bump both together.
+  SPEC_SPINE_VERSION: v0.11.0
+
+jobs:
+  spine:
+    name: spec-spine gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install spec-spine
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/statecrafting/spec-spine/main/install.sh \
+            | SPEC_SPINE_VERSION="$SPEC_SPINE_VERSION" SPEC_SPINE_BIN_DIR="$HOME/.local/bin" sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - run: spec-spine --version
+      # `compile --check` validates the corpus AND proves the committed
+      # registry shards match it, without writing. Never run it after a
+      # plain `compile` in the same job.
+      - run: spec-spine compile --check
+      - run: spec-spine index check
+      - run: spec-spine lint --fail-on-warn
+      - name: Coupling gate
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          printf '%s' "${PR_BODY:-}" > "$RUNNER_TEMP/pr-body.txt"
+          spec-spine couple \
+            --base "${{ github.event.pull_request.base.sha }}" \
+            --head HEAD \
+            --pr-body "$RUNNER_TEMP/pr-body.txt"
+      # The whole-tree ownership assertion: every source file inside a crate
+      # is specifically claimed by a spec (spec 032 of spec-spine).
+      - run: spec-spine index coverage --fail-on-untraced
+      - run: scripts/spec-dag.sh
+
+  cargo:
+    name: cargo gate
+    needs: spine
+    if: ${{ hashFiles('Cargo.toml') != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # rustup installs the toolchain pinned in rust-toolchain.toml (spec 010).
+      - run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --workspace --locked
+      - run: cargo test --workspace --locked
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo fmt --all --check
+
+  deny:
+    name: supply chain (cargo-deny)
+    needs: spine
+    if: ${{ hashFiles('deny.toml') != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+
+  attest:
+    name: corpus attestation
+    needs: spine
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install spec-spine
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/statecrafting/spec-spine/main/install.sh \
+            | SPEC_SPINE_VERSION="$SPEC_SPINE_VERSION" SPEC_SPINE_BIN_DIR="$HOME/.local/bin" sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      # The reproducible attestation over the corpus and its coupling verdict
+      # (spec-spine spec 023): the repo's own ledger seal, published as a
+      # build artifact so a later steward can `verify-attestation --recompute`.
+      - run: spec-spine attest --with-coupling > corpus-attestation.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: corpus-attestation-${{ github.sha }}
+          path: corpus-attestation.json

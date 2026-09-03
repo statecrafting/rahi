@@ -1,0 +1,202 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '015-kernel-manifest-and-adjudication' file unit 'crates/rahi-kernel/Cargo.toml' does not exist",
+        "path": "crates/rahi-kernel/Cargo.toml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '015-kernel-manifest-and-adjudication' file unit 'crates/rahi-kernel/src/lib.rs' does not exist",
+        "path": "crates/rahi-kernel/src/lib.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '015-kernel-manifest-and-adjudication' file unit 'crates/rahi-kernel/src/manifest.rs' does not exist",
+        "path": "crates/rahi-kernel/src/manifest.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '015-kernel-manifest-and-adjudication' file unit 'crates/rahi-kernel/src/capability.rs' does not exist",
+        "path": "crates/rahi-kernel/src/capability.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '015-kernel-manifest-and-adjudication' file unit 'crates/rahi-kernel/src/verify.rs' does not exist",
+        "path": "crates/rahi-kernel/src/verify.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '015-kernel-manifest-and-adjudication' file unit 'crates/rahi-kernel/src/adjudicate.rs' does not exist",
+        "path": "crates/rahi-kernel/src/adjudicate.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '015-kernel-manifest-and-adjudication' file unit 'crates/rahi-kernel/src/facade.rs' does not exist",
+        "path": "crates/rahi-kernel/src/facade.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '015-kernel-manifest-and-adjudication' file unit 'crates/rahi-kernel/src/observe.rs' does not exist",
+        "path": "crates/rahi-kernel/src/observe.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '015-kernel-manifest-and-adjudication' file unit 'crates/rahi-kernel/tests/manifest.rs' does not exist",
+        "path": "crates/rahi-kernel/tests/manifest.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '015-kernel-manifest-and-adjudication' file unit 'crates/rahi-kernel/tests/adjudicate.rs' does not exist",
+        "path": "crates/rahi-kernel/tests/adjudicate.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '015-kernel-manifest-and-adjudication' file unit 'crates/rahi-kernel/testdata/manifests/' does not exist",
+        "path": "crates/rahi-kernel/testdata/manifests/"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '015-kernel-manifest-and-adjudication' section unit 'workspace.dependencies' not found in Cargo.toml",
+        "path": "Cargo.toml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '015-kernel-manifest-and-adjudication' file unit 'crates/rahi-kernel/src/adjudicate.rs' does not exist",
+        "path": "crates/rahi-kernel/src/adjudicate.rs"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "013-ledger-decision-chain"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/Cargo.toml"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/adjudicate.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/capability.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/facade.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/lib.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/manifest.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/observe.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/verify.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/testdata/manifests/"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/tests/adjudicate.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/tests/manifest.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "anchor": "workspace.dependencies",
+          "file": "Cargo.toml",
+          "kind": "section"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "constrains",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/adjudicate.rs"
+        }
+      }
+    ],
+    "specId": "015-kernel-manifest-and-adjudication",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "ef0b0e5c9a05cf5ddbee75b5762d6d9322e21a10c64353ed0ec67986bfe5625d"
+}

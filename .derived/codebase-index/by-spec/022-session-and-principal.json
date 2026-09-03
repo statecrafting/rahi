@@ -1,0 +1,159 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '022-session-and-principal' file unit 'crates/rahi-idp/src/login.rs' does not exist",
+        "path": "crates/rahi-idp/src/login.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '022-session-and-principal' file unit 'crates/rahi-idp/src/session.rs' does not exist",
+        "path": "crates/rahi-idp/src/session.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '022-session-and-principal' file unit 'crates/rahi-idp/src/envelope.rs' does not exist",
+        "path": "crates/rahi-idp/src/envelope.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '022-session-and-principal' file unit 'crates/rahi-idp/src/refresh.rs' does not exist",
+        "path": "crates/rahi-idp/src/refresh.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '022-session-and-principal' file unit 'crates/rahi-idp/src/principal.rs' does not exist",
+        "path": "crates/rahi-idp/src/principal.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '022-session-and-principal' file unit 'crates/rahi-idp/src/extractor.rs' does not exist",
+        "path": "crates/rahi-idp/src/extractor.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '022-session-and-principal' file unit 'crates/rahi-idp/tests/session.rs' does not exist",
+        "path": "crates/rahi-idp/tests/session.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '022-session-and-principal' file unit 'crates/rahi-idp/tests/principal.rs' does not exist",
+        "path": "crates/rahi-idp/tests/principal.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '022-session-and-principal' file unit 'crates/rahi-idp/src/lib.rs' does not exist",
+        "path": "crates/rahi-idp/src/lib.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '022-session-and-principal' file unit 'crates/rahi-idp/src/principal.rs' does not exist",
+        "path": "crates/rahi-idp/src/principal.rs"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "021-idp-proxy-and-discovery"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/envelope.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/extractor.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/login.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/principal.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/refresh.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/session.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/principal.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/session.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/lib.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "constrains",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/principal.rs"
+        }
+      }
+    ],
+    "specId": "022-session-and-principal",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "8853c593a079e597a510764812fa46a2eefc20ab9208d2f8b0eb02c6467c82bf"
+}

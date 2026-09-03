@@ -1,0 +1,173 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '010-workspace-and-core-types' file unit 'Cargo.toml' does not exist",
+        "path": "Cargo.toml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '010-workspace-and-core-types' file unit 'rust-toolchain.toml' does not exist",
+        "path": "rust-toolchain.toml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '010-workspace-and-core-types' file unit 'deny.toml' does not exist",
+        "path": "deny.toml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '010-workspace-and-core-types' file unit 'crates/rahi-types/Cargo.toml' does not exist",
+        "path": "crates/rahi-types/Cargo.toml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '010-workspace-and-core-types' file unit 'crates/rahi-types/src/lib.rs' does not exist",
+        "path": "crates/rahi-types/src/lib.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '010-workspace-and-core-types' file unit 'crates/rahi-types/src/error.rs' does not exist",
+        "path": "crates/rahi-types/src/error.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '010-workspace-and-core-types' file unit 'crates/rahi-types/src/principal.rs' does not exist",
+        "path": "crates/rahi-types/src/principal.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '010-workspace-and-core-types' file unit 'crates/rahi-types/src/revision.rs' does not exist",
+        "path": "crates/rahi-types/src/revision.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '010-workspace-and-core-types' file unit 'crates/rahi-types/src/config.rs' does not exist",
+        "path": "crates/rahi-types/src/config.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '010-workspace-and-core-types' file unit 'crates/rahi-types/src/version.rs' does not exist",
+        "path": "crates/rahi-types/src/version.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '010-workspace-and-core-types' file unit 'crates/rahi-types/tests/' does not exist",
+        "path": "crates/rahi-types/tests/"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "002-chassis-thesis"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-types/Cargo.toml"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-types/src/config.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-types/src/error.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-types/src/lib.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-types/src/principal.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-types/src/revision.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-types/src/version.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-types/tests/"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "deny.toml"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "rust-toolchain.toml"
+        }
+      }
+    ],
+    "specId": "010-workspace-and-core-types",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "1a4cbef01f3f21e08429be2d82bf43e18bb70ce9fe5b2b963c18e4eb424a8219"
+}

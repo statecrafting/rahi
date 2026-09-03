@@ -1,0 +1,101 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-03",
+    "dependsOn": [
+      "015-kernel-manifest-and-adjudication"
+    ],
+    "domain": "edge",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/Cargo.toml"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/src/lib.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/src/router.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/src/state.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/src/middleware/mod.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/src/middleware/security_headers.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/src/middleware/csrf.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/src/middleware/rate_limit.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/src/probes.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/src/static_files.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/src/error.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/tests/probes.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/tests/middleware.rs"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "010-workspace-and-core-types",
+        "unit": {
+          "anchor": "workspace.dependencies",
+          "file": "Cargo.toml",
+          "kind": "section"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 2
+    },
+    "id": "020-edge-server",
+    "implementation": "pending",
+    "kind": "kernel",
+    "risk": "high",
+    "sectionHeadings": [
+      "020: The edge",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/020-edge-server/spec.md",
+    "status": "approved",
+    "summary": "The one public listener of a cell: an axum Router builder that an app mounts its services on, a fixed middleware order (observation outermost, then security headers, CSRF double-submit, and a per-node rate limiter on the cache group), liveness and readiness probes that answer different questions, a static file slot for the app's SPA, and one mapping from rahi_types::Error to HTTP status. Everything an app serves goes through this router; there is no second listener.\n",
+    "title": "The edge: axum router, middleware chain, probes, static slot, error mapping"
+  },
+  "shardHash": "df5ed142e0867cdb7e72474cea436ee7ba0930685e1f059ca5ea8703af5a1e1c",
+  "specVersion": "1.1.0"
+}

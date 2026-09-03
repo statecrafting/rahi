@@ -1,0 +1,216 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/Cargo.toml' does not exist",
+        "path": "crates/rahi-store/Cargo.toml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/src/lib.rs' does not exist",
+        "path": "crates/rahi-store/src/lib.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/src/config.rs' does not exist",
+        "path": "crates/rahi-store/src/config.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/src/store.rs' does not exist",
+        "path": "crates/rahi-store/src/store.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/src/txn.rs' does not exist",
+        "path": "crates/rahi-store/src/txn.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/src/query.rs' does not exist",
+        "path": "crates/rahi-store/src/query.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/src/migrate.rs' does not exist",
+        "path": "crates/rahi-store/src/migrate.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/src/backup.rs' does not exist",
+        "path": "crates/rahi-store/src/backup.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/tests/store.rs' does not exist",
+        "path": "crates/rahi-store/tests/store.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/tests/txn.rs' does not exist",
+        "path": "crates/rahi-store/tests/txn.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/tests/migrate.rs' does not exist",
+        "path": "crates/rahi-store/tests/migrate.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/tests/backup.rs' does not exist",
+        "path": "crates/rahi-store/tests/backup.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '011-store-hiqlite' section unit 'workspace.dependencies' not found in Cargo.toml",
+        "path": "Cargo.toml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/src/txn.rs' does not exist",
+        "path": "crates/rahi-store/src/txn.rs"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "010-workspace-and-core-types"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/Cargo.toml"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/backup.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/config.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/lib.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/migrate.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/query.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/store.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/txn.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/backup.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/migrate.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/store.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/txn.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "anchor": "workspace.dependencies",
+          "file": "Cargo.toml",
+          "kind": "section"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "constrains",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/txn.rs"
+        }
+      }
+    ],
+    "specId": "011-store-hiqlite",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "d750b4375da3dfd930a0b57bddf418bc179bb3d2aad20e9fb4eca7c7980b6a4e"
+}

@@ -1,0 +1,131 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '012-store-coordination' file unit 'crates/rahi-store/src/lock.rs' does not exist",
+        "path": "crates/rahi-store/src/lock.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '012-store-coordination' file unit 'crates/rahi-store/src/notify.rs' does not exist",
+        "path": "crates/rahi-store/src/notify.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '012-store-coordination' file unit 'crates/rahi-store/src/outbox.rs' does not exist",
+        "path": "crates/rahi-store/src/outbox.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '012-store-coordination' file unit 'crates/rahi-store/src/watermark.rs' does not exist",
+        "path": "crates/rahi-store/src/watermark.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '012-store-coordination' file unit 'crates/rahi-store/tests/lock.rs' does not exist",
+        "path": "crates/rahi-store/tests/lock.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '012-store-coordination' file unit 'crates/rahi-store/tests/notify.rs' does not exist",
+        "path": "crates/rahi-store/tests/notify.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '012-store-coordination' file unit 'crates/rahi-store/tests/outbox.rs' does not exist",
+        "path": "crates/rahi-store/tests/outbox.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '012-store-coordination' file unit 'crates/rahi-store/src/lib.rs' does not exist",
+        "path": "crates/rahi-store/src/lib.rs"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "011-store-hiqlite"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/lock.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/notify.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/outbox.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/watermark.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/lock.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/notify.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/outbox.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/lib.rs"
+        }
+      }
+    ],
+    "specId": "012-store-coordination",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "8e4e96850f7e1f43b0eb37db52a2ecb17954ceffc78a9e97797a9a8c31acc207"
+}

@@ -1,0 +1,70 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-03",
+    "dependsOn": [
+      "031-single-container-packaging"
+    ],
+    "domain": "ops",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "docker/compose.yml"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-harness/Cargo.toml"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-harness/src/lib.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-harness/src/boot.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-harness/src/client.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-harness/src/cookies.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-harness/src/rauthy.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-harness/tests/boot.rs"
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 3
+    },
+    "id": "033-dev-substrate-and-harness",
+    "implementation": "pending",
+    "kind": "tooling",
+    "risk": "medium",
+    "sectionHeadings": [
+      "033: The dev substrate and the harness",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/033-dev-substrate-and-harness/spec.md",
+    "status": "approved",
+    "summary": "Two things a contributor needs: a compose file that runs the N=1 topology (the image with a bind-mounted volume, watched rebuilds) and a harness crate that boots a built cell binary under a throwaway data directory with fresh keys and OS-allocated ports, starts a rauthy on loopback when one is available, waits on /readyz and never on /healthz, and hands back an HTTP client with a cookie jar so authenticated flows are testable. One instance per test file, never per test. Carries enrahitu://033.\n",
+    "title": "The dev substrate and the harness: compose for N=1, boot the real binary, wait on /readyz, a cookie jar"
+  },
+  "shardHash": "584f4053b1d24542be6a96102174068873c3db074defa1fa916499a02d74601c",
+  "specVersion": "1.1.0"
+}

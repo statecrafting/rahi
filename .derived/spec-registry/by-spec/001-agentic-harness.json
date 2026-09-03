@@ -1,0 +1,98 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-03",
+    "dependsOn": [
+      "000-rahi-bootstrap"
+    ],
+    "domain": "governance",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "AGENTS.md"
+      },
+      {
+        "kind": "file",
+        "path": "CLAUDE.md"
+      },
+      {
+        "kind": "file",
+        "path": "Makefile"
+      },
+      {
+        "kind": "file",
+        "path": "spec-spine.toml"
+      },
+      {
+        "kind": "file",
+        "path": ".mcp.json"
+      },
+      {
+        "kind": "file",
+        "path": "standards/spec/contract.md"
+      },
+      {
+        "kind": "file",
+        "path": "standards/spec/templates/"
+      },
+      {
+        "kind": "file",
+        "path": ".claude/settings.json"
+      },
+      {
+        "kind": "file",
+        "path": ".claude/agents/"
+      },
+      {
+        "kind": "file",
+        "path": ".claude/rules/"
+      },
+      {
+        "kind": "file",
+        "path": ".claude/skills/"
+      },
+      {
+        "kind": "file",
+        "path": ".github/workflows/govern.yml"
+      },
+      {
+        "kind": "file",
+        "path": ".github/dependabot.yml"
+      },
+      {
+        "kind": "file",
+        "path": "scripts/verify-spec.sh"
+      },
+      {
+        "kind": "file",
+        "path": "scripts/spec-dag.sh"
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 1
+    },
+    "id": "001-agentic-harness",
+    "implementation": "complete",
+    "kind": "governance",
+    "risk": "high",
+    "sectionHeadings": [
+      "001: Agentic engineering harness",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/001-agentic-harness/spec.md",
+    "status": "approved",
+    "summary": "The governed-development loop every human and every driven session runs inside: the cross-agent New Sessions protocol and the Working the backlog protocol in AGENTS.md, the Claude Code skills (init, setup, next, build, verify, spec, commit, code-review, ship, shepherd, validate-and-fix, cleanup, implement-plan, research, refactor-claude-md), the four pipeline agents, the standing and path-scoped rules (including the chassis invariants checklist), the hooks that keep the derived artifacts fresh and block an ungated PR, the Makefile that is the one source of truth for what CI validates, and the CI workflow that re-runs the same gate. The harness is what makes the corpus buildable by claude-observatory.\n",
+    "title": "Agentic engineering harness: session protocol, skills, agents, hooks, gate"
+  },
+  "shardHash": "ddac9602602a7b7e2c603c93a81199b915aa7f1a239fc86aaa27906f71ec91ad",
+  "specVersion": "1.1.0"
+}

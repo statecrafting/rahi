@@ -1,0 +1,80 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "constrains": [
+      {
+        "kind": "sequencing-plan",
+        "note": "Wave 1: the state core. Types, the hiqlite store and its coordination primitives, the decision chain and its archive, and the kernel. Ends when a manifest can be verified, a decision can be appended and verified across a restart, and a lease-guarded write is fenced, all without a network listener.\n",
+        "target_specs": [
+          "010-workspace-and-core-types",
+          "011-store-hiqlite",
+          "012-store-coordination",
+          "013-ledger-decision-chain",
+          "014-ledger-sealing-and-archive",
+          "015-kernel-manifest-and-adjudication"
+        ]
+      },
+      {
+        "kind": "sequencing-plan",
+        "note": "Wave 2: the edge and identity. The axum server with its middleware chain and probes, the rauthy proxy and discovery, sessions and the principal, metrics and tracing, and the hardening pass. Ends when a browser can log in through the app's origin against a rauthy on loopback and the session survives a renewal.\n",
+        "target_specs": [
+          "020-edge-server",
+          "021-idp-proxy-and-discovery",
+          "022-session-and-principal",
+          "023-observability",
+          "024-hardening"
+        ]
+      },
+      {
+        "kind": "sequencing-plan",
+        "note": "Wave 3: operations and the reference app. The verbs and the binary composer, the single image with first boot and die-together supervision, the N=3 topology on Kubernetes with S3 backups, the dev substrate and test harness, and hello-cell, the app that proves every responsibility end to end and is the template consumers copy from.\n",
+        "target_specs": [
+          "030-operational-verbs",
+          "031-single-container-packaging",
+          "032-cluster-topology",
+          "033-dev-substrate-and-harness",
+          "034-hello-cell"
+        ]
+      }
+    ],
+    "created": "2026-09-03",
+    "dependsOn": [
+      "000-rahi-bootstrap"
+    ],
+    "domain": "governance",
+    "extraFrontmatter": {
+      "wave": 1
+    },
+    "id": "002-chassis-thesis",
+    "implementation": "n-a",
+    "kind": "thesis",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/00-lineage.md"
+        }
+      }
+    ],
+    "risk": "critical",
+    "sectionHeadings": [
+      "002: Chassis thesis",
+      "1. Purpose",
+      "2. The seven responsibilities",
+      "3. The deployment unit",
+      "4. Crate topology and dependency direction",
+      "5. Build order",
+      "6. What the thesis refuses",
+      "7. Resolved decisions"
+    ],
+    "specPath": "specs/002-chassis-thesis/spec.md",
+    "status": "approved",
+    "summary": "The architectural record every ordinary spec operates inside. rahi is a set of Rust library crates and one binary composer that give an application exactly seven things: identity, state, ledger, kernel, edge, operations, and a dev substrate. It ships as one container with one volume and one origin, with rauthy co-deployed and never shared. It is a library that apps compose, not a template that apps are stamped from. This spec fixes the responsibilities, the crate topology, the dependency direction, and the three-wave build order. It owns no code.\n",
+    "title": "Chassis thesis: seven responsibilities, one deployment unit, a library not a template"
+  },
+  "shardHash": "8abb59b138427c120284f61ebf4151776e1c910bc13b5ef77aba7a1f1c266d77",
+  "specVersion": "1.1.0"
+}

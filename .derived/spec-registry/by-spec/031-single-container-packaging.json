@@ -1,0 +1,96 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-03",
+    "dependsOn": [
+      "030-operational-verbs"
+    ],
+    "domain": "ops",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/src/first_boot.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/src/keys.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/src/supervise.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/src/rauthy_env.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/tests/first_boot.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/tests/supervise.rs"
+      },
+      {
+        "kind": "file",
+        "path": "docker/Dockerfile"
+      },
+      {
+        "kind": "file",
+        "path": "docker/entrypoint.sh"
+      },
+      {
+        "kind": "file",
+        "path": "docker/rauthy.env.template"
+      },
+      {
+        "kind": "file",
+        "path": ".github/workflows/image.yml"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-agentic-harness",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/govern.yml"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 3
+    },
+    "id": "031-single-container-packaging",
+    "implementation": "pending",
+    "kind": "tooling",
+    "risk": "critical",
+    "sectionHeadings": [
+      "031: Single-container packaging",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/031-single-container-packaging/spec.md",
+    "status": "approved",
+    "summary": "One container plus one volume is a complete authenticated application. The image carries the app binary and the rauthy release binary. First boot generates every key (ledger, session, backup, rauthy ENC_KEYS, the admin token), writes rauthy's environment derived from one public URL, and bootstraps the OIDC client; a restart regenerates nothing. The app is the supervisor: it starts rauthy on loopback, waits for its health, starts serve, and when either exits the other is stopped and the container exits. The volume layout is /data/hiqlite, /data/rauthy, /data/keys, and /data/backups. Carries enrahitu://007.\n",
+    "title": "Single-container packaging: one image, one volume, first boot, keys, die-together supervision"
+  },
+  "shardHash": "7b60e92d13b3eb519be82d4d839a74c93c03eb0e6fe5e690fa2c1a79d002aac3",
+  "specVersion": "1.1.0"
+}

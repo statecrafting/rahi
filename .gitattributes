@@ -1,0 +1,22 @@
+# Determinism contract: every text file checks out with LF so content hashes
+# (spec-spine's and hqgit's own golden vectors, spec 012) are identical on every
+# platform.
+* text=auto eol=lf
+
+*.rs text eol=lf
+*.toml text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.proto text eol=lf
+*.sh text eol=lf
+*.go text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+Makefile text eol=lf
+
+# Golden vectors are bytes; never normalize them.
+*.cbor binary
+*.bin binary
+*.png binary

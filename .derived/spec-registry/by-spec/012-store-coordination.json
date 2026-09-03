@@ -1,0 +1,76 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-03",
+    "dependsOn": [
+      "011-store-hiqlite"
+    ],
+    "domain": "store",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "crates/rahi-store/src/lock.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-store/src/notify.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-store/src/outbox.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-store/src/watermark.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-store/tests/lock.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-store/tests/notify.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-store/tests/outbox.rs"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "011-store-hiqlite",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/lib.rs"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 1
+    },
+    "id": "012-store-coordination",
+    "implementation": "pending",
+    "kind": "kernel",
+    "risk": "critical",
+    "sectionHeadings": [
+      "012: Store coordination",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/012-store-coordination/spec.md",
+    "status": "approved",
+    "summary": "The coordination plane over the cache Raft group: distributed leases with the Raft log id as a mandatory fencing token and an explicit release, key-only local notify whose envelope is the routing key, the outbox row that commits in the same txn as the resource it describes, and the monotonic revision watermark every consumer polls so that notify is only ever a latency hint. Carries enrahitu://032 §3.2, §3.4, §3.5, §3.10.\n",
+    "title": "Store coordination: fenced leases, local notify, the outbox, and the revision watermark"
+  },
+  "shardHash": "c7b4f81677ca2c66ffc3eb1bf4eea138c67e28751f79d9b2aaa4fd3af8cb8147",
+  "specVersion": "1.1.0"
+}

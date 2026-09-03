@@ -1,0 +1,17 @@
+# Version-pin bumps self-waive the coupling gate (spec-spine's
+# auto_waive_dependency_only), so these PRs need no spec edit.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly

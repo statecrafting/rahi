@@ -1,0 +1,145 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '032-cluster-topology' file unit 'deploy/k8s/kustomization.yaml' does not exist",
+        "path": "deploy/k8s/kustomization.yaml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '032-cluster-topology' file unit 'deploy/k8s/statefulset.yaml' does not exist",
+        "path": "deploy/k8s/statefulset.yaml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '032-cluster-topology' file unit 'deploy/k8s/service.yaml' does not exist",
+        "path": "deploy/k8s/service.yaml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '032-cluster-topology' file unit 'deploy/k8s/ingress.yaml' does not exist",
+        "path": "deploy/k8s/ingress.yaml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '032-cluster-topology' file unit 'deploy/k8s/backup-cronjob.yaml' does not exist",
+        "path": "deploy/k8s/backup-cronjob.yaml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '032-cluster-topology' file unit 'deploy/k8s/servicemonitor.yaml' does not exist",
+        "path": "deploy/k8s/servicemonitor.yaml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '032-cluster-topology' file unit 'deploy/k8s/secret.example.yaml' does not exist",
+        "path": "deploy/k8s/secret.example.yaml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '032-cluster-topology' file unit 'deploy/README.md' does not exist",
+        "path": "deploy/README.md"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '032-cluster-topology' file unit 'scripts/k8s-validate.sh' does not exist",
+        "path": "scripts/k8s-validate.sh"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "031-single-container-packaging"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/README.md"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/backup-cronjob.yaml"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/ingress.yaml"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/kustomization.yaml"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/secret.example.yaml"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/service.yaml"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/servicemonitor.yaml"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/statefulset.yaml"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/k8s-validate.sh"
+        }
+      }
+    ],
+    "specId": "032-cluster-topology",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "cda79844eaf547c7cca51b72a76156e662182ccc8ccc663c283bbdd9245af46b"
+}
