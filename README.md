@@ -86,5 +86,6 @@ human review; drafts are visible as blockers and never scheduled.
 
 ## License
 
-Apache-2.0, see [`LICENSE`](LICENSE). The chassis is consumed by AGPL
-products; Apache-2.0 into AGPL is the sanctioned direction.
+Apache-2.0, see [`LICENSE`](LICENSE). The products that consume this
+chassis are Apache-2.0 as well, so a crate can move in either direction
+across the family without a licence review.

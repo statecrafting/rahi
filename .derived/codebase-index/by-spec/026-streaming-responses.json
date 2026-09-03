@@ -1,0 +1,77 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '026-streaming-responses' file unit 'crates/rahi-edge/src/stream.rs' does not exist",
+        "path": "crates/rahi-edge/src/stream.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '026-streaming-responses' file unit 'crates/rahi-edge/tests/stream.rs' does not exist",
+        "path": "crates/rahi-edge/tests/stream.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '026-streaming-responses' file unit 'crates/rahi-edge/src/router.rs' does not exist",
+        "path": "crates/rahi-edge/src/router.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '026-streaming-responses' file unit 'crates/rahi-edge/src/lib.rs' does not exist",
+        "path": "crates/rahi-edge/src/lib.rs"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "020-edge-server",
+      "023-observability",
+      "025-api-tokens-and-resource-server"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/stream.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/tests/stream.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/lib.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/router.rs"
+        }
+      }
+    ],
+    "specId": "026-streaming-responses",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "a3c235a4f3a712307b2b2bfcc74d6df4db131713d48c99e17ae60ce96baf56bc"
+}

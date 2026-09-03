@@ -75,6 +75,6 @@
     "summary": "The architectural record every ordinary spec operates inside. rahi is a set of Rust library crates and one binary composer that give an application exactly seven things: identity, state, ledger, kernel, edge, operations, and a dev substrate. It ships as one container with one volume and one origin, with rauthy co-deployed and never shared. It is a library that apps compose, not a template that apps are stamped from. This spec fixes the responsibilities, the crate topology, the dependency direction, and the three-wave build order. It owns no code.\n",
     "title": "Chassis thesis: seven responsibilities, one deployment unit, a library not a template"
   },
-  "shardHash": "8abb59b138427c120284f61ebf4151776e1c910bc13b5ef77aba7a1f1c266d77",
+  "shardHash": "4884443b82d8469baa66971d74f18a339643ad5b37f18db955b1a51b1ac1871f",
   "specVersion": "1.1.0"
 }

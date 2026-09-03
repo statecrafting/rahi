@@ -143,9 +143,9 @@ crate and rauthy is a separate process.
 
 ## 5. Build order
 
-Wave 1 (010 to 015) is the state core and is buildable and testable with no
+Wave 1 (010 to 016) is the state core and is buildable and testable with no
 network listener: a temp directory, a single-voter hiqlite, and fixtures.
-Wave 2 (020 to 024) adds the edge and identity; its tests need a rauthy
+Wave 2 (020 to 026) adds the edge and identity; its tests need a rauthy
 binary on loopback (spec 021 names it as an operator prerequisite for its
 integration tests and ships unit tests that do not). Wave 3 (030 to 034)
 adds the verbs, the image, the topology, the harness, and the reference app.
@@ -156,8 +156,10 @@ Within a wave the ordinal is the order; across waves every spec's
 
 - A second relational store beside hiqlite's SQLite group. If a product
   needs vectors or full-text search, it is a spec in that product over the
-  same store (SQLite extensions are loadable; hiqlite builds rusqlite with
-  `load_extension`).
+  same store, reading binary values through 016 and ranking in its own
+  process. Loadable SQLite extensions are refused (016 B-4): hiqlite
+  replicates statements, so an engine that differs between nodes diverges
+  silently.
 - A template, a stamp verb, or an upgrade mechanism beyond a version bump.
 - Any app code that opens rauthy's storage, or any deployment that shares a
   volume between Raft members.
@@ -165,6 +167,15 @@ Within a wave the ordinal is the order; across waves every spec's
 - A notify consumer that does not also poll a watermark.
 
 ## 7. Resolved decisions
+
+- **D-A (2026-09-03, amendment).** The refusal list originally recorded
+  that SQLite extensions are loadable, on the strength of hiqlite building
+  rusqlite with the feature enabled. Spec 016 examined the replication
+  model and closed it: the feature being compiled in says nothing about
+  whether every node in a Raft group has the same extension present, and a
+  follower that applies a statement against a different engine breaks the
+  state machine. The waves in §5 grew to 016, 025, and 026 in the same
+  amendment, for binary values, the resource server, and streaming.
 
 - **D1 (rebuild, not amend).** The enrahitu corpus is superseded by this
   corpus; decisions are carried by citation (`enrahitu://NNN`), never by

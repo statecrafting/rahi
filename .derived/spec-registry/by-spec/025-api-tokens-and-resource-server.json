@@ -1,0 +1,92 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "constrains": [
+      {
+        "flavor": "invariant-freeze",
+        "note": "the app mints no credential; rauthy is the only issuer, cookie or bearer",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/principal.rs"
+        }
+      }
+    ],
+    "created": "2026-09-03",
+    "dependsOn": [
+      "021-idp-proxy-and-discovery",
+      "022-session-and-principal",
+      "024-hardening"
+    ],
+    "domain": "identity",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "crates/rahi-idp/src/resource.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-idp/src/bearer.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-idp/src/scope.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-idp/src/registration.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-idp/tests/bearer.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-idp/testdata/tokens/"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "021-idp-proxy-and-discovery",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "022-session-and-principal",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/extractor.rs"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 2
+    },
+    "id": "025-api-tokens-and-resource-server",
+    "implementation": "pending",
+    "kind": "kernel",
+    "risk": "critical",
+    "sectionHeadings": [
+      "025: The resource server",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/025-api-tokens-and-resource-server/spec.md",
+    "status": "approved",
+    "summary": "A browser is not the only client. Command line tools, agent runtimes, and MCP clients hold no cookie and cannot follow a redirect into a browser session, and the chassis has so far had nothing to say to them. This spec makes the app an OAuth 2.1 resource server over the same IdP: it publishes protected resource metadata so a client can discover the authorization server, validates rauthy-issued JWT access tokens locally against the cached JWKS with a mandatory audience check, gates routes on scope, and answers an unauthenticated request with the challenge that bootstraps discovery. Registration and the grants themselves stay rauthy's: the app issues no API key, ever.\n",
+    "title": "The resource server: bearer tokens rauthy issued, audience bound, scope gated, never app minted"
+  },
+  "shardHash": "09310001e6fb1a4a05ea47caa6b6309d39dd7e0fc190ec29d150c09d74bdb4d6",
+  "specVersion": "1.1.0"
+}

@@ -1,0 +1,147 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '025-api-tokens-and-resource-server' file unit 'crates/rahi-idp/src/resource.rs' does not exist",
+        "path": "crates/rahi-idp/src/resource.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '025-api-tokens-and-resource-server' file unit 'crates/rahi-idp/src/bearer.rs' does not exist",
+        "path": "crates/rahi-idp/src/bearer.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '025-api-tokens-and-resource-server' file unit 'crates/rahi-idp/src/scope.rs' does not exist",
+        "path": "crates/rahi-idp/src/scope.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '025-api-tokens-and-resource-server' file unit 'crates/rahi-idp/src/registration.rs' does not exist",
+        "path": "crates/rahi-idp/src/registration.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '025-api-tokens-and-resource-server' file unit 'crates/rahi-idp/tests/bearer.rs' does not exist",
+        "path": "crates/rahi-idp/tests/bearer.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '025-api-tokens-and-resource-server' file unit 'crates/rahi-idp/testdata/tokens/' does not exist",
+        "path": "crates/rahi-idp/testdata/tokens/"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '025-api-tokens-and-resource-server' file unit 'crates/rahi-idp/src/lib.rs' does not exist",
+        "path": "crates/rahi-idp/src/lib.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '025-api-tokens-and-resource-server' file unit 'crates/rahi-idp/src/extractor.rs' does not exist",
+        "path": "crates/rahi-idp/src/extractor.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '025-api-tokens-and-resource-server' file unit 'crates/rahi-idp/src/principal.rs' does not exist",
+        "path": "crates/rahi-idp/src/principal.rs"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "021-idp-proxy-and-discovery",
+      "022-session-and-principal",
+      "024-hardening"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/bearer.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/registration.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/resource.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/scope.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/testdata/tokens/"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/bearer.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/extractor.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/lib.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "constrains",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/principal.rs"
+        }
+      }
+    ],
+    "specId": "025-api-tokens-and-resource-server",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "85b5313fca229581b2812e604f5124e797f3f347be9907038ba98a6b6e6c0f1a"
+}

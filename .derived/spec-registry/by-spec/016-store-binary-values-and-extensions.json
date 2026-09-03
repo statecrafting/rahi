@@ -1,0 +1,75 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "constrains": [
+      {
+        "flavor": "invariant-freeze",
+        "note": "no SQLite extension is ever loaded; every node runs one identical engine",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/store.rs"
+        }
+      }
+    ],
+    "created": "2026-09-03",
+    "dependsOn": [
+      "011-store-hiqlite",
+      "012-store-coordination"
+    ],
+    "domain": "store",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "crates/rahi-store/src/blob.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-store/tests/blob.rs"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "011-store-hiqlite",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "011-store-hiqlite",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/query.rs"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 1
+    },
+    "id": "016-store-binary-values-and-extensions",
+    "implementation": "pending",
+    "kind": "kernel",
+    "risk": "high",
+    "sectionHeadings": [
+      "016: Binary values and the extension policy",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/016-store-binary-values-and-extensions/spec.md",
+    "status": "approved",
+    "summary": "Applications above the chassis store vectors, thumbnails, and signatures, so the store must round-trip binary values with a declared ceiling and a paged read that never materializes a table. It must also answer, once and in writing, whether a loadable SQLite extension may be used: it may not. hiqlite replicates statements rather than pages, so a node whose engine differs diverges silently, and a virtual table's behavior under snapshot, backup, and restore is unproven. The escape hatch is named here so a later spec can open it with evidence rather than by assumption.\n",
+    "title": "Binary values and the extension policy: BLOBs are first class, loadable extensions are refused"
+  },
+  "shardHash": "a7b5010300a327744ffec4ef53282d1f7a0d3a44373d1318aee1310124afb840",
+  "specVersion": "1.1.0"
+}

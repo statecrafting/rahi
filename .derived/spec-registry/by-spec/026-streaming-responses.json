@@ -1,0 +1,66 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-03",
+    "dependsOn": [
+      "020-edge-server",
+      "023-observability",
+      "025-api-tokens-and-resource-server"
+    ],
+    "domain": "edge",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/src/stream.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/tests/stream.rs"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "020-edge-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/router.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "020-edge-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/lib.rs"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 2
+    },
+    "id": "026-streaming-responses",
+    "implementation": "pending",
+    "kind": "kernel",
+    "risk": "medium",
+    "sectionHeadings": [
+      "026: Streaming responses",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/026-streaming-responses/spec.md",
+    "status": "approved",
+    "summary": "A response that is produced over seconds rather than milliseconds breaks every default the edge holds: compression buffers it, the request timeout kills it, the rate limiter counts it once and forgets it, and graceful shutdown drops it mid-sentence. This spec adds one streaming mechanism, server-sent events, and makes a streaming route declare itself so those four defaults are turned off deliberately rather than discovered in production. Streams are bounded by a per-stream channel and a per-client concurrency limit, are cancellation-aware, close cleanly on shutdown, and are one span each in the tracer.\n",
+    "title": "Streaming responses: server-sent events as the one mechanism, declared per route, bounded and cancellable"
+  },
+  "shardHash": "0ace102b2a06e5fd370784986b48d28bceb5ce5c8a205d11dbe4b0e265fdabaf",
+  "specVersion": "1.1.0"
+}

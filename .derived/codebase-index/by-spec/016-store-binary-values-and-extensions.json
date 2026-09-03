@@ -1,0 +1,90 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '016-store-binary-values-and-extensions' file unit 'crates/rahi-store/src/blob.rs' does not exist",
+        "path": "crates/rahi-store/src/blob.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '016-store-binary-values-and-extensions' file unit 'crates/rahi-store/tests/blob.rs' does not exist",
+        "path": "crates/rahi-store/tests/blob.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '016-store-binary-values-and-extensions' file unit 'crates/rahi-store/src/lib.rs' does not exist",
+        "path": "crates/rahi-store/src/lib.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '016-store-binary-values-and-extensions' file unit 'crates/rahi-store/src/query.rs' does not exist",
+        "path": "crates/rahi-store/src/query.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '016-store-binary-values-and-extensions' file unit 'crates/rahi-store/src/store.rs' does not exist",
+        "path": "crates/rahi-store/src/store.rs"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "011-store-hiqlite",
+      "012-store-coordination"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/blob.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/blob.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/lib.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/query.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "constrains",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/store.rs"
+        }
+      }
+    ],
+    "specId": "016-store-binary-values-and-extensions",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "020f51c0806cfdadf51ebba2233310b257220187856561e47522a1b4e9789090"
+}
