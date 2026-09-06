@@ -1,0 +1,11 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "rahi-types",
+    "path": "crates/rahi-types",
+    "specRef": "010-workspace-and-core-types",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "1c84c1caddc92409467b0332ac56c7bafdf8c2adb6bb09187c6f7158abc42818"
+}

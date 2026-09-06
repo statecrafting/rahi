@@ -13,8 +13,10 @@ depends_on:
   - "002-chassis-thesis"
 establishes:
   - "Cargo.toml"
+  - "Cargo.lock"
   - "rust-toolchain.toml"
   - "deny.toml"
+  - "apps/.gitkeep"
   - "crates/rahi-types/Cargo.toml"
   - "crates/rahi-types/src/lib.rs"
   - "crates/rahi-types/src/error.rs"
@@ -136,7 +138,37 @@ token types (022); any I/O.
 
 ## 7. Resolved decisions
 
-None yet.
+- **D-1 (2026-09-05, build session).** The toolchain is pinned at
+  `1.96.0` and `rust-version` is `1.96`, the current stable at build time.
+  Alternative rejected: a channel name (`stable`), which B-2 forbids
+  because it is not reproducible.
+- **D-2 (2026-09-05, build session).** `serde` (with `derive`) is the
+  crate's only runtime dependency; `serde_json` is a dev-dependency for the
+  round-trip tests. `Error` implements `Display` and `std::error::Error` by
+  hand. Alternative rejected: `thiserror`, which adds a proc-macro
+  dependency for ten variants whose messages are one shape.
+- **D-3 (2026-09-05, build session).** `apps/.gitkeep` is committed so the
+  `apps/*` member glob of B-1 resolves: cargo refuses a glob whose
+  directory does not exist, and `apps/` is empty until spec 034.
+  Alternative rejected: omitting `apps/*` until 034, which contradicts B-1.
+- **D-4 (2026-09-05, build session).** The override variables are
+  `RAHI_DATA_DIR`, `RAHI_HIQLITE_API_ADDR`, `RAHI_HIQLITE_RAFT_ADDR`,
+  `RAHI_RAUTHY_ADDR`, `RAHI_TRUSTED_PROXY_HOPS`, and `RAHI_OTLP_ENDPOINT`.
+  Addresses are `std::net::SocketAddr`; `trusted_proxy_hops` is a `u8`;
+  an empty value is absent and takes the default; the cookie scheme is
+  derived and has no override. `PublicUrl` is a validated newtype over
+  `String` (scheme `http` or `https`, non-empty host, no userinfo, query,
+  or fragment, trailing slash stripped). Alternative rejected: the `url`
+  crate, which brings `idna` and friends into every crate for one field.
+- **D-5 (2026-09-05, build session).** `Revision::next` saturates at
+  `u64::MAX` rather than wrapping, so a revision never compares below its
+  predecessor. `Revision::ZERO` names the never-written state.
+- **D-6 (2026-09-05, build session).** `Error` also exposes `kind()` (a
+  stable snake_case label for logs and metrics), `message()`, and the
+  three public `EXIT_*` constants that `exit_code()` returns. The variant
+  list is exhaustive (no `#[non_exhaustive]`): adding a variant is a spec
+  amendment and every downstream match should break. The workspace lint
+  table also denies `float_arithmetic` and warns on `missing_docs`.
 
 ## Verification
 

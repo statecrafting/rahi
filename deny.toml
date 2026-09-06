@@ -1,0 +1,40 @@
+# Supply-chain policy (spec 010 B-3). Checked by `cargo deny check`.
+
+[graph]
+all-features = true
+
+[advisories]
+# An advisory with a known fix is an error; unmaintained crates in the
+# workspace's own tree are surfaced, yanked crates refused.
+version = 2
+unmaintained = "workspace"
+yanked = "deny"
+ignore = []
+
+[licenses]
+version = 2
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Unicode-3.0",
+  "Zlib",
+  "MPL-2.0",
+  "MIT-0",
+]
+confidence-threshold = 0.8
+# The allow list is the policy of B-3, not a mirror of the current tree.
+unused-allowed-license = "allow"
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+highlight = "all"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

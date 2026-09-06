@@ -86,11 +86,6 @@
         "code": "W-001",
         "message": "spec '030-operational-verbs' file unit 'crates/rahi-cli/tests/cli.rs' does not exist",
         "path": "crates/rahi-cli/tests/cli.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '030-operational-verbs' section unit 'workspace.dependencies' not found in Cargo.toml",
-        "path": "Cargo.toml"
       }
     ]
   },
@@ -99,7 +94,12 @@
       "014-ledger-sealing-and-archive",
       "024-hardening"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "Cargo.toml",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
         "locations": [],
@@ -255,7 +255,15 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "Cargo.toml",
+            "span": {
+              "endLine": 18,
+              "startLine": 15
+            }
+          }
+        ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
@@ -269,5 +277,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "76c7ded9b4b9074b18466e99a861186909f9866cc036d792f31971c671836679"
+  "shardHash": "9993015835c05733af1ea212131386d39a2a83ed5971057167ee2ad27f9f58ca"
 }

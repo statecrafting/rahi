@@ -59,11 +59,6 @@
       },
       {
         "code": "W-001",
-        "message": "spec '015-kernel-manifest-and-adjudication' section unit 'workspace.dependencies' not found in Cargo.toml",
-        "path": "Cargo.toml"
-      },
-      {
-        "code": "W-001",
         "message": "spec '015-kernel-manifest-and-adjudication' file unit 'crates/rahi-kernel/src/adjudicate.rs' does not exist",
         "path": "crates/rahi-kernel/src/adjudicate.rs"
       }
@@ -73,7 +68,12 @@
     "dependsOn": [
       "013-ledger-decision-chain"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "Cargo.toml",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
         "locations": [],
@@ -175,7 +175,15 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "Cargo.toml",
+            "span": {
+              "endLine": 18,
+              "startLine": 15
+            }
+          }
+        ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
@@ -198,5 +206,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "ef0b0e5c9a05cf5ddbee75b5762d6d9322e21a10c64353ed0ec67986bfe5625d"
+  "shardHash": "15d6b2e2694e1333389a0c351919b43a33045d6aad26538ef6a5c76f0231e1c9"
 }

@@ -31,11 +31,6 @@
         "code": "W-001",
         "message": "spec '014-ledger-sealing-and-archive' file unit 'crates/rahi-ledger/Cargo.toml' does not exist",
         "path": "crates/rahi-ledger/Cargo.toml"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '014-ledger-sealing-and-archive' section unit 'workspace.dependencies' not found in Cargo.toml",
-        "path": "Cargo.toml"
       }
     ]
   },
@@ -43,7 +38,12 @@
     "dependsOn": [
       "013-ledger-decision-chain"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "Cargo.toml",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
         "locations": [],
@@ -100,7 +100,15 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "Cargo.toml",
+            "span": {
+              "endLine": 18,
+              "startLine": 15
+            }
+          }
+        ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
@@ -114,5 +122,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "eff6ba16da4d7087485a488baccfa247c4ba978c36ea93b699c1b4e57eda6565"
+  "shardHash": "c68eaec721d20a7b93228301332d6a01f8aac1af0d907fe29425dd24a3d7d543"
 }

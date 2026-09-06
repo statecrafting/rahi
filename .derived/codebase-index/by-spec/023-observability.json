@@ -41,11 +41,6 @@
         "code": "W-001",
         "message": "spec '023-observability' file unit 'crates/rahi-edge/src/middleware/mod.rs' does not exist",
         "path": "crates/rahi-edge/src/middleware/mod.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '023-observability' section unit 'workspace.dependencies' not found in Cargo.toml",
-        "path": "Cargo.toml"
       }
     ]
   },
@@ -53,7 +48,12 @@
     "dependsOn": [
       "020-edge-server"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "Cargo.toml",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
         "locations": [],
@@ -128,7 +128,15 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "Cargo.toml",
+            "span": {
+              "endLine": 18,
+              "startLine": 15
+            }
+          }
+        ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
@@ -142,5 +150,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "8d59b88732f3cdac88b9d7abb64de9fd0567dcd6d05d1e8aa7c084d684fedcdc"
+  "shardHash": "6252d77ab8d6b19b13f0e4b1e377330eed6c2088539fe6a0a9c6a3d02c63c1b8"
 }

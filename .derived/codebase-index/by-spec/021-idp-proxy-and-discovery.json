@@ -51,11 +51,6 @@
         "code": "W-001",
         "message": "spec '021-idp-proxy-and-discovery' file unit 'crates/rahi-idp/testdata/discovery/' does not exist",
         "path": "crates/rahi-idp/testdata/discovery/"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '021-idp-proxy-and-discovery' section unit 'workspace.dependencies' not found in Cargo.toml",
-        "path": "Cargo.toml"
       }
     ]
   },
@@ -63,7 +58,12 @@
     "dependsOn": [
       "020-edge-server"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "Cargo.toml",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
         "locations": [],
@@ -156,7 +156,15 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "Cargo.toml",
+            "span": {
+              "endLine": 18,
+              "startLine": 15
+            }
+          }
+        ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
@@ -170,5 +178,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "1dfbe89de6eef8588db76e6c67bd05dd3bae4861014d8910d1d9a46255b4e714"
+  "shardHash": "81f8e3ebd7d4dfb9b07d5b329a3cc8a55591bb3ce1cc3cedbaed46f269d74726"
 }
