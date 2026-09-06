@@ -13,6 +13,7 @@ spec = "011-store-hiqlite"
 
 [dependencies]
 rahi-types = { workspace = true }
+futures-core = { workspace = true }
 hiqlite = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
