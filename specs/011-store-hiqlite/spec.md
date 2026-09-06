@@ -171,17 +171,19 @@ Locks, notify, outbox, and the revision watermark (012); the decision chain
   `Cache::Kv`; spec 012 grows the enum through an `extends` edge on
   `store.rs`. `Store` owns the lifecycle (`open`, `shutdown`) and derefs
   to the clonable `StoreHandle` that carries every operation.
-- **D-9 (2026-09-05, build session, needs human review).** hiqlite's tree
-  fails the 010 B-3 policy on two counts, and this spec extends `deny.toml`
-  additively rather than weakening the policy: `CDLA-Permissive-2.0` is
-  allowed for `webpki-root-certs` (the Mozilla root store as data), and
-  `RUSTSEC-2026-0194` and `RUSTSEC-2026-0195` (quick-xml 0.39, both
-  denial-of-service in XML parsing) are ignored with reasons, because the
-  fixed quick-xml is a semver-breaking jump that no released `cryptr`
-  under hiqlite 0.14's pin can reach, and the only XML the workspace
-  parses is the listing of its own configured backup bucket. The ignores
-  are to be removed the moment hiqlite lifts `cryptr`. Alternative
-  rejected: a `[patch]` to a fork, which the constitution forbids.
+- **D-9 (2026-09-05, build session; accepted 2026-09-05, human decision).**
+  hiqlite's tree fails the 010 B-3 policy on two counts, and this spec
+  extends `deny.toml` additively rather than weakening the policy:
+  `CDLA-Permissive-2.0` is allowed for `webpki-root-certs` (the Mozilla
+  root store as data), and `RUSTSEC-2026-0194` and `RUSTSEC-2026-0195`
+  (quick-xml 0.39, both denial-of-service in XML parsing) are ignored with
+  reasons, because the fixed quick-xml is a semver-breaking jump that no
+  released `cryptr` under hiqlite 0.14's pin can reach, and the only XML
+  the workspace parses is the listing of its own configured backup bucket.
+  The ignores are to be removed the moment hiqlite lifts `cryptr`.
+  Alternative rejected: a `[patch]` to a fork, which the constitution
+  forbids. Reviewed and accepted on 2026-09-05; the exception stands until
+  hiqlite moves, and no further review is pending.
 
 ## Verification
 
