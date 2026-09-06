@@ -1,73 +1,73 @@
 {
   "diagnostics": {
-    "errors": [],
-    "warnings": [
+    "errors": [
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/Cargo.toml' does not exist",
         "path": "crates/rahi-store/Cargo.toml"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/src/lib.rs' does not exist",
         "path": "crates/rahi-store/src/lib.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/src/config.rs' does not exist",
         "path": "crates/rahi-store/src/config.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/src/store.rs' does not exist",
         "path": "crates/rahi-store/src/store.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/src/txn.rs' does not exist",
         "path": "crates/rahi-store/src/txn.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/src/query.rs' does not exist",
         "path": "crates/rahi-store/src/query.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/src/migrate.rs' does not exist",
         "path": "crates/rahi-store/src/migrate.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/src/backup.rs' does not exist",
         "path": "crates/rahi-store/src/backup.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/tests/store.rs' does not exist",
         "path": "crates/rahi-store/tests/store.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/tests/txn.rs' does not exist",
         "path": "crates/rahi-store/tests/txn.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/tests/migrate.rs' does not exist",
         "path": "crates/rahi-store/tests/migrate.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/tests/backup.rs' does not exist",
         "path": "crates/rahi-store/tests/backup.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/src/txn.rs' does not exist",
         "path": "crates/rahi-store/src/txn.rs"
       }
-    ]
+    ],
+    "warnings": []
   },
   "mapping": {
     "dependsOn": [
@@ -220,5 +220,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "5069ead391417b07b673daaed60cf9b19acd70985ece550af90228e73357181d"
+  "shardHash": "af5031cae7c67af29f39a26e9b41218b1e7726bdc1510b884b54ef9968d4c031"
 }
