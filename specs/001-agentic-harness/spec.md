@@ -189,6 +189,22 @@ session may be mid-build in. It now runs `index check` and reports a stale
 index for the session to regenerate and commit. B-4's meaning is
 unchanged.
 
+D-6 (2026-09-06, the stall before 016). B-4's Stop hook reports a stale
+codebase index; it does not regenerate one. It used to run `spec-spine
+index`, a write, and then print "review git diff .derived/ and include it
+in your commit" to a session that had already stopped. Nothing committed
+the result, so the tree was left dirty. claude-observatory's build stage
+refuses to start on an unclean tree, a refusal pauses the run, and a paused
+run never resumes without a human: after spec 015 merged and verified,
+standby looped "driving rahi, paused, flight slot released, idle, rescan"
+every sixty seconds for eleven hours with the daemon healthy the whole
+time. The same dirt short-circuits the daemon's checkout normalization, so
+the tree cannot heal itself back to the default branch either. The hook now
+runs `index check` and prints the command to run, which lets a stale index
+reach CI as a gate failure fixed deliberately: the same read-only stance
+D-5 gave the PR gate. It also exits quietly outside a spec corpus, so a
+non-corpus project never sees the message.
+
 ## Verification
 
 ```verify:cli

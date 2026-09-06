@@ -85,7 +85,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cd \"${CLAUDE_PROJECT_DIR:-.}\" 2>/dev/null || exit 0; sc=spec-spine; command -v \"$sc\" >/dev/null 2>&1 || { echo '[codebase-index] spec-spine absent, staleness check skipped (run /setup)'; exit 0; }; \"$sc\" index check >/dev/null 2>&1 && exit 0; gd=$(git rev-parse --git-dir 2>/dev/null) || gd=.git; if [ -d \"$gd/rebase-merge\" ] || [ -d \"$gd/rebase-apply\" ] || [ -f \"$gd/MERGE_HEAD\" ] || [ -f \"$gd/CHERRY_PICK_HEAD\" ]; then echo '[codebase-index] stale, but a rebase/merge is in progress, left untouched; run spec-spine index afterwards'; exit 0; fi; out=$(\"$sc\" index 2>&1); if [ $? -eq 0 ]; then echo '[codebase-index] was stale, auto-regenerated via spec-spine index; review git diff .derived/ and include it in your commit'; else echo '[codebase-index] stale and spec-spine index FAILED:'; echo \"$out\" | tail -10; fi; true"
+            "command": "cd \"${CLAUDE_PROJECT_DIR:-.}\" 2>/dev/null || exit 0\n[ -d specs ] || exit 0\nsc=spec-spine\ncommand -v \"$sc\" >/dev/null 2>&1 || { echo '[codebase-index] spec-spine absent, staleness check skipped (run /setup)'; exit 0; }\n# Read-only by design. A session that has ended cannot commit a regenerated\n# index, so writing one here leaves the tree dirty, which refuses the next\n# orchestrator run and pauses the project (spec 001 D-6).\n\"$sc\" index check >/dev/null 2>&1 && exit 0\necho '[codebase-index] STALE: run `spec-spine index` and commit the regenerated shards with the change that made them stale.'\necho '[codebase-index] Not regenerated here: a write at session end leaves .derived/ uncommitted and the next orchestrator run refuses a dirty tree.'\ntrue"
           }
         ]
       }
