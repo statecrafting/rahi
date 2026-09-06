@@ -16,11 +16,16 @@ establishes:
   - "crates/rahi-store/src/notify.rs"
   - "crates/rahi-store/src/outbox.rs"
   - "crates/rahi-store/src/watermark.rs"
+  - "crates/rahi-store/src/cache.rs"
   - "crates/rahi-store/tests/lock.rs"
   - "crates/rahi-store/tests/notify.rs"
   - "crates/rahi-store/tests/outbox.rs"
+  - "crates/rahi-store/tests/watermark.rs"
+  - "crates/rahi-store/tests/cache.rs"
 extends:
   - { spec: "011-store-hiqlite", unit: "crates/rahi-store/src/lib.rs", nature: additive }
+  - { spec: "011-store-hiqlite", unit: "crates/rahi-store/Cargo.toml", nature: additive }
+  - { spec: "010-workspace-and-core-types", unit: { kind: section, file: "Cargo.toml", anchor: "workspace.dependencies" }, nature: additive }
 summary: >
   The coordination plane over the cache Raft group: distributed leases with
   the Raft log id as a mandatory fencing token and an explicit release,
@@ -104,7 +109,102 @@ which uses `txn` plus a unique index and no primitive from here (013).
 
 ## 7. Resolved decisions
 
-None yet.
+- **D-1 (2026-09-06, build session; contradicts B-1, pending a human
+  amendment).** The fencing token is minted from the SQL group, not read
+  from hiqlite's lock. B-1 says the token is the Raft log id, but
+  `hiqlite::Lock` keeps its `id` field private in 0.14 and exposes no
+  accessor, no `Debug`, and no `Serialize`, so the log id is unreachable
+  from a dependent crate. `lease(key)` therefore takes hiqlite's lock for
+  mutual exclusion and, while holding it, bumps a row in a `lease_fence`
+  table (`INSERT ... ON CONFLICT DO UPDATE SET token = token + 1`) and
+  reads the new value back with `query_consistent`. The lock serialises the
+  bump for its key, so tokens for one key are strictly increasing
+  (FR-001), and the table is durable, which the Raft log id would not have
+  been across a restore. The consequence is that a token is only
+  comparable with other tokens of the same lease key: one lease key guards
+  one resource set. Alternative rejected: the cache group's Raft
+  `last_log_index`, which is reachable but resets when the group is
+  rebuilt, and would then hand out tokens below the ones already recorded
+  in `fence` columns, wedging every later write.
+- **D-2 (2026-09-06, build session).** `Lease::release` is `async` and
+  consumes the handle, but it cannot acknowledge: hiqlite releases on
+  `Lock::drop` by spawning a task and offers no confirmed release. A
+  caller that must observe the handover observes it by acquiring again.
+  A lease that `fenced_txn` has found superseded does not drop its lock at
+  all: hiqlite's lock handler panics when told to release a lock another
+  holder now owns, and that panic kills the node's whole locking
+  subsystem, so the superseded handle leaks the lock (one key string and
+  one client handle) instead of taking the node down on exactly the path
+  fencing exists for.
+- **D-3 (2026-09-06, build session).** `fenced_txn` prefixes the caller's
+  batch with a guard statement,
+  `UPDATE lease_fence SET token = CASE WHEN token <= :t THEN token ELSE
+  NULL END WHERE lease_key = :k`. The `fence <= :token` predicate B-2
+  requires is applied to every statement as well, but a predicate alone is
+  not enough: a superseded holder's `UPDATE` matching no row is not an
+  error, so the batch would commit and the outbox row beside it would land.
+  SQLite has no `RAISE` outside a trigger, so a `NOT NULL` violation is the
+  abort; it rolls the whole batch back, and the guard's result is stripped
+  before the caller's results are returned. hiqlite reports a failed
+  statement inside a transaction as `Error::Transaction` rather than as a
+  constraint violation, so the guard is recognised by the column it names
+  and mapped to `Error::Conflict` (FR-002).
+- **D-4 (2026-09-06, build session).** `Statement::fenced` rewrites the SQL
+  rather than adding a parameter: the token is written as an integer
+  literal so the caller's positional parameters keep their numbers, and the
+  `WHERE` it appends to is found by scanning for the first `WHERE` keyword
+  at parenthesis depth zero and outside every literal, quoted identifier,
+  and comment, so a subquery's `WHERE` is never mistaken for the
+  statement's. Only `UPDATE` and `DELETE` can be fenced; anything else is
+  `Error::Validation`, because an `INSERT` has no row whose token can be
+  compared. A caller inserting under a lease stamps `fence` with
+  `lease.token` itself.
+- **D-5 (2026-09-06, build session).** The `lease_fence` and `outbox`
+  tables are DDL like any other, so they are not created at first use:
+  `coordination_migration(version)` returns them as one `Migration` that
+  the app places in its own list for the `migrate` verb to apply (spec 011
+  B-4, constitution IX). An app that neither leases nor stages an envelope
+  does not carry it.
+- **D-6 (2026-09-06, build session; contradicts B-6, pending a human
+  amendment).** A restart does not clear the cache group. B-6 asks for a
+  test asserting that it does; hiqlite 0.14 persists the cache Raft log
+  under `data_dir` and replays it at startup, so a KV value and a counter
+  both outlive the process (measured, not read: `tests/cache.rs`). The
+  test asserts what hiqlite actually does, so an upgrade that changes it is
+  caught, and it asserts the properties that do make the group unfit for
+  durable state: a value expires on its TTL, a delete is a delete, and
+  nothing in the group is written by the transaction that decided
+  anything. The invariant "nothing durable lives in the cache group" stands
+  as a rule for application code; it was never a guarantee from hiqlite.
+- **D-7 (2026-09-06, build session).** `listen()` returns the named type
+  `Listen`, which implements `futures_core::Stream<Item = Envelope>` and
+  also offers `recv().await`, rather than an anonymous `impl Stream`: spec
+  015 wraps this surface in `Governed<Notify>` and needs a nameable type.
+  It yields only events published after this process started
+  (`listen_after_start`), because the cache group replays older ones. The
+  stream ends rather than looping when the group closes or an event does
+  not decode, which is survivable exactly because a consumer polls
+  `Watermark::since` anyway. `futures-core` is the one new workspace
+  dependency (the trait, no runtime).
+- **D-8 (2026-09-06, build session).** hiqlite gains the `counters`
+  feature, additively on spec 010's `workspace.dependencies` and spec 011
+  B-6's set. B-6 of this spec requires `counter_add` and `counter_get`, and
+  hiqlite gates them behind that feature; the alternative, a read-modify-
+  write over the KV cache, is not atomic and so is not usable for the rate
+  limit the counters exist for.
+- **D-9 (2026-09-06, build session).** `Watermark::next` stamps the rows
+  the batch left at `Revision::ZERO`, the value spec 010 defines as "never
+  written": the caller writes its row with `revision = 0` and `next`
+  appends one `UPDATE ... SET revision = (SELECT COALESCE(MAX(revision), 0)
+  + 1 FROM t) WHERE revision = 0`. One transaction is therefore one
+  revision, and two rows written together share it. `max(revision) + 1`
+  hands the same revision out twice if the newest row is deleted, so a
+  table whose consumers must not miss a change keeps a tombstone instead of
+  deleting. `TxnBuilder` lives in `outbox.rs` because the outbox is the
+  reason a batch is shared, and the KV and counter helpers of B-6 live in a
+  fifth module, `cache.rs`, rather than inside one of the four the
+  Territory names; `tests/watermark.rs` and `tests/cache.rs` cover FR-004
+  and B-6.
 
 ## Verification
 

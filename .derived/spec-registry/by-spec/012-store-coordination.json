@@ -27,6 +27,10 @@
       },
       {
         "kind": "file",
+        "path": "crates/rahi-store/src/cache.rs"
+      },
+      {
+        "kind": "file",
         "path": "crates/rahi-store/tests/lock.rs"
       },
       {
@@ -36,6 +40,14 @@
       {
         "kind": "file",
         "path": "crates/rahi-store/tests/outbox.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-store/tests/watermark.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-store/tests/cache.rs"
       }
     ],
     "extends": [
@@ -45,6 +57,23 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-store/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "011-store-hiqlite",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/Cargo.toml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "010-workspace-and-core-types",
+        "unit": {
+          "anchor": "workspace.dependencies",
+          "file": "Cargo.toml",
+          "kind": "section"
         }
       }
     ],
@@ -71,6 +100,6 @@
     "summary": "The coordination plane over the cache Raft group: distributed leases with the Raft log id as a mandatory fencing token and an explicit release, key-only local notify whose envelope is the routing key, the outbox row that commits in the same txn as the resource it describes, and the monotonic revision watermark every consumer polls so that notify is only ever a latency hint. Carries enrahitu://032 §3.2, §3.4, §3.5, §3.10.\n",
     "title": "Store coordination: fenced leases, local notify, the outbox, and the revision watermark"
   },
-  "shardHash": "e1aa1e23a2cc07a58cb6313b28338a149e07a2cd89b0f5e2239dd897df3d7825",
+  "shardHash": "d6f70a18ab7fd5ca579396ee13798c9a1efa01e6e2dacf47fcfca326f2b7bef3",
   "specVersion": "1.1.0"
 }

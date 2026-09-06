@@ -1,57 +1,82 @@
 {
-  "diagnostics": {
-    "errors": [
-      {
-        "code": "I-004",
-        "message": "spec '012-store-coordination' file unit 'crates/rahi-store/src/lock.rs' does not exist",
-        "path": "crates/rahi-store/src/lock.rs"
-      },
-      {
-        "code": "I-004",
-        "message": "spec '012-store-coordination' file unit 'crates/rahi-store/src/notify.rs' does not exist",
-        "path": "crates/rahi-store/src/notify.rs"
-      },
-      {
-        "code": "I-004",
-        "message": "spec '012-store-coordination' file unit 'crates/rahi-store/src/outbox.rs' does not exist",
-        "path": "crates/rahi-store/src/outbox.rs"
-      },
-      {
-        "code": "I-004",
-        "message": "spec '012-store-coordination' file unit 'crates/rahi-store/src/watermark.rs' does not exist",
-        "path": "crates/rahi-store/src/watermark.rs"
-      },
-      {
-        "code": "I-004",
-        "message": "spec '012-store-coordination' file unit 'crates/rahi-store/tests/lock.rs' does not exist",
-        "path": "crates/rahi-store/tests/lock.rs"
-      },
-      {
-        "code": "I-004",
-        "message": "spec '012-store-coordination' file unit 'crates/rahi-store/tests/notify.rs' does not exist",
-        "path": "crates/rahi-store/tests/notify.rs"
-      },
-      {
-        "code": "I-004",
-        "message": "spec '012-store-coordination' file unit 'crates/rahi-store/tests/outbox.rs' does not exist",
-        "path": "crates/rahi-store/tests/outbox.rs"
-      }
-    ],
-    "warnings": []
-  },
   "mapping": {
     "dependsOn": [
       "011-store-hiqlite"
     ],
     "implementingPaths": [
       {
+        "path": "Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/src/cache.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-store/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/src/lock.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/src/notify.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/src/outbox.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/src/watermark.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/tests/cache.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/tests/lock.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/tests/notify.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/tests/outbox.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/tests/watermark.rs",
         "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-store/src/cache.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/cache.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-store/src/lock.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -60,7 +85,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-store/src/notify.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -69,7 +98,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-store/src/outbox.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -78,7 +111,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-store/src/watermark.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -87,7 +124,24 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-store/tests/cache.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/cache.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-store/tests/lock.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -96,7 +150,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-store/tests/notify.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -105,12 +163,42 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-store/tests/outbox.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
           "kind": "file",
           "path": "crates/rahi-store/tests/outbox.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-store/tests/watermark.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/watermark.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-store/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/Cargo.toml"
         }
       },
       {
@@ -125,11 +213,29 @@
           "kind": "file",
           "path": "crates/rahi-store/src/lib.rs"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.toml",
+            "span": {
+              "endLine": 23,
+              "startLine": 15
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "anchor": "workspace.dependencies",
+          "file": "Cargo.toml",
+          "kind": "section"
+        }
       }
     ],
     "specId": "012-store-coordination",
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "92ebb66ff8196a925d0b886327684e2d64d461f2d413eab66873946b8e642f27"
+  "shardHash": "d1556f6f293846e249709cab4f86df9f16ac759d80d1dacb8e5d713ec3b79207"
 }
