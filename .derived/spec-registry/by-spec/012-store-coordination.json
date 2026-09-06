@@ -52,7 +52,7 @@
       "wave": 1
     },
     "id": "012-store-coordination",
-    "implementation": "pending",
+    "implementation": "in-progress",
     "kind": "kernel",
     "risk": "critical",
     "sectionHeadings": [
@@ -71,6 +71,6 @@
     "summary": "The coordination plane over the cache Raft group: distributed leases with the Raft log id as a mandatory fencing token and an explicit release, key-only local notify whose envelope is the routing key, the outbox row that commits in the same txn as the resource it describes, and the monotonic revision watermark every consumer polls so that notify is only ever a latency hint. Carries enrahitu://032 §3.2, §3.4, §3.5, §3.10.\n",
     "title": "Store coordination: fenced leases, local notify, the outbox, and the revision watermark"
   },
-  "shardHash": "c7b4f81677ca2c66ffc3eb1bf4eea138c67e28751f79d9b2aaa4fd3af8cb8147",
+  "shardHash": "e1aa1e23a2cc07a58cb6313b28338a149e07a2cd89b0f5e2239dd897df3d7825",
   "specVersion": "1.1.0"
 }
