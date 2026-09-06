@@ -1,6 +1,6 @@
 ---
 name: setup
-description: "One-time contributor setup for rahi: install spec-spine 0.11.0, the pinned Rust toolchain once rust-toolchain.toml exists, the optional cargo-deny and cargo-fuzz, and verify the governed loop with make spine."
+description: "One-time contributor setup for rahi: install spec-spine 0.11.0, the pinned Rust toolchain once rust-toolchain.toml exists, the optional cargo-deny, and verify the governed loop with make spine."
 allowed-tools: Bash, Read
 ---
 
@@ -40,8 +40,7 @@ cargo --version
 Before spec 010 there is no `Cargo.toml`; every `make` target is guarded
 for that, and this step is skipped with a note.
 
-Optional, but CI runs both and `make deny` skips without
-them:
+Optional, but CI runs it and `make deny` skips without it:
 
 ```sh
 cargo install cargo-deny --locked

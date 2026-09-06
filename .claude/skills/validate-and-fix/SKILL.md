@@ -1,6 +1,6 @@
 ---
 name: validate-and-fix
-description: "Run make ci (the exact gate CI runs) and fix what it surfaces by severity, with coupling failures and golden-vector changes escalated to a human."
+description: "Run make ci (the exact gate CI runs) and fix what it surfaces by severity, with coupling failures and chassis-invariant changes escalated to a human."
 allowed-tools: Bash, Read, Edit, Glob, Grep, Agent
 ---
 
@@ -30,10 +30,10 @@ Capture full output (file paths, line numbers, messages) and categorize:
 
 - **CRITICAL** (human decision, do not fix silently): a coupling failure
   (`C-001` drift or `C-002` unclaimed path) that would need an owning spec
-  edited to clear; any change to a golden vector under
-  a chassis invariant (`.claude/rules/chassis-invariants.md`); a `spec-dag`
-  cycle; anything on a hashed path (`codec/`, `entry.rs`, `hash.rs`)
-  reached through an ambient input.
+  edited to clear; any change that relaxes a chassis invariant
+  (`.claude/rules/chassis-invariants.md`); a `spec-dag` cycle; a rewritten
+  fixture chain under `testdata/chains/`; an ambient input (clock, env,
+  map order) reaching a hashed record or manifest.
 - **HIGH**: test failures, build breaks, index staleness, a `C-002` whose
   remedy is claiming the file in the spec being implemented.
 - **MEDIUM**: `spec-spine lint` warnings (the gate runs `--fail-on-warn`),
@@ -55,8 +55,9 @@ script.
 - **Phase 3, critical**: present each CRITICAL finding with the evidence
   and a proposed remedy, then wait. Refusing the destructive step is
   sometimes the right answer (`.claude/rules/adversarial-prompt-refusal.md`).
-  A golden-vector mismatch means the encoding changed: that is a schema
-  MAJOR, a spec amendment, and a human decision, in that order.
+  A fixture chain that stops verifying means the record encoding or the
+  hash changed: that is a spec amendment and a human decision, never a
+  regenerated fixture.
 - **Phase 4, verification**: re-run `make ci` end to end.
 
 ## 3. Error handling
@@ -100,9 +101,10 @@ Re-run `make ci`, confirm no new findings, and summarize:
 After feature work, beyond what the gates enforce:
 
 - Every new `pub` item is named or covered in its spec's Behavior section.
-- No `HashMap`, float, `std::time`, or `std::env` on a hashed path.
-- New fact kinds and predicates carry frozen strings and appear in the
-  owning spec's vocabulary section.
+- No `HashMap`, float, or `std::env` read reaches a hashed ledger record
+  or manifest.
+- New capability names and decision outcomes appear in the owning spec's
+  Behavior section.
 - New third-party crates are in `[workspace.dependencies]` and the spec
   declares the `extends` edge on spec 010's section.
 - The spec's `## Verification` block still names a command that exists.

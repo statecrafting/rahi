@@ -56,13 +56,14 @@ silently). Outcomes:
 - `index coverage --fail-on-untraced` lists a file: same remedy as
   `C-002`.
 - A cargo gate fails: fix it. Never disable a test, never loosen a lint,
-  never regenerate a golden vector (a vector change is a schema MAJOR and a
-  human decision; stop and report).
+  never rewrite a fixture chain under `testdata/chains/` to make a
+  verification test pass (a chain fixture is evidence; stop and report).
 
 ## Step 2: review the diff
 
-Invoke the `code-review` skill on the working diff. It delegates L0/L1
-paths to `ledger-guardian` and trust-plane paths to `trust-reviewer`.
+Invoke the `code-review` skill on the working diff. It checks any path
+under the store, ledger, identity, or kernel crates against
+`.claude/rules/chassis-invariants.md`.
 Apply confirmed, actionable fixes. If a fix touches any gate input (a
 `spec.md`, a manifest, a workflow, `Makefile`), re-run Step 1.
 

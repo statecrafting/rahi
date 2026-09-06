@@ -18,10 +18,32 @@ jobs:
   spine:
     name: spec-spine gate
     runs-on: ubuntu-latest
+    outputs:
+      has_cargo: ${{ steps.tree.outputs.has_cargo }}
+      has_deny: ${{ steps.tree.outputs.has_deny }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      # `hashFiles` is not allowed in a job-level `if` (GitHub rejects the
+      # workflow at startup, so the run reports as "workflow file issue"
+      # with no checks), and a job-level `if` is evaluated before any
+      # checkout anyway. The guard the Makefile applies locally is therefore
+      # published as an output of this job (spec 001 D-4).
+      - name: Probe the tree
+        id: tree
+        run: |
+          set -euo pipefail
+          if [ -f Cargo.toml ]; then
+            echo "has_cargo=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_cargo=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -f deny.toml ]; then
+            echo "has_deny=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_deny=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Install spec-spine
         run: |
           set -euo pipefail
@@ -54,7 +76,7 @@ jobs:
   cargo:
     name: cargo gate
     needs: spine
-    if: ${{ hashFiles('Cargo.toml') != '' }}
+    if: needs.spine.outputs.has_cargo == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -69,7 +91,7 @@ jobs:
   deny:
     name: supply chain (cargo-deny)
     needs: spine
-    if: ${{ hashFiles('deny.toml') != '' }}
+    if: needs.spine.outputs.has_deny == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

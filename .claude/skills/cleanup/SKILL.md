@@ -43,12 +43,11 @@ You are a cleanup analyzer for rahi. Analyze and report; change nothing.
 --locked -- -W dead_code -W unused 2>&1 | grep -E "unused|dead|never
 used"`; `cargo udeps --workspace` if installed (nightly), otherwise a
 manual pass over each crate's `[dependencies]` against its `use` lines.
-TypeScript (`web/`): `npx --no-install knip --no-exit-code` if present.
 Fallback for orphan files: a source file under `crates/*/src/` that no
 `mod` declaration or `use` path references.
 
-**B. Duplicates.** A duplicate detector if installed (`jscpd` for TS,
-`simian` or `cpd` for Rust); otherwise surface near-identical `pub fn`
+**B. Duplicates.** A duplicate detector if installed (`simian` or `cpd`
+for Rust); otherwise surface near-identical `pub fn`
 signatures across crates with `grep -rn "^pub fn" crates/*/src | awk -F:
 '{print $3}' | sort | uniq -d`. Treat results as hints.
 
@@ -59,11 +58,10 @@ categorizing.
 
 Keep (false positives): anything under `.derived/` (compiler output);
 generated code (`build.rs` outputs, prost modules under `target/`); trait
-implementations reached only through dynamic dispatch seams (`Signer`,
-`Verifier`, `IssuerResolver`, `ObjectStore`, `Projection`); public API of
-library crates consumed by `rahi-cli` or `rahi-server`; test fixtures
-and `testing` feature builders; workflow and hook scripts;
-golden vectors (never touch, spec 012).
+implementations reached only through dynamic dispatch seams (`Cell`,
+`LedgerSigner`, injected clocks and stores); public API of library crates
+consumed by `rahi-cli` or an app under `apps/`; migrations; test fixtures
+and fixture chains under `testdata/`; workflow and hook scripts.
 
 Safe to remove: private items clippy flags as never used with no
 suppression; dependencies with zero usage in their crate; files no spec

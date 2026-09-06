@@ -1,16 +1,17 @@
 ---
 name: code-review
-description: "Review the current diff for correctness bugs and spec drift with make spine as the gate, delegate L0/L1 and trust-plane paths to ledger-guardian and trust-reviewer, and emit an evidence-oriented findings list"
+description: "Review the current diff for correctness bugs and spec drift with make spine as the gate, check the store, ledger, identity, and kernel paths against the chassis-invariants rule, and emit an evidence-oriented findings list"
 allowed-tools: Read, Grep, Glob, Agent, Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git show:*), Bash(git rev-parse:*), Bash(git fetch:*), Bash(spec-spine:*), Bash(make:*), Bash(cargo:*), Bash(grep:*)
 argument-hint: "[scope] - e.g. \"branch\", \"working tree\", \"crates/rahi-ledger\""
 ---
 
-# /code-review: correctness, spec drift, frozen invariants
+# /code-review: correctness, spec drift, chassis invariants
 
 Reviews the current diff against three questions: does the change have
 correctness or edge-case bugs, does it still match its owning spec's
-contract, and can it alter a hashed byte or let something unverified
-count as verified. Output is an evidence-oriented findings list, each
+contract, and does it relax a chassis invariant (one `txn` per write and
+its outbox row, CAS append on the chain, the IdP subject as the only
+principal id, deny by default). Output is an evidence-oriented findings list, each
 line citing `file:line`. Nothing authored is modified; `make spine`
 regenerates `.derived/` deterministically, and a diff it leaves is itself
 evidence (stale shards).

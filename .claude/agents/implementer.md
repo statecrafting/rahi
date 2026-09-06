@@ -48,7 +48,7 @@ Read the files that will change and the seams the dependency specs expose (trait
 ### 3. Make Minimal Changes
 
 - Prefer `Edit` for existing files, `Write` for new files
-- Match surrounding style; owned data, no lifetimes at public boundaries, `BTreeMap` never `HashMap` in the L0/L1 crates
+- Match surrounding style; owned data, no lifetimes at public boundaries, `BTreeMap` never `HashMap` in anything that reaches a hashed record or manifest
 - One concern per change; do not refactor beyond the plan
 - New file? Add it to the spec's `establishes` in the same change
 - New dependency? Root `[workspace.dependencies]` plus `workspace = true` in the crate, plus the `extends` edge on spec 010's `Cargo.toml` section `workspace.dependencies`
@@ -102,6 +102,6 @@ Files changed with paths, verification results, deviations from the plan, and an
 - **DO:** Stop and report when the spec is wrong rather than silent (coherence guard)
 - **DO NOT:** Design or architect; ask for a plan if the spec is unclear
 - **DO NOT:** Edit `.derived/`
-- **DO NOT:** Regenerate a golden vector, ever
+- **DO NOT:** Rewrite a fixture chain under `testdata/chains/` to make a test pass
 - **DO NOT:** Amend an owning spec's contract to make the gate pass
 - **DO NOT:** Combine multiple plan steps into one large edit

@@ -58,8 +58,8 @@ Per task:
 
 Rules: read the entire plan before starting; keep the plan in sync after
 every task, not in batches; never commit unless asked (`/commit` when
-asked); never disable or skip a failing test; never regenerate a golden
-vector; claim every new source file in the spec whose territory it joins
+asked); never disable or skip a failing test; never rewrite a fixture chain
+to make a test pass; claim every new source file in the spec whose territory it joins
 (the ownership ratchet, `C-002`); preserve the plan's structure.
 
 Mid-implementation checkpoint at 50 percent: report done, issues,
@@ -99,4 +99,4 @@ the user, never by this skill.
 | Test or build failure | fix; if unfixable, mark the task blocked and continue with independent tasks |
 | Ambiguous task | ask |
 | Coupling failure | surface the drift; never patch the spec to match the code |
-| Golden vector mismatch | stop; a human decides (schema MAJOR) |
+| Chassis invariant would be relaxed | stop; a human decides |

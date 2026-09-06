@@ -1,6 +1,6 @@
 ---
 name: commit
-description: "Create a git commit with an impact-focused conventional commit message whose scope is the spec ordinal (feat(017): ...), with the regenerated .derived/ shards staged alongside the change they describe."
+description: "Create a git commit with an impact-focused conventional commit message whose scope is the spec ordinal (feat(011): ...), with the regenerated .derived/ shards staged alongside the change they describe."
 allowed-tools: Bash
 argument-hint: "[optional note about the change]"
 ---
@@ -44,7 +44,7 @@ Format: `type(scope): subject`
 **Type (required):** `feat`, `fix`, `refactor`, `docs`, `test`, `chore`.
 
 **Scope:** the three-digit ordinal of the spec the change implements or
-amends: `feat(017): ...`, `fix(011): ...`, `docs(024): ...`. Harness and
+amends: `feat(013): ...`, `fix(011): ...`, `docs(024): ...`. Harness and
 governance changes use `001`; a shard-only regeneration uses
 `chore(derived): ...`; a dependency bump on the workspace table uses
 `chore(010): ...`.
@@ -55,10 +55,10 @@ governance changes use `001`; a shard-only regeneration uses
 - No trailing period. No emojis. No em dash.
 
 **Good versus bad:**
-- BAD: `refactor(017): extract helper for parent sorting`
-- GOOD: `feat(017): ledger entries reject unsorted or duplicate parents`
-- BAD: `feat(032): add new subcommand handler`
-- GOOD: `feat(032): hq status reports the four spec-spine exit codes`
+- BAD: `refactor(013): extract helper for head lookup`
+- GOOD: `feat(013): chain append retries a parent-index collision three times`
+- BAD: `feat(030): add new subcommand handler`
+- GOOD: `feat(030): rahi preflight exits 1 when a store directory is shared`
 
 **Body (optional):** separate from the subject with a blank line. Use
 dash-prefixed bullets only for multiple distinct changes. Keep lines under
