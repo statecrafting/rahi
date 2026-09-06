@@ -1,5 +1,10 @@
 //! Opening the node and the handle every other crate holds (spec 011 B-1,
 //! B-2, B-3).
+//!
+//! Spec 016 adds two properties to the same node: the connection is never
+//! handed a SQLite extension, which [`Store::open`] proves against its own
+//! engine at boot, and a write refuses a parameter above the handle's
+//! [`crate::MAX_VALUE_BYTES`] ceiling before the statement is submitted.
 
 use std::borrow::Cow;
 
@@ -7,6 +12,7 @@ use hiqlite::{CacheVariants, Client, Node, NodeConfig};
 use rahi_types::Error;
 use serde::de::DeserializeOwned;
 
+use crate::blob;
 use crate::config::StoreConfig;
 use crate::error::map;
 use crate::query::{Value, owned_row_to, params};
@@ -43,6 +49,10 @@ pub struct Store {
 pub struct StoreHandle {
     client: Client,
     has_s3: bool,
+    /// The size a single parameter is refused above (spec 016 B-2). Set from
+    /// [`crate::MAX_VALUE_BYTES`] at open and lowered, never raised, by
+    /// [`StoreHandle::with_max_value_bytes`].
+    pub(crate) max_value_bytes: usize,
 }
 
 impl std::fmt::Debug for Store {
@@ -69,7 +79,8 @@ impl Store {
     /// # Errors
     ///
     /// [`Error::Config`] when `data_dir` is, or lies inside, rauthy's
-    /// directory, or when the secrets are malformed; [`Error::Io`] or
+    /// directory, when the secrets are malformed, or when the engine does not
+    /// refuse to load an extension (spec 016 B-4); [`Error::Io`] or
     /// [`Error::Upstream`] when the node fails to start.
     pub async fn open(cfg: &StoreConfig) -> Result<Self, Error> {
         cfg.check_data_dir()?;
@@ -79,11 +90,19 @@ impl Store {
             .map_err(map)?;
         client.wait_until_healthy_db().await;
         client.wait_until_healthy_cache().await;
+        let handle = StoreHandle {
+            client,
+            has_s3: cfg.s3.is_some(),
+            max_value_bytes: blob::MAX_VALUE_BYTES,
+        };
+        if let Err(refused) = blob::assert_extensions_refused(&handle).await {
+            // The node is already up and this process must not run: stop the
+            // Raft it just started rather than leaving it serving.
+            let _ = handle.client.shutdown().await;
+            return Err(refused);
+        }
         Ok(Self {
-            handle: StoreHandle {
-                client,
-                has_s3: cfg.s3.is_some(),
-            },
+            handle,
             cfg: cfg.clone(),
         })
     }
@@ -146,13 +165,15 @@ impl StoreHandle {
     ///
     /// # Errors
     ///
-    /// [`Error::Validation`] for a bad statement, [`Error::Conflict`] for a
-    /// constraint violation, [`Error::Upstream`] for a Raft failure.
+    /// [`Error::Validation`] for a bad statement or a parameter above
+    /// [`Self::max_value_bytes`], [`Error::Conflict`] for a constraint
+    /// violation, [`Error::Upstream`] for a Raft failure.
     pub async fn execute(
         &self,
         sql: impl Into<Cow<'static, str>>,
         values: Vec<Value>,
     ) -> Result<ExecuteResult, Error> {
+        blob::check_values(&values, self.max_value_bytes)?;
         self.client
             .execute(sql, params(values))
             .await
@@ -169,13 +190,15 @@ impl StoreHandle {
     /// # Errors
     ///
     /// The first failing statement's error, mapped; the batch is rolled
-    /// back. An empty batch is [`Error::Validation`].
+    /// back. An empty batch, or a parameter above [`Self::max_value_bytes`]
+    /// in any statement, is [`Error::Validation`] and submits nothing.
     pub async fn txn(&self, statements: Vec<Statement>) -> Result<Vec<ExecuteResult>, Error> {
         if statements.is_empty() {
             return Err(Error::Validation(
                 "txn needs at least one statement".to_owned(),
             ));
         }
+        blob::check_statements(&statements, self.max_value_bytes)?;
         let queries: Vec<(String, hiqlite::Params)> = statements
             .into_iter()
             .map(Statement::into_hiqlite)

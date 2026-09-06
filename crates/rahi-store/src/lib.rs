@@ -14,6 +14,12 @@
 //! the outbox, the revision watermark) is spec 012's territory in this same
 //! crate.
 //!
+//! Spec 016 adds bytes and one refusal: a BLOB parameter and a BLOB column
+//! are ordinary ([`Blob`], [`MAX_VALUE_BYTES`]), a sweep is a loop over
+//! [`StoreHandle::query_paged`], and no SQLite extension is ever loaded on
+//! any node, because hiqlite replicates the statement and an engine that
+//! differs between nodes diverges silently.
+//!
 //! The coordination plane (spec 012) adds the four primitives a controller
 //! needs and the one rule that ties them together: [`StoreHandle::lease`]
 //! takes a fenced lease, [`Notify`] publishes and subscribes to key-only
@@ -26,6 +32,7 @@
 #![forbid(unsafe_code)]
 
 pub mod backup;
+pub mod blob;
 pub mod cache;
 pub mod config;
 mod error;
@@ -39,12 +46,13 @@ pub mod txn;
 pub mod watermark;
 
 pub use backup::{BackupId, BackupListing};
+pub use blob::{Blob, DEFAULT_PAGE_ROWS, EXTENSIONS, EngineReport, MAX_VALUE_BYTES};
 pub use config::{EncKey, EncKeys, Peer, S3Backup, StoreConfig, StoreSecrets};
 pub use lock::{FENCE_TABLE_SQL, LEASE_TTL_SECONDS, Lease};
 pub use migrate::{Migration, MigrationReport};
 pub use notify::{Envelope, Listen, Notify};
 pub use outbox::{OUTBOX_TABLE_SQL, Outbox, TxnBuilder};
-pub use query::Value;
+pub use query::{Page, Value};
 pub use store::{Cache, Store, StoreHandle};
 pub use txn::{ExecuteResult, Statement};
 pub use watermark::Watermark;

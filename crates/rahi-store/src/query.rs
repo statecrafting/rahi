@@ -4,10 +4,17 @@
 //! `query_consistent` comes back from the leader as owned rows, which this
 //! module turns into a name-to-value map and hands to serde, so both calls
 //! deserialize into the same caller types.
+//!
+//! Spec 016 adds the third read: [`StoreHandle::query_paged`] is the
+//! supported way to sweep a table, because neither of the first two bounds
+//! what it returns.
 
 use rahi_types::Error;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+
+use crate::blob::DEFAULT_PAGE_ROWS;
+use crate::store::StoreHandle;
 
 /// A SQL parameter value.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -72,6 +79,12 @@ impl From<Vec<u8>> for Value {
     }
 }
 
+impl From<&[u8]> for Value {
+    fn from(v: &[u8]) -> Self {
+        Self::Blob(v.to_vec())
+    }
+}
+
 impl<T: Into<Value>> From<Option<T>> for Value {
     fn from(v: Option<T>) -> Self {
         v.map_or(Self::Null, Into::into)
@@ -123,5 +136,93 @@ fn untag(value: &serde_json::Value) -> serde_json::Value {
             .unwrap_or(serde_json::Value::Null),
         serde_json::Value::String(s) if s == "Null" => serde_json::Value::Null,
         other => other.clone(),
+    }
+}
+
+/// One page of a sweep (spec 016 B-3).
+///
+/// A sweep is a loop over [`StoreHandle::query_paged`], never one unbounded
+/// `query`, so the peak memory of a full-table scan is a property of
+/// [`Page::size`] rather than of how large the table grew.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Page {
+    /// Rows in this page. Defaults to [`DEFAULT_PAGE_ROWS`].
+    pub size: u32,
+    /// Rows to skip: the `OFFSET` this page starts after.
+    pub after: u64,
+}
+
+impl Default for Page {
+    fn default() -> Self {
+        Self {
+            size: DEFAULT_PAGE_ROWS,
+            after: 0,
+        }
+    }
+}
+
+impl Page {
+    /// The first page of `size` rows.
+    #[must_use]
+    pub const fn new(size: u32) -> Self {
+        Self { size, after: 0 }
+    }
+
+    /// The page after this one: the same size, `size` rows further on.
+    #[must_use]
+    pub const fn next(self) -> Self {
+        Self {
+            size: self.size,
+            after: self.after.saturating_add(self.size as u64),
+        }
+    }
+}
+
+impl StoreHandle {
+    /// One page of a read, from the local replica (spec 016 B-3).
+    ///
+    /// Appends `LIMIT` and `OFFSET` to `sql` as two further positional
+    /// parameters, so `sql` numbers its own from `$1` and does not carry a
+    /// `LIMIT` of its own. Order is the caller's business: a sweep whose
+    /// statement does not order its rows may see a row twice and miss
+    /// another, because `OFFSET` counts rows rather than remembering them.
+    ///
+    /// Reads the local replica, like [`Self::query`]: a sweep is a scan, and
+    /// a scan that took a leader round-trip per page would pause Raft once
+    /// per page. A sweep that must not miss a concurrent write reads
+    /// [`crate::Watermark::since`] afterwards.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Validation`] when `page.size` is zero, when `page.after`
+    /// exceeds `i64`, or for a bad statement or a row that does not fit `T`.
+    pub async fn query_paged<T>(
+        &self,
+        sql: &str,
+        values: Vec<Value>,
+        page: Page,
+    ) -> Result<Vec<T>, Error>
+    where
+        T: DeserializeOwned + Send + 'static,
+    {
+        if page.size == 0 {
+            return Err(Error::Validation(
+                "a page of zero rows never advances a sweep".to_owned(),
+            ));
+        }
+        let offset = i64::try_from(page.after)
+            .map_err(|_| Error::Validation(format!("page offset {} exceeds i64", page.after)))?;
+        // hiqlite binds `$n` by position, so the appended clause names the two
+        // numbers after the caller's own rather than a bare `?`, whose index
+        // SQLite would derive from the highest one already in the statement.
+        let limit = values.len() + 1;
+        let mut values = values;
+        values.push(Value::Integer(i64::from(page.size)));
+        values.push(Value::Integer(offset));
+        self.query(
+            format!("{sql} LIMIT ${limit} OFFSET ${}", limit + 1),
+            values,
+        )
+        .await
     }
 }
