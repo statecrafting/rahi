@@ -171,6 +171,24 @@ dependabot `npm` entry for `/web`, which D-1 already rules out and which
 failed on every scheduled run. Both were learned from hqgit's spec 001
 D-3, where the identical workflow first hit the failure.
 
+D-5 (2026-09-06, first multi-repo session). B-4's hooks resolve the repo
+they act on from the action, not from the session. Both began with
+`cd "${CLAUDE_PROJECT_DIR:-.}"`, which binds a hook to the session's
+project: with sibling checkouts open, an edit under another repo
+recompiled and staleness-checked this one, and a `git push` or `gh pr
+create` aimed at a sibling was judged against this repo's branch and
+coupling state. The staleness hook now derives the root from the edited
+file (`git -C "$(dirname "$fp")" rev-parse --show-toplevel`); the push and
+PR gate honours an explicit `cd <dir>` prefix in the command and otherwise
+its own `cwd`; and both exit quietly unless `$root/specs` exists, so a
+non-corpus repo is never gated. The same fix made the PR gate read-only.
+It ran `spec-spine index`, a write, into the tree it was judging, then
+blocked on the uncommitted `.derived/` its own write had just produced;
+that is unrecoverable from inside the hook and mutates a tree another
+session may be mid-build in. It now runs `index check` and reports a stale
+index for the session to regenerate and commit. B-4's meaning is
+unchanged.
+
 ## Verification
 
 ```verify:cli
