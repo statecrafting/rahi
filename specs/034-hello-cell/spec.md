@@ -98,9 +98,11 @@ The whole of `apps/hello-cell`. It depends on the chassis crates and
 
 - **AC-1.** `cargo test -p hello-cell --locked` passes (rauthy-dependent
   steps skipped or passed, never failed for absence).
-- **AC-2.** `docker compose -f docker/compose.yml up` followed by opening
-  the public URL shows the page and a working login (an operator check,
-  recorded in the README).
+- **AC-2.** The end-to-end check is written into the README as a runnable
+  operator procedure: `docker compose -f docker/compose.yml up`, open the
+  public URL, see the page, complete a login through rauthy. Recording
+  that procedure satisfies this criterion. Running it needs a rauthy
+  image, so it is an operator check and never a `verify:cli` command.
 - **AC-3.** `make ci` exits 0 with every crate and the app present, and
   `spec-spine index coverage --fail-on-untraced` exits 0 across the whole
   workspace.
@@ -112,7 +114,12 @@ own manifests, migrations, and routes in their own repositories.
 
 ## 7. Resolved decisions
 
-None yet.
+- **D-1 (2026-09-05, human decision).** AC-2 is satisfied by recording the
+  compose-and-login procedure in the README, not by executing it, on the
+  same reasoning as 032 D-1: a build session has no rauthy image and no
+  public origin, and a criterion no session can run must not hold the last
+  spec in the chain at `implementation: in-progress`. AC-1 and AC-3 remain
+  fully mechanical and are what a session proves.
 
 ## Verification
 

@@ -90,10 +90,12 @@ environment (011 B-1, 030).
 ## 5. Acceptance criteria
 
 - **AC-1.** `scripts/k8s-validate.sh` exits 0.
-- **AC-2.** A three-replica rollout on the reference cluster reaches
-  `/readyz` on all pods and a backup CronJob run lands one archive in the
-  bucket (an operator-run check recorded in the README; not in
-  `verify:cli`).
+- **AC-2.** The rollout check is written into the README as a runnable
+  operator procedure: bring up the three-replica StatefulSet, confirm
+  `/readyz` on every pod, trigger the backup CronJob once, and confirm one
+  archive in the bucket. Recording that procedure satisfies this
+  criterion. Running it needs the reference cluster and its S3 endpoint,
+  so it is an operator check and never a `verify:cli` command.
 
 ## 6. Out of scope
 
@@ -101,7 +103,13 @@ Helm packaging; multi-cluster; the object store's own lifecycle rules.
 
 ## 7. Resolved decisions
 
-None yet.
+- **D-1 (2026-09-05, human decision).** AC-2 is satisfied by recording the
+  rollout and backup procedure in the README, not by executing it. A build
+  session has no cluster and no bucket, and holding the spec at
+  `implementation: in-progress` for a criterion no session can run would
+  stall 034, which depends on this spec. The operator runs the recorded
+  procedure out of band; a failure there is a defect report against this
+  spec, not a reason to withhold completion.
 
 ## Verification
 
