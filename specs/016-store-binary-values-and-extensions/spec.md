@@ -204,17 +204,6 @@ before it hands the store bytes.
   adds that line to the preflight check list of its B-3 and flips this
   spec to `implementation: complete`; until then it stays `in-progress`.
 
-- **2026-09-06 (second build session).** The gate is green and AC-1 passes;
-  the hold above is the only thing outstanding, and it needs one act this
-  build session may not perform. Spec 030's B-3 enumerates the preflight
-  checks (config parses, `/data` writable, key file modes, hiqlite elects,
-  rauthy answers, ledger verifies, free disk) and does not name the engine
-  report, so closing AC-2 is not a matter of the 030 session remembering to
-  call `engine_report()`: it needs an authoring edit to 030's B-3 adding
-  that check. Amending 030 to match this spec's acceptance is not a build
-  session's call, so the contradiction is surfaced rather than resolved.
-  See decision D-8.
-
 ## Verification
 
 ```verify:cli
