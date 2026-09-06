@@ -37,7 +37,7 @@ rahi is specified before it is built: the corpus under `specs/` is the whole des
 | Design | `docs/design/` | Analysis; cited, never authoritative |
 | Derived | `.derived/` | Compiler output, read only through `spec-spine` |
 
-Behavioral rules live in `.claude/rules/`: the standing three (orchestrator, governed reads, coherence guard) and the path-scoped three (ledger invariants, trust invariants, build commands).
+Behavioral rules live in `.claude/rules/`: the standing three (orchestrator, governed reads, coherence guard) and the path-scoped two (chassis invariants, build commands).
 
 ## Process
 
