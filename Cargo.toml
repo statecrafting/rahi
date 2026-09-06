@@ -15,6 +15,7 @@ authors = ["Bartek Kus"]
 [workspace.dependencies]
 rahi-types = { path = "crates/rahi-types", version = "0.1.0" }
 rahi-store = { path = "crates/rahi-store", version = "0.1.0" }
+rahi-ledger = { path = "crates/rahi-ledger", version = "0.1.0" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 hiqlite = { version = "0.14", default-features = false, features = ["sqlite", "cache", "counters", "dlock", "listen_notify_local", "backup", "s3"] }
@@ -34,6 +35,13 @@ base64 = "0.22"
 async-trait = "0.1"
 s3-simple = "0.8"
 url = "2"
+
+# The kernel (spec 015): the declared manifest is TOML, and adjudication is
+# the action-gate primitive: a pure gate over an ordered check registry with a
+# stable config hash the manifest hash folds in.
+toml = { version = "1", default-features = false, features = ["parse", "serde"] }
+action-gate-types = "0.1"
+action-gate-core = { version = "0.1", features = ["checks-common"] }
 
 [workspace.lints.rust]
 unsafe_code = "deny"

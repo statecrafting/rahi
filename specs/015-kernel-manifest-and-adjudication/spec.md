@@ -6,7 +6,7 @@ kind: "kernel"
 domain: "kernel"
 created: "2026-09-03"
 authors: ["Bartek Kus"]
-implementation: pending
+implementation: complete
 risk: critical
 wave: 1
 depends_on:
@@ -136,7 +136,110 @@ degradation (a later spec if a product needs them).
 
 ## 7. Resolved decisions
 
-None yet.
+- **D-1 (2026-09-06, build session; refines B-2).** `Manifest::hash()` is
+  fallible and builds its own gate, so the hash stays pure over the
+  document: `hash(&self) -> Result<Hash, Error>` serialises the parsed
+  model, canonicalises it, assembles the gate from the manifest itself
+  (`Manifest::gate()`), and hashes the model bytes followed by the gate's
+  `config_hash()`. No `Gate` argument is taken, so a caller cannot root a
+  chain at a gate the manifest does not describe. B-2 names
+  `config_hash()` as an input and B-8 needs the hash *before*
+  `Ledger::open`, which runs before `Kernel::boot`; both hold only if the
+  gate is derivable from the manifest alone. The `Result` is what keeps
+  the crate inside the workspace's `unwrap_used` and `expect_used`
+  denials. Rejected alternative: an infallible `hash()` with an internal
+  `expect`, which the workspace clippy configuration denies.
+- **D-2 (2026-09-06, build session; names B-4's types).**
+  `Kernel::adjudicate(&ActionContext)` returns
+  `action_gate_types::Decision`, re-exported as `Verdict`. B-4 writes the
+  return type as `Decision` with `Allow` / `Deny(reason)` /
+  `Degrade(reason)`, but `Decision` in this chassis already means the
+  ledgered record (spec 013) and this crate depends on `rahi-ledger`;
+  aliasing the gate's own type keeps one name per concept and makes the
+  value a check returns the value the kernel returns, `check_ids` and
+  `blocking` included. `Request` is the typed form of an `ActionContext`,
+  lowered by `Request::to_context()`, because an `ActionContext` is a
+  string map and a typo in an attribute key would read as a permit.
+  Rejected alternative: a third `Allow`/`Deny`/`Degrade` enum in this
+  crate, which would collide with `rahi_ledger::Outcome` at every import.
+- **D-3 (2026-09-06, build session; completes B-1's resource families).**
+  A capability's resource must appear in the `resources` list its kind
+  draws from (`db.*` in `tables`, `kv.*` in `kv`, `counter.*` in
+  `counters`, `secret.read` in `secrets`, `http.egress` in `egress`).
+  `lock.acquire`, `notify.publish`, and `notify.listen` draw from no list
+  and name their resource directly, validated for shape only: B-1 declares
+  no lock or topic family, and a lock key or a topic is an ephemeral
+  coordination name rather than a durable resource an operator would
+  inventory. Narrowing them is what `key_prefix` is for. The cost is that
+  a typo in a lock key is caught by the grant that names it and not by the
+  resource list. Rejected alternative: adding `locks[]` and `topics[]`,
+  which would widen a schema B-1 fixes.
+- **D-4 (2026-09-06, build session; completes B-1's `gate.checks`).** The
+  roster is a closed catalog, seeded here with one entry: `secrets`
+  (`action-gate`'s own `SecretsCheck`). The capability check, id `grants`,
+  is always the first check in every gate and a roster that names it is
+  `Error::Validation`; an unknown id is refused when the manifest is
+  parsed rather than skipped when the gate is built. Deny by default
+  cannot be a roster entry, because a manifest that omitted it would
+  assemble a gate that admits everything. An open roster resolved against
+  app-registered checks would also leave `Manifest::hash()` undefined
+  until registration, which contradicts D-1 and B-8's ordering. Adding a
+  check is a spec amendment. Rejected alternative: an app-supplied check
+  registry, which makes the manifest hash depend on runtime state.
+- **D-5 (2026-09-06, build session; extends B-6 to `Degrade`).** `Deny`
+  and `Degrade` are both ledgered and both return `Error::Denied` carrying
+  the decision id; `Allow` is not ledgered. The record's outcome is the
+  gate's, so a degrade reads as `degrade` in the chain. B-6 names `Deny`
+  because that is the case constitution X is about, but a degrade is
+  equally a governance event, and `action-gate` is explicit that `Degrade`
+  is a signal the consumer interprets: the chassis has no reduced form of
+  a store write to perform, so the only honest interpretation at a facade
+  is refusal with the reason recorded. Ledgering allows would turn the
+  chain into the request log, which spec 014's hot window is not sized
+  for. Rejected alternative: treating `Degrade` as `Allow`, which performs
+  in full the operation the gate asked to reduce.
+- **D-6 (2026-09-06, build session; resolves B-3's two forms).** One
+  facade is one capability:
+  `Governed::new(kernel, service, kind, resource, inner)` binds the
+  triple, and each operation method refuses a facade declared for another
+  kind. `verify!` reads those three literals from the call site, so the
+  declaration the build checks and the triple the runtime adjudicates are
+  the same three tokens and cannot drift. A site that builds its triple at
+  runtime carries a `#[governed(service = .., kind = .., resource = ..)]`
+  marker written as a comment above the call and read from the source
+  text; Rust rejects an unknown attribute without a proc-macro crate, and
+  a companion macro crate would appear in `cargo tree` and break AC-2. A
+  site with neither is `Error::Validation`, not an unverified call.
+  Rejected alternative: a facade carrying only the service, with the kind
+  implied by the method, which leaves no literal for the walk to read.
+- **D-7 (2026-09-06, build session; widens B-6's failure handling).**
+  Every failed `Ledger::append` raises `kernel_ledger_failures`, not only
+  `Error::Integrity`: a store failure that loses a denial is equally a
+  governance failure and equally must not be silent. The denial queue is
+  bounded (`DEFAULT_QUEUE_CAPACITY` 1024) and `emit` uses `try_send`, so a
+  full queue drops the record and raises `kernel_decisions_dropped`; B-6
+  forbids the request path from awaiting the append, and under a stalled
+  leader the alternative to dropping is a stalled cell. Both paths reach
+  `observe::on_failure`, and with no observer registered the kernel writes
+  the failure to stderr, because the chassis has no logging facility until
+  spec 023 and this is the one failure that must never be silent. Rejected
+  alternatives: blocking on a full queue; an unbounded queue, which turns
+  a stalled appender into unbounded memory growth.
+- **D-8 (2026-09-06, build session; completes B-6's decision id).** The
+  kernel reads no clock. A decision id is
+  `kernel:<last 16 hex of the chain head at boot>:<12-digit counter>`, and
+  wall time is optional and supplied by the app as `KernelOptions::clock`,
+  a closure the kernel calls when building a payload; with no clock the
+  payload has no `wall_time` key. B-6 says the wall time is
+  caller-supplied and spec 013 D-3 keeps the record's timestamp slot on
+  the store revision, so a clock of the kernel's own would contradict
+  both. The chain head is the one per-boot value already in hand, needs no
+  randomness, and makes an id reproducible from the chain; two boots can
+  mint the same id only if the earlier one appended nothing, in which case
+  the id it minted never landed. Rejected alternatives: a uuid or random
+  nonce, which adds a dependency and makes ids unreproducible;
+  `SystemTime::now()`, in a crate whose decisions are meant to be
+  re-derivable.
 
 ## Verification
 

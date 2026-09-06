@@ -1,0 +1,122 @@
+# The same ceiling as valid.toml, written by someone with other habits
+# (spec 015 FR-002). Nothing here changes what the cell may do, so nothing
+# here may change the manifest hash.
+
+[contract]
+version   = "1.0.0"
+
+[auth]
+operator_role = "rahi-operator"
+
+[observability]
+otel         = false
+metrics_path = "/metrics"
+
+[ledger]
+max_record_bytes = 65536
+schema_version   = "1.0.0"
+
+[gate]
+checks = [ "secrets" ]
+
+[app]
+org  = "statecrafting"
+name = "hello-cell"
+
+
+[resources]
+egress   = [ "*.example.com" ]
+secrets  = [ "webhook_token" ]
+counters = [ "requests" ]
+kv       = [ "cache" ]
+tables   = [ "notes", "audit" ]
+
+
+# The catalog. An array of tables is ordered data, so the order is the same as
+# valid.toml's; the keys inside each entry are not.
+[[capabilities]]
+resource = "notes"
+kind     = "db.read"
+id       = "notes-read"
+
+[[capabilities]]
+kind     = "db.write"
+id       = "notes-write"
+resource = "notes"
+
+[[capabilities]]
+id       = "notes-txn"
+resource = "notes"
+kind     = "db.txn"
+
+[[capabilities]]
+resource = "notes"
+id       = "schema"
+kind     = "db.migrate"
+
+[[capabilities]]
+id          = "cache-get"
+constraints = { key_prefix = "demo:" }
+kind        = "kv.get"
+resource    = "cache"
+
+[[capabilities]]
+constraints = { key_prefix = "demo:" }
+resource    = "cache"
+kind        = "kv.put"
+id          = "cache-put"
+
+[[capabilities]]
+kind        = "kv.delete"
+constraints = { key_prefix = "demo:" }
+id          = "cache-delete"
+resource    = "cache"
+
+[[capabilities]]
+resource = "requests"
+kind     = "counter.add"
+id       = "request-count"
+
+[[capabilities]]
+kind     = "counter.get"
+resource = "requests"
+id       = "request-read"
+
+[[capabilities]]
+constraints = { key_prefix = "note:" }
+kind        = "lock.acquire"
+resource    = "note"
+id          = "note-lock"
+
+[[capabilities]]
+resource = "note"
+id       = "note-publish"
+kind     = "notify.publish"
+
+[[capabilities]]
+kind     = "notify.listen"
+id       = "note-listen"
+resource = "note"
+
+[[capabilities]]
+id       = "webhook-secret"
+kind     = "secret.read"
+resource = "webhook_token"
+
+[[capabilities]]
+resource = "*.example.com"
+kind     = "http.egress"
+id       = "webhook-egress"
+
+
+# Services are a map, so declaring webhooks first changes nothing.
+[services.webhooks]
+capabilities = [ "webhook-secret", "webhook-egress" ]
+
+[services.notes]
+capabilities = [
+  "notes-read", "notes-write", "notes-txn", "schema",
+  "cache-get", "cache-put", "cache-delete",
+  "request-count", "request-read",
+  "note-lock", "note-publish", "note-listen",
+]

@@ -1,0 +1,33 @@
+# A key this schema does not define (spec 015 B-1). A typo in a governance
+# document is a hole in the ceiling that reads like a rule, so unknown keys
+# are refused rather than ignored.
+
+[app]
+name = "hello-cell"
+org = "statecrafting"
+
+[resources]
+tables = ["notes"]
+views = ["recent_notes"]
+
+[[capabilities]]
+id = "notes-read"
+kind = "db.read"
+resource = "notes"
+
+[services.notes]
+capabilities = ["notes-read"]
+
+[ledger]
+schema_version = "1.0.0"
+max_record_bytes = 65536
+
+[observability]
+metrics_path = "/metrics"
+otel = false
+
+[auth]
+operator_role = "rahi-operator"
+
+[contract]
+version = "1.0.0"

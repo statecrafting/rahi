@@ -1,0 +1,121 @@
+# valid.toml with one grant removed (spec 015 FR-002): the hash must move.
+
+[app]
+name = "hello-cell"
+org = "statecrafting"
+
+[resources]
+tables = ["notes", "audit"]
+kv = ["cache"]
+counters = ["requests"]
+secrets = ["webhook_token"]
+egress = ["*.example.com"]
+
+[[capabilities]]
+id = "notes-read"
+kind = "db.read"
+resource = "notes"
+
+[[capabilities]]
+id = "notes-write"
+kind = "db.write"
+resource = "notes"
+
+[[capabilities]]
+id = "notes-txn"
+kind = "db.txn"
+resource = "notes"
+
+[[capabilities]]
+id = "schema"
+kind = "db.migrate"
+resource = "notes"
+
+[[capabilities]]
+id = "cache-get"
+kind = "kv.get"
+resource = "cache"
+constraints = { key_prefix = "demo:" }
+
+[[capabilities]]
+id = "cache-put"
+kind = "kv.put"
+resource = "cache"
+constraints = { key_prefix = "demo:" }
+
+[[capabilities]]
+id = "cache-delete"
+kind = "kv.delete"
+resource = "cache"
+constraints = { key_prefix = "demo:" }
+
+[[capabilities]]
+id = "request-count"
+kind = "counter.add"
+resource = "requests"
+
+[[capabilities]]
+id = "request-read"
+kind = "counter.get"
+resource = "requests"
+
+[[capabilities]]
+id = "note-lock"
+kind = "lock.acquire"
+resource = "note"
+constraints = { key_prefix = "note:" }
+
+[[capabilities]]
+id = "note-publish"
+kind = "notify.publish"
+resource = "note"
+
+[[capabilities]]
+id = "note-listen"
+kind = "notify.listen"
+resource = "note"
+
+[[capabilities]]
+id = "webhook-secret"
+kind = "secret.read"
+resource = "webhook_token"
+
+[[capabilities]]
+id = "webhook-egress"
+kind = "http.egress"
+resource = "*.example.com"
+
+[services.notes]
+capabilities = [
+  "notes-read",
+  "notes-txn",
+  "schema",
+  "cache-get",
+  "cache-put",
+  "cache-delete",
+  "request-count",
+  "request-read",
+  "note-lock",
+  "note-publish",
+  "note-listen",
+]
+
+[services.webhooks]
+capabilities = ["webhook-secret", "webhook-egress"]
+
+[gate]
+checks = ["secrets"]
+
+[ledger]
+schema_version = "1.0.0"
+max_record_bytes = 65536
+
+[observability]
+metrics_path = "/metrics"
+otel = false
+
+[auth]
+operator_role = "rahi-operator"
+
+[contract]
+version = "1.0.0"
