@@ -13,7 +13,6 @@ depends_on:
   - "002-chassis-thesis"
 establishes:
   - "Cargo.toml"
-  - "Cargo.lock"
   - "rust-toolchain.toml"
   - "deny.toml"
   - "apps/.gitkeep"
@@ -169,6 +168,14 @@ token types (022); any I/O.
   list is exhaustive (no `#[non_exhaustive]`): adding a variant is a spec
   amendment and every downstream match should break. The workspace lint
   table also denies `float_arithmetic` and warns on `missing_docs`.
+- **D-7 (2026-09-05, human decision).** `Cargo.lock` is not claimed by
+  this spec. The build session of 010 had added it to `establishes`, which
+  overrode spec-spine's built-in lockfile bypass and forced every later
+  spec that adds a dependency to declare an `extends` edge on the lock
+  (011 did). The lock is committed and gated with `--locked` (B-2) but is
+  a derived artifact of the dependency table, owned by the coupling
+  floor, not by a spec. Alternative rejected: keeping the claim and the
+  per-spec edges, which is friction with no governance gain.
 
 ## Verification
 

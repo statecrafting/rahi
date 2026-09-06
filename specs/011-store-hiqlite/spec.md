@@ -29,7 +29,6 @@ establishes:
 extends:
   - { spec: "010-workspace-and-core-types", unit: { kind: section, file: "Cargo.toml", anchor: "workspace.dependencies" }, nature: additive }
   - { spec: "010-workspace-and-core-types", unit: "deny.toml", nature: additive }
-  - { spec: "010-workspace-and-core-types", unit: "Cargo.lock", nature: additive }
 constrains:
   - { flavor: invariant-freeze, unit: "crates/rahi-store/src/txn.rs", note: "one txn is the atomic unit; constitution IX" }
 summary: >

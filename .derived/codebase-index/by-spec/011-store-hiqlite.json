@@ -5,10 +5,6 @@
     ],
     "implementingPaths": [
       {
-        "path": "Cargo.lock",
-        "source": "spec-edge"
-      },
-      {
         "path": "Cargo.toml",
         "source": "spec-edge"
       },
@@ -263,19 +259,6 @@
       {
         "locations": [
           {
-            "file": "Cargo.lock"
-          }
-        ],
-        "ownership": true,
-        "sourceField": "extends",
-        "unit": {
-          "kind": "file",
-          "path": "Cargo.lock"
-        }
-      },
-      {
-        "locations": [
-          {
             "file": "deny.toml"
           }
         ],
@@ -322,5 +305,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "4f430ca959b5b58e63d4d1cb3e0a739cc1556b99e69d4cebe672c71f6ffc0d17"
+  "shardHash": "9a295f4e0a0cb6ceb13ee0ab79135b22c622fdf0e72df045416bbeb16c41aa15"
 }
