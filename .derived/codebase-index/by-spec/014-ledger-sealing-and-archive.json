@@ -1,28 +1,28 @@
 {
   "diagnostics": {
-    "errors": [],
-    "warnings": [
+    "errors": [
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '014-ledger-sealing-and-archive' file unit 'crates/rahi-ledger/src/seal.rs' does not exist",
         "path": "crates/rahi-ledger/src/seal.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '014-ledger-sealing-and-archive' file unit 'crates/rahi-ledger/src/segment.rs' does not exist",
         "path": "crates/rahi-ledger/src/segment.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '014-ledger-sealing-and-archive' file unit 'crates/rahi-ledger/src/archive.rs' does not exist",
         "path": "crates/rahi-ledger/src/archive.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '014-ledger-sealing-and-archive' file unit 'crates/rahi-ledger/tests/seal.rs' does not exist",
         "path": "crates/rahi-ledger/tests/seal.rs"
       }
-    ]
+    ],
+    "warnings": []
   },
   "mapping": {
     "dependsOn": [
@@ -128,5 +128,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "e34d47434ef562c5bceb1629537097563183cad662a18d4f7a254379f25d1f9f"
+  "shardHash": "8e4e77f130bb3dfb02fc2a0bbe70ae87b10d2e2009d3fc53641ed8a225bdba75"
 }
