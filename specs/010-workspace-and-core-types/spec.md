@@ -6,7 +6,7 @@ kind: "kernel"
 domain: "types"
 created: "2026-09-03"
 authors: ["Bartek Kus"]
-implementation: pending
+implementation: in-progress
 risk: high
 wave: 1
 depends_on:

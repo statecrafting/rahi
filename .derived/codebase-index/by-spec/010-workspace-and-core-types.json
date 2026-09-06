@@ -1,63 +1,63 @@
 {
   "diagnostics": {
-    "errors": [],
-    "warnings": [
+    "errors": [
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '010-workspace-and-core-types' file unit 'Cargo.toml' does not exist",
         "path": "Cargo.toml"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '010-workspace-and-core-types' file unit 'rust-toolchain.toml' does not exist",
         "path": "rust-toolchain.toml"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '010-workspace-and-core-types' file unit 'deny.toml' does not exist",
         "path": "deny.toml"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '010-workspace-and-core-types' file unit 'crates/rahi-types/Cargo.toml' does not exist",
         "path": "crates/rahi-types/Cargo.toml"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '010-workspace-and-core-types' file unit 'crates/rahi-types/src/lib.rs' does not exist",
         "path": "crates/rahi-types/src/lib.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '010-workspace-and-core-types' file unit 'crates/rahi-types/src/error.rs' does not exist",
         "path": "crates/rahi-types/src/error.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '010-workspace-and-core-types' file unit 'crates/rahi-types/src/principal.rs' does not exist",
         "path": "crates/rahi-types/src/principal.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '010-workspace-and-core-types' file unit 'crates/rahi-types/src/revision.rs' does not exist",
         "path": "crates/rahi-types/src/revision.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '010-workspace-and-core-types' file unit 'crates/rahi-types/src/config.rs' does not exist",
         "path": "crates/rahi-types/src/config.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '010-workspace-and-core-types' file unit 'crates/rahi-types/src/version.rs' does not exist",
         "path": "crates/rahi-types/src/version.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '010-workspace-and-core-types' file unit 'crates/rahi-types/tests/' does not exist",
         "path": "crates/rahi-types/tests/"
       }
-    ]
+    ],
+    "warnings": []
   },
   "mapping": {
     "dependsOn": [
@@ -169,5 +169,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "1a4cbef01f3f21e08429be2d82bf43e18bb70ce9fe5b2b963c18e4eb424a8219"
+  "shardHash": "67432f9e867d1a31dd3b8d48430b0c4102ee76e4cbbbb8ba009b51ed814f0ce2"
 }

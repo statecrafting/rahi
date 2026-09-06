@@ -58,7 +58,7 @@
       "wave": 1
     },
     "id": "010-workspace-and-core-types",
-    "implementation": "pending",
+    "implementation": "in-progress",
     "kind": "kernel",
     "risk": "high",
     "sectionHeadings": [
@@ -77,6 +77,6 @@
     "summary": "The first build: a virtual Cargo workspace with the toolchain pinned, unsafe denied, one shared dependency table, and a supply-chain policy; plus rahi-types, the plain-data substrate every other crate depends on and that depends on nothing in the workspace. It fixes the Error enum with the four exit codes, the Principal as the IdP's subject plus claims, the Revision and FenceToken newtypes the store's invariants are written against, the Config tree derived from one public URL, and the schema version constants.\n",
     "title": "Cargo workspace and the core types: Error, Principal, Revision, FenceToken, Config"
   },
-  "shardHash": "fe5e9f9bbd22b9ef372ecf8b13f654cfeca3d2db464abf9e2cee238374c2388c",
+  "shardHash": "d5e1ec4583f455f7bb2d3d03cf52ef37d8939d75037b096d393d8b21d87b548b",
   "specVersion": "1.1.0"
 }
