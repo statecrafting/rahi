@@ -11,6 +11,11 @@
 //! The head is the value an append does a compare-and-swap against and the
 //! resident chain is what a boot decides to fail on: a stale replica would
 //! turn either into a wrong answer (spec 011 B-3).
+//!
+//! What is resident is a window, not the history. Spec 014 seals the tail
+//! into archived segments, and the one thing that changes here is the hash
+//! the oldest resident record links to: [`Ledger::resident_root`], not the
+//! genesis parent, once anything has been sealed.
 
 use rahi_store::Statement;
 use rahi_store::{StoreHandle, Value};
@@ -19,8 +24,10 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::record::{Decision, DecisionId, DecisionKind, Hash, Outcome, SignedRecord};
+use crate::seal::Depth;
+use crate::segment::{SEGMENTS_INDEX_SQL, SEGMENTS_TABLE_SQL};
 use crate::signer::{LedgerSigner, LedgerVerifier};
-use crate::verify::{order_chain, verify_chain};
+use crate::verify::order_chain;
 
 /// The decision table (spec 013 B-2).
 ///
@@ -91,10 +98,11 @@ impl Ledger {
     /// manifest change without a deploy genesis record is caught here rather
     /// than believed.
     ///
-    /// Verification runs over the whole resident chain on every open and
-    /// fails closed. The caller is a boot path and constitution XI makes the
-    /// consequence explicit: on [`Error::Integrity`] the process exits rather
-    /// than serves.
+    /// Verification runs over the whole resident chain and every sealed
+    /// segment's header on every open ([`crate::Depth::Resident`], spec 014
+    /// B-4) and fails closed. The caller is a boot path and constitution XI
+    /// makes the consequence explicit: on [`Error::Integrity`] the process
+    /// exits rather than serves.
     ///
     /// # Errors
     ///
@@ -114,12 +122,13 @@ impl Ledger {
         };
         ledger.create_schema().await?;
 
-        let mut records = ledger.records().await?;
-        if records.is_empty() {
+        // A chain whose whole head window has been sealed is empty here and
+        // is not a fresh chain: spec 014's segments are the rest of it, and
+        // re-genesising over them would fork the ledger at its root.
+        if ledger.records().await?.is_empty() && ledger.segment_count().await? == 0 {
             ledger.append(ledger.genesis_decision()).await?;
-            records = ledger.records().await?;
         }
-        verify_chain(&ledger.genesis_parent, &records, &ledger.verifier())?;
+        ledger.verify_chain(Depth::Resident).await?;
         Ok(ledger)
     }
 
@@ -146,8 +155,10 @@ impl Ledger {
     /// The hash the next append chains onto.
     ///
     /// The head is the one record no other record claims as a parent, or the
-    /// genesis parent when nothing is resident yet. Read through the leader:
-    /// this is the value the compare-and-swap is against.
+    /// resident root when nothing is resident yet: the genesis parent on a
+    /// fresh chain, and the last sealed segment's terminal hash on one whose
+    /// window has been archived (spec 014 B-4). Read through the leader: this
+    /// is the value the compare-and-swap is against.
     ///
     /// # Errors
     ///
@@ -160,7 +171,7 @@ impl Ledger {
         let mut heads = rows.into_iter();
         let Some(head) = heads.next() else {
             return if self.count().await? == 0 {
-                Ok(self.genesis_parent.clone())
+                self.resident_root().await
             } else {
                 Err(Error::Integrity(
                     "the chain has records but no head: its links form a cycle".to_owned(),
@@ -178,18 +189,21 @@ impl Ledger {
 
     /// Every resident record, in chain order.
     ///
+    /// Sealed records are not here: they are in the archive, and
+    /// [`Ledger::segments`] names them (spec 014 B-1).
+    ///
     /// # Errors
     ///
     /// [`Error::Integrity`] when a stored row does not parse or when the
-    /// records do not form one list rooted at the genesis parent; the store's
-    /// own error when the read fails.
+    /// records do not form one list rooted at [`Ledger::resident_root`]; the
+    /// store's own error when the read fails.
     pub async fn records(&self) -> Result<Vec<SignedRecord>, Error> {
         let rows: Vec<RecordRow> = self.store.query_consistent(RECORDS_SQL, vec![]).await?;
         let records = rows
             .into_iter()
             .map(|row| SignedRecord::from_bytes(&row.record))
             .collect::<Result<Vec<_>, Error>>()?;
-        order_chain(&self.genesis_parent, records)
+        order_chain(&self.resident_root().await?, records)
     }
 
     /// How many records are resident.
@@ -223,17 +237,17 @@ impl Ledger {
         Ok(out)
     }
 
-    /// Verify the resident chain again, without reopening.
+    /// Verify the chain again, without reopening.
+    ///
+    /// The boot check: what is resident plus every sealed segment's header
+    /// ([`crate::Depth::Resident`]). Reaching the archived bodies is
+    /// [`Ledger::verify_chain`] at [`crate::Depth::Full`].
     ///
     /// # Errors
     ///
     /// [`Error::Integrity`] as [`Ledger::open`].
     pub async fn verify(&self) -> Result<(), Error> {
-        verify_chain(
-            &self.genesis_parent,
-            &self.records().await?,
-            &self.verifier(),
-        )
+        self.verify_chain(Depth::Resident).await
     }
 
     /// The genesis record's decision: the chain's own statement of what it is.
@@ -268,6 +282,12 @@ impl Ledger {
         {
             return Err(self.index_failure(err).await);
         }
+        self.store
+            .txn(vec![
+                Statement::new(SEGMENTS_TABLE_SQL),
+                Statement::new(SEGMENTS_INDEX_SQL),
+            ])
+            .await?;
         Ok(())
     }
 
