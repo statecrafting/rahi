@@ -6,12 +6,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+  # No npm anywhere in this repository (spec 001 D-1), so no npm entry.
+  # The cargo entry reports "no manifest" until spec 010 lands Cargo.toml.
   - package-ecosystem: cargo
     directory: /
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
-  - package-ecosystem: npm
-    directory: /web
-    schedule:
-      interval: weekly

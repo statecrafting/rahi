@@ -157,6 +157,20 @@ D-3 (2026-09-03, authoring). The hqgit `ledger-guardian` and
 checkable by a rule; a specialist agent per crate would cost a subagent
 spawn per review for a checklist the reviewer can hold.
 
+D-4 (2026-09-05, first CI runs). B-3's "cargo gates when a workspace
+exists" is guarded by an output of the `spine` job, not by `hashFiles` in
+a job-level `if`. GitHub allows `hashFiles` only inside a step (a
+job-level `if` is evaluated before any checkout), and the workflow fails
+at startup with `calling function "hashFiles" is not allowed here`, which
+reports as a run with no checks rather than as a failed gate; every
+govern run on this repository failed that way until this fix. The `spine`
+job probes for `Cargo.toml` and `deny.toml` after its checkout and
+publishes `has_cargo` and `has_deny`; the `cargo` and `deny` jobs gate on
+those. The guard's meaning is unchanged. The same review dropped the
+dependabot `npm` entry for `/web`, which D-1 already rules out and which
+failed on every scheduled run. Both were learned from hqgit's spec 001
+D-3, where the identical workflow first hit the failure.
+
 ## Verification
 
 ```verify:cli

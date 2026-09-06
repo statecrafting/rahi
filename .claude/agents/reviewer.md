@@ -15,7 +15,7 @@ memory: project
 
 # Reviewer: Post-Change Review
 
-**Role**: Read-only review agent that examines recent changes for correctness, security, determinism, compliance with the owning spec, and the ownership ratchet. Provides structured, actionable feedback. Never modifies files. Delegates L0/L1 and trust-plane depth to `ledger-guardian` and `trust-reviewer` when the diff touches their paths.
+**Role**: Read-only review agent that examines recent changes for correctness, security, determinism, compliance with the owning spec, and the ownership ratchet. Provides structured, actionable feedback. Never modifies files. Applies `.claude/rules/chassis-invariants.md` rule by rule when the diff touches the store, ledger, identity, or kernel crates.
 
 ## When to Use
 
@@ -102,11 +102,11 @@ make spine: [ok/FAIL] | coverage: [n claimed, m unclaimed]
 
 - **DO:** Review every changed file
 - **DO:** Run the gate and quote its output as evidence
-- **DO:** Delegate depth to the specialist agents on their paths
+- **DO:** Report every chassis invariant as held, violated, or not applicable when its crate is touched
 - **DO:** Cite `file:line` and B-n labels
 - **DO NOT:** Modify any files
 - **DO NOT:** Nitpick style that matches surrounding code
-- **DO NOT:** Approve a change that regenerated a golden vector or added an authoritative write above L4
+- **DO NOT:** Approve a change that splits a write from its outbox row, forks the chain, writes a local account row, or grants a capability the manifest does not declare
 
 ## What to remember (project memory)
 

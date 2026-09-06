@@ -72,7 +72,7 @@ code.
   {
     "id": "<spec-id>/D-n",
     "specId": "<spec-id>",
-    "scope": ["<spec-id>", "crates/rahi-ledger/src/entry.rs"],
+    "scope": ["<spec-id>", "crates/rahi-ledger/src/append.rs"],
     "title": "one line",
     "decision": "what was chosen",
     "rationale": "why",
@@ -89,7 +89,7 @@ code.
 
 ## Step 3: implement inside the territory (steps 4 and 5)
 
-- Every new file under `crates/`, `fuzz/`, `executor/`, or `web/` is
+- Every new file under `crates/`, `apps/`, `docker/`, or `deploy/` is
   claimed in this spec's `establishes` in the same change (the ownership
   ratchet: `spec-spine index coverage --fail-on-untraced` refuses an
   unclaimed file and `couple` refuses a changed one).
@@ -99,11 +99,11 @@ code.
   with `workspace = true`. Always `--locked`.
 - Touching a file another spec owns needs an `extends` edge on that
   spec's unit, declared in this spec's frontmatter.
-- The frozen invariants (step 5): nothing that reaches a hashed byte may
-  depend on a clock, an environment read, a float, or `HashMap`
-  iteration. A change to any golden vector under
-  `crates/rahi-types/testdata/vectors/` is a schema MAJOR and a human
-  decision: stop and report, never regenerate.
+- The chassis invariants (step 5): `.claude/rules/chassis-invariants.md`
+  is the checklist. Ledger records and manifests hash canonical bytes, so
+  nothing that reaches them may depend on `HashMap` iteration, a float,
+  or an ambient read. A change that needs an invariant relaxed is a human
+  decision: stop and report.
 - Do not edit `.derived/` by hand.
 
 Use the `implementer` agent for focused sub-tasks and `explorer` for
@@ -148,7 +148,7 @@ next spec.
 - A dirty tree, the wrong branch, or a red `make spine` in preflight.
 - A `draft` spec, an unmet dependency, or a missing operator prerequisite.
 - A contradiction between the spec and what the code must do.
-- A golden vector that would change.
+- A chassis invariant that would have to be relaxed.
 - A coupling failure that only a spec rewrite or a `Spec-Drift-Waiver:`
   could clear: a driven session never self-approves a waiver.
 - A `PreToolUse` hook refusal (exit 2): it is a stop, not an obstacle.

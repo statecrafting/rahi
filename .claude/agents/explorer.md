@@ -20,7 +20,7 @@ mutation: read-only
 
 - To understand how a layer, crate, or module works, or is specified to work
 - To trace a `depends_on` chain, an `extends` chain, or a crate dependency chain
-- To find every spec that claims a path, every fact kind, every predicate, every seam
+- To find every spec that claims a path, every migration, every route, every seam
 - To answer "where is X specified?", "what depends on Y?", "which spec owns Z?"
 - Before planning a change, to gather the current state of affected specs and code
 
@@ -45,7 +45,7 @@ Which layer, which spec ids, which crates. Note whether the answer is about the 
 ### 2. Search Broadly, Then Narrow
 
 - `Glob` for `specs/*/spec.md`, `crates/*/src/**/*.rs`
-- `Grep` for fact kinds (`change.revision_submitted`), predicate URIs (`rahi/approval/v1`), seams (`trait IssuerResolver`), spec ids
+- `Grep` for capability names in manifests, decision `Outcome` variants, seams (`trait Cell`, `LedgerSigner`), spec ids
 - `Read` the spec or file once located
 - `Bash` for `spec-spine registry list --ids-only`, `spec-spine registry show <id>`, `spec-spine registry relationships <id>`, `spec-spine index coverage`, `cargo metadata`, `git log`
 

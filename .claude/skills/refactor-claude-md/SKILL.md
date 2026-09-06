@@ -39,7 +39,7 @@ index: every change here couples to `specs/001-agentic-harness/spec.md`
    ```markdown
    ---
    paths:
-     - "crates/rahi-eval/**"
+     - "crates/rahi-edge/**"
    ---
 
    Two or three key points, and the doc to read: `docs/<name>.md`.
@@ -63,13 +63,14 @@ index: every change here couples to `specs/001-agentic-harness/spec.md`
 ## Good extraction candidates in this repository
 
 - Per-crate implementation notes once a crate has shipped (for example
-  the REAPI digest mapping for `crates/rahi-eval/**`).
-- Testing patterns (fixture ledgers, the `testing` feature builders).
-- The web client's conventions (`web/**`).
+  the middleware order and probe semantics for `crates/rahi-edge/**`).
+- Testing patterns (fixture chains, injected clocks and stores, the
+  harness in `rahi-harness`).
+- Deployment notes for `docker/**` and `deploy/**`.
 
 ## Keep in CLAUDE.md
 
-- The frozen invariants and the hash-stability rule.
+- The frozen chassis invariants.
 - Commands and exit codes.
 - The layer-to-crate table.
 - Governance mechanics (ownership ratchet, committed `.derived/`, hooks).

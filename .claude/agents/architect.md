@@ -37,7 +37,7 @@ rahi is specified before it is built: the corpus under `specs/` is the whole des
 | Design | `docs/design/` | Analysis; cited, never authoritative |
 | Derived | `.derived/` | Compiler output, read only through `spec-spine` |
 
-Behavioral rules live in `.claude/rules/`: the standing three (orchestrator, governed reads, coherence guard) and the path-scoped three (ledger invariants, trust invariants, build commands).
+Behavioral rules live in `.claude/rules/`: the standing three (orchestrator, governed reads, coherence guard) and the path-scoped two (chassis invariants, build commands).
 
 ## Process
 
@@ -56,8 +56,8 @@ Read the spec (or request). Identify the layer, the crate, every file in `establ
 ### 3. Validate Against the Corpus
 
 - Does the approach stay inside the spec's Territory? A file outside it needs an `extends` edge or belongs to another spec.
-- Does it hold the frozen invariants? Anything that changes a golden vector, adds a clock or map-order dependency to a hashed path, or writes authoritatively from L5 up is a stop, not a plan step.
-- Does it keep dependencies pointing downward? `rahi-cli` and `rahi-server` never depend on each other.
+- Does it hold the frozen invariants? Anything that splits a write from its outbox row, puts durable state in the cache group, opens rauthy's store, forks or rewrites the decision chain, writes a local account row, or grants a capability the manifest does not declare is a stop, not a plan step.
+- Does it keep dependencies pointing downward? types, store, ledger and kernel, idp and edge, ops and cli; the chassis never depends on an app under `apps/`.
 - Does it need a new third-party crate? Then the plan includes the `[workspace.dependencies]` entry and the `extends` edge on spec 010.
 - Will the derived artifacts need regenerating (`spec-spine compile && spec-spine index`)? Almost always yes.
 
@@ -67,7 +67,7 @@ Ordered, atomic steps. For each: **What** (files), **Why** (the B-n, FR, or prin
 
 ### 5. Identify Risks
 
-- **Invariant risk**: any step near hashed bytes, signatures, or cache trust
+- **Invariant risk**: any step near `txn` boundaries, the chain append path, session or principal handling, or kernel adjudication
 - **Coupling drift**: a file the plan touches that no edge covers
 - **Ownership debt**: a new file not yet in `establishes` (`C-002`)
 - **Spec silence**: a decision the spec does not make; name it so the session records a D-n
@@ -110,15 +110,15 @@ Ordered, atomic steps. For each: **What** (files), **Why** (the B-n, FR, or prin
 - **DO:** Keep each step verifiable by one command
 - **DO NOT:** Modify files; this agent is read-only
 - **DO NOT:** Plan around the gate or the ownership ratchet
-- **DO NOT:** Propose regenerating a golden vector
+- **DO NOT:** Propose relaxing a chassis invariant; that is a human decision
 
 ## What to remember (project memory)
 
 This agent writes to `.claude/agent-memory/architect/MEMORY.md`. Record patterns that recur across decompositions, not plans for specific specs:
 
-- **Spec-shape patterns**: edge combinations that keep the gate clean for a class of change (a crate extension, a new predicate, a new CLI verb)
+- **Spec-shape patterns**: edge combinations that keep the gate clean for a class of change (a crate extension, a new migration, a new CLI verb)
 - **Decomposition pitfalls**: wrong cuts seen proposed (splitting a spec's code and its `establishes` growth across PRs; putting a dependency in a crate manifest without the workspace table)
 - **Latent constraints**: invariants that emerge from how the crates compose rather than from one spec
-- **Reusable plan skeletons**: the standard shape for "found a crate", "add a module", "add a fact kind", "add a predicate"
+- **Reusable plan skeletons**: the standard shape for "found a crate", "add a module", "add a migration", "add a route"
 
 Do not record plans for specific specs, reactions to one conversation, or generic engineering advice.
