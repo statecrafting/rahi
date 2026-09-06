@@ -1,18 +1,18 @@
 {
   "diagnostics": {
-    "errors": [],
-    "warnings": [
+    "errors": [
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '016-store-binary-values-and-extensions' file unit 'crates/rahi-store/src/blob.rs' does not exist",
         "path": "crates/rahi-store/src/blob.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '016-store-binary-values-and-extensions' file unit 'crates/rahi-store/tests/blob.rs' does not exist",
         "path": "crates/rahi-store/tests/blob.rs"
       }
-    ]
+    ],
+    "warnings": []
   },
   "mapping": {
     "dependsOn": [
@@ -96,5 +96,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "fe560fe306d07bec928ec86e39256a8d9553eb9a6387d42c6a0181052c6e5141"
+  "shardHash": "e7f03f356621fde6fc89f4c783c4c628cf45f78955634881f9a18eeace1b2189"
 }
