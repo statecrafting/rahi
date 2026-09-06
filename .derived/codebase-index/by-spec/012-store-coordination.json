@@ -36,11 +36,6 @@
         "code": "W-001",
         "message": "spec '012-store-coordination' file unit 'crates/rahi-store/tests/outbox.rs' does not exist",
         "path": "crates/rahi-store/tests/outbox.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '012-store-coordination' file unit 'crates/rahi-store/src/lib.rs' does not exist",
-        "path": "crates/rahi-store/src/lib.rs"
       }
     ]
   },
@@ -48,7 +43,12 @@
     "dependsOn": [
       "011-store-hiqlite"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "crates/rahi-store/src/lib.rs",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
         "locations": [],
@@ -114,7 +114,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-store/src/lib.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {

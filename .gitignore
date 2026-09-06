@@ -28,3 +28,6 @@ data/
 # local overlays
 .idea/
 .DS_Store
+
+# subagent scratch memory written by the reviewer agent; never corpus truth
+.claude/agent-memory/

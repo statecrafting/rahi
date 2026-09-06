@@ -6,7 +6,7 @@ kind: "kernel"
 domain: "store"
 created: "2026-09-03"
 authors: ["Bartek Kus"]
-implementation: pending
+implementation: complete
 risk: critical
 wave: 1
 depends_on:
@@ -15,6 +15,7 @@ establishes:
   - "crates/rahi-store/Cargo.toml"
   - "crates/rahi-store/src/lib.rs"
   - "crates/rahi-store/src/config.rs"
+  - "crates/rahi-store/src/error.rs"
   - "crates/rahi-store/src/store.rs"
   - "crates/rahi-store/src/txn.rs"
   - "crates/rahi-store/src/query.rs"
@@ -24,8 +25,11 @@ establishes:
   - "crates/rahi-store/tests/txn.rs"
   - "crates/rahi-store/tests/migrate.rs"
   - "crates/rahi-store/tests/backup.rs"
+  - "crates/rahi-store/tests/common/"
 extends:
   - { spec: "010-workspace-and-core-types", unit: { kind: section, file: "Cargo.toml", anchor: "workspace.dependencies" }, nature: additive }
+  - { spec: "010-workspace-and-core-types", unit: "deny.toml", nature: additive }
+  - { spec: "010-workspace-and-core-types", unit: "Cargo.lock", nature: additive }
 constrains:
   - { flavor: invariant-freeze, unit: "crates/rahi-store/src/txn.rs", note: "one txn is the atomic unit; constitution IX" }
 summary: >
@@ -123,7 +127,62 @@ Locks, notify, outbox, and the revision watermark (012); the decision chain
 
 ## 7. Resolved decisions
 
-None yet.
+- **D-1 (2026-09-05, build session).** hiqlite `0.14` with
+  `default-features = false` and exactly the B-6 set. The default
+  `auto-heal` (silent WAL repair) and `toml` features are off: a chassis
+  that fails closed on integrity (constitution XI) does not heal storage
+  silently. `serde_json` is a runtime dependency (already in the tree
+  through hiqlite) for the owned-row mapping of D-2.
+- **D-2 (2026-09-05, build session).** `query_consistent<T:
+  DeserializeOwned>`: hiqlite returns owned rows from the leader with no
+  serde path, so the store flattens each owned row into a name-to-value
+  map and deserializes it, giving both read calls the same caller types.
+  Alternative rejected: a `FromRow` trait, which would have put a hiqlite
+  type in every caller's signature.
+- **D-3 (2026-09-05, build session).** Rauthy's territory is recognised
+  structurally: `Store::open` refuses any `data_dir` with a `rauthy` path
+  component, because rauthy's directory is the `rauthy` sibling on the
+  same volume (thesis §3) and B-7 forbids a field naming it.
+- **D-4 (2026-09-05, build session).** The chassis `Config` carries no
+  secrets, so `StoreConfig::from_config(&Config, StoreSecrets)` takes them
+  as a second argument and stays pure. `StoreSecrets` holds the two hiqlite
+  shared secrets and the at-rest key set as raw 32-byte keys; spec 030
+  custodies them under `/data/keys`. `Debug` on secret-bearing types
+  redacts.
+- **D-5 (2026-09-05, build session).** `schema_version` has no timestamp
+  column. hiqlite panics on `unixepoch()`, `time()`, and every other
+  non-deterministic SQL function on the write path, because each follower
+  must apply identical bytes. Consequence for every later spec: a
+  timestamp that reaches the store is a caller-supplied value, never a SQL
+  default.
+- **D-6 (2026-09-05, build session).** `Migration.sql` may hold several
+  statements separated by `;`; the store splits and applies them inside
+  the same `txn` that records the version. Trigger bodies, which contain
+  `;`, are not supported by the splitter. Migrations are validated as a
+  list (strictly ascending, never `0`) before anything runs; a recorded
+  version is skipped regardless of its text; an unapplied version below
+  the recorded one is `Error::Conflict`.
+- **D-7 (2026-09-05, build session).** hiqlite's `backup()` returns
+  nothing, so `BackupId` is the newest `backup_node_<id>_<ts>.sqlite` that
+  appears in the local listing after the call. The follower check runs
+  before the call through `is_leader_db`, so a follower gets
+  `Error::Stale` without a round-trip. `backup_list_s3` without a target
+  is `Error::Config` rather than hiqlite's empty list.
+- **D-8 (2026-09-05, build session).** The cache group has one index,
+  `Cache::Kv`; spec 012 grows the enum through an `extends` edge on
+  `store.rs`. `Store` owns the lifecycle (`open`, `shutdown`) and derefs
+  to the clonable `StoreHandle` that carries every operation.
+- **D-9 (2026-09-05, build session, needs human review).** hiqlite's tree
+  fails the 010 B-3 policy on two counts, and this spec extends `deny.toml`
+  additively rather than weakening the policy: `CDLA-Permissive-2.0` is
+  allowed for `webpki-root-certs` (the Mozilla root store as data), and
+  `RUSTSEC-2026-0194` and `RUSTSEC-2026-0195` (quick-xml 0.39, both
+  denial-of-service in XML parsing) are ignored with reasons, because the
+  fixed quick-xml is a semver-breaking jump that no released `cryptr`
+  under hiqlite 0.14's pin can reach, and the only XML the workspace
+  parses is the listing of its own configured backup bucket. The ignores
+  are to be removed the moment hiqlite lifts `cryptr`. Alternative
+  rejected: a `[patch]` to a fork, which the constitution forbids.
 
 ## Verification
 

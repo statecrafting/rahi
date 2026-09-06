@@ -1,0 +1,25 @@
+[package]
+name = "rahi-store"
+version = "0.1.0"
+description = "The application store of the rahi chassis: hiqlite in-process with txn, two read calls, migrations, and backup"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[package.metadata.spec-spine]
+spec = "011-store-hiqlite"
+
+[dependencies]
+rahi-types = { workspace = true }
+hiqlite = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+
+[lints]
+workspace = true

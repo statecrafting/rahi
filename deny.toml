@@ -9,7 +9,15 @@ all-features = true
 version = 2
 unmaintained = "workspace"
 yanked = "deny"
-ignore = []
+ignore = [
+  # quick-xml 0.39 under hiqlite 0.14 -> cryptr ^0.10 -> s3-simple ^0.8. The
+  # fix (quick-xml >= 0.41) is a semver-breaking jump no released cryptr under
+  # hiqlite's pin can reach. Both are denial-of-service in XML parsing, and
+  # the only XML this workspace parses is the listing of its own configured
+  # backup bucket (spec 011 D-9). Remove both when hiqlite lifts cryptr.
+  { id = "RUSTSEC-2026-0194", reason = "quick-xml duplicate-attribute check; parses only the operator's own S3 listing" },
+  { id = "RUSTSEC-2026-0195", reason = "quick-xml NsReader allocation; parses only the operator's own S3 listing" },
+]
 
 [licenses]
 version = 2
@@ -23,6 +31,9 @@ allow = [
   "Zlib",
   "MPL-2.0",
   "MIT-0",
+  # webpki-root-certs: the Mozilla root store as data, pulled in by hiqlite's
+  # TLS stack (spec 011 D-9).
+  "CDLA-Permissive-2.0",
 ]
 confidence-threshold = 0.8
 # The allow list is the policy of B-3, not a mirror of the current tree.
