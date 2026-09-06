@@ -211,6 +211,23 @@ reach CI as a gate failure fixed deliberately: the same read-only stance
 D-5 gave the PR gate. It also exits quietly outside a spec corpus, so a
 non-corpus project never sees the message.
 
+D-7 (2026-09-06, pin bump). The `spec-spine` pin moves from 0.11.0 to
+0.14.0 in every site that states it (`govern.yml`, `AGENTS.md`, `README.md`,
+`/setup`, the architect agent). The corpus was verified byte-compatible
+first: 0.14.0's `compile --check` and `index check` both report fresh
+against shards written by 0.11.0. The bump matters here more than
+anywhere: spec-spine 044 was written for this corpus's `approved` +
+`in-progress` state, which 0.11.0 treats as not in flight, so every
+not-yet-written unit of the spec under build was a hard error for the
+whole build window. Also gained: `registry plan` (038, which `/next`
+reimplemented in Python), `--json` verdicts (037), `layout.state_dir`
+(039, the declared home for `data/` instead of `resolver_exclusions`),
+and the 046 kit hooks, which are the D-5/D-6 fixes ported upstream.
+`spec-spine index` now prints the `W-001` warnings it always recorded; on
+a pending spec that is one line per not-yet-written unit and is expected.
+Follow-ons (`registry plan` in the init reads, `state_dir`, retiring the
+Python in `/next`) are their own change.
+
 ## Verification
 
 ```verify:cli

@@ -1,6 +1,6 @@
 ---
 name: setup
-description: "One-time contributor setup for rahi: install spec-spine 0.11.0, the pinned Rust toolchain once rust-toolchain.toml exists, the optional cargo-deny, and verify the governed loop with make spine."
+description: "One-time contributor setup for rahi: install spec-spine 0.14.0, the pinned Rust toolchain once rust-toolchain.toml exists, the optional cargo-deny, and verify the governed loop with make spine."
 allowed-tools: Bash, Read
 ---
 
@@ -13,17 +13,17 @@ ad-hoc parsing of `.derived/**/*.json`
 
 ## Process
 
-### 1. Install spec-spine 0.11.0
+### 1. Install spec-spine 0.14.0
 
 The version is pinned in `AGENTS.md` and in `.github/workflows/govern.yml`
 (`SPEC_SPINE_VERSION`); the three must agree. Either route:
 
 ```sh
-cargo install spec-spine-cli --version 0.11.0 --locked   # with a Rust toolchain
-npm i -g spec-spine@0.11.0                               # prebuilt binary, no toolchain
+cargo install spec-spine-cli --version 0.14.0 --locked   # with a Rust toolchain
+npm i -g spec-spine@0.14.0                               # prebuilt binary, no toolchain
 ```
 
-Verify: `spec-spine --version` prints `spec-spine 0.11.0`. A different
+Verify: `spec-spine --version` prints `spec-spine 0.14.0`. A different
 version is a halt: CI runs the pinned one and a local pass on another
 version proves nothing.
 
@@ -89,7 +89,7 @@ Report exactly:
 ```
 ## setup: rahi
 
-**spec-spine:** {0.11.0 / wrong version <v> / failed at <step>}
+**spec-spine:** {0.14.0 / wrong version <v> / failed at <step>}
 **Rust toolchain:** {<channel> from rust-toolchain.toml / not yet (spec 010 pending)}
 **Optional tools:** cargo-deny {present/absent}, jq {present/absent}
 **Governed loop (make spine):**
