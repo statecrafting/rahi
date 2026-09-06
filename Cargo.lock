@@ -223,6 +223,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
+name = "attest-ledger-core"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cdf835c5e3680ddaf4dd9c4da525a8762ce5803e1f3245889a7393f3ccd5f183"
+dependencies = [
+ "attest-ledger-types",
+ "base64 0.22.1",
+ "canonical-keysort-json",
+ "ed25519-dalek",
+ "getrandom 0.4.3",
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+]
+
+[[package]]
+name = "attest-ledger-types"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16b5cb6e21a7f0342be61b4cf42bfdad81360f2efdf4eeec4dc33c32734691d7"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -498,6 +525,15 @@ name = "bytes"
 version = "1.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
+
+[[package]]
+name = "canonical-keysort-json"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05b39d732daeef9a1bff08849dfaa3217be9a9765024d494f6a5707e987e1043"
+dependencies = [
+ "serde_json",
+]
 
 [[package]]
 name = "cc"
@@ -857,6 +893,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "curve25519-dalek"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5eed333089e2e1c1ac8c6c0398e5e2497b4c9926ca6d0365ed1e099afa5bc23"
+dependencies = [
+ "cfg-if",
+ "cpufeatures 0.3.1",
+ "curve25519-dalek-derive",
+ "digest 0.11.3",
+ "fiat-crypto",
+ "rustc_version",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
+name = "curve25519-dalek-derive"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f46882e17999c6cc590af592290432be3bce0428cb0d5f8b6715e4dc7b383eb3"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "data-encoding"
 version = "2.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -974,6 +1037,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
+name = "ed25519"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29fcf32e6c73d1079f83ab4d782de2d81620346a5f38c6237a86a22f8368980a"
+dependencies = [
+ "signature",
+]
+
+[[package]]
+name = "ed25519-dalek"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ebaa1a2bf1290ab3bfe5a7b771d050ebffab2711c19a81691c683a5144a25de"
+dependencies = [
+ "curve25519-dalek",
+ "ed25519",
+ "sha2 0.11.0",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
 name = "either"
 version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1059,6 +1144,12 @@ dependencies = [
  "tokio",
  "utf-8",
 ]
+
+[[package]]
+name = "fiat-crypto"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64cd1e32ddd350061ae6edb1b082d7c54915b5c672c389143b9a63403a109f24"
 
 [[package]]
 name = "find-msvc-tools"
@@ -2281,6 +2372,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
+name = "rahi-ledger"
+version = "0.1.0"
+dependencies = [
+ "attest-ledger-core",
+ "attest-ledger-types",
+ "base64 0.22.1",
+ "canonical-keysort-json",
+ "ed25519-dalek",
+ "rahi-store",
+ "rahi-types",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "rahi-store"
 version = "0.1.0"
 dependencies = [
@@ -2934,6 +3042,12 @@ name = "shlex"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
+
+[[package]]
+name = "signature"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "28d567dcbaf0049cb8ac2608a76cd95ff9e4412e1899d389ee400918ca7537f5"
 
 [[package]]
 name = "simd_cesu8"

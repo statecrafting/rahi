@@ -14,12 +14,20 @@ authors = ["Bartek Kus"]
 
 [workspace.dependencies]
 rahi-types = { path = "crates/rahi-types", version = "0.1.0" }
+rahi-store = { path = "crates/rahi-store", version = "0.1.0" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 hiqlite = { version = "0.14", default-features = false, features = ["sqlite", "cache", "counters", "dlock", "listen_notify_local", "backup", "s3"] }
 futures-core = { version = "0.3", default-features = false }
 tokio = { version = "1", default-features = false }
 tempfile = "3"
+# The statecrafting ledger primitives (spec 013): the record envelope, the
+# hashing and verification engine, and the canonical bytes both hash over.
+attest-ledger-types = "0.1"
+attest-ledger-core = "0.1"
+canonical-keysort-json = "0.1"
+ed25519-dalek = "3"
+base64 = "0.22"
 
 [workspace.lints.rust]
 unsafe_code = "deny"

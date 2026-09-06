@@ -1,0 +1,30 @@
+[package]
+name = "rahi-ledger"
+version = "0.1.0"
+description = "The decision chain of the rahi chassis: hash-linked signed records, a unique-parent CAS append, and full verification at boot"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[package.metadata.spec-spine]
+spec = "013-ledger-decision-chain"
+
+[dependencies]
+rahi-types = { workspace = true }
+rahi-store = { workspace = true }
+attest-ledger-types = { workspace = true }
+attest-ledger-core = { workspace = true }
+canonical-keysort-json = { workspace = true }
+ed25519-dalek = { workspace = true }
+base64 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+
+[lints]
+workspace = true
