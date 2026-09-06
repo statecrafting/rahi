@@ -1,25 +1,22 @@
 {
-  "diagnostics": {
-    "errors": [
-      {
-        "code": "I-004",
-        "message": "spec '016-store-binary-values-and-extensions' file unit 'crates/rahi-store/src/blob.rs' does not exist",
-        "path": "crates/rahi-store/src/blob.rs"
-      },
-      {
-        "code": "I-004",
-        "message": "spec '016-store-binary-values-and-extensions' file unit 'crates/rahi-store/tests/blob.rs' does not exist",
-        "path": "crates/rahi-store/tests/blob.rs"
-      }
-    ],
-    "warnings": []
-  },
   "mapping": {
     "dependsOn": [
       "011-store-hiqlite",
       "012-store-coordination"
     ],
     "implementingPaths": [
+      {
+        "path": "Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/src/blob.rs",
+        "source": "spec-edge"
+      },
       {
         "path": "crates/rahi-store/src/lib.rs",
         "source": "spec-edge"
@@ -31,11 +28,19 @@
       {
         "path": "crates/rahi-store/src/store.rs",
         "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/tests/blob.rs",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-store/src/blob.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -44,12 +49,29 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-store/tests/blob.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
           "kind": "file",
           "path": "crates/rahi-store/tests/blob.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-store/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/Cargo.toml"
         }
       },
       {
@@ -85,6 +107,37 @@
           }
         ],
         "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/store.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.toml",
+            "span": {
+              "endLine": 50,
+              "startLine": 15
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "anchor": "workspace.dependencies",
+          "file": "Cargo.toml",
+          "kind": "section"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-store/src/store.rs"
+          }
+        ],
+        "ownership": true,
         "sourceField": "constrains",
         "unit": {
           "kind": "file",
@@ -96,5 +149,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "e7f03f356621fde6fc89f4c783c4c628cf45f78955634881f9a18eeace1b2189"
+  "shardHash": "8adbb329ef71bb6be26280bbfb5f98c347b57d1cd0ed4e3c414aeb02d01794cd"
 }

@@ -18,6 +18,9 @@ establishes:
 extends:
   - { spec: "011-store-hiqlite", unit: "crates/rahi-store/src/lib.rs", nature: additive }
   - { spec: "011-store-hiqlite", unit: "crates/rahi-store/src/query.rs", nature: additive }
+  - { spec: "011-store-hiqlite", unit: "crates/rahi-store/src/store.rs", nature: additive }
+  - { spec: "011-store-hiqlite", unit: "crates/rahi-store/Cargo.toml", nature: additive }
+  - { spec: "010-workspace-and-core-types", unit: { kind: section, file: "Cargo.toml", anchor: "workspace.dependencies" }, nature: additive }
 constrains:
   - { flavor: invariant-freeze, unit: "crates/rahi-store/src/store.rs", note: "no SQLite extension is ever loaded; every node runs one identical engine" }
 summary: >
@@ -131,6 +134,75 @@ before it hands the store bytes.
   which is the worst possible failure shape: correct in development,
   divergent in production. Rejected alternative: allow extensions when
   `cluster.size == 1`.
+
+- **D-2 (2026-09-06, build session).** The boot assertion of B-4 asserts
+  the outcome, not the flag. hiqlite 0.14 owns the connection pool, hands
+  out no rusqlite handle, and drops row-level errors on every local read
+  (`while let Some(Ok(row)) = rows.next()`), so a load request comes back
+  as `Ok(vec![])` whether the engine refused it or merely failed it: the
+  connection's flag is not readable from here. `Store::open` therefore
+  asserts what is readable and is what matters: the request returns no
+  row, and a load that had succeeded would return exactly one. The rest of
+  the ban is static (the grep of FR-004, and no API that could). Rejected
+  alternative: probing through `execute`, which would append a probe
+  statement to the Raft log at every boot and would assert the leader's
+  engine rather than this node's own.
+
+- **D-3 (2026-09-06, build session).** The ceiling is a property of the
+  handle, not a `StoreConfig` field. `MAX_VALUE_BYTES` is where every
+  handle starts; `StoreHandle::with_max_value_bytes` returns a clone with a
+  lower one and refuses anything above the current value, which is what
+  "configurable downward only" means without a mutable global.
+  `StoreHandle::engine_report()` is the pair of facts AC-2 has `preflight`
+  print. The check covers `Text` parameters as well as `Blob`, because
+  both are replicated verbatim, and runs on the write paths only, because
+  a read parameter is never appended to the log. It lands in 011's
+  `store.rs`, declared as an additive `extends` edge, because `execute`,
+  `txn`, and `open` all live there. Rejected alternative: a
+  `max_value_bytes` field on `StoreConfig`, which 016's territory does not
+  reach and which would have rewritten every `StoreConfig` literal in
+  specs 011, 013, and 015.
+
+- **D-4 (2026-09-06, build session).** `query_paged` appends
+  `LIMIT $n+1 OFFSET $n+2` rather than B-3's literal `LIMIT ? OFFSET ?`,
+  because hiqlite binds positionally and SQLite would derive a bare `?`'s
+  index from the highest number already in the statement, which the
+  caller, not the chassis, controls. A `Page` whose size is zero is
+  `Error::Validation`: it never advances a sweep. The paged read is local,
+  like every other scan; a sweep that took a leader round-trip per page
+  would pause Raft once per page.
+
+- **D-5 (2026-09-06, build session).** The grep of B-4 has no exemption
+  list. `blob.rs` assembles the SQL function's name from two halves with
+  `concat!`, so the token appears nowhere in the crate's sources and any
+  occurrence at all is a defect. `tests/blob.rs` scans
+  `crates/rahi-store/src` for all three names and proves the scanner
+  fails on each of them in a sample rather than assuming it would.
+
+- **D-6 (2026-09-06, build session).** FR-005's N=3 test lives in
+  `crates/rahi-store/tests/blob.rs`. Spec 033's harness boots the packaged
+  binary over HTTP, is a different instrument, and does not exist yet,
+  while hiqlite starts three in-process nodes in one test as its own
+  cluster tests do. The test writes 1000 BLOB rows through the leader and
+  compares a paged `query_consistent` sweep and each node's own local
+  sweep, byte for byte.
+
+- **D-7 (2026-09-06, build session).** `serde_bytes` enters
+  `[workspace.dependencies]` and `rahi-store`'s `[dev-dependencies]` only.
+  B-1 names `serde_bytes::ByteBuf` as a supported column shape, and the
+  claim is worth testing; no chassis code depends on it, and the store's
+  own path carries bytes without it.
+
+## 8. Status
+
+- **2026-09-06.** B-1 to B-6, FR-001 to FR-005, and AC-1 hold. AC-2 does
+  not, and cannot yet: `preflight` is `crates/rahi-ops/src/preflight.rs`,
+  spec 030's territory, and spec 030 is `pending`. The two facts AC-2 has
+  it print are implemented and tested here as
+  `StoreHandle::engine_report()`, whose `Display` is
+  `extensions: none, max_value_bytes: <n>`. The session that builds 030
+  adds that line to the preflight check list of its B-3 and flips this
+  spec to `implementation: complete`; until then it stays `in-progress`.
 
 ## Verification
 
