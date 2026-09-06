@@ -1,63 +1,63 @@
 {
   "diagnostics": {
-    "errors": [],
-    "warnings": [
+    "errors": [
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '013-ledger-decision-chain' file unit 'crates/rahi-ledger/Cargo.toml' does not exist",
         "path": "crates/rahi-ledger/Cargo.toml"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '013-ledger-decision-chain' file unit 'crates/rahi-ledger/src/lib.rs' does not exist",
         "path": "crates/rahi-ledger/src/lib.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '013-ledger-decision-chain' file unit 'crates/rahi-ledger/src/record.rs' does not exist",
         "path": "crates/rahi-ledger/src/record.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '013-ledger-decision-chain' file unit 'crates/rahi-ledger/src/chain.rs' does not exist",
         "path": "crates/rahi-ledger/src/chain.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '013-ledger-decision-chain' file unit 'crates/rahi-ledger/src/append.rs' does not exist",
         "path": "crates/rahi-ledger/src/append.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '013-ledger-decision-chain' file unit 'crates/rahi-ledger/src/verify.rs' does not exist",
         "path": "crates/rahi-ledger/src/verify.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '013-ledger-decision-chain' file unit 'crates/rahi-ledger/src/signer.rs' does not exist",
         "path": "crates/rahi-ledger/src/signer.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '013-ledger-decision-chain' file unit 'crates/rahi-ledger/tests/append.rs' does not exist",
         "path": "crates/rahi-ledger/tests/append.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '013-ledger-decision-chain' file unit 'crates/rahi-ledger/tests/verify.rs' does not exist",
         "path": "crates/rahi-ledger/tests/verify.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '013-ledger-decision-chain' file unit 'crates/rahi-ledger/testdata/chains/' does not exist",
         "path": "crates/rahi-ledger/testdata/chains/"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '013-ledger-decision-chain' file unit 'crates/rahi-ledger/src/append.rs' does not exist",
         "path": "crates/rahi-ledger/src/append.rs"
       }
-    ]
+    ],
+    "warnings": []
   },
   "mapping": {
     "dependsOn": [
@@ -192,5 +192,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "e6c380bbb1e2ffda4287910d6d60e0e6f7961ae4062ca471b911cc1bb81fbeeb"
+  "shardHash": "9e8313ad3f0e903304156af2ae8d5a3ccac292d0d4a24f4388676a49cc1d379e"
 }
