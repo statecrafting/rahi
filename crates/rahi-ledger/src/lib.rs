@@ -43,23 +43,39 @@
 //! # }
 //! ```
 //!
-//! Sealing the tail into archived segments is spec 014's, in this same crate;
-//! what a decision is *about* is spec 015's, which owns the kinds and emits
+//! The tail is not unbounded. hiqlite replicates the whole database to every
+//! node, so history that only grows cannot stay resident: spec 014 seals the
+//! oldest run into an immutable [`Segment`], writes it to an [`Archive`], and
+//! deletes it from the hot table ([`seal`], [`segment`], [`archive`]). The
+//! chain still verifies end to end, because the segments carry their own
+//! hash links and [`Ledger::resident_root`] names the hash the oldest
+//! resident record chains onto.
+//!
+//! What a decision is *about* is spec 015's, which owns the kinds and emits
 //! them.
 
 #![forbid(unsafe_code)]
 
 pub mod append;
+pub mod archive;
 pub mod chain;
 pub mod record;
+pub mod seal;
+pub mod segment;
 pub mod signer;
 pub mod verify;
 
 pub use append::APPEND_ATTEMPTS;
+pub use archive::{Archive, FsArchive, S3Archive, S3Config};
 pub use chain::{DECISIONS_INDEX_SQL, DECISIONS_TABLE_SQL, Ledger};
 pub use record::{
     CanonicalJson, CapabilityId, Decision, DecisionId, DecisionKind, Hash, Outcome, SignedRecord,
     revision_stamp,
+};
+pub use seal::{Depth, SealPolicy};
+pub use segment::{
+    SEGMENT_PREFIX, SEGMENTS_INDEX_SQL, SEGMENTS_TABLE_SQL, Segment, SegmentHeader, order_segments,
+    segment_hash,
 };
 pub use signer::{DEFAULT_KEY_PATH, LedgerSigner, LedgerVerifier};
 pub use verify::{order_chain, verify_chain};

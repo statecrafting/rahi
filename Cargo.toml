@@ -28,6 +28,12 @@ attest-ledger-core = "0.1"
 canonical-keysort-json = "0.1"
 ed25519-dalek = "3"
 base64 = "0.22"
+# The segment archive (spec 014): a dyn-compatible async trait needs boxed
+# futures, and the object store is the S3 client hiqlite already carries,
+# reached through a parsed endpoint.
+async-trait = "0.1"
+s3-simple = "0.8"
+url = "2"
 
 [workspace.lints.rust]
 unsafe_code = "deny"

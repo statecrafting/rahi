@@ -40,6 +40,14 @@
         "spec": "013-ledger-decision-chain",
         "unit": {
           "kind": "file",
+          "path": "crates/rahi-ledger/src/chain.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "013-ledger-decision-chain",
+        "unit": {
+          "kind": "file",
           "path": "crates/rahi-ledger/Cargo.toml"
         }
       },
@@ -57,7 +65,7 @@
       "wave": 1
     },
     "id": "014-ledger-sealing-and-archive",
-    "implementation": "pending",
+    "implementation": "complete",
     "kind": "feature",
     "risk": "high",
     "sectionHeadings": [
@@ -76,6 +84,6 @@
     "summary": "hiqlite replicates the whole database to every node, so an unbounded audit history cannot live in it; the head and a hot window do. When the window exceeds its bound the oldest contiguous run is sealed into an immutable segment (first id, last id, count, segment hash, previous segment hash), written to an object store behind a trait with an S3 implementation, and deleted from the hot table. Segments link to their predecessor and the head links to the last segment, so the chain verifies end to end without archived history resident. Archive is never conflated with backup. Carries enrahitu://032 §3.7 and §3.9.\n",
     "title": "Ledger sealing: a resident hot window, immutable segments archived to object storage"
   },
-  "shardHash": "85bc213199a1a7178063d9a65ea9ad4826b7458d1100159b681b631e60017dbb",
+  "shardHash": "016b9fa4b5bf590751f1d4630e8fd6473bd456ac6382ec8a2f1b22676e5afb1a",
   "specVersion": "1.1.0"
 }

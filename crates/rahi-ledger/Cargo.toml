@@ -21,6 +21,10 @@ ed25519-dalek = { workspace = true }
 base64 = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+# The segment archive (spec 014 B-3).
+async-trait = { workspace = true }
+s3-simple = { workspace = true }
+url = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
