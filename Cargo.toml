@@ -13,8 +13,12 @@ repository = "https://github.com/statecrafting/rahi"
 authors = ["Bartek Kus"]
 
 [workspace.dependencies]
+rahi-types = { path = "crates/rahi-types", version = "0.1.0" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+hiqlite = { version = "0.14", default-features = false, features = ["sqlite", "cache", "dlock", "listen_notify_local", "backup", "s3"] }
+tokio = { version = "1", default-features = false }
+tempfile = "3"
 
 [workspace.lints.rust]
 unsafe_code = "deny"
