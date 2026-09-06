@@ -1,64 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '013-ledger-decision-chain' file unit 'crates/rahi-ledger/Cargo.toml' does not exist",
-        "path": "crates/rahi-ledger/Cargo.toml"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '013-ledger-decision-chain' file unit 'crates/rahi-ledger/src/lib.rs' does not exist",
-        "path": "crates/rahi-ledger/src/lib.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '013-ledger-decision-chain' file unit 'crates/rahi-ledger/src/record.rs' does not exist",
-        "path": "crates/rahi-ledger/src/record.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '013-ledger-decision-chain' file unit 'crates/rahi-ledger/src/chain.rs' does not exist",
-        "path": "crates/rahi-ledger/src/chain.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '013-ledger-decision-chain' file unit 'crates/rahi-ledger/src/append.rs' does not exist",
-        "path": "crates/rahi-ledger/src/append.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '013-ledger-decision-chain' file unit 'crates/rahi-ledger/src/verify.rs' does not exist",
-        "path": "crates/rahi-ledger/src/verify.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '013-ledger-decision-chain' file unit 'crates/rahi-ledger/src/signer.rs' does not exist",
-        "path": "crates/rahi-ledger/src/signer.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '013-ledger-decision-chain' file unit 'crates/rahi-ledger/tests/append.rs' does not exist",
-        "path": "crates/rahi-ledger/tests/append.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '013-ledger-decision-chain' file unit 'crates/rahi-ledger/tests/verify.rs' does not exist",
-        "path": "crates/rahi-ledger/tests/verify.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '013-ledger-decision-chain' file unit 'crates/rahi-ledger/testdata/chains/' does not exist",
-        "path": "crates/rahi-ledger/testdata/chains/"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '013-ledger-decision-chain' file unit 'crates/rahi-ledger/src/append.rs' does not exist",
-        "path": "crates/rahi-ledger/src/append.rs"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "011-store-hiqlite"
@@ -67,11 +7,63 @@
       {
         "path": "Cargo.toml",
         "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ledger",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "crates/rahi-ledger/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ledger/src/append.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ledger/src/chain.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ledger/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ledger/src/record.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ledger/src/signer.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ledger/src/verify.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ledger/testdata/chains/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ledger/tests/append.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ledger/tests/common/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ledger/tests/verify.rs",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ledger/Cargo.toml"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -80,7 +72,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ledger/src/append.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -89,7 +85,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ledger/src/chain.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -98,7 +98,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ledger/src/lib.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -107,7 +111,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ledger/src/record.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -116,7 +124,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ledger/src/signer.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -125,7 +137,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ledger/src/verify.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -134,7 +150,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ledger/testdata/chains/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -143,7 +163,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ledger/tests/append.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -152,7 +176,24 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ledger/tests/common/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/tests/common/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ledger/tests/verify.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -165,7 +206,7 @@
           {
             "file": "Cargo.toml",
             "span": {
-              "endLine": 23,
+              "endLine": 31,
               "startLine": 15
             }
           }
@@ -179,7 +220,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ledger/src/append.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "constrains",
         "unit": {
@@ -192,5 +237,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "e6c380bbb1e2ffda4287910d6d60e0e6f7961ae4062ca471b911cc1bb81fbeeb"
+  "shardHash": "ce365a149e2f883d36874fa3814d7329f36a83e8074ba77bd73bce2caab6a18d"
 }

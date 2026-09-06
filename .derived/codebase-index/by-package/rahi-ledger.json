@@ -1,0 +1,11 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "rahi-ledger",
+    "path": "crates/rahi-ledger",
+    "specRef": "013-ledger-decision-chain",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "4cbb599ac9565222e0b2e6b148fbec0950c1074d1ba84fd10ef33c91b3a9d319"
+}
