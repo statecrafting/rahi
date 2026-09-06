@@ -6,7 +6,7 @@ kind: "kernel"
 domain: "store"
 created: "2026-09-03"
 authors: ["Bartek Kus"]
-implementation: in-progress
+implementation: complete
 risk: critical
 wave: 1
 depends_on:
