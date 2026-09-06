@@ -66,11 +66,6 @@
         "code": "W-001",
         "message": "spec '020-edge-server' file unit 'crates/rahi-edge/tests/middleware.rs' does not exist",
         "path": "crates/rahi-edge/tests/middleware.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '020-edge-server' section unit 'workspace.dependencies' not found in Cargo.toml",
-        "path": "Cargo.toml"
       }
     ]
   },
@@ -78,7 +73,12 @@
     "dependsOn": [
       "015-kernel-manifest-and-adjudication"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "Cargo.toml",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
         "locations": [],
@@ -198,7 +198,15 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "Cargo.toml",
+            "span": {
+              "endLine": 18,
+              "startLine": 15
+            }
+          }
+        ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
@@ -212,5 +220,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "05dcaf77d0c336284b3a6afe87e3f77b0e47219b860bbd3f35d64a094b52b121"
+  "shardHash": "8d0093534da0501b10a3ba2c5ab099c3c2da1db4f7ef6ea86b1e498c3223f721"
 }

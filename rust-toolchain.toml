@@ -1,0 +1,4 @@
+# Pinned by spec 010 B-2. Bump by amending the spec's Resolved decisions.
+[toolchain]
+channel = "1.96.0"
+components = ["rustfmt", "clippy"]

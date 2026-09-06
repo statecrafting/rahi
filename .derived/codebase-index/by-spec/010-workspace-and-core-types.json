@@ -1,72 +1,86 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '010-workspace-and-core-types' file unit 'Cargo.toml' does not exist",
-        "path": "Cargo.toml"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '010-workspace-and-core-types' file unit 'rust-toolchain.toml' does not exist",
-        "path": "rust-toolchain.toml"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '010-workspace-and-core-types' file unit 'deny.toml' does not exist",
-        "path": "deny.toml"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '010-workspace-and-core-types' file unit 'crates/rahi-types/Cargo.toml' does not exist",
-        "path": "crates/rahi-types/Cargo.toml"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '010-workspace-and-core-types' file unit 'crates/rahi-types/src/lib.rs' does not exist",
-        "path": "crates/rahi-types/src/lib.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '010-workspace-and-core-types' file unit 'crates/rahi-types/src/error.rs' does not exist",
-        "path": "crates/rahi-types/src/error.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '010-workspace-and-core-types' file unit 'crates/rahi-types/src/principal.rs' does not exist",
-        "path": "crates/rahi-types/src/principal.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '010-workspace-and-core-types' file unit 'crates/rahi-types/src/revision.rs' does not exist",
-        "path": "crates/rahi-types/src/revision.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '010-workspace-and-core-types' file unit 'crates/rahi-types/src/config.rs' does not exist",
-        "path": "crates/rahi-types/src/config.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '010-workspace-and-core-types' file unit 'crates/rahi-types/src/version.rs' does not exist",
-        "path": "crates/rahi-types/src/version.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '010-workspace-and-core-types' file unit 'crates/rahi-types/tests/' does not exist",
-        "path": "crates/rahi-types/tests/"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "002-chassis-thesis"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "Cargo.lock",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "apps/.gitkeep",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-types",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "crates/rahi-types/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-types/src/config.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-types/src/error.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-types/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-types/src/principal.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-types/src/revision.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-types/src/version.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-types/tests/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deny.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "rust-toolchain.toml",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "Cargo.lock"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.toml"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -75,7 +89,24 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "apps/.gitkeep"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "apps/.gitkeep"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-types/Cargo.toml"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -84,7 +115,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-types/src/config.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -93,7 +128,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-types/src/error.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -102,7 +141,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-types/src/lib.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -111,7 +154,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-types/src/principal.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -120,7 +167,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-types/src/revision.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -129,7 +180,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-types/src/version.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -138,7 +193,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-types/tests/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -147,7 +206,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "deny.toml"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -156,7 +219,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "rust-toolchain.toml"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -169,5 +236,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "1a4cbef01f3f21e08429be2d82bf43e18bb70ce9fe5b2b963c18e4eb424a8219"
+  "shardHash": "96c4992f075a96d7d01eca3a8a694436f30ba65e6851b01fd3ad6dd70e96ab19"
 }

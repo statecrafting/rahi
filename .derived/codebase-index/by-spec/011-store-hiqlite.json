@@ -64,11 +64,6 @@
       },
       {
         "code": "W-001",
-        "message": "spec '011-store-hiqlite' section unit 'workspace.dependencies' not found in Cargo.toml",
-        "path": "Cargo.toml"
-      },
-      {
-        "code": "W-001",
         "message": "spec '011-store-hiqlite' file unit 'crates/rahi-store/src/txn.rs' does not exist",
         "path": "crates/rahi-store/src/txn.rs"
       }
@@ -78,7 +73,12 @@
     "dependsOn": [
       "010-workspace-and-core-types"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "Cargo.toml",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
         "locations": [],
@@ -189,7 +189,15 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "Cargo.toml",
+            "span": {
+              "endLine": 18,
+              "startLine": 15
+            }
+          }
+        ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
@@ -212,5 +220,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "d750b4375da3dfd930a0b57bddf418bc179bb3d2aad20e9fb4eca7c7980b6a4e"
+  "shardHash": "5069ead391417b07b673daaed60cf9b19acd70985ece550af90228e73357181d"
 }

@@ -1,0 +1,21 @@
+[package]
+name = "rahi-types"
+version = "0.1.0"
+description = "The plain-data substrate of the rahi chassis: Error, Principal, Revision, FenceToken, Config"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[package.metadata.spec-spine]
+spec = "010-workspace-and-core-types"
+
+[dependencies]
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[lints]
+workspace = true
