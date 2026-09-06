@@ -11,9 +11,6 @@ use std::path::{Path, PathBuf};
 use rahi_types::{Config, Error};
 use serde::{Deserialize, Serialize};
 
-/// The app hiqlite directory under the data volume root.
-pub const DEFAULT_HIQLITE_DIR: &str = "/data/hiqlite";
-
 /// The path component that marks rauthy's territory on the volume.
 const RAUTHY_DIR_NAME: &str = "rauthy";
 

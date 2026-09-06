@@ -25,7 +25,7 @@ pub mod store;
 pub mod txn;
 
 pub use backup::{BackupId, BackupListing};
-pub use config::{DEFAULT_HIQLITE_DIR, EncKey, EncKeys, S3Backup, StoreConfig, StoreSecrets};
+pub use config::{EncKey, EncKeys, Peer, S3Backup, StoreConfig, StoreSecrets};
 pub use migrate::{Migration, MigrationReport};
 pub use query::Value;
 pub use store::{Cache, Store, StoreHandle};
