@@ -1,0 +1,32 @@
+# A capability whose kind is outside the closed vocabulary (spec 015 FR-001).
+# `db.drop` reads like a real permission, which is exactly why an open
+# vocabulary is dangerous: the kernel would have no way to enforce it.
+
+[app]
+name = "hello-cell"
+org = "statecrafting"
+
+[resources]
+tables = ["notes"]
+
+[[capabilities]]
+id = "notes-drop"
+kind = "db.drop"
+resource = "notes"
+
+[services.notes]
+capabilities = ["notes-drop"]
+
+[ledger]
+schema_version = "1.0.0"
+max_record_bytes = 65536
+
+[observability]
+metrics_path = "/metrics"
+otel = false
+
+[auth]
+operator_role = "rahi-operator"
+
+[contract]
+version = "1.0.0"

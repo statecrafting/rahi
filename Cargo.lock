@@ -3,6 +3,31 @@
 version = 4
 
 [[package]]
+name = "action-gate-core"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a0c828e53a7a5648d0555dfd8208df7fc9231bb32371078eeabb03c691e4145"
+dependencies = [
+ "action-gate-types",
+ "canonical-keysort-json",
+ "hex",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+]
+
+[[package]]
+name = "action-gate-types"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f06b181e4649459d2fafaf0ffe087ee29f467d04044e50f9d1c0738564c63264"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "aead"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2372,6 +2397,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
+name = "rahi-kernel"
+version = "0.1.0"
+dependencies = [
+ "action-gate-core",
+ "action-gate-types",
+ "canonical-keysort-json",
+ "rahi-ledger",
+ "rahi-store",
+ "rahi-types",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "toml",
+]
+
+[[package]]
 name = "rahi-ledger"
 version = "0.1.0"
 dependencies = [
@@ -2987,6 +3029,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_spanned"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6662b5879511e06e8999a8a235d848113e942c9124f211511b16466ee2995f26"
+dependencies = [
+ "serde_core",
+]
+
+[[package]]
 name = "serde_urlencoded"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3356,6 +3407,19 @@ dependencies = [
  "libc",
  "pin-project-lite",
  "tokio",
+]
+
+[[package]]
+name = "toml"
+version = "1.1.5+spec-1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12c0ba9680044b4ce98d391a62094047eada0d64860b80166c39f4a6b5640785"
+dependencies = [
+ "serde_core",
+ "serde_spanned",
+ "toml_datetime",
+ "toml_parser",
+ "winnow 1.0.4",
 ]
 
 [[package]]

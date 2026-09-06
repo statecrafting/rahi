@@ -1,0 +1,11 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "rahi-kernel",
+    "path": "crates/rahi-kernel",
+    "specRef": "015-kernel-manifest-and-adjudication",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "da694233bb649fdc0b74bbb3a592afdfb6dd4a3f24d8e181b6bc83b6f7ff23d6"
+}

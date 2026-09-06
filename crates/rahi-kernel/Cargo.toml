@@ -1,0 +1,31 @@
+[package]
+name = "rahi-kernel"
+version = "0.1.0"
+description = "The governance seam of the rahi chassis: a declared capability manifest, verified at build, enforced at runtime, with every denial ledgered"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[package.metadata.spec-spine]
+spec = "015-kernel-manifest-and-adjudication"
+
+[dependencies]
+rahi-types = { workspace = true }
+rahi-store = { workspace = true }
+rahi-ledger = { workspace = true }
+action-gate-types = { workspace = true }
+action-gate-core = { workspace = true }
+canonical-keysort-json = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt", "sync", "time"] }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+
+[lints]
+workspace = true

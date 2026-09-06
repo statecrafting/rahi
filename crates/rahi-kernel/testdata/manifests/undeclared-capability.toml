@@ -1,0 +1,31 @@
+# A service granted a capability the catalog does not declare
+# (spec 015 FR-001). A grant that names nothing is a grant nobody can audit.
+
+[app]
+name = "hello-cell"
+org = "statecrafting"
+
+[resources]
+tables = ["notes"]
+
+[[capabilities]]
+id = "notes-read"
+kind = "db.read"
+resource = "notes"
+
+[services.notes]
+capabilities = ["notes-read", "notes-purge"]
+
+[ledger]
+schema_version = "1.0.0"
+max_record_bytes = 65536
+
+[observability]
+metrics_path = "/metrics"
+otel = false
+
+[auth]
+operator_role = "rahi-operator"
+
+[contract]
+version = "1.0.0"
