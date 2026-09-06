@@ -1,68 +1,68 @@
 {
   "diagnostics": {
-    "errors": [],
-    "warnings": [
+    "errors": [
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '015-kernel-manifest-and-adjudication' file unit 'crates/rahi-kernel/Cargo.toml' does not exist",
         "path": "crates/rahi-kernel/Cargo.toml"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '015-kernel-manifest-and-adjudication' file unit 'crates/rahi-kernel/src/lib.rs' does not exist",
         "path": "crates/rahi-kernel/src/lib.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '015-kernel-manifest-and-adjudication' file unit 'crates/rahi-kernel/src/manifest.rs' does not exist",
         "path": "crates/rahi-kernel/src/manifest.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '015-kernel-manifest-and-adjudication' file unit 'crates/rahi-kernel/src/capability.rs' does not exist",
         "path": "crates/rahi-kernel/src/capability.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '015-kernel-manifest-and-adjudication' file unit 'crates/rahi-kernel/src/verify.rs' does not exist",
         "path": "crates/rahi-kernel/src/verify.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '015-kernel-manifest-and-adjudication' file unit 'crates/rahi-kernel/src/adjudicate.rs' does not exist",
         "path": "crates/rahi-kernel/src/adjudicate.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '015-kernel-manifest-and-adjudication' file unit 'crates/rahi-kernel/src/facade.rs' does not exist",
         "path": "crates/rahi-kernel/src/facade.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '015-kernel-manifest-and-adjudication' file unit 'crates/rahi-kernel/src/observe.rs' does not exist",
         "path": "crates/rahi-kernel/src/observe.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '015-kernel-manifest-and-adjudication' file unit 'crates/rahi-kernel/tests/manifest.rs' does not exist",
         "path": "crates/rahi-kernel/tests/manifest.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '015-kernel-manifest-and-adjudication' file unit 'crates/rahi-kernel/tests/adjudicate.rs' does not exist",
         "path": "crates/rahi-kernel/tests/adjudicate.rs"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '015-kernel-manifest-and-adjudication' file unit 'crates/rahi-kernel/testdata/manifests/' does not exist",
         "path": "crates/rahi-kernel/testdata/manifests/"
       },
       {
-        "code": "W-001",
+        "code": "I-004",
         "message": "spec '015-kernel-manifest-and-adjudication' file unit 'crates/rahi-kernel/src/adjudicate.rs' does not exist",
         "path": "crates/rahi-kernel/src/adjudicate.rs"
       }
-    ]
+    ],
+    "warnings": []
   },
   "mapping": {
     "dependsOn": [
@@ -206,5 +206,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "5e79104bec1f5c599ad554885364213b919b981394115da46a54cc8bcbec5b1d"
+  "shardHash": "62e833f203331652336f678581aa462ba544ce93b3a28631884d86547cc77295"
 }

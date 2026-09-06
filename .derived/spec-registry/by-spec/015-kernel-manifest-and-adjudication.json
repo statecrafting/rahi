@@ -79,7 +79,7 @@
       "wave": 1
     },
     "id": "015-kernel-manifest-and-adjudication",
-    "implementation": "pending",
+    "implementation": "in-progress",
     "kind": "kernel",
     "risk": "critical",
     "sectionHeadings": [
@@ -98,6 +98,6 @@
     "summary": "The governance seam. An app declares a manifest (TOML, embedded at compile time): identity, services, resources by name, a capability catalog, per service grants, the gate roster, ledger and observability policy. The kernel canonicalizes and hashes it, verifies at build that every governed facade the app links is covered by a grant, adjudicates every store, lock, notify, secret, and egress operation at runtime through the action-gate primitive, denies anything not granted, and appends a Decision for every denial without the request path awaiting the ledger. Carries enrahitu://020 and enrahitu://021 with the parser-based extractor replaced by a declared manifest.\n",
     "title": "The kernel: a declared capability ceiling, verified at build, enforced at runtime, denials ledgered"
   },
-  "shardHash": "3a69715302c205d99493a74a5f97737e225b658efcf1f4a20b8650e73c1ec25e",
+  "shardHash": "5ac3c74f95622e44bc312b3fd6be33095f1ae7b7799a7c190979cb875d0d26e6",
   "specVersion": "1.1.0"
 }
