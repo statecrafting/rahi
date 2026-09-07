@@ -85,7 +85,7 @@
       "wave": 2
     },
     "id": "020-edge-server",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "kind": "kernel",
     "risk": "high",
     "sectionHeadings": [
@@ -104,6 +104,6 @@
     "summary": "The one public listener of a cell: an axum Router builder that an app mounts its services on, a fixed middleware order (observation outermost, then security headers, CSRF double-submit, and a per-node rate limiter on the cache group), liveness and readiness probes that answer different questions, a static file slot for the app's SPA, and one mapping from rahi_types::Error to HTTP status. Everything an app serves goes through this router; there is no second listener.\n",
     "title": "The edge: axum router, middleware chain, probes, static slot, error mapping"
   },
-  "shardHash": "c4ba05062dc1ccda57c8e1a69d81b62c26287b4ce07cd2079457c7cd8351fd72",
+  "shardHash": "279c776109bce0e1075845b168918a6a1fea8e259fa7277d82a89cd705401b71",
   "specVersion": "1.1.0"
 }
