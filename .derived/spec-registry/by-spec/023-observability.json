@@ -53,6 +53,46 @@
       },
       {
         "nature": "additive",
+        "spec": "020-edge-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/router.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "020-edge-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/Cargo.toml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "020-edge-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/testdata/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "015-kernel-manifest-and-adjudication",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/facade.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "015-kernel-manifest-and-adjudication",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/Cargo.toml"
+        }
+      },
+      {
+        "nature": "additive",
         "spec": "010-workspace-and-core-types",
         "unit": {
           "anchor": "workspace.dependencies",
@@ -65,7 +105,7 @@
       "wave": 2
     },
     "id": "023-observability",
-    "implementation": "pending",
+    "implementation": "complete",
     "kind": "feature",
     "risk": "medium",
     "sectionHeadings": [
@@ -84,6 +124,6 @@
     "summary": "The substrate contract every cell exposes: Prometheus text on /metrics from an in-process registry (process metrics, HTTP counters and duration histograms labeled by route pattern and status class, store operation counters, kernel decisions and ledger failures), and an OTel tracer with a span per request and per store operation that exports OTLP only when an endpoint is configured and always retains a bounded ring buffer of recent traces queryable in-process. Kernel decisions attach their id to the active span through the observe hook. Carries enrahitu://022.\n",
     "title": "Observability: /metrics always on, an in-process OTel tracer with a ring buffer, decisions on spans"
   },
-  "shardHash": "7e79d61c06ff89afd196b66464504856e722f5fd3a687d7be6dc77eba2844abb",
+  "shardHash": "f37bb9c9442173bfda81183db5bfccfcecaeca8a5abefefd97da90de949a5ff8",
   "specVersion": "1.1.0"
 }

@@ -23,6 +23,11 @@
 //! # }
 //! ```
 //!
+//! Spec 023 adds [`obs`]: the process-wide metrics registry `/metrics` serves,
+//! the in-process tracer, and the bounded ring of recent traces a cell keeps
+//! whether or not a collector is listening. The observation seam spec 020 left
+//! outermost is where it attaches.
+//!
 //! What lives here: the router builder ([`router`]), the state every handler
 //! is given ([`state`]), the three middleware ([`middleware`]), the two
 //! probes ([`probes`]), the static slot ([`static_files`]), and the one
@@ -37,6 +42,7 @@
 
 pub mod error;
 pub mod middleware;
+pub mod obs;
 pub mod probes;
 pub mod router;
 pub mod state;
@@ -46,6 +52,7 @@ pub use error::{EdgeError, EdgeResult, status_of};
 pub use middleware::csrf::Csrf;
 pub use middleware::rate_limit::{ClientResolver, Clock, RateLimiter, RateLimits};
 pub use middleware::security_headers::SecurityHeaders;
+pub use obs::{Metrics, Obs, ObsOptions, Ring, Trace, get_trace, list_traces, subscribe};
 pub use probes::{HEALTHZ_PATH, READYZ_PATH};
 pub use router::{Edge, EdgeBuilder};
 pub use state::AppState;

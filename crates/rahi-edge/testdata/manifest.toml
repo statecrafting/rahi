@@ -9,6 +9,12 @@
 name = "edge-fixture"
 org = "statecrafting"
 
+# A declared service with no grants at all (spec 023 FR-002). A facade needs
+# the service to exist; the ceiling being empty is what makes every operation
+# through it a denial, which is the request the observability test observes.
+[services.notes]
+capabilities = []
+
 [ledger]
 schema_version = "1.0.0"
 max_record_bytes = 65536
