@@ -1,0 +1,86 @@
+{
+  "issuer": "https://cell.example.com/auth/v1",
+  "authorization_endpoint": "https://cell.example.com/auth/v1/oidc/authorize",
+  "backchannel_logout_supported": true,
+  "backchannel_logout_session_supported": true,
+  "device_authorization_endpoint": "https://cell.example.com/auth/v1/oidc/device",
+  "token_endpoint": "https://cell.example.com/auth/v1/oidc/token",
+  "introspection_endpoint": "https://cell.example.com/auth/v1/oidc/introspect",
+  "revocation_endpoint": "https://cell.example.com/auth/v1/oidc/revoke",
+  "userinfo_endpoint": "https://cell.example.com/auth/v1/oidc/userinfo",
+  "end_session_endpoint": "https://cell.example.com/auth/v1/oidc/logout",
+  "grant_types_supported": [
+    "authorization_code",
+    "client_credentials",
+    "password",
+    "refresh_token",
+    "urn:ietf:params:oauth:grant-type:device_code",
+    "urn:ietf:params:oauth:grant-type:token-exchange"
+  ],
+  "response_types_supported": [
+    "code"
+  ],
+  "subject_types_supported": [
+    "public"
+  ],
+  "id_token_signing_alg_values_supported": [
+    "RS256",
+    "RS384",
+    "RS512",
+    "EdDSA"
+  ],
+  "token_endpoint_auth_methods_supported": [
+    "client_secret_post",
+    "client_secret_basic"
+  ],
+  "token_endpoint_auth_signing_alg_values_supported": [
+    "RS256",
+    "RS384",
+    "RS512",
+    "EdDSA"
+  ],
+  "claims_supported": [
+    "iss",
+    "azp",
+    "amr",
+    "aud",
+    "sub",
+    "sid",
+    "preferred_username",
+    "email",
+    "email_verified",
+    "given_name",
+    "family_name",
+    "groups"
+  ],
+  "claim_types_supported": [
+    "normal",
+    "aggregated",
+    "distributed"
+  ],
+  "scopes_supported": [
+    "openid",
+    "profile",
+    "email",
+    "groups"
+  ],
+  "code_challenge_methods_supported": [
+    "plain",
+    "S256"
+  ],
+  "dpop_signing_alg_values_supported": [
+    "RS256",
+    "RS384",
+    "RS512",
+    "EdDSA"
+  ],
+  "service_documentation": "https://sebadob.github.io/rauthy/",
+  "ui_locales_supported": [
+    "en",
+    "de",
+    "zhhans",
+    "ko"
+  ],
+  "claims_parameter_supported": true,
+  "client_id_metadata_document_supported": true
+}

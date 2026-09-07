@@ -1,0 +1,11 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "rahi-idp",
+    "path": "crates/rahi-idp",
+    "specRef": "021-idp-proxy-and-discovery",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "f4223cffcf44e1c54ca97b5d5fab677351d9059ebd65685ae86ce9657c202c86"
+}
