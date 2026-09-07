@@ -268,6 +268,37 @@ delegation (a product spec in hqgit).
   second belongs to a spec that does not exist yet. Once it is settled, this
   flips to `complete` with no code change here.
 
+- **2026-09-07 (second build session; confirms the above, adds no code).**
+  The whole governed gate is green on this branch: `spec-spine compile`,
+  `index check`, `lint --fail-on-warn`, `couple --base origin/main`
+  (18 paths, no drift), and `make ci` all exit 0. Both `verify:cli` blocks
+  pass, and AC-1 passes as 79 tests across the crate. The only tree change
+  this session carries is a doc-comment correction in `envelope.rs`:
+  `Envelope.issued` was documented as enabling an age-out without a
+  round-trip, and nothing reads it for that purpose, so the comment now
+  says what the field is (the seal time, rewritten by a rotation).
+
+  D-4's conflict was re-derived from the code rather than taken on trust,
+  and it is real and narrower than D-4 states: it reduces to the single
+  constant `config::CALLBACK_PATH` (`crates/rahi-idp/src/config.rs:20`,
+  spec 021's territory). `config.rs:70` builds `IdpConfig::redirect_uri`
+  from it and `bootstrap.rs:75` registers exactly that string with rauthy,
+  while this spec's `Sessions::new` (`session.rs:239`) independently builds
+  `<origin>/session/callback` from its own `session::CALLBACK_PATH`. The
+  two literals differ and rauthy matches a `redirect_uri` literally, so a
+  browser-real login is refused. Spec 021 B-1's value is moreover unusable
+  on its own terms: `/auth/callback` falls inside the raw proxy prefix that
+  021 B-2 forwards verbatim, so rauthy would receive its own redirect back
+  and answer 404. This spec's B-1 is the clause carrying the stated reason.
+
+  So the human fix in the first of D-4's two shapes is one line: set spec
+  021 B-1's `redirect_uri` to `<public_url>/session/callback` and
+  `config::CALLBACK_PATH` to `/session/callback`; `bootstrap_client` and
+  the registration follow with no further change, and this crate's tests
+  are unaffected. That edit belongs to whoever owns spec 021, not to a
+  session implementing 022 (`.claude/rules/adversarial-prompt-refusal.md`),
+  which is why this stays `in-progress`.
+
 ## Verification
 
 ```verify:cli

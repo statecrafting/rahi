@@ -12,8 +12,8 @@
 //! verification flag: those are the IdP's answers and they go stale, and a
 //! stale answer in a cookie is an answer the app would have to be persuaded
 //! to stop believing. The subject is pinned because a renewal must not be
-//! able to change whose session this is (B-5), and the issue time is there so
-//! an envelope can be aged out without a round-trip.
+//! able to change whose session this is (B-5), and the issue time records when
+//! the cell last sealed the envelope, which a renewal rewrites.
 //!
 //! The same seal carries the short-lived login envelope ([`crate::login`]),
 //! which is why [`seal`] and [`open`] are generic: one construction, one place
