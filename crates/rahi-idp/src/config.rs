@@ -17,7 +17,11 @@ pub const AUTH_PREFIX: &str = "/auth";
 /// this.
 pub const ISSUER_PATH: &str = "/auth/v1";
 /// Where rauthy sends the browser back after an authorization code.
-pub const CALLBACK_PATH: &str = "/auth/callback";
+/// Deliberately outside `AUTH_PREFIX`: that subtree is forwarded raw to
+/// rauthy (B-2), so a callback inside it is handed straight back to rauthy,
+/// which has no such route. This is the app's own route (spec 022 B-1), and
+/// `bootstrap_client` registers this exact string with rauthy (D-9).
+pub const CALLBACK_PATH: &str = "/session/callback";
 /// The discovery document, under rauthy's API root.
 pub const DISCOVERY_PATH: &str = "/auth/v1/.well-known/openid-configuration";
 /// rauthy's admin API root for the client bootstrap (spec 021 B-5).
@@ -148,7 +152,10 @@ mod tests {
         let idp = IdpConfig::derive(&config("https://cell.example.com"), "hello-cell")
             .expect("the fixture derives");
         assert_eq!(idp.issuer, "https://cell.example.com/auth/v1");
-        assert_eq!(idp.redirect_uri, "https://cell.example.com/auth/callback");
+        assert_eq!(
+            idp.redirect_uri,
+            "https://cell.example.com/session/callback"
+        );
         assert_eq!(idp.post_logout_redirect_uri, "https://cell.example.com");
         assert_eq!(idp.loopback_base, "http://127.0.0.1:8080");
         assert_eq!(

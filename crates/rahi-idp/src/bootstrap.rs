@@ -336,7 +336,7 @@ mod tests {
             "id": "hello-cell",
             "confidential": true,
             "enabled": true,
-            "redirect_uris": ["https://cell.example.com/auth/callback"],
+            "redirect_uris": ["https://cell.example.com/session/callback"],
             "post_logout_redirect_uris": ["https://cell.example.com"],
             "flows_enabled": ["authorization_code", "refresh_token"],
             "challenges": ["S256"],
@@ -355,8 +355,8 @@ mod tests {
     fn a_widened_client_still_matches() {
         let mut client = registered();
         client["redirect_uris"] = serde_json::json!([
-            "https://cell.example.com/auth/callback",
-            "https://staging.example.com/auth/callback"
+            "https://cell.example.com/session/callback",
+            "https://staging.example.com/session/callback"
         ]);
         client["flows_enabled"] =
             serde_json::json!(["authorization_code", "refresh_token", "client_credentials"]);
@@ -430,13 +430,14 @@ mod tests {
     #[test]
     fn the_update_widens_rather_than_replaces() {
         let mut client = registered();
-        client["redirect_uris"] = serde_json::json!(["https://staging.example.com/auth/callback"]);
+        client["redirect_uris"] =
+            serde_json::json!(["https://staging.example.com/session/callback"]);
         let update = settings().update_request(&client);
         assert_eq!(
             update["redirect_uris"],
             serde_json::json!([
-                "https://staging.example.com/auth/callback",
-                "https://cell.example.com/auth/callback"
+                "https://staging.example.com/session/callback",
+                "https://cell.example.com/session/callback"
             ])
         );
     }
@@ -448,7 +449,7 @@ mod tests {
         assert_eq!(create["confidential"], true);
         assert_eq!(
             create["redirect_uris"],
-            serde_json::json!(["https://cell.example.com/auth/callback"])
+            serde_json::json!(["https://cell.example.com/session/callback"])
         );
     }
 }
