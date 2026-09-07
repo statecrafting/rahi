@@ -17,10 +17,12 @@ use axum::response::Response;
 
 /// The outermost layer: observation (spec 023).
 ///
-/// It is a pass-through today and named anyway, because the position is the
-/// contract. Spans, metrics, and the request log land here, outside every
-/// refusal, so that a 403 from the CSRF check and a 429 from the limiter are
-/// observed like any other answer.
+/// The position was the contract before there was anything to put in it.
+/// Spec 023 filled it: the request span opens here and the answer is counted
+/// here, outside every refusal, so that a 403 from the CSRF check and a 429
+/// from the limiter are observed like any other answer. Before
+/// `obs::init` has run, and for the paths spec 023 B-5 leaves alone, it is
+/// still a pass-through.
 pub async fn observation(request: Request, next: Next) -> Response {
-    next.run(request).await
+    crate::obs::observe(request, next).await
 }

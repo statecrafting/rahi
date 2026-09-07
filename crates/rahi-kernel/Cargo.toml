@@ -21,6 +21,10 @@ canonical-keysort-json = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 toml = { workspace = true }
+# Spec 023 B-2 opens a span per governed operation. `tracing` is a facade over
+# whatever subscriber the binary installed, so this is not a dependency on the
+# crate that does the observing.
+tracing = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "sync", "time"] }
 
 [dev-dependencies]

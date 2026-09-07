@@ -111,8 +111,9 @@ impl EdgeBuilder {
     ///
     /// The layers go on in one fixed order (B-2). Reading outward from the
     /// app: the rate limiter, the CSRF check, the security headers, and
-    /// observation. The probes are merged after the two inner layers are
-    /// applied, which is what puts them outside both.
+    /// observation. The probes and `/metrics` (spec 023 B-1) are merged after
+    /// the two inner layers are applied, which is what puts them outside
+    /// both.
     pub fn build(self) -> Router {
         let mut guarded = Router::new();
         for (prefix, router) in self.mounts {
@@ -143,6 +144,7 @@ impl EdgeBuilder {
 
         Router::new()
             .merge(probes::router().with_state(self.state.clone()))
+            .merge(crate::obs::metrics_router())
             .merge(guarded)
             .layer(from_fn_with_state(
                 SecurityHeaders::from_config(self.state.config()),

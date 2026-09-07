@@ -28,6 +28,17 @@
 //! three literals at the construction site, so the verifier reads what the
 //! runtime will enforce rather than guessing at it.
 
+/// The span a governed operation opens, which spec 023's layer turns into
+/// `store_ops_total` and `store_op_duration_seconds` (spec 023 B-2).
+///
+/// The name and the field below are the whole contract between this crate and
+/// the one that observes it: the kernel imports nothing from the edge (spec
+/// 023 B-4), so what they share is a span name.
+pub const STORE_SPAN: &str = "store.op";
+/// The field on [`STORE_SPAN`] naming the capability kind, which is the label
+/// the store metrics are counted under.
+pub const STORE_SPAN_KIND: &str = "kind";
+
 use std::fmt;
 use std::future::Future;
 use std::sync::Arc;
@@ -39,6 +50,7 @@ use rahi_store::{
 use rahi_types::{Error, FenceToken, Sub};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+use tracing::Instrument as _;
 
 use crate::Kernel;
 use crate::adjudicate::Request;
@@ -246,8 +258,21 @@ impl<T> Governed<T> {
                 request.resource
             )));
         }
-        self.kernel.admit(&request).await?;
-        op(&self.inner).await
+        // Spec 023 B-2: one span per governed store operation. The kernel
+        // knows nothing about who is listening; `tracing` is the seam, and
+        // spec 023's layer turns a closed span into the store metrics.
+        let span = tracing::info_span!(
+            STORE_SPAN,
+            kind = request.kind.as_str(),
+            service = request.service.as_str(),
+            resource = %request.resource,
+        );
+        async move {
+            self.kernel.admit(&request).await?;
+            op(&self.inner).await
+        }
+        .instrument(span)
+        .await
     }
 
     /// Refuse a call whose kind is not the one this facade was declared for.
@@ -479,11 +504,21 @@ impl Governed<Lease> {
         )
         .with_table(table)
         .with_key(self.inner.key());
-        self.kernel.admit(&request).await?;
-        self.kernel
-            .store_handle()
-            .fenced_txn(&self.inner, statements)
-            .await
+        let span = tracing::info_span!(
+            STORE_SPAN,
+            kind = request.kind.as_str(),
+            service = request.service.as_str(),
+            resource = %request.resource,
+        );
+        async move {
+            self.kernel.admit(&request).await?;
+            self.kernel
+                .store_handle()
+                .fenced_txn(&self.inner, statements)
+                .await
+        }
+        .instrument(span)
+        .await
     }
 
     /// Hand the lease back.
