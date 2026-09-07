@@ -65,7 +65,7 @@
       "wave": 2
     },
     "id": "023-observability",
-    "implementation": "pending",
+    "implementation": "in-progress",
     "kind": "feature",
     "risk": "medium",
     "sectionHeadings": [
@@ -84,6 +84,6 @@
     "summary": "The substrate contract every cell exposes: Prometheus text on /metrics from an in-process registry (process metrics, HTTP counters and duration histograms labeled by route pattern and status class, store operation counters, kernel decisions and ledger failures), and an OTel tracer with a span per request and per store operation that exports OTLP only when an endpoint is configured and always retains a bounded ring buffer of recent traces queryable in-process. Kernel decisions attach their id to the active span through the observe hook. Carries enrahitu://022.\n",
     "title": "Observability: /metrics always on, an in-process OTel tracer with a ring buffer, decisions on spans"
   },
-  "shardHash": "7e79d61c06ff89afd196b66464504856e722f5fd3a687d7be6dc77eba2844abb",
+  "shardHash": "452b06fb36b2cd3123adfa6da5fb4889f7d22065f6dc7308d5519194545ca982",
   "specVersion": "1.1.0"
 }
