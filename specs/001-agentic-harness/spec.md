@@ -23,8 +23,12 @@ establishes:
   - ".claude/agents/"
   - ".claude/rules/"
   - ".claude/skills/"
+  - ".github/workflows/ci.yml"
   - ".github/workflows/govern.yml"
   - ".github/dependabot.yml"
+  - "CODEOWNERS"
+  - ".gitattributes"
+  - ".githooks/"
   - "scripts/verify-spec.sh"
   - "scripts/spec-dag.sh"
 summary: >
@@ -58,8 +62,9 @@ and the code-review skill apply.
 Code needs beyond it), `Makefile` (the CI composite), `spec-spine.toml`,
 `.mcp.json`, the contract and template under `standards/spec/` (the
 constitution itself is in the bypass floor and is amended only by a spec
-that `amends` it), the whole `.claude/` harness, the CI workflow, dependabot
-config, and the two helper scripts. The build session for any later spec is
+that `amends` it), the whole `.claude/` harness, the two CI workflows and the
+dependabot config, `CODEOWNERS`, `.gitattributes`, the `.githooks/` merge
+driver, and the two helper scripts. The build session for any later spec is
 granted authority to append a dated D-n note to this spec when it must
 adjust a hook or a Makefile target to make its own territory buildable; it
 may not change the protocol's substance without an amendment.
@@ -79,12 +84,31 @@ may not change the protocol's substance without an amendment.
   `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo
   fmt --all --check`, and `cargo deny check` when `deny.toml` exists. Every
   target is guarded so the composite is green on the specify-only tree.
-- **B-3 (CI is the same gate).** `.github/workflows/govern.yml` runs on
-  pull requests: `spec-spine compile --check`, `index check`, `lint
-  --fail-on-warn`, `couple` with the PR body as waiver source, `index
-  coverage --fail-on-untraced`, the cargo gates when a workspace exists,
-  and `spec-spine attest --with-coupling` uploaded as a build artifact. It
-  pins `spec-spine` to the version named in `AGENTS.md`.
+- **B-3 (CI is the same gate, behind one check).**
+  `.github/workflows/ci.yml` is the only workflow with event triggers
+  (`pull_request`, `push` to the default branch, and `merge_group`). It runs
+  the cargo gates when a workspace exists, the supply-chain gate when
+  `deny.toml` exists, and calls `.github/workflows/govern.yml`, a reusable
+  workflow (`on: workflow_call`) that runs `spec-spine compile --check`,
+  `index check`, `lint --fail-on-warn`, `couple` with the PR body as waiver
+  source and both endpoints as the event's frozen SHAs, `index coverage
+  --fail-on-untraced`, `scripts/spec-dag.sh`, and `spec-spine attest
+  --with-coupling` uploaded as a build artifact. `jobs.ci-gate` (`needs`
+  every other job, `if: always()`) is the **single** status check branch
+  protection requires: it fails when any job reports `failure` or
+  `cancelled`, and counts a skipped job as a pass, so a conditional gate
+  cannot leave a required check permanently unreported. Whichever gates a run
+  did not exercise are announced as notices, so green never silently means
+  "never ran". CI pins `spec-spine` to `SPEC_SPINE_VERSION` in the `Makefile`,
+  which is the one place the pin is stated.
+- **B-9 (derived-artifact merge hygiene).** `.gitattributes` normalizes text
+  to LF on checkout and assigns the sharded `.derived/` globs to the
+  `spec-spine-derived-regen` merge driver; `.githooks/merge-derived-index.sh`
+  is that driver and `.githooks/enable-merge-driver.sh` registers it in a
+  clone. Registration lives in `.git/config`, which is not committed, so the
+  driver is opt-in per clone and the CI staleness gate stays the source of
+  truth. `CODEOWNERS` names a reviewer for the corpus, the standards, the
+  harness, and everything that runs with a token.
 - **B-4 (hooks).** `.claude/settings.json` wires: `SessionStart` (report
   registry and index freshness), `PostToolUse` on `Edit|Write` (recompile
   after a spec edit; staleness check after any hashed-input edit),
@@ -132,6 +156,12 @@ may not change the protocol's substance without an amendment.
 - **AC-2.** `scripts/spec-dag.sh` exits 0 on this corpus.
 - **AC-3.** `scripts/verify-spec.sh 001-agentic-harness` runs this spec's
   block below and exits 0.
+- **AC-4.** Branch protection on `main` requires exactly one check, `ci-gate`,
+  and additionally sets: signed commits required, linear history required,
+  enforcement for administrators, force pushes and deletions refused. This
+  asserts a repository setting rather than a property of the checkout, so it is
+  verified with `gh api repos/statecrafting/rahi/branches/main/protection`, not
+  in the block below.
 
 ## 6. Out of scope
 
@@ -278,10 +308,78 @@ and AC-3 of this spec require it by name, and changing what a spec
 requires is not a bump's business. Retiring it is its own change, and it
 waits on the kit retiring its copy.
 
+D-9 (2026-09-07, sibling parity audit). The gate chain ran on every PR and
+was never binding. Branch protection on `main` required **no** status check
+at all (`required_status_checks.contexts` was empty), so GitHub would merge
+a PR whose CI was red; the only thing enforcing green was the `/shepherd`
+skill, which is the agent that wants to merge. A corpus whose thesis is
+that done is never self-authored cannot leave its merge gate to the
+merger's own discretion.
+
+It could not be fixed in the settings alone. `govern.yml` published four
+separately-named checks, two of them conditional on `has_cargo` and
+`has_deny`, and a skipped required check never reports a conclusion, so an
+enumerated required-context list would have blocked every PR forever the
+first time a guard closed. This is butler-ai's D-2 with different names:
+there, two checks both literally called `gate` made a required-context list
+unable to distinguish them, and branch protection was consequently never
+configured at all.
+
+B-3 now takes spec-spine's and butler-ai's shape. `ci.yml` is the only
+workflow with event triggers and holds the language gates; `govern.yml`
+becomes `on: workflow_call` and is called as `jobs.govern`, publishing no
+check of its own; `jobs.ci-gate` aggregates every job into the one required
+context, counting a skip as a pass and any `failure` or `cancelled` as a
+refusal. `merge_group` is added and is inert until the merge queue is
+enabled. Nothing about *what* the chain runs moved; only how many checks it
+publishes and whether GitHub is willing to merge without them.
+
+Three defects surfaced in the same audit and are fixed here rather than
+filed:
+
+- The coupling gate diffed `--base <base.sha> --head HEAD`. On a
+  `pull_request` the checkout is `refs/pull/N/merge`, which re-resolves
+  against the current base on every run, so the diff folded in commits
+  merged after this PR opened and reported them as this PR's drift, or
+  silently widened a waiver's scope. Both endpoints are now the event's
+  frozen SHAs, which is what spec-spine's own CI documents.
+- `.gitattributes` carried no merge driver for the sharded `.derived/`
+  trees. PR #22 conflicted on exactly three of those shards, resolved by
+  hand. B-9 ports spec-spine spec 020's driver, opt-in per clone.
+- The `spec-spine` pin was hardcoded in `govern.yml` and restated in prose
+  in `AGENTS.md` and `README.md`, which is the hand sweep D-7 had to
+  perform. `SPEC_SPINE_VERSION` now lives in the `Makefile` and CI reads
+  that literal, so the pin moves in one place; a `make setup` target
+  consumes it too. The prose sites still name the version for a human
+  reader and are no longer what CI installs.
+
+`CODEOWNERS` is added with the same reading: the corpus, the standards, the
+harness, and everything that runs with a token.
+
 ## Verification
 
 ```verify:cli
 scripts/spec-dag.sh
 scripts/verify-spec.sh 000-rahi-bootstrap
 make spine
+# B-3: exactly one aggregate gate, named ci-gate, in the one triggered workflow.
+grep -q '^  ci-gate:' .github/workflows/ci.yml
+# B-3: the governance chain is reusable only (no event triggers of its own).
+grep -q 'workflow_call' .github/workflows/govern.yml
+sh -c '! grep -qE "^  (push|pull_request|merge_group):" .github/workflows/govern.yml'
+# B-3: ci.yml is the single triggered entry point and calls that chain.
+grep -q 'uses: ./.github/workflows/govern.yml' .github/workflows/ci.yml
+grep -q '^  merge_group:' .github/workflows/ci.yml
+# B-3: the coupling gate diffs the event's frozen SHAs, never the merge ref.
+grep -q 'HEAD_SHA: ..{ github.event.pull_request.head.sha }' .github/workflows/govern.yml
+sh -c '! grep -q -- "--head HEAD" .github/workflows/govern.yml'
+# B-3: the pin is stated in the Makefile, and CI reads it from there.
+sh -c 'test -n "$(sed -n "s/^SPEC_SPINE_VERSION ?= //p" Makefile)"'
+grep -q "SPEC_SPINE_VERSION ?= " .github/workflows/govern.yml
+# B-9: LF normalization, the merge-driver attribute, and the driver itself.
+grep -q 'text=auto eol=lf' .gitattributes
+grep -q 'merge=spec-spine-derived-regen' .gitattributes
+test -x .githooks/merge-derived-index.sh
+test -x .githooks/enable-merge-driver.sh
+test -f CODEOWNERS
 ```

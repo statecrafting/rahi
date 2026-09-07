@@ -1,18 +1,29 @@
 # The governed gate, re-run in CI exactly as `make ci` runs it locally
-# (spec 001 B-3). claude-observatory's shepherd stage watches this workflow.
+# (spec 001 B-3).
+#
+# This is a REUSABLE workflow. It declares no event triggers of its own:
+# `ci.yml` calls it as `jobs.govern`, so its result folds into the one
+# `ci-gate` status check branch protection requires instead of publishing a
+# second, separately-named check (spec 001 D-9). The `github` context inside a
+# called workflow is the caller's, so `github.event.pull_request` below is the
+# real PR event.
+#
+# Nothing here writes to `.derived/`: a writing `compile` before `--check`
+# would make the freshness check pass unconditionally.
 name: govern
 
 on:
-  pull_request:
-  push:
-    branches: [main]
+  workflow_call:
+    outputs:
+      has_cargo:
+        description: "Cargo.toml exists, so the caller's cargo gate is live"
+        value: ${{ jobs.spine.outputs.has_cargo }}
+      has_deny:
+        description: "deny.toml exists, so the caller's supply-chain gate is live"
+        value: ${{ jobs.spine.outputs.has_deny }}
 
 permissions:
   contents: read
-
-env:
-  # Pinned to the version AGENTS.md names; bump both together.
-  SPEC_SPINE_VERSION: v0.15.0
 
 jobs:
   spine:
@@ -24,6 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          # Full history so the coupling gate can diff against the merge base.
           fetch-depth: 0
       # `hashFiles` is not allowed in a job-level `if` (GitHub rejects the
       # workflow at startup, so the run reports as "workflow file issue"
@@ -44,11 +56,26 @@ jobs:
           else
             echo "has_deny=false" >> "$GITHUB_OUTPUT"
           fi
-      - name: Install spec-spine
+      # A skipped job is invisible in the caller's `ci-gate`, which counts a
+      # skip as a pass. Say out loud which downstream gates this run will not
+      # exercise, so green never silently means "never ran" (spec 001 D-9).
+      - name: Announce inactive gates
         run: |
           set -euo pipefail
+          if [ "${{ steps.tree.outputs.has_cargo }}" != "true" ]; then
+            echo "::notice::cargo gate INACTIVE: no Cargo.toml (lands with spec 010)"
+          fi
+          if [ "${{ steps.tree.outputs.has_deny }}" != "true" ]; then
+            echo "::notice::supply-chain gate INACTIVE: no deny.toml (lands with spec 010)"
+          fi
+      - name: Install spec-spine (pinned in the Makefile)
+        run: |
+          set -euo pipefail
+          ver="$(sed -n 's/^SPEC_SPINE_VERSION ?= //p' Makefile)"
+          test -n "$ver" || { echo "::error::no SPEC_SPINE_VERSION in Makefile"; exit 1; }
+          echo "installing spec-spine v${ver}"
           curl -fsSL https://raw.githubusercontent.com/statecrafting/spec-spine/main/install.sh \
-            | SPEC_SPINE_VERSION="$SPEC_SPINE_VERSION" SPEC_SPINE_BIN_DIR="$HOME/.local/bin" sh
+            | SPEC_SPINE_VERSION="v${ver}" SPEC_SPINE_BIN_DIR="$HOME/.local/bin" sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - run: spec-spine --version
       # `compile --check` validates the corpus AND proves the committed
@@ -57,45 +84,31 @@ jobs:
       - run: spec-spine compile --check
       - run: spec-spine index check
       - run: spec-spine lint --fail-on-warn
+      # PR-only: the gate reads the PR-body waiver, which push and merge_group
+      # do not carry. Diff the event's frozen SHAs, never the checked-out merge
+      # ref: `refs/pull/N/merge` re-resolves against the current base every
+      # time the job runs, so `base.sha...HEAD` would fold in changes merged
+      # after this PR opened and report them as false drift (or silently widen
+      # a waiver's scope). `base.sha...head.sha` is stable across re-runs
+      # (spec 001 D-9).
       - name: Coupling gate
         if: github.event_name == 'pull_request'
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
+          echo "coupling base: $BASE_SHA to head: $HEAD_SHA"
           printf '%s' "${PR_BODY:-}" > "$RUNNER_TEMP/pr-body.txt"
           spec-spine couple \
-            --base "${{ github.event.pull_request.base.sha }}" \
-            --head HEAD \
+            --base "$BASE_SHA" \
+            --head "$HEAD_SHA" \
             --pr-body "$RUNNER_TEMP/pr-body.txt"
       # The whole-tree ownership assertion: every source file inside a crate
       # is specifically claimed by a spec (spec 032 of spec-spine).
       - run: spec-spine index coverage --fail-on-untraced
       - run: scripts/spec-dag.sh
-
-  cargo:
-    name: cargo gate
-    needs: spine
-    if: needs.spine.outputs.has_cargo == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      # rustup installs the toolchain pinned in rust-toolchain.toml (spec 010).
-      - run: rustup show
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo build --workspace --locked
-      - run: cargo test --workspace --locked
-      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
-      - run: cargo fmt --all --check
-
-  deny:
-    name: supply chain (cargo-deny)
-    needs: spine
-    if: needs.spine.outputs.has_deny == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: EmbarkStudios/cargo-deny-action@v2
 
   attest:
     name: corpus attestation
@@ -105,11 +118,13 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - name: Install spec-spine
+      - name: Install spec-spine (pinned in the Makefile)
         run: |
           set -euo pipefail
+          ver="$(sed -n 's/^SPEC_SPINE_VERSION ?= //p' Makefile)"
+          test -n "$ver" || { echo "::error::no SPEC_SPINE_VERSION in Makefile"; exit 1; }
           curl -fsSL https://raw.githubusercontent.com/statecrafting/spec-spine/main/install.sh \
-            | SPEC_SPINE_VERSION="$SPEC_SPINE_VERSION" SPEC_SPINE_BIN_DIR="$HOME/.local/bin" sh
+            | SPEC_SPINE_VERSION="v${ver}" SPEC_SPINE_BIN_DIR="$HOME/.local/bin" sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       # The reproducible attestation over the corpus and its coupling verdict
       # (spec-spine spec 023): the repo's own ledger seal, published as a

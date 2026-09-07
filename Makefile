@@ -10,7 +10,22 @@ SHELL := /bin/bash
 SPEC_SPINE ?= spec-spine
 BASE ?= origin/main
 
-.PHONY: spine spec-dag ci build test lint fmt deny coverage attest verify help
+# The one place the governance pin is stated. CI reads this literal out of this
+# file (spec 001 D-9), so the pin moves in exactly one place.
+SPEC_SPINE_VERSION ?= 0.15.0
+
+.PHONY: setup spine spec-dag ci build test lint fmt deny coverage attest verify help
+
+## setup: install the pinned spec-spine and prove the governed loop once
+setup:
+	@if [ -x "$$(command -v $(SPEC_SPINE))" ] && $(SPEC_SPINE) --version 2>/dev/null | grep -q "$(SPEC_SPINE_VERSION)"; then \
+	  echo "[setup] spec-spine $(SPEC_SPINE_VERSION) already present"; \
+	else \
+	  echo "[setup] installing spec-spine $(SPEC_SPINE_VERSION)"; \
+	  cargo install spec-spine-cli --version "$(SPEC_SPINE_VERSION)" --locked \
+	    || SPEC_SPINE_VERSION="v$(SPEC_SPINE_VERSION)" sh -c 'curl -fsSL https://raw.githubusercontent.com/statecrafting/spec-spine/main/install.sh | sh'; \
+	fi
+	$(SPEC_SPINE) --version
 
 ## spine: the governed gate chain (compile, index, lint, index check, couple, spec-dag)
 spine:

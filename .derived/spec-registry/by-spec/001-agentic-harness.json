@@ -55,11 +55,27 @@
       },
       {
         "kind": "file",
+        "path": ".github/workflows/ci.yml"
+      },
+      {
+        "kind": "file",
         "path": ".github/workflows/govern.yml"
       },
       {
         "kind": "file",
         "path": ".github/dependabot.yml"
+      },
+      {
+        "kind": "file",
+        "path": "CODEOWNERS"
+      },
+      {
+        "kind": "file",
+        "path": ".gitattributes"
+      },
+      {
+        "kind": "file",
+        "path": ".githooks/"
       },
       {
         "kind": "file",
@@ -93,6 +109,6 @@
     "summary": "The governed-development loop every human and every driven session runs inside: the cross-agent New Sessions protocol and the Working the backlog protocol in AGENTS.md, the Claude Code skills (init, setup, next, build, verify, spec, commit, code-review, ship, shepherd, validate-and-fix, cleanup, implement-plan, research, refactor-claude-md), the four pipeline agents, the standing and path-scoped rules (including the chassis invariants checklist), the hooks that keep the derived artifacts fresh and block an ungated PR, the Makefile that is the one source of truth for what CI validates, and the CI workflow that re-runs the same gate. The harness is what makes the corpus buildable by claude-observatory.\n",
     "title": "Agentic engineering harness: session protocol, skills, agents, hooks, gate"
   },
-  "shardHash": "076698bc80d38ecd89d4ca46ee66b1fb1f4063ad1412441bdf2f439acbcc6b32",
+  "shardHash": "730cb850cb601d9f1308b3daaa47c2ccdf4b7fff16d44bc9c663013721f928f4",
   "specVersion": "1.1.0"
 }
