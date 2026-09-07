@@ -1,0 +1,31 @@
+[package]
+name = "rahi-edge"
+version = "0.1.0"
+description = "The edge of the rahi chassis: one axum router, a fixed middleware order, probes, a static slot, and one error mapping"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[package.metadata.spec-spine]
+spec = "020-edge-server"
+
+[dependencies]
+rahi-types = { workspace = true }
+rahi-store = { workspace = true }
+rahi-ledger = { workspace = true }
+rahi-kernel = { workspace = true }
+axum = { workspace = true }
+tower-http = { workspace = true }
+getrandom = { workspace = true }
+base64 = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+tower = { workspace = true, features = ["util"] }
+
+[lints]
+workspace = true

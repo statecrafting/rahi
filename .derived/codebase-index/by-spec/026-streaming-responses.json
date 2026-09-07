@@ -11,16 +11,6 @@
         "code": "W-001",
         "message": "spec '026-streaming-responses' file unit 'crates/rahi-edge/tests/stream.rs' does not exist",
         "path": "crates/rahi-edge/tests/stream.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '026-streaming-responses' file unit 'crates/rahi-edge/src/router.rs' does not exist",
-        "path": "crates/rahi-edge/src/router.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '026-streaming-responses' file unit 'crates/rahi-edge/src/lib.rs' does not exist",
-        "path": "crates/rahi-edge/src/lib.rs"
       }
     ]
   },
@@ -30,7 +20,16 @@
       "023-observability",
       "025-api-tokens-and-resource-server"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "crates/rahi-edge/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/router.rs",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
         "locations": [],
@@ -51,7 +50,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/lib.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
@@ -60,7 +63,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/router.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {

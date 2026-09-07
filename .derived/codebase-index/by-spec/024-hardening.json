@@ -21,16 +21,6 @@
         "code": "W-001",
         "message": "spec '024-hardening' file unit 'crates/rahi-edge/tests/hardening.rs' does not exist",
         "path": "crates/rahi-edge/tests/hardening.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '024-hardening' file unit 'crates/rahi-edge/src/lib.rs' does not exist",
-        "path": "crates/rahi-edge/src/lib.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '024-hardening' file unit 'crates/rahi-edge/src/middleware/rate_limit.rs' does not exist",
-        "path": "crates/rahi-edge/src/middleware/rate_limit.rs"
       }
     ]
   },
@@ -39,7 +29,16 @@
       "022-session-and-principal",
       "023-observability"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "crates/rahi-edge/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/middleware/rate_limit.rs",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
         "locations": [],
@@ -78,7 +77,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/lib.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
@@ -87,7 +90,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/middleware/rate_limit.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {

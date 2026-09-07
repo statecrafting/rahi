@@ -1,0 +1,11 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "rahi-edge",
+    "path": "crates/rahi-edge",
+    "specRef": "020-edge-server",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "5d2336e9669ea0b9114039618accb8f834e242b10e97b2f6ef6178d96c5903e0"
+}
