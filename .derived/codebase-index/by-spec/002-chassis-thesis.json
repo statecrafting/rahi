@@ -3,7 +3,12 @@
     "dependsOn": [
       "000-rahi-bootstrap"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "docs/design/00-lineage.md",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
         "locations": [
