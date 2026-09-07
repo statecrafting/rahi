@@ -25,6 +25,8 @@ establishes:
   - "crates/rahi-edge/src/error.rs"
   - "crates/rahi-edge/tests/probes.rs"
   - "crates/rahi-edge/tests/middleware.rs"
+  - "crates/rahi-edge/tests/common/mod.rs"
+  - "crates/rahi-edge/testdata/"
 extends:
   - { spec: "010-workspace-and-core-types", unit: { kind: section, file: "Cargo.toml", anchor: "workspace.dependencies" }, nature: additive }
 summary: >
@@ -118,7 +120,81 @@ the rauthy proxy route (021); sessions (022).
 
 ## 7. Resolved decisions
 
-None yet.
+- **D-1 (2026-09-06, build session; realises B-8's signature).** The status
+  table is `error::status_of` and `EdgeError` is the newtype that carries a
+  workspace error into a response. B-8 writes the mapping as
+  `impl IntoResponse for rahi_types::Error`, which the orphan rule forbids in
+  this crate: `IntoResponse` belongs to `axum-core` and `Error` to
+  `rahi-types`, so neither is local here and the impl cannot be written.
+  Writing it in `rahi-types` instead would put axum under the crate every
+  other crate depends on and invert constitution XIV's direction. What B-8
+  fixes, one mapping in one place, is unchanged: `status_of` is the table,
+  `error::response` builds the body, and a handler returns
+  `Result<T, EdgeError>` so `?` reaches it. Rejected alternative: an
+  extension trait over `Result`, which leaves the mapping reachable only
+  through the sugar and lets a handler assemble a status by hand.
+- **D-2 (2026-09-06, build session; settles B-8's "502 or 500").**
+  `Upstream` is 502; `Io` and `Config` are 500. `Error::Upstream` names a
+  co-deployed or remote dependency that failed (spec 010 B-4), which is what
+  a gateway status is for, and the cell is the gateway in front of rauthy and
+  of the store. `Io` and `Config` are failures of this process, which is what
+  500 says. Rejected alternative: 502 for all three, which tells a client to
+  retry against another upstream when the fault is local and will not move.
+- **D-3 (2026-09-06, build session; realises B-5's "counters with TTL").**
+  The window ordinal is part of the counter's key
+  (`rl:<group>:<identity>:<unix seconds / 60>`) rather than an expiry on the
+  counter. The store's counters take no TTL argument (spec 011 exposes
+  `counter_add` and `counter_get`), so a fixed window is expressed by never
+  naming a spent window again. The cost is that a spent window's key lingers
+  in memory until the node restarts, and that a restart forgives every window
+  in progress; the cache group is memory-resident, which bounds both.
+  Rejected alternatives: read-modify-write over `kv_put`'s TTL, which is not
+  atomic and undercounts exactly when it matters; adding a TTL to the store's
+  counter API, which is spec 011's unit and a wider hiqlite surface.
+- **D-4 (2026-09-06, build session; completes B-5's failure behavior).** A
+  store failure inside the limiter admits the request. Constitution IX puts
+  rate limits in the derived cache group precisely because nothing whose loss
+  changes a decision may live there, so a limiter that refused traffic when
+  that group blinked would make derived state a hard dependency of the whole
+  edge and turn a cache blip into an outage. The cost is that a cell whose
+  cache group is down admits unmetered traffic until it returns; spec 023's
+  metrics are where that becomes visible. Rejected alternative: answering
+  503, which fails closed on a group whose contents are disposable by design.
+- **D-5 (2026-09-06, build session; defines B-7's "hashed assets").** An
+  asset is hashed when its last path segment is not `index.html`, has an
+  extension, and its stem carries a `.` or `-` separated tail of at least
+  eight alphanumeric characters with a digit among them: `index-BsX9k2Lp.js`
+  and `main.4f3a2b1c.css` are immutable, `vendor-bootstrap.css` and `app.js`
+  revalidate. The rule errs toward revalidating because the two errors are
+  not symmetric: a false positive pins a stale asset in every cache for a
+  year, and a false negative costs one conditional request. Rejected
+  alternative: immutable for every non-HTML file, which is true only of build
+  output the chassis cannot verify it is serving.
+- **D-6 (2026-09-06, build session; completes B-1's state for B-6).**
+  `AppState` also carries the ledger, and the extension slot is a type-erased
+  `http::Extensions` read by type. B-1 lists the kernel, the store handle,
+  the config, and the slot, but B-6 makes readiness an answer about the store
+  *and* the ledger, and the kernel exposes no ledger accessor (spec 015), so
+  the probe reaches the chain from the state or not at all. Readiness reads
+  `Ledger::head` rather than re-verifying the chain: verification is a
+  boot-time property that has already failed closed (constitution XI), and
+  re-running it per probe would be a signature check over the whole hot
+  window on a path a kubelet calls every few seconds. The slot is
+  type-erased because a named type would be `rahi-idp`'s and AC-2 forbids
+  that edge; spec 022 inserts its extractor and reads it back by type.
+  Rejected alternative: a `Kernel::ledger()` accessor, which amends spec
+  015's crate to answer spec 020's probe.
+- **D-7 (2026-09-06, build session; completes B-4's issuance).** The CSRF
+  layer mints the token itself: a safe request that arrives without the
+  cookie is issued one on the way out, and the cookie is readable by script.
+  B-4 fixes the pair and the header but names no issuer, and a double submit
+  is only a proof if the page can read the cookie to echo it; what makes the
+  pair evidence is that a cross-origin caller can send the cookie and cannot
+  read it. The cookie is `SameSite=Lax`, `Path=/`, undomained, and `Secure`
+  under the `__Host-` prefix. An entropy failure answers 500 rather than
+  issuing a guessable token. Rejected alternative: minting in the session
+  layer (spec 022), which leaves every route unprotected until a principal
+  exists and makes CSRF depend on identity.
 
 ## Verification
 

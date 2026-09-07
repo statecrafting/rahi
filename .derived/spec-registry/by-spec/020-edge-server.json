@@ -60,6 +60,14 @@
       {
         "kind": "file",
         "path": "crates/rahi-edge/tests/middleware.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/tests/common/mod.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/testdata/"
       }
     ],
     "extends": [
@@ -96,6 +104,6 @@
     "summary": "The one public listener of a cell: an axum Router builder that an app mounts its services on, a fixed middleware order (observation outermost, then security headers, CSRF double-submit, and a per-node rate limiter on the cache group), liveness and readiness probes that answer different questions, a static file slot for the app's SPA, and one mapping from rahi_types::Error to HTTP status. Everything an app serves goes through this router; there is no second listener.\n",
     "title": "The edge: axum router, middleware chain, probes, static slot, error mapping"
   },
-  "shardHash": "6f423c5bc9084a1c009d0098b72206db4eeb6f5b61402f21ee3c89a5088981af",
+  "shardHash": "c4ba05062dc1ccda57c8e1a69d81b62c26287b4ce07cd2079457c7cd8351fd72",
   "specVersion": "1.1.0"
 }

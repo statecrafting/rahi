@@ -1,74 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/Cargo.toml' does not exist",
-        "path": "crates/rahi-edge/Cargo.toml"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/src/lib.rs' does not exist",
-        "path": "crates/rahi-edge/src/lib.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/src/router.rs' does not exist",
-        "path": "crates/rahi-edge/src/router.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/src/state.rs' does not exist",
-        "path": "crates/rahi-edge/src/state.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/src/middleware/mod.rs' does not exist",
-        "path": "crates/rahi-edge/src/middleware/mod.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/src/middleware/security_headers.rs' does not exist",
-        "path": "crates/rahi-edge/src/middleware/security_headers.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/src/middleware/csrf.rs' does not exist",
-        "path": "crates/rahi-edge/src/middleware/csrf.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/src/middleware/rate_limit.rs' does not exist",
-        "path": "crates/rahi-edge/src/middleware/rate_limit.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/src/probes.rs' does not exist",
-        "path": "crates/rahi-edge/src/probes.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/src/static_files.rs' does not exist",
-        "path": "crates/rahi-edge/src/static_files.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/src/error.rs' does not exist",
-        "path": "crates/rahi-edge/src/error.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/tests/probes.rs' does not exist",
-        "path": "crates/rahi-edge/tests/probes.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '020-edge-server' file unit 'crates/rahi-edge/tests/middleware.rs' does not exist",
-        "path": "crates/rahi-edge/tests/middleware.rs"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "015-kernel-manifest-and-adjudication"
@@ -77,11 +7,79 @@
       {
         "path": "Cargo.toml",
         "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "crates/rahi-edge/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/error.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/middleware/csrf.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/middleware/mod.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/middleware/rate_limit.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/middleware/security_headers.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/probes.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/router.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/state.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/static_files.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/testdata/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/tests/common/mod.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/tests/middleware.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/tests/probes.rs",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-edge/Cargo.toml"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -90,7 +88,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/error.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -99,7 +101,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/lib.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -108,7 +114,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/middleware/csrf.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -117,7 +127,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/middleware/mod.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -126,7 +140,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/middleware/rate_limit.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -135,7 +153,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/middleware/security_headers.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -144,7 +166,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/probes.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -153,7 +179,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/router.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -162,7 +192,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/state.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -171,7 +205,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/static_files.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -180,7 +218,37 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-edge/testdata/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/testdata/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/tests/common/mod.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/tests/common/mod.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/tests/middleware.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -189,7 +257,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-edge/tests/probes.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -202,7 +274,7 @@
           {
             "file": "Cargo.toml",
             "span": {
-              "endLine": 50,
+              "endLine": 60,
               "startLine": 15
             }
           }
@@ -220,5 +292,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "bdba42aafb466cccf7c708afbb2e5b391364db30b4e244f35e9f89961f3cbbdc"
+  "shardHash": "08a5618dd0952cca26f2f0364116972feb7c6265a0069ce16a78cb4922a0533f"
 }

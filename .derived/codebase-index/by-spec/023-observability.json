@@ -31,16 +31,6 @@
         "code": "W-001",
         "message": "spec '023-observability' file unit 'crates/rahi-edge/tests/obs.rs' does not exist",
         "path": "crates/rahi-edge/tests/obs.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '023-observability' file unit 'crates/rahi-edge/src/lib.rs' does not exist",
-        "path": "crates/rahi-edge/src/lib.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '023-observability' file unit 'crates/rahi-edge/src/middleware/mod.rs' does not exist",
-        "path": "crates/rahi-edge/src/middleware/mod.rs"
       }
     ]
   },
@@ -51,6 +41,14 @@
     "implementingPaths": [
       {
         "path": "Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/middleware/mod.rs",
         "source": "spec-edge"
       }
     ],
@@ -110,7 +108,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/lib.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
@@ -119,7 +121,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/middleware/mod.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
@@ -132,7 +138,7 @@
           {
             "file": "Cargo.toml",
             "span": {
-              "endLine": 50,
+              "endLine": 60,
               "startLine": 15
             }
           }
@@ -150,5 +156,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "6dcec68888cdc0888fb004d7c6c295c751d6be662f170264f71b3d439cab8279"
+  "shardHash": "6618d0fabc5639f524bc3f480f3106bd084bf866848d797c800d9715c558bd8d"
 }

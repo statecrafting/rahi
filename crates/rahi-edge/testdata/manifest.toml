@@ -1,0 +1,24 @@
+# The fixture cell's manifest (spec 020 FR-001).
+#
+# The edge adjudicates nothing of its own, so this declares the smallest
+# document `Manifest::parse` accepts: the tests need a kernel to build an
+# `AppState`, not a ceiling to test against. Spec 015's fixtures are where the
+# capability vocabulary is exercised.
+
+[app]
+name = "edge-fixture"
+org = "statecrafting"
+
+[ledger]
+schema_version = "1.0.0"
+max_record_bytes = 65536
+
+[observability]
+metrics_path = "/metrics"
+otel = false
+
+[auth]
+operator_role = "rahi-operator"
+
+[contract]
+version = "1.0.0"

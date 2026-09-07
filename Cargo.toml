@@ -16,6 +16,7 @@ authors = ["Bartek Kus"]
 rahi-types = { path = "crates/rahi-types", version = "0.1.0" }
 rahi-store = { path = "crates/rahi-store", version = "0.1.0" }
 rahi-ledger = { path = "crates/rahi-ledger", version = "0.1.0" }
+rahi-kernel = { path = "crates/rahi-kernel", version = "0.1.0" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 hiqlite = { version = "0.14", default-features = false, features = ["sqlite", "cache", "counters", "dlock", "listen_notify_local", "backup", "s3"] }
@@ -47,6 +48,15 @@ action-gate-core = { version = "0.1", features = ["checks-common"] }
 # and the test that a BLOB column lands in a `serde_bytes::ByteBuf` field
 # needs the type spec 016 B-1 names.
 serde_bytes = "0.11"
+
+# The edge (spec 020): axum is the one listener, tower-http serves the static
+# slot, and the CSRF token draws its bytes from the operating system. axum and
+# tower-http are already in the tree under hiqlite, and the versions here are
+# the ones already locked, so the edge adds no second copy of the HTTP stack.
+axum = { version = "0.8" }
+tower = { version = "0.5" }
+tower-http = { version = "0.6", default-features = false, features = ["fs"] }
+getrandom = "0.4"
 
 [workspace.lints.rust]
 unsafe_code = "deny"
