@@ -34,11 +34,6 @@
       },
       {
         "code": "W-001",
-        "message": "spec '025-api-tokens-and-resource-server' file unit 'crates/rahi-idp/src/lib.rs' does not exist",
-        "path": "crates/rahi-idp/src/lib.rs"
-      },
-      {
-        "code": "W-001",
         "message": "spec '025-api-tokens-and-resource-server' file unit 'crates/rahi-idp/src/extractor.rs' does not exist",
         "path": "crates/rahi-idp/src/extractor.rs"
       },
@@ -55,7 +50,12 @@
       "022-session-and-principal",
       "024-hardening"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "crates/rahi-idp/src/lib.rs",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
         "locations": [],
@@ -121,7 +121,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/lib.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {

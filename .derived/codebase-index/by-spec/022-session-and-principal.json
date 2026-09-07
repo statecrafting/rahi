@@ -44,11 +44,6 @@
       },
       {
         "code": "W-001",
-        "message": "spec '022-session-and-principal' file unit 'crates/rahi-idp/src/lib.rs' does not exist",
-        "path": "crates/rahi-idp/src/lib.rs"
-      },
-      {
-        "code": "W-001",
         "message": "spec '022-session-and-principal' file unit 'crates/rahi-idp/src/principal.rs' does not exist",
         "path": "crates/rahi-idp/src/principal.rs"
       }
@@ -58,7 +53,12 @@
     "dependsOn": [
       "021-idp-proxy-and-discovery"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "crates/rahi-idp/src/lib.rs",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
         "locations": [],
@@ -133,7 +133,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/lib.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {

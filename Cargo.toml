@@ -17,6 +17,7 @@ rahi-types = { path = "crates/rahi-types", version = "0.1.0" }
 rahi-store = { path = "crates/rahi-store", version = "0.1.0" }
 rahi-ledger = { path = "crates/rahi-ledger", version = "0.1.0" }
 rahi-kernel = { path = "crates/rahi-kernel", version = "0.1.0" }
+rahi-edge = { path = "crates/rahi-edge", version = "0.1.0" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 hiqlite = { version = "0.14", default-features = false, features = ["sqlite", "cache", "counters", "dlock", "listen_notify_local", "backup", "s3"] }
@@ -57,6 +58,12 @@ axum = { version = "0.8" }
 tower = { version = "0.5" }
 tower-http = { version = "0.6", default-features = false, features = ["fs"] }
 getrandom = "0.4"
+
+# Identity (spec 021): rauthy is reached over loopback only, so the client is
+# built without a TLS backend at all. `stream` is what keeps the proxy from
+# buffering a body in either direction. reqwest is already in the tree under
+# hiqlite at this version, so this adds no second HTTP client.
+reqwest = { version = "0.13", default-features = false, features = ["stream", "json"] }
 
 [workspace.lints.rust]
 unsafe_code = "deny"

@@ -1,59 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '021-idp-proxy-and-discovery' file unit 'crates/rahi-idp/Cargo.toml' does not exist",
-        "path": "crates/rahi-idp/Cargo.toml"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '021-idp-proxy-and-discovery' file unit 'crates/rahi-idp/src/lib.rs' does not exist",
-        "path": "crates/rahi-idp/src/lib.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '021-idp-proxy-and-discovery' file unit 'crates/rahi-idp/src/config.rs' does not exist",
-        "path": "crates/rahi-idp/src/config.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '021-idp-proxy-and-discovery' file unit 'crates/rahi-idp/src/proxy.rs' does not exist",
-        "path": "crates/rahi-idp/src/proxy.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '021-idp-proxy-and-discovery' file unit 'crates/rahi-idp/src/discovery.rs' does not exist",
-        "path": "crates/rahi-idp/src/discovery.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '021-idp-proxy-and-discovery' file unit 'crates/rahi-idp/src/jwks.rs' does not exist",
-        "path": "crates/rahi-idp/src/jwks.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '021-idp-proxy-and-discovery' file unit 'crates/rahi-idp/src/bootstrap.rs' does not exist",
-        "path": "crates/rahi-idp/src/bootstrap.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '021-idp-proxy-and-discovery' file unit 'crates/rahi-idp/tests/proxy.rs' does not exist",
-        "path": "crates/rahi-idp/tests/proxy.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '021-idp-proxy-and-discovery' file unit 'crates/rahi-idp/tests/discovery.rs' does not exist",
-        "path": "crates/rahi-idp/tests/discovery.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '021-idp-proxy-and-discovery' file unit 'crates/rahi-idp/testdata/discovery/' does not exist",
-        "path": "crates/rahi-idp/testdata/discovery/"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "020-edge-server"
@@ -62,11 +7,63 @@
       {
         "path": "Cargo.toml",
         "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "crates/rahi-idp/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/bootstrap.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/config.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/discovery.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/jwks.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/proxy.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/testdata/discovery/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/tests/common/mod.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/tests/discovery.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/tests/proxy.rs",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/Cargo.toml"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -75,7 +72,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/bootstrap.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -84,7 +85,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/config.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -93,7 +98,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/discovery.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -102,7 +111,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/jwks.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -111,7 +124,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/lib.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -120,7 +137,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/proxy.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -129,7 +150,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/testdata/discovery/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -138,7 +163,24 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/tests/common/mod.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/common/mod.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/tests/discovery.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -147,7 +189,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/tests/proxy.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -160,7 +206,7 @@
           {
             "file": "Cargo.toml",
             "span": {
-              "endLine": 60,
+              "endLine": 67,
               "startLine": 15
             }
           }
@@ -178,5 +224,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "2b9acaa1790541b21fb973f64c750032d7aa4715085ae3dd27bac93295d3fafd"
+  "shardHash": "9aa00c3c10511b20604a246e88103115b3d4eb79212fd6b8f31bab1a97037b0c"
 }
