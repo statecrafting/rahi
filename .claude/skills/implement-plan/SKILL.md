@@ -1,6 +1,6 @@
 ---
 name: implement-plan
-description: Execute a plan file step by step with progress tracking, phase checkpoints, and the rahi gate after every step that touches spec-owned paths
+description: "Execute a plan file step by step with progress tracking, phase checkpoints, and the governed gate after every step that touches spec-owned paths. For one whole spec, prefer /build."
 allowed-tools: Bash, Read, Edit, Write, Glob, Grep, Agent
 argument-hint: "<path-to-plan-file>"
 ---
@@ -15,19 +15,26 @@ territory) that a single spec does not describe.
 
 ## Input
 
-Plan file path: `$ARGUMENTS`. If absent, look for `*.plan.md` under
-`docs/plans/` or the session scratchpad, list candidates, and ask.
+Plan file path: `$ARGUMENTS`. If absent, look for `*.plan.md` in the
+session scratchpad and under any plans directory the project keeps, list
+candidates, and ask.
+
+The plan's own `status` field (`draft`, `in-development`, `in-review`,
+`completed`, `blocked`) is a planning vocabulary for the plan file only.
+It is not the spec `status` or `implementation` field; never write it
+into a `spec.md`.
 
 ## Phase 0: parse
 
 1. Read the plan in full.
 2. Extract: frontmatter (status, dates), goals, acceptance criteria,
    implementation steps, existing checkboxes, and the **owning spec** of
-   every path the plan touches (`spec-spine registry show <id> --json`).
+   every path the plan touches (`spec-spine registry show <id> --json`,
+   `spec-spine index coverage` for the unclaimed ones).
 3. Validate readiness: no clear acceptance criteria or steps means stop
    and ask; `completed` means confirm before redoing; `blocked` means ask
    what unblocks it.
-4. If any step touches a shipped spec's territory in a way its Behavior
+4. If any step touches a shipped spec's territory in a way its behavior
    section does not describe, stop: that needs a spec amendment first
    (`.claude/rules/adversarial-prompt-refusal.md`).
 
@@ -47,27 +54,31 @@ driven session's standing authorization satisfies this checkpoint).
 Per task:
 
 1. Announce the task.
-2. Implement it, on a feature branch, never on `main`.
-3. Verify: the narrowest cargo target (`cargo test -p <crate> --locked`),
-   then `make spine` whenever the task touched a spec-owned path, a
-   `spec.md`, a manifest, or any hashed input (`.claude/**`, `AGENTS.md`,
-   `CLAUDE.md`, `Makefile`, `docs/design/**`, workflows, standards).
+2. Implement it, on a feature branch, never on the default branch.
+3. Verify: the narrowest test target the stack offers, then the gate as
+   `AGENTS.md` lists it whenever the task touched a spec-owned path, a
+   `spec.md`, a manifest, or any hashed input (`spec-spine.toml [index]
+   extra_hashed_inputs`; typically the harness, design docs, workflows,
+   standards).
 4. Update the plan file: check the box, recompute `progress` (checked over
    total, rounded), update `updated`.
 5. Next task.
 
 Rules: read the entire plan before starting; keep the plan in sync after
 every task, not in batches; never commit unless asked (`/commit` when
-asked); never disable or skip a failing test; never rewrite a fixture chain
-to make a test pass; claim every new source file in the spec whose territory it joins
-(the ownership ratchet, `C-002`); preserve the plan's structure.
+asked); never disable or skip a failing test; never regenerate a
+never-touch artefact the path-scoped rules name; claim every new source
+file in the spec whose territory it joins (the ownership ratchet,
+`C-002`), or declare the `extends` edge when the territory is another
+spec's; preserve the plan's structure.
 
 Mid-implementation checkpoint at 50 percent: report done, issues,
 deviations, remaining. Wait for confirmation.
 
 ## Phase 3: completion
 
-Set `status: in-review`, `progress: 100`, `updated`. Run `make ci`. Deliver:
+Set `status: in-review`, `progress: 100`, `updated`. Run the full
+composite. Deliver:
 
 ```
 ## Implementation Complete
@@ -77,8 +88,8 @@ Set `status: in-review`, `progress: 100`, `updated`. Run `make ci`. Deliver:
 ### What was done
 ### Files modified (with owning spec)
 ### Verification
-- make spine: ok | FAIL
-- make ci: ok | FAIL
+- governance gate: ok | FAIL at <step>
+- stack gate: ok | FAIL at <command>
 ### Known issues or follow-ups
 ```
 
@@ -98,5 +109,11 @@ the user, never by this skill.
 | Blocked | ask what unblocks it |
 | Test or build failure | fix; if unfixable, mark the task blocked and continue with independent tasks |
 | Ambiguous task | ask |
-| Coupling failure | surface the drift; never patch the spec to match the code |
-| Chassis invariant would be relaxed | stop; a human decides |
+| Coupling failure | surface the drift; never patch a spec you are not implementing to match the code |
+| Never-touch artefact would change | stop; a human decides |
+
+## Project layer
+
+Read from `AGENTS.md`: the gate command list and the narrowest test
+targets. Read from `.claude/rules/`: the never-touch artefacts. Nothing
+here is edited per project.

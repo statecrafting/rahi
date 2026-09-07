@@ -228,6 +228,24 @@ a pending spec that is one line per not-yet-written unit and is expected.
 Follow-ons (`registry plan` in the init reads, `state_dir`, retiring the
 Python in `/next`) are their own change.
 
+D-8 (2026-09-06, kit adoption). The fifteen skills under `.claude/skills/`
+are the spec-spine kit's own (spec-spine spec 048), taken byte for byte,
+and the three standing rules are the kit's spec 047 text. The kit's hooks
+are the ones this repository wrote under D-5 and D-6, ported upstream as
+spec-spine spec 046 and returned here with two additions: the `specs`
+guard on `SessionStart`, and the "a waiver is a human instrument"
+sentence in the PR gate's refusal. B-4's meaning is unchanged. The kit
+moved every project fact out of the skills into `AGENTS.md` and the
+path-scoped rules, which this repository already held (`make spine`,
+`make ci`, the 0.14.0 pin, `chassis-invariants`), so nothing was lost in
+the swap and a future kit update is a copy. In substance: `/next` wraps
+`spec-spine registry plan` and drops the Python readiness script (the D-7
+follow-on), `/spec` derives the ordinal from the registry and the enums
+from `spec-spine.toml`, `/code-review` uses `compile --check` so a review
+never writes, `/commit` carries the session-link and em-dash bans, and
+`scripts/verify-spec.sh` is the kit's copy, which also accepts a numbered
+`## N. Verification` heading.
+
 ## Verification
 
 ```verify:cli

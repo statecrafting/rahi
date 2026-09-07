@@ -44,6 +44,7 @@ to derive its plan; anything added here is picked up on the next init.
    - `spec-spine index check`: index staleness (non-fatal)
    - `spec-spine registry status-report --json --nonzero-only`: lifecycle counts
    - `spec-spine registry list --ids-only`: the spec inventory
+   - `spec-spine registry plan`: the ready set (spec-spine 038): which specs can be worked on now and what blocks the rest; `/next` applies the approval and in-flight rules on top of it
    - `spec-spine index coverage`: which source files no spec claims (exit 2 if stale)
    - `scripts/spec-dag.sh`: the DAG is acyclic and every dependency is lower-numbered
    - `ls crates/ apps/ docker/ deploy/ 2>/dev/null`: what has been built so far (absent directories are expected before their spec lands)
@@ -155,7 +156,7 @@ Skills live in `.claude/skills/`:
 
 - `/init`: this protocol.
 - `/setup`: install spec-spine and the Rust toolchain; verify the loop.
-- `/next`: the next ready spec, with honest blockers when none is ready.
+- `/next`: the next ready spec from `registry plan`, minus drafts, with in-flight specs and honest blockers.
 - `/build <id>`: one spec start to finish per "Working the backlog".
 - `/verify <id>`: run a spec's `verify:cli` blocks locally.
 - `/spec`: author a new spec from the template; next ordinal; DAG check.
@@ -166,6 +167,12 @@ Skills live in `.claude/skills/`:
   confirm the merge on disk.
 - `/validate-and-fix`: run `make ci` and fix what it surfaces.
 - `/cleanup`, `/implement-plan`, `/research`, `/refactor-claude-md`.
+
+The fifteen are the spec-spine kit's, byte for byte (spec-spine spec 048).
+The project layer the skills read lives in this file (the pin, the binary,
+`make spine` and `make ci` as the gate, the default branch) and in the
+path-scoped rules (the chassis invariants, the fixture chains); do not edit
+a skill to add a project fact, add it here.
 
 ## Conventions
 
