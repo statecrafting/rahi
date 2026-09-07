@@ -66,7 +66,7 @@
       "wave": 2
     },
     "id": "022-session-and-principal",
-    "implementation": "pending",
+    "implementation": "in-progress",
     "kind": "kernel",
     "risk": "critical",
     "sectionHeadings": [
@@ -85,6 +85,6 @@
     "summary": "The app keeps the shell and gives up the authority. Login is the authorization-code flow with PKCE through the proxy; the session cookie is a signed envelope holding rauthy's refresh token and the pinned subject, httpOnly and same-origin, that grants nothing on presentation; the access assertion is short-lived and minted from the IdP's claims; renewal forwards the refresh token to rauthy and re-reads roles and email_verified from userinfo every time, so a role removed at the IdP takes effect within one access lifetime and a refused grant ends the session. No local account row is ever written. Carries enrahitu://004.\n",
     "title": "Sessions and the principal: the signed envelope, renewal as a round-trip, the IdP subject as the only id"
   },
-  "shardHash": "6363266c9c786472777aaa16fc1520dbd8331afa51ef4346bc3ca39653e2e553",
+  "shardHash": "afbff7749e89b4b02100b3ac72a7326342b88cd4003b972ee09ddd08185d9b8d",
   "specVersion": "1.1.0"
 }
