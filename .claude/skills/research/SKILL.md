@@ -1,6 +1,6 @@
 ---
 name: research
-description: Deep research with parallel sub-agents, query classification, and filesystem artifact passing; corpus questions read specs through spec-spine, external questions use the web
+description: "Deep research with parallel sub-agents, query classification, and filesystem artifact passing; corpus questions read specs through spec-spine, external questions use the web."
 allowed-tools: Agent, Read, Write, Bash(git log:*), Bash(git diff:*), Bash(spec-spine:*), WebSearch, WebFetch, Glob, Grep
 argument-hint: "<question or topic to investigate>"
 ---
@@ -27,14 +27,14 @@ Decide: query type, agent count, domains (corpus, codebase, external
 docs, papers, general web), and scope (corpus-only, web-only, hybrid).
 
 - **Corpus questions** ("what does spec 020 say about erasure", "who owns
-  `crates/rahi-ledger/src/append.rs`", "what depends on 022"): use the
-  `explorer` agent with `spec-spine registry show|relationships <id>`,
-  `spec-spine index render`, `Grep` over `specs/`, and `git log`. Never
-  parse `.derived/` directly.
-- **External questions** (rauthy's OIDC endpoints and token claims,
-  hiqlite Raft semantics and its cache group, axum middleware ordering,
-  OTel span conventions, Prometheus exposition format): `WebSearch` and `WebFetch`, preferring primary sources
-  (specifications, RFCs, the library's own docs).
+  this file", "what depends on 064", "how does the compiler validate
+  frontmatter"): use the `explorer` agent with
+  `spec-spine registry show|relationships <id>`, `spec-spine index render`,
+  `spec-spine index coverage`, `Grep` over `specs/` and the source, and
+  `git log`. Never parse `.derived/` directly.
+- **External questions** (a protocol, a library's semantics, an RFC):
+  `WebSearch` and `WebFetch`, preferring primary sources (specifications,
+  RFCs, the library's own docs).
 - Many questions are hybrid; split them across agents by domain.
 
 ## Phase 2: parallel execution
@@ -43,17 +43,24 @@ Spawn all sub-agents in one message. Each prompt begins with a depth
 trigger: "Quick check:", "Investigate:", or "Deep dive:".
 
 Each sub-agent MUST write its full report to the session scratchpad
-directory when one is listed in the system prompt (otherwise
-`/tmp/rahi-research/`) as `research_<timestamp>_<slug>.md` and return
-only: the file path, a two to three sentence summary, key topics, and the
-source count.
+directory when one is listed in the system prompt (otherwise a
+`research/` directory under the tool-state root `spec-spine.toml
+[layout] state_dir` names, never committed) as
+`research_<timestamp>_<slug>.md` and return only: the file path, a two to
+three sentence summary, key topics, and the source count.
 
-Example, depth-first ("how should 111 bind the identity key to the QUIC
-certificate?"):
+Example, hybrid ("how should the new spec bind an identity key to the
+transport certificate?"):
 
 ```
-Task 1: "Deep dive: raw public key TLS (RFC 7250) support in rustls and quinn; how iroh binds a node id to the endpoint certificate"
-Task 2: "Investigate: what spec 060 and spec 111 in specs/ already fix about identity binding; use spec-spine registry show"
+Task 1: "Deep dive: raw public key TLS (RFC 7250) support in the libraries this stack uses"
+Task 2: "Investigate: what the existing specs already fix about identity binding; use spec-spine registry show and relationships"
+```
+
+Example, corpus-only ("trace the spec compiler's validation pipeline"):
+
+```
+Task 1: "Investigate: which spec owns the validation code (spec-spine index coverage, registry show), then read it and list the diagnostics it can emit in order"
 ```
 
 ## Phase 3: synthesis
@@ -84,3 +91,8 @@ sub-agent report paths, and name contradictions and gaps explicitly.
 Prefer primary sources; cross-reference important claims; state what could
 not be determined; separate fact from inference; prefer recent sources and
 flag stale ones. Never use the em dash character in any written artifact.
+
+## Project layer
+
+Nothing here is project-specific. External topics come from the question;
+the report location comes from the harness or `spec-spine.toml`.

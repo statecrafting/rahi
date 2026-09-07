@@ -1,6 +1,6 @@
 ---
 name: cleanup
-description: Run dead-code and duplicate-code detection across the rahi crates, investigate each finding in context, and return categorized recommendations that respect spec ownership
+description: "Run dead-code and duplicate-code detection across the source surface with one read-only analyzer agent, investigate each finding in context, and return categorized recommendations that respect spec ownership."
 allowed-tools: Agent, Read, Bash, Glob, Grep, Edit
 ---
 
@@ -9,9 +9,9 @@ allowed-tools: Agent, Read, Bash, Glob, Grep, Edit
 ## Purpose
 
 Spawn one analyzer sub-agent that runs dead-code and duplicate-code
-detection across `crates/` and `apps/`, reads each
-finding in context, and returns a structured report. Optional detectors
-are used when available and skipped visibly when not.
+detection across the source surface `AGENTS.md` or `CLAUDE.md` names,
+reads each finding in context, and returns a structured report. Optional
+detectors are used when available and skipped visibly when not.
 
 ## Usage
 
@@ -31,43 +31,49 @@ are used when available and skipped visibly when not.
 ### Step 2: spawn the analyzer
 
 Use the `Agent` tool (type `explorer`, read-only) with this prompt, passing
-the selected detectors:
+the selected detectors and the source surface:
 
 ---
 
-You are a cleanup analyzer for rahi. Analyze and report; change nothing.
+You are a cleanup analyzer. Analyze and report; change nothing.
 
 **Detectors to run:** [selected]
+**Source surface:** [directories]
 
-**A. Dead code.** Rust first: `cargo clippy --workspace --all-targets
---locked -- -W dead_code -W unused 2>&1 | grep -E "unused|dead|never
-used"`; `cargo udeps --workspace` if installed (nightly), otherwise a
-manual pass over each crate's `[dependencies]` against its `use` lines.
-Fallback for orphan files: a source file under `crates/*/src/` that no
-`mod` declaration or `use` path references.
+**A. Dead code.** Per language present, prefer the stack's own detector
+and fall back visibly:
 
-**B. Duplicates.** A duplicate detector if installed (`simian` or `cpd`
-for Rust); otherwise surface near-identical `pub fn`
-signatures across crates with `grep -rn "^pub fn" crates/*/src | awk -F:
-'{print $3}' | sort | uniq -d`. Treat results as hints.
+| Language | Detector | Fallback |
+|---|---|---|
+| Rust | `cargo clippy --workspace --all-targets --locked -- -W dead_code -W unused`, `cargo udeps` (nightly) | each crate's `[dependencies]` against its `use` lines; a file under `src/` no `mod` or `use` path references |
+| TypeScript | `npx --no-install knip --no-exit-code` | an exported symbol no import references |
+| Python | `vulture` | a module nothing imports |
+| Go | `go vet ./...`, `staticcheck ./...` | an unexported identifier with one definition and no use |
+
+Count the linter's unused findings separately from orphan files.
+
+**B. Duplicates.** A duplicate detector if installed (`jscpd`, `simian`,
+`cpd`); otherwise surface near-identical public function signatures
+across the surface (`grep -rn "^pub fn\|^export function\|^def \|^func "`
+then `sort | uniq -d`). Treat results as hints.
 
 **C. Investigate every finding** by reading the source before
 categorizing.
 
 **D. Categorize.**
 
-Keep (false positives): anything under `.derived/` (compiler output);
-generated code (`build.rs` outputs, prost modules under `target/`); trait
-implementations reached only through dynamic dispatch seams (`Cell`,
-`LedgerSigner`, injected clocks and stores); public API of library crates
-consumed by `rahi-cli` or an app under `apps/`; migrations; test fixtures
-and fixture chains under `testdata/`; workflow and hook scripts.
+Keep (false positives): anything under the derived directory (compiler
+output); generated code; trait or interface implementations reached only
+through dynamic dispatch (the seams the project's rules name); public API
+of a library consumed by another package; test fixtures and builders;
+fuzz targets; workflow and hook scripts; entry points and registries; any
+never-touch artefact the path-scoped rules name.
 
-Safe to remove: private items clippy flags as never used with no
-suppression; dependencies with zero usage in their crate; files no spec
+Safe to remove: private items the linter flags as never used with no
+suppression; dependencies with zero usage in their package; files no spec
 claims and nothing references (check `spec-spine index coverage` first).
 
-Needs review: exported items flagged unused inside their crate; files
+Needs review: exported items flagged unused inside their package; files
 recently added (`git log` shows planned work); ambiguous dependency usage
 (a build script, a feature gate).
 
@@ -94,8 +100,9 @@ Duplicates by priority: high (more than 15 lines of logic), medium (10 to
 #### Keep as-is
 
 ### Detectors
-- clippy unused: ran / skipped
-- cargo udeps: ran / skipped: reason
+- linter unused findings: N
+- dead-code detector: ran / skipped: reason
+- dependency audit: ran / skipped: reason
 - duplicate detector: ran / skipped: reason
 
 ### Summary
@@ -103,9 +110,11 @@ Duplicates by priority: high (more than 15 lines of logic), medium (10 to
 ```
 
 Rules: read code before categorizing; be conservative; name the owning
-spec of every path via `spec-spine registry show <id> --json` (never parse
-`.derived/`); never recommend removing a migration, a chassis invariant test, or
-a seam implementation; make no changes.
+spec of every path via `spec-spine registry show <id> --json` and
+`spec-spine index coverage` (never parse `.derived/`); never recommend
+removing a never-touch artefact, a fuzz target, or a seam implementation;
+do not explore the codebase for problems beyond what the detectors find;
+do not create any files; make no changes.
 
 ---
 
@@ -115,7 +124,13 @@ a seam implementation; make no changes.
 
 Ask whether to remove the safe items, walk the review items, or keep the
 report. Removing a spec-claimed path is a change to that spec's territory:
-the owning spec's `establishes` list must drop the path in the same
-change, and if the owner is a shipped spec that is an amendment (a dated
-`## Amendments received` entry) that invalidates its dependents. Say so
-before removing anything.
+if the owner is the spec being implemented, its `establishes` list drops
+the path in the same change; if the owner is a shipped spec, that is an
+amendment recorded in a new spec (an `amends` edge), never an edit to the
+shipped spec itself. Say so before removing anything.
+
+## Project layer
+
+Read from `AGENTS.md` or `CLAUDE.md`: the source surface. Read from
+`.claude/rules/`: the dynamic-dispatch seams and never-touch artefacts.
+Nothing here is edited per project.
