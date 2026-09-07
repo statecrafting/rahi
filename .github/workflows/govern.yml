@@ -12,7 +12,7 @@ permissions:
 
 env:
   # Pinned to the version AGENTS.md names; bump both together.
-  SPEC_SPINE_VERSION: v0.14.0
+  SPEC_SPINE_VERSION: v0.15.0
 
 jobs:
   spine:
