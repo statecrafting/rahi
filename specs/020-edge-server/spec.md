@@ -184,6 +184,18 @@ the rauthy proxy route (021); sessions (022).
   that edge; spec 022 inserts its extractor and reads it back by type.
   Rejected alternative: a `Kernel::ledger()` accessor, which amends spec
   015's crate to answer spec 020's probe.
+- **D-8 (2026-09-07, build session; completes B-2's coverage).** The static
+  slot sits inside the CSRF and rate-limit layers with the app's routers;
+  what stays outside them is what B-2 names, the probes and (when spec 023
+  adds it) `/metrics`. B-2 fixes the order and names the two exceptions but
+  does not place the slot, and a slot outside the limiter would be an
+  unmetered path into the filesystem for an unauthenticated client. The
+  costs are named rather than hidden: an SPA's asset burst is counted
+  against its client's ceiling, so a cell serving many small files declares
+  a wider default than 300 or ships fewer, larger bundles; and the router's
+  own 404, which no mounted route produced, is outside the limiter along
+  with the probes. Rejected alternative: the slot beside the probes, which
+  buys an untouched asset budget with an unmetered read path.
 - **D-7 (2026-09-06, build session; completes B-4's issuance).** The CSRF
   layer mints the token itself: a safe request that arrives without the
   cookie is issued one on the way out, and the cookie is readable by script.

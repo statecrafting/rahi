@@ -6,6 +6,12 @@
 //! read it to echo it, and what makes the pair a proof is that a cross-origin
 //! caller can send the cookie but cannot read it to build the header.
 //!
+//! The cookie is minted again on any safe request that arrives without one,
+//! so a page reads it at the moment it builds a request rather than caching
+//! the value it saw at boot. Nothing here is stateful: what makes the pair a
+//! proof is that the two halves match, not that the server issued this
+//! particular value.
+//!
 //! `/auth/*` is exempt. That prefix is rauthy's own proxy (spec 021), it is
 //! forwarded raw, and rauthy brings its own CSRF handling; a chassis token on
 //! those requests would be a second opinion about a question the IdP already

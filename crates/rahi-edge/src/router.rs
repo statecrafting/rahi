@@ -5,7 +5,7 @@
 //! chooses what is served, the chassis chooses what every request passes
 //! through on its way there.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use axum::Router;
 use axum::middleware::{from_fn, from_fn_with_state};
@@ -123,7 +123,7 @@ impl EdgeBuilder {
             };
         }
         if let Some(dir) = &self.static_dir {
-            guarded = guarded.merge(static_slot(dir));
+            guarded = guarded.merge(static_files::service(dir));
         }
 
         let mut limiter = RateLimiter::new(self.state.store().clone(), self.limits);
@@ -150,8 +150,4 @@ impl EdgeBuilder {
             ))
             .layer(from_fn(observation))
     }
-}
-
-fn static_slot(dir: &Path) -> Router {
-    static_files::service(dir)
 }
