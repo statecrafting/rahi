@@ -85,8 +85,10 @@ may not change the protocol's substance without an amendment.
   fmt --all --check`, and `cargo deny check` when `deny.toml` exists. Every
   target is guarded so the composite is green on the specify-only tree.
 - **B-3 (CI is the same gate, behind one check).**
-  `.github/workflows/ci.yml` is the only workflow with event triggers
-  (`pull_request`, `push` to the default branch, and `merge_group`). It runs
+  `.github/workflows/ci.yml` is the only workflow in the gate chain with event
+  triggers (`pull_request`, `push` to the default branch, and `merge_group`); a
+  release workflow that publishes no PR status check is outside this chain and
+  keeps its own triggers (spec 031's `image.yml`). It runs
   the cargo gates when a workspace exists, the supply-chain gate when
   `deny.toml` exists, and calls `.github/workflows/govern.yml`, a reusable
   workflow (`on: workflow_call`) that runs `spec-spine compile --check`,

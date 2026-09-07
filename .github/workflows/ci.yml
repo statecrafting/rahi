@@ -4,7 +4,9 @@
 # in as a reusable workflow, so it reports through this gate rather than
 # publishing a second, separately-named check.
 #
-# This is the only workflow in the repository with event triggers.
+# This is the only triggered workflow in the gate chain. A release workflow that
+# publishes no PR status check (spec 031's image.yml) sits outside it and keeps
+# its own triggers.
 name: ci
 
 on:
