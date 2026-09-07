@@ -113,6 +113,6 @@
     "summary": "Operations that exist. rahi-ops implements preflight (config, keys, both stores' health, disk), migrate (spec 011's migrations as a deploy step, leader-only), backup (one encrypted archive holding the app's hiqlite snapshot taken through the addon, rauthy's snapshot taken through rauthy's own API, and the key material that decrypts both), restore (a cluster reset that refuses partial input and is single-shot by a marker), and ledger verify (spec 013 over an exported chain). rahi-cli is the binary composer: an app implements the Cell trait and its main is rahi_cli::run(cell), which yields serve plus every verb with the four exit codes. Carries enrahitu://027.\n",
     "title": "The verbs and the binary composer: preflight, migrate, backup, restore, ledger verify"
   },
-  "shardHash": "a12476d2cf444c537bd5cb2b41b0eadf2c62380d7e2ea80fd02d0ac872d590a8",
+  "shardHash": "78239740fa64abc047352fb35068b3938bdcf69997863fec3b18c1873aa9acf9",
   "specVersion": "1.1.0"
 }

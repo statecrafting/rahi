@@ -6,7 +6,7 @@ kind: "kernel"
 domain: "identity"
 created: "2026-09-03"
 authors: ["Bartek Kus"]
-implementation: in-progress
+implementation: complete
 risk: critical
 wave: 2
 depends_on:
@@ -102,10 +102,13 @@ documents under `testdata/discovery/` and need nothing.
   `jwks_uri` is `Error::Validation`.
 - **FR-003.** JWKS tests: unknown `kid` refreshes once then rejects; a key
   removed upstream verifies for one interval and not after.
-- **FR-004.** With `RAHI_TEST_RAUTHY` set, an integration test boots rauthy
-  on loopback, bootstraps the client, fetches discovery through the proxy,
-  and asserts the issuer is the public URL; otherwise it is skipped with a
-  message.
+- **FR-004.** *(Moved to spec 031 FR-005 on 2026-09-07; see D-8.)* The
+  integration run that boots a live rauthy, bootstraps the client, fetches
+  discovery through the proxy, and asserts the issuer belongs to the spec
+  that builds the container the two processes share. What stays here is the
+  skip: `tests/discovery.rs` skips in both directions with a message naming
+  031, so the suite never fails for the absence of a rauthy this crate
+  cannot start.
 
 ## 5. Acceptance criteria
 
@@ -115,7 +118,8 @@ documents under `testdata/discovery/` and need nothing.
 ## 6. Out of scope
 
 The login flow, sessions, and the principal (022); rauthy's own
-configuration file and process supervision (031); mail delivery for the
+configuration file and process supervision (031); booting a live rauthy to
+exercise the proxy end to end (031 FR-005, by D-8); mail delivery for the
 IdP (an operator concern documented in 031).
 
 ## 7. Resolved decisions
@@ -190,6 +194,20 @@ IdP (an operator concern documented in 031).
   document missing `jwks_uri` fails at the deserializer rather than at the
   first token. Rejected alternative: keeping the whole document, which makes
   every rauthy release a potential parse change for fields no caller wants.
+- **D-8 (2026-09-07, corpus amendment; moves FR-004 to spec 031).** FR-004
+  required an integration test that boots rauthy on loopback. This crate
+  cannot start rauthy: the configuration file, the admin token, and the
+  container the two processes share are all spec 031's territory, and B-5
+  and B-6 already say so for the admin token and the cookie mode. A
+  requirement that can only be discharged from another spec's territory
+  belongs to that spec, so it moves to 031 as FR-005, where B-6's smoke
+  test already fetched discovery through the proxy and asserted the issuer.
+  Nothing is lost and no assertion is weakened; the requirement is filed
+  where it can be met. With it gone, every claim in this spec is built and
+  covered and `implementation` flips to `complete`. See spec 031 D-1 for
+  the same decision from the receiving side. Rejected alternative: keeping
+  the requirement here and holding this spec open until 031 merges, which
+  blocks 022, 024, 030, and 031 itself on a spec only 031 can close.
 
 ## 8. Status
 
@@ -207,6 +225,13 @@ IdP (an operator concern documented in 031).
   remains is FR-004's boot, and it is a human's call whether it lands here
   after spec 031 or moves into 031's own territory: writing it now would mean
   writing a container arrangement no session can execute.
+
+- **2026-09-07 (corpus amendment).** That call was made: FR-004 moves into
+  spec 031 as its FR-005 (D-8 here, D-1 there). Every remaining claim in
+  this spec is built and covered, the index records no unresolved unit
+  against it, and `implementation` is `complete`. The skip in
+  `tests/discovery.rs` stays and now names 031 as the spec that closes it.
+  This unblocks 022, and behind it 024, 030, and 031.
 
 ## Verification
 

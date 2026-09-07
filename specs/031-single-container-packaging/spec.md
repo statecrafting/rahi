@@ -95,6 +95,12 @@ image job runs after the cargo gate).
   `COOKIE_MODE=danger-insecure` and for `https` contains
   `PROXY_MODE=true`.
 - **FR-004.** The image smoke test in CI passes on both architectures.
+- **FR-005.** The smoke test of B-6 boots rauthy in the running container,
+  bootstraps the OIDC client (021 B-5), fetches discovery through the
+  proxy, and asserts the issuer is the public URL. This is spec 021's
+  FR-004, moved here by D-1; 021 owns the proxy and the discovery client,
+  this spec owns the only place either can be exercised against a live
+  rauthy.
 
 ## 5. Acceptance criteria
 
@@ -102,7 +108,7 @@ image job runs after the cargo gate).
   `--test supervise` pass.
 - **AC-2.** `docker build -f docker/Dockerfile .` succeeds and the smoke
   test of B-6 passes locally (skipped in `verify:cli` when docker is
-  absent).
+  absent), including the discovery assertion of FR-005.
 
 ## 6. Out of scope
 
@@ -111,7 +117,28 @@ for development (033).
 
 ## 7. Resolved decisions
 
-None yet.
+- **D-1 (2026-09-07, corpus amendment; inherits 021's FR-004).** Spec 021's
+  FR-004 required an integration test that boots rauthy on loopback,
+  bootstraps the client, fetches discovery through the proxy, and asserts
+  the issuer. Booting rauthy needs three things 021 does not own and this
+  spec builds: rauthy's configuration file (B-2), its admin token
+  (B-2, from `/data/keys`), and the container the two processes share
+  (B-3, B-4). The requirement is therefore this spec's, and it arrives as
+  FR-005. It costs nothing to carry: B-6's smoke test already fetched
+  discovery through the proxy and asserted the issuer, so FR-005 names an
+  assertion the smoke test was going to make anyway and binds it to the
+  spec that needed it.
+
+  Spec 021 was held `in-progress` for this one requirement while every
+  other claim in it was built and covered, and specs 022, 024, 030, and
+  this one sit behind 021 in the declared DAG, so the requirement's
+  misplacement stalled the whole of waves 2 and 3. The two specs' own
+  status notes named the contradiction and left it for a human, which is
+  what the coherence guard asks; this entry is that decision. Spec 021 is
+  flipped to `implementation: complete` in the same change. Rejected
+  alternative: leaving FR-004 in 021 and holding that spec open until this
+  one merges, which keeps a spec in flight for a year of build order and
+  blocks the four specs behind it for the same reason.
 
 ## Verification
 
