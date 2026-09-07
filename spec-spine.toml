@@ -47,6 +47,10 @@ standalone_rust_workspaces = []
 # No npm anywhere in this repository (spec 001 D-1).
 npm_workspaces = []
 standalone_npm_packages = []
+# The claude-observatory state root for this project: declared so the gates
+# know it and refuse to govern it, instead of a private path per concern
+# (spec-spine spec 039). Gitignored; spec-spine never reads it.
+state_dir = "data"
 
 [index]
 # Beyond the always-hashed core (manifests, specs, span-backing sources): the
@@ -66,7 +70,7 @@ extra_hashed_inputs = [
   "docker/**",
   "deploy/**",
 ]
-resolver_exclusions = ["target", "node_modules", ".derived", "dist", "build", "data"]
+resolver_exclusions = ["target", "node_modules", ".derived", "dist", "build"]
 
 # Named hash slices (spec-spine spec 012): a PR that touches only one
 # surface can be gated on that slice alone.

@@ -246,6 +246,38 @@ never writes, `/commit` carries the session-link and em-dash bans, and
 `scripts/verify-spec.sh` is the kit's copy, which also accepts a numbered
 `## N. Verification` heading.
 
+D-9 (2026-09-07, pin bump). The `spec-spine` pin moves from 0.14.0 to
+0.15.0 in every site that states it (`govern.yml`, `AGENTS.md`,
+`README.md`, the architect agent); `/setup` states the pin as `<pin>`
+since D-8 and needs no edit. The corpus was verified byte-compatible
+first: under 0.15.0 `compile --check`, `index check`, `lint
+--fail-on-warn`, `index coverage --fail-on-untraced`, and `couple` all
+pass against shards written by 0.14.0, with no shard rewritten. The
+fifteen kit skills, the three standing rules, and `scripts/verify-spec.sh`
+were diffed against the v0.15.0 kit and are byte-identical, so D-8's "a
+future kit update is a copy" held with nothing to copy; the four agent
+files differ only where this repository localized the kit's placeholders,
+which is what D-8 intended. Gained: `spec-spine verify <id>` (spec-spine
+spec 049), the verb that retires the `verify-spec.sh` three adopters each
+wrote, and `index diagnostics` with `index check --fail-on-unresolved`
+(spec 050), which gives the `W-001` counts a reader and a gate. The 78
+`W-001` this corpus records all belong to pending specs claiming units
+not yet written, which is what a specify-first corpus is; none belong to
+a spec in flight.
+
+This change also closes the `state_dir` follow-on D-7 deferred:
+`layout.state_dir = "data"` replaces `"data"` in `resolver_exclusions`,
+which declares what the directory *is* (claude-observatory's state root
+for this project) rather than hiding it from the resolver alone.
+spec-spine's own adopter audit names this repository's `"data"` entry as
+the case the knob was added for.
+
+Not adopted here: `spec-spine verify <id>` does not yet replace
+`scripts/verify-spec.sh`. The v0.15.0 kit still ships the script, FR-002
+and AC-3 of this spec require it by name, and changing what a spec
+requires is not a bump's business. Retiring it is its own change, and it
+waits on the kit retiring its copy.
+
 ## Verification
 
 ```verify:cli
