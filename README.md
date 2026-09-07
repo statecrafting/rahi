@@ -15,12 +15,17 @@ the chassis; it never forks it.
 The name is the lineage: enrahitu was Encore, Rauthy, Hiqlite, Turso. Drop
 Encore and Turso and what remains is what this is.
 
-## Status: specified, not yet built
+## Status: wave 1 built, wave 2 under way
 
-This repository is a complete specification corpus and the harness that
-builds it. There is no code under `crates/` yet. Every ordinary spec is
-`status: approved` and `implementation: pending`; spec ordinals are the
-build order; and each spec is bounded to one driven session's territory.
+This repository is a complete specification corpus, the harness that
+builds it, and the code built so far. All 22 specs are `status: approved`;
+spec ordinals are the build order; and each spec is bounded to one driven
+session's territory. Six crates exist (`rahi-types`, `rahi-store`,
+`rahi-ledger`, `rahi-kernel`, `rahi-edge`, `rahi-idp`), every one of their
+86 source files specifically claimed by the spec that built it. Wave 1 is
+complete except 016; wave 2 has the edge (020) and observability (023)
+landed; wave 3, the operational verbs and packaging, is not started.
+`spec-spine registry plan` is the live answer to what is buildable now.
 The corpus is built by
 [claude-observatory](https://github.com/bartekus/claude-observatory), which
 schedules the lowest-numbered ready spec, drives one fresh session through
@@ -56,7 +61,7 @@ binary in the same container and never forked.
 ## Governance
 
 The corpus is governed by [spec-spine](https://github.com/statecrafting/spec-spine)
-0.14.0. `make spine` runs the gate (compile, index, lint, index check,
+0.15.0. `make spine` runs the gate (compile, index, lint, index check,
 couple, DAG check); `make ci` adds ownership coverage and the cargo gates
 once a workspace exists. Derived artifacts under `.derived/` are committed
 and read only through `spec-spine` subcommands. Every source file inside a
@@ -64,7 +69,7 @@ crate must be specifically claimed by a spec; a session that adds a file
 claims it in the spec it is implementing.
 
 ```sh
-cargo install spec-spine-cli --locked   # or: npm i -g spec-spine@0.14.0
+cargo install spec-spine-cli --locked   # or: npm i -g spec-spine@0.15.0
 make spine
 spec-spine registry list
 scripts/spec-dag.sh
