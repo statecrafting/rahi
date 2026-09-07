@@ -69,7 +69,7 @@
       "wave": 2
     },
     "id": "021-idp-proxy-and-discovery",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "kind": "kernel",
     "risk": "critical",
     "sectionHeadings": [
@@ -89,6 +89,6 @@
     "summary": "One public origin for app and IdP: rauthy binds loopback, the app reverse-proxies the /auth/* subtree to it raw and unfiltered with bodies streamed, the issuer and every OIDC endpoint live under the app's URL, the driver trusts rauthy's discovery document fetched through the loopback base and caches its JWKS with rotation, and the app's OIDC client is bootstrapped on first boot with authorization-code plus refresh, S256 PKCE, RS256, and redirect URIs derived from the public URL. rauthy is a release binary in the same container and is never forked. Carries enrahitu://005.\n",
     "title": "rauthy behind a same-origin proxy: the raw /auth/* route, discovery, JWKS, client bootstrap"
   },
-  "shardHash": "94f1500e9ce094f4a475f39dbba7a75999ef3402e5e61dd49394ae59ac0df3e9",
+  "shardHash": "639d5b9af704193d6a65856ee75f2b9bbbca54a167d006951e6e496fd306a815",
   "specVersion": "1.1.0"
 }

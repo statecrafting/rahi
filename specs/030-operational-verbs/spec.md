@@ -76,9 +76,11 @@ boot, key generation, and supervision (031) are modules added to
   migrations (`Error::Stale`, exit 2) and prints the `migrate` command.
 - **B-3 (preflight).** Checks, each reported pass or fail with a reason:
   config parses; `/data` writable; key files present with mode `0600`;
-  the app's hiqlite opens and elects; rauthy answers on loopback; the
-  ledger verifies at `Depth::Resident`; free disk above a threshold. Exit 1
-  on any failure; never mutates.
+  the app's hiqlite opens and elects; the store's engine report
+  (`StoreHandle::engine_report()`, spec 016) prints `extensions: none` and
+  the configured `max_value_bytes`; rauthy answers on loopback; the ledger
+  verifies at `Depth::Resident`; free disk above a threshold. Exit 1 on any
+  failure; never mutates.
 - **B-4 (migrate).** Runs `Store::migrate(cell.migrations())` on the
   leader, refuses on a follower with the leader named, takes a backup first
   when `--backup` is given, prints the report.
@@ -131,7 +133,21 @@ where archives land in a cluster (032).
 
 ## 7. Resolved decisions
 
-None yet.
+- **D-1 (2026-09-07, corpus amendment; adds the engine report to B-3).**
+  B-3's check list now names the store's engine report. Spec 016 built the
+  two facts and their `Display` (`StoreHandle::engine_report()`, whose
+  output is `extensions: none, max_value_bytes: <n>`) and made printing
+  them from `preflight` its AC-2, but `preflight` is this spec's territory
+  and B-3 did not list the check, so a diligent session building 030 would
+  have closed every requirement it could read and still left 016's AC-2
+  open. Spec 016's own `## 8. Status` surfaced that contradiction on
+  2026-09-06 rather than resolving it, which is what the coherence guard
+  asks of a build session; this entry is the human answer it was waiting
+  for. The session that builds 030 adds the check, and flips spec 016 to
+  `implementation: complete` in the same change. No `depends_on` edge is
+  added: 016 is a built crate this spec calls a public method on, and
+  declaring the edge would make 030 blocked by a spec that only 030 can
+  unblock.
 
 ## Verification
 

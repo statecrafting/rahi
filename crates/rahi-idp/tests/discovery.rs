@@ -266,17 +266,22 @@ fn the_default_options_are_the_spec_defaults() {
     );
 }
 
-// ------------------------------------------------------------ FR-004
+// -------------------------------------------------- spec 031 FR-005
 
-/// FR-004: with `RAHI_TEST_RAUTHY` naming a binary, boot it, bootstrap the
-/// client, and read discovery through the proxy. Without one, say so and
-/// pass: an absent operator prerequisite is not a failing chassis.
+/// The live-rauthy run: with `RAHI_TEST_RAUTHY` naming a binary, boot it,
+/// bootstrap the client, and read discovery through the proxy. Without one,
+/// say so and pass: an absent operator prerequisite is not a failing chassis.
+///
+/// The requirement moved to spec 031 FR-005 (spec 021 D-8): booting rauthy
+/// needs the configuration file, the admin token, and the container that
+/// spec builds, none of which this crate owns. The assertion stays written
+/// here, where that arrangement will find it.
 #[tokio::test]
 async fn a_real_rauthy_issues_under_the_public_url() {
     let Ok(binary) = std::env::var("RAHI_TEST_RAUTHY") else {
         eprintln!(
             "skipped: set RAHI_TEST_RAUTHY to a rauthy binary to run the integration \
-             check (spec 021 FR-004)"
+             check (spec 031 FR-005)"
         );
         return;
     };
