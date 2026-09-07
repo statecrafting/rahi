@@ -15,7 +15,7 @@ design, every ordinary spec is `approved` and `implementation: pending`, and
 spec ordinals are the build order. Code arrives one spec per session under
 `crates/`, `apps/`, `docker/`, and `deploy/`.
 
-Governance is `spec-spine` **0.11.0** on your `PATH` (CI pins the same
+Governance is `spec-spine` **0.14.0** on your `PATH` (CI pins the same
 version). All governed reads of `.derived/` go through its CLI.
 
 ## New Sessions
