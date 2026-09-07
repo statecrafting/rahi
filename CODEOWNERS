@@ -1,0 +1,24 @@
+# Spec: specs/001-agentic-harness/spec.md
+# GitHub requests a review from the listed owner on any PR touching a matching
+# path (enforced once branch protection requires Code Owner review).
+
+*                       @bartekus
+
+# The governed authority ledger and its configuration.
+/specs/                 @bartekus
+/standards/             @bartekus
+/spec-spine.toml        @bartekus
+
+# What agents may do.
+/.claude/               @bartekus
+/AGENTS.md              @bartekus
+/CLAUDE.md              @bartekus
+/Makefile               @bartekus
+
+# What runs with tokens.
+/.github/               @bartekus
+/.githooks/             @bartekus
+
+# The deployment surface: one container, one volume, one origin (specs 031, 032).
+/docker/                @bartekus
+/deploy/                @bartekus

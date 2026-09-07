@@ -1,0 +1,76 @@
+# The single CI entry point (spec 001 B-3). Every check rahi runs is a job
+# here, and `jobs.ci-gate` aggregates them into the ONE status check branch
+# protection requires. The governance chain lives in `govern.yml` and is pulled
+# in as a reusable workflow, so it reports through this gate rather than
+# publishing a second, separately-named check.
+#
+# This is the only triggered workflow in the gate chain. A release workflow that
+# publishes no PR status check (spec 031's image.yml) sits outside it and keeps
+# its own triggers.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  # GitHub merge queue. Each queued PR is tested against the speculative merged
+  # tree, so a green PR cannot be silently invalidated by the one ahead of it.
+  # The coupling gate stays pull_request-only (it reads the PR-body waiver,
+  # which merge_group does not carry); every other check runs here.
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  govern:
+    uses: ./.github/workflows/govern.yml
+
+  cargo:
+    name: cargo gate
+    needs: govern
+    if: needs.govern.outputs.has_cargo == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # rustup installs the toolchain pinned in rust-toolchain.toml (spec 010).
+      - run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --workspace --locked
+      - run: cargo test --workspace --locked
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo fmt --all --check
+
+  deny:
+    name: supply chain (cargo-deny)
+    needs: govern
+    if: needs.govern.outputs.has_deny == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: EmbarkStudios/cargo-deny-action@v2
+
+  # The single required status check for branch protection and the merge queue
+  # (spec 001 D-9). It aggregates every CI job, so branch protection requires
+  # just this one name instead of an enumerated, drift-prone list: rahi's cargo
+  # and supply-chain jobs are conditional, and a skipped required check never
+  # reports, which would block every PR forever. A skipped job counts as a pass
+  # here (the govern job announces which gates were inactive); a failed or
+  # cancelled job fails the gate. A new job is covered the moment it joins
+  # `needs`.
+  ci-gate:
+    name: ci-gate
+    if: ${{ always() }}
+    needs: [govern, cargo, deny]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all CI jobs to have passed
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          echo "A required CI job failed or was cancelled:"
+          echo "  govern=${{ needs.govern.result }} cargo=${{ needs.cargo.result }} deny=${{ needs.deny.result }}"
+          exit 1
+      - name: All required CI jobs passed
+        run: |
+          echo "ci-gate passed: govern, cargo and deny are all green or skipped"
+          echo "  govern=${{ needs.govern.result }} cargo=${{ needs.cargo.result }} deny=${{ needs.deny.result }}"

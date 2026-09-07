@@ -21,7 +21,19 @@
         "source": "spec-edge"
       },
       {
+        "path": ".gitattributes",
+        "source": "spec-edge"
+      },
+      {
+        "path": ".githooks/",
+        "source": "spec-edge"
+      },
+      {
         "path": ".github/dependabot.yml",
+        "source": "spec-edge"
+      },
+      {
+        "path": ".github/workflows/ci.yml",
         "source": "spec-edge"
       },
       {
@@ -38,6 +50,10 @@
       },
       {
         "path": "CLAUDE.md",
+        "source": "spec-edge"
+      },
+      {
+        "path": "CODEOWNERS",
         "source": "spec-edge"
       },
       {
@@ -121,6 +137,32 @@
       {
         "locations": [
           {
+            "file": ".gitattributes"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": ".gitattributes"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": ".githooks/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": ".githooks/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": ".github/dependabot.yml"
           }
         ],
@@ -129,6 +171,19 @@
         "unit": {
           "kind": "file",
           "path": ".github/dependabot.yml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": ".github/workflows/ci.yml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/ci.yml"
         }
       },
       {
@@ -181,6 +236,19 @@
         "unit": {
           "kind": "file",
           "path": "CLAUDE.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "CODEOWNERS"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "CODEOWNERS"
         }
       },
       {
@@ -266,5 +334,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "471ce81b918c2251a743913b9eac24ee3c481989ff7d43be44ba243f41292518"
+  "shardHash": "d93eade8043ba6d508fba78422d8e76939d9df06ee453a351b232794aab5caf1"
 }

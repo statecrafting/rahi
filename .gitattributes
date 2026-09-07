@@ -20,3 +20,13 @@ Makefile text eol=lf
 *.cbor binary
 *.bin binary
 *.png binary
+
+# Derived shard trees (spec-spine spec 024 sharding; spec 020 merge driver).
+# Sharding means two PRs touching different specs write disjoint files and do
+# not conflict at all; this driver covers the residual same-shard conflict by
+# regenerating both artifacts from the merged tree. It is opt-in per clone,
+# because the driver registration lives in .git/config, which is not committed:
+#   ./.githooks/enable-merge-driver.sh
+.derived/spec-registry/by-spec/*.json     merge=spec-spine-derived-regen
+.derived/codebase-index/by-spec/*.json    merge=spec-spine-derived-regen
+.derived/codebase-index/by-package/*.json merge=spec-spine-derived-regen
