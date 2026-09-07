@@ -61,7 +61,8 @@ documents under `testdata/discovery/` and need nothing.
 - **B-1 (config).** `IdpConfig` is derived from `rahi_types::Config`:
   `loopback_base` (`http://127.0.0.1:8080`), `issuer`
   (`<public_url>/auth/v1`), `client_id` (the app name from the manifest),
-  `redirect_uri` (`<public_url>/auth/callback`), and the client secret path
+  `redirect_uri` (`<public_url>/session/callback`, the app's own callback
+  route outside the raw proxy subtree; see D-9), and the client secret path
   under `/data/keys/`.
 - **B-2 (proxy).** `proxy_router() -> Router` mounts `/auth/*` and forwards
   method, path, query, headers (minus hop-by-hop), and a streamed body to
@@ -232,6 +233,29 @@ IdP (an operator concern documented in 031).
   against it, and `implementation` is `complete`. The skip in
   `tests/discovery.rs` stays and now names 031 as the spec that closes it.
   This unblocks 022, and behind it 024, 030, and 031.
+
+- **D-9 (2026-09-07, corpus amendment; one callback constant).** B-1 fixed
+  `redirect_uri` at `<public_url>/auth/callback`, and B-5's
+  `bootstrap_client` registered exactly that string with rauthy. Spec 022 B-1
+  mounts the app's callback at `<public_url>/session/callback` and states its
+  reason: `/auth/*` is this spec's own raw-forwarded proxy subtree (B-2), so
+  an app route inside it is a route the proxy hands straight back to rauthy,
+  which has no such route. The two values cannot both be the redirect URI of
+  a working cell: rauthy matches `redirect_uri` literally, so a browser-real
+  login was refused, and B-1's own value was independently unusable for the
+  reason B-2 gives. Spec 022's build session found this, recorded it as that
+  spec's D-4, and correctly refused to amend this spec to match code it had
+  just written; the reconciliation was left to a human and is made here.
+
+  `config::CALLBACK_PATH` becomes `/session/callback` and B-1 states the new
+  value. `bootstrap_client` reads `config.redirect_uri` and so registers the
+  corrected URI with no further change; the eight literals asserting the old
+  value in this spec's own tests (`config.rs`, `bootstrap.rs`) move with it.
+  Nothing about the proxy, discovery, or the client bootstrap's mechanics
+  changes: this corrects a value, not a behavior. Rejected alternative:
+  leaving B-1 alone and having spec 030's composer register both URIs, which
+  keeps a broken value in the corpus and defers the fix behind 030, a spec
+  that is itself blocked by 022.
 
 ## Verification
 
