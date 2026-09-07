@@ -1,0 +1,25 @@
+# The fixture cell's manifest (spec 022 B-6).
+#
+# The identity crate adjudicates nothing against a ceiling: the one thing it
+# asks the kernel for is a ledgered refusal when a principal lacks a role
+# (`Kernel::refuse`), and that needs a booted kernel rather than a grant. So
+# this is the smallest document `Manifest::parse` accepts, plus the operator
+# role spec 024 will name.
+
+[app]
+name = "hello-cell"
+org = "statecrafting"
+
+[ledger]
+schema_version = "1.0.0"
+max_record_bytes = 65536
+
+[observability]
+metrics_path = "/metrics"
+otel = false
+
+[auth]
+operator_role = "rahi-operator"
+
+[contract]
+version = "1.0.0"

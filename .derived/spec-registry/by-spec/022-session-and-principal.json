@@ -50,6 +50,14 @@
       {
         "kind": "file",
         "path": "crates/rahi-idp/tests/principal.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-idp/tests/oidc/"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-idp/testdata/oidc/"
       }
     ],
     "extends": [
@@ -59,6 +67,39 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-idp/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "021-idp-proxy-and-discovery",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/Cargo.toml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "021-idp-proxy-and-discovery",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/discovery.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "015-kernel-manifest-and-adjudication",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "010-workspace-and-core-types",
+        "unit": {
+          "anchor": "workspace.dependencies",
+          "file": "Cargo.toml",
+          "kind": "section"
         }
       }
     ],
@@ -78,6 +119,7 @@
       "5. Acceptance criteria",
       "6. Out of scope",
       "7. Resolved decisions",
+      "8. Status",
       "Verification"
     ],
     "specPath": "specs/022-session-and-principal/spec.md",
@@ -85,6 +127,6 @@
     "summary": "The app keeps the shell and gives up the authority. Login is the authorization-code flow with PKCE through the proxy; the session cookie is a signed envelope holding rauthy's refresh token and the pinned subject, httpOnly and same-origin, that grants nothing on presentation; the access assertion is short-lived and minted from the IdP's claims; renewal forwards the refresh token to rauthy and re-reads roles and email_verified from userinfo every time, so a role removed at the IdP takes effect within one access lifetime and a refused grant ends the session. No local account row is ever written. Carries enrahitu://004.\n",
     "title": "Sessions and the principal: the signed envelope, renewal as a round-trip, the IdP subject as the only id"
   },
-  "shardHash": "afbff7749e89b4b02100b3ac72a7326342b88cd4003b972ee09ddd08185d9b8d",
+  "shardHash": "7a927a610b1b4d11c70e2e40dc278bc8bc9577f6cf3275916cfb56583a8ca764",
   "specVersion": "1.1.0"
 }

@@ -2621,12 +2621,20 @@ name = "rahi-idp"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "base64 0.22.1",
+ "getrandom 0.4.3",
+ "rahi-kernel",
+ "rahi-ledger",
+ "rahi-store",
  "rahi-types",
  "reqwest",
+ "ring",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
  "tower",
+ "url",
 ]
 
 [[package]]
@@ -2875,6 +2883,7 @@ dependencies = [
  "rustls-platform-verifier",
  "serde",
  "serde_json",
+ "serde_urlencoded",
  "sync_wrapper",
  "tokio",
  "tokio-rustls",

@@ -13,13 +13,24 @@ spec = "021-idp-proxy-and-discovery"
 
 [dependencies]
 rahi-types = { workspace = true }
+# Sessions (spec 022): the assertion cache is the store's cache group, and a
+# role refusal is ledgered through the kernel's own denial queue rather than
+# through a second appender in this crate.
+rahi-store = { workspace = true }
+rahi-kernel = { workspace = true }
 axum = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+base64 = { workspace = true }
+getrandom = { workspace = true }
+ring = { workspace = true }
+url = { workspace = true }
 tokio = { workspace = true, features = ["time"] }
 
 [dev-dependencies]
+rahi-ledger = { workspace = true }
+tempfile = { workspace = true }
 tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "time"] }
 tower = { workspace = true, features = ["util"] }
 
