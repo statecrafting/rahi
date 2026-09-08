@@ -1,29 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '024-hardening' file unit 'crates/rahi-edge/src/client_identity.rs' does not exist",
-        "path": "crates/rahi-edge/src/client_identity.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '024-hardening' file unit 'crates/rahi-edge/src/operator.rs' does not exist",
-        "path": "crates/rahi-edge/src/operator.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '024-hardening' file unit 'crates/rahi-edge/src/exposure.rs' does not exist",
-        "path": "crates/rahi-edge/src/exposure.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '024-hardening' file unit 'crates/rahi-edge/tests/hardening.rs' does not exist",
-        "path": "crates/rahi-edge/tests/hardening.rs"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "022-session-and-principal",
@@ -31,17 +6,41 @@
     ],
     "implementingPaths": [
       {
+        "path": "crates/rahi-edge/src/client_identity.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/exposure.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-edge/src/lib.rs",
         "source": "spec-edge"
       },
       {
         "path": "crates/rahi-edge/src/middleware/rate_limit.rs",
         "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/operator.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/router.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/tests/hardening.rs",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/client_identity.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -50,7 +49,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/exposure.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -59,7 +62,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/operator.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -68,7 +75,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-edge/tests/hardening.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -101,11 +112,24 @@
           "kind": "file",
           "path": "crates/rahi-edge/src/middleware/rate_limit.rs"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/router.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/router.rs"
+        }
       }
     ],
     "specId": "024-hardening",
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "a7a3f6ed2d57811896b08d4e48ffaf91dcb8a06dc6d2eee4c09fa420da0e3121"
+  "shardHash": "77ad63323132019af3096374dbd674b4f8096637f5e3ea8c038240bf53b802be"
 }
