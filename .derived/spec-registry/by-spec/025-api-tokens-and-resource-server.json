@@ -96,6 +96,6 @@
     "summary": "A browser is not the only client. Command line tools, agent runtimes, and MCP clients hold no cookie and cannot follow a redirect into a browser session, and the chassis has so far had nothing to say to them. This spec makes the app an OAuth 2.1 resource server over the same IdP: it publishes protected resource metadata so a client can discover the authorization server, validates rauthy-issued JWT access tokens locally against the cached JWKS with a mandatory audience check, gates routes on scope, and answers an unauthenticated request with the challenge that bootstraps discovery. Registration and the grants themselves stay rauthy's: the app issues no API key, ever.\n",
     "title": "The resource server: bearer tokens rauthy issued, audience bound, scope gated, never app minted"
   },
-  "shardHash": "1e17f3f175f6f0d08aa43680c9be2ef86e7f7c220f998b4ae7a5994accb3e34f",
+  "shardHash": "2f07ebcb8e95950df6d699a3496f7bdb083be0f8822f9ebd487831ab37a67e41",
   "specVersion": "1.1.0"
 }

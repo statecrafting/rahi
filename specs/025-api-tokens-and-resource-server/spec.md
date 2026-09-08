@@ -263,6 +263,40 @@ consumer needs yet.
   condition that is vacuously true when the variable is unset, which would
   let a build session flip the spec on its own reading of its own acceptance.
 
+- **D-10 (2026-09-07, third build session; supersedes D-9's mechanism).**
+  AC-2's live run is gated on `RAHI_TEST_RAUTHY_URL`, the origin of an
+  already running rauthy, and when it is set `tests/bearer.rs` derives this
+  cell's identity from that origin and fetches the discovery document,
+  reporting what happened rather than reciting a prerequisite it never
+  checked. Spec 021 keeps its own reading of `RAHI_TEST_RAUTHY` as a binary
+  path in `tests/discovery.rs`, which this spec does not own and does not
+  touch. The remaining steps AC-2 names were driven green by hand against
+  `ghcr.io/sebadob/rauthy:0.36.0` and are recorded as a reproducible recipe in
+  `testdata/tokens/README.md`. D-9's premise, that the run waits on the
+  container spec 031 builds, is false: pointing the test at a running instance
+  needs no container lifecycle, no new dependency, and no other spec's
+  territory. Rejected alternative: redefining `RAHI_TEST_RAUTHY` itself as a
+  URL, which contradicts spec 021 B-2's text and would make spec 021's own
+  discovery test panic on a value that is not a path.
+
+- **D-11 (2026-09-07, third build session; reports a contradiction rather
+  than resolving it).** Spec 021 B-2 fixes this cell's issuer at
+  `<public_url>/auth/v1` and `Discovery::parse` holds the published document
+  to it exactly, while rauthy builds its issuer as
+  `{scheme}://{pub_url}/auth/v1/` with no setting that removes the trailing
+  slash. The comparison never succeeds against a real rauthy, which blocks
+  AC-2 before dynamic registration is reached and would refuse every real
+  access token on the `iss` check in `ResourceServer::validate`. This spec
+  records the defect and does not repair it: it holds `extends` edges on spec
+  021's `lib.rs` and spec 022's `extractor.rs` and `session.rs`, none on
+  `config.rs` or `discovery.rs`, and spec 021 is `implementation: complete`.
+  The reconciliation is spec 021's, either `ISSUER_PATH` carrying the trailing
+  slash or `Discovery::parse` comparing modulo it, with B-2's text moving to
+  match. Rejected alternative: normalising the issuer inside this spec's
+  bearer validation alone, which would leave spec 021's boot handshake and
+  spec 022's sessions still unable to reach a real rauthy while hiding the
+  defect behind one passing criterion.
+
 ## 8. Status
 
 - **2026-09-07 (build session).** B-1 to B-12, FR-001 to FR-006, and AC-1
@@ -307,6 +341,57 @@ consumer needs yet.
   does. The repair is unchanged and remains a human authoring act: either move
   AC-2 to the spec that owns the arrangement, as 021 FR-004 moved to 031
   FR-005, or give it the deferral clause spec 022's AC-2 already carries.
+
+- **2026-09-07 (third build session, remediation).** The hold stands and the
+  frontmatter stays `in-progress`, but the reason the two entries above give
+  is wrong and is corrected here. AC-2 is not blocked on the authorization
+  server being unavailable, and it is not blocked on spec 031's container.
+  Rauthy runs on this machine: the image `ghcr.io/sebadob/rauthy:0.36.0` is
+  present locally, and every OAuth step AC-2 names was driven green against it
+  by hand this session. A client registered through
+  `POST /auth/v1/clients_dyn`; `PUT /auth/v1/clients/{id}` bound a scope and
+  set `allowed_resources` to the cell's origin; `POST /auth/v1/oidc/authorize`
+  with a solved proof of work and an S256 challenge answered `202` with the
+  code on a loopback redirect; and `POST /auth/v1/oidc/token` with the
+  verifier and `resource` returned an access token carrying
+  `aud = [<client id>, <cell origin>]` and the granted scope. The recipe is
+  recorded in `crates/rahi-idp/testdata/tokens/README.md`. No new dependency
+  is needed to drive it: `ring`, `reqwest`, `base64`, and `serde_json` are
+  already this crate's.
+
+  **What blocks AC-2 is a contradiction in spec 021, and it blocks far more
+  than this criterion.** Spec 021 B-2 fixes this cell's issuer at
+  `<public_url>/auth/v1`, and `Discovery::parse` holds the published document
+  to it exactly. Rauthy builds its issuer as `{scheme}://{pub_url}/auth/v1/`
+  in `src/data/src/rauthy_config.rs` and exposes no setting that removes the
+  trailing slash. The two never compare equal, so the handshake fails before
+  registration is even reached:
+
+  ```text
+  the discovery document is issued by http://localhost:8080/auth/v1/ and this
+  cell's issuer is http://localhost:8080/auth/v1: the document belongs to
+  another deployment
+  ```
+
+  That is not a test-arrangement problem. `Discovery::fetch_within` is how
+  spec 021 reaches rauthy at boot and how spec 022 validates a session, and
+  the same one-character difference would refuse every real access token on
+  the `iss` check in `ResourceServer::validate`. As the corpus stands, no
+  deployment of this chassis can complete a handshake with the identity
+  provider it is built around. The two earlier suggested repairs (moving AC-2
+  to the spec that owns the arrangement, or giving it spec 022 AC-2's deferral
+  clause) would not close it either: wherever the criterion is filed, it fails
+  on the same comparison.
+
+  The reconciliation belongs to spec 021: either `ISSUER_PATH` carries the
+  trailing slash rauthy publishes, or `Discovery::parse` compares issuers
+  modulo it, and B-2's text moves with whichever is chosen. This spec extends
+  spec 021's `lib.rs` only, not `config.rs` or `discovery.rs`, and amending
+  another spec's requirement mid-build is what
+  `.claude/rules/adversarial-prompt-refusal.md` forbids, so the contradiction
+  is surfaced rather than resolved. `tests/bearer.rs` now runs the handshake
+  against a real rauthy when `RAHI_TEST_RAUTHY_URL` names one and reports
+  exactly this, in place of the earlier claim about a missing container.
 
 ## Verification
 

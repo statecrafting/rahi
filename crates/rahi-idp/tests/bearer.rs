@@ -29,9 +29,9 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use oidc::{CLIENT_ID, Cell, KID, SUB, T0, send, sign};
 use rahi_idp::{
-    Authenticated, BearerRoutes, Proxy, Registration, RequireBearer, RequireScope, Resource,
-    ResourceServer, SESSION_PREFIX, is_bearer_route, proxy_router, resource_router, session_router,
-    with_bearer, with_scope, with_sessions,
+    Authenticated, BearerRoutes, Discovery, IdpConfig, Proxy, Registration, RequireBearer,
+    RequireScope, Resource, ResourceServer, SESSION_PREFIX, is_bearer_route, proxy_router,
+    resource_router, session_router, with_bearer, with_scope, with_sessions,
 };
 use rahi_types::Config;
 use serde_json::{Value, json};
@@ -872,30 +872,47 @@ fn between<'t>(text: &'t str, open: &str, close: &str) -> Option<&'t str> {
 
 // ------------------------------------------------------------- AC-2
 
-/// AC-2: the live-rauthy run. With `RAHI_TEST_RAUTHY` naming a binary, a
-/// dynamically registered client completes authorization code with PKCE and
-/// presents its token here; without one, say so and pass.
+/// AC-2: the live-rauthy run, and the handshake it does not get past today.
 ///
-/// Booting rauthy from a test needs its configuration file, its admin API
-/// key, and the key set, which spec 031 builds and this crate does not own
-/// (spec 021 D-8 settled the same question for FR-004 there). The assertion
-/// is written here, where that arrangement will find it.
+/// With `RAHI_TEST_RAUTHY_URL` naming the origin of a running rauthy, this
+/// opens AC-2's first step against it: derive this cell's identity from that
+/// origin and fetch the discovery document. The steps after it (dynamic
+/// registration, authorization code with PKCE on a loopback redirect, the
+/// token bound to this resource) are the recipe under `testdata/tokens/`, and
+/// each has been run green by hand against rauthy 0.36.0.
+///
+/// The handshake is where it stops. Spec 021 B-2 fixes this cell's issuer at
+/// `<public_url>/auth/v1` and `Discovery::parse` holds the document to it
+/// exactly; rauthy builds its own as `{scheme}://{pub_url}/auth/v1/` with no
+/// setting that removes the trailing slash. The two never compare equal, so
+/// no real rauthy is reachable from this chassis, and no real token would
+/// pass the `iss` check in `ResourceServer::validate` either. That is a
+/// contradiction in a spec this one only extends, so it is reported rather
+/// than patched from here.
 #[tokio::test]
 async fn a_real_rauthy_admits_a_registered_client_by_scope() {
-    let Ok(binary) = std::env::var("RAHI_TEST_RAUTHY") else {
+    let Ok(origin) = std::env::var("RAHI_TEST_RAUTHY_URL") else {
         eprintln!(
-            "skipped: set RAHI_TEST_RAUTHY to a rauthy binary to run the registration, \
-             PKCE, and scope-gate check (AC-2)"
+            "skipped: set RAHI_TEST_RAUTHY_URL to the origin of a running rauthy \
+             (for example http://localhost:8080) to run AC-2's handshake"
         );
         return;
     };
-    assert!(
-        std::path::Path::new(&binary).exists(),
-        "RAHI_TEST_RAUTHY names {binary}, which does not exist"
-    );
-    eprintln!(
-        "skipped: {binary} needs the container spec 031 builds (configuration, admin \
-         key, key set) before a dynamic registration and a browser-real login can be \
-         driven from a test"
-    );
+
+    let env = BTreeMap::from([("RAHI_PUBLIC_URL", origin.as_str())]);
+    let config = Config::from_env(&env).expect("the origin is a well formed public url");
+    let idp = IdpConfig::derive(&config, CLIENT_ID).expect("the identity configuration derives");
+
+    match Discovery::fetch_within(&idp, Duration::from_secs(5)).await {
+        Ok(discovery) => eprintln!(
+            "the document at {} agrees with the configured issuer {}: AC-2's remaining \
+             steps are the recipe under testdata/tokens/",
+            idp.discovery_url(),
+            discovery.issuer
+        ),
+        Err(err) => eprintln!(
+            "blocked: {err}; this is spec 021 B-2's issuer, which rauthy cannot \
+             publish, so AC-2 stays open until that is reconciled"
+        ),
+    }
 }

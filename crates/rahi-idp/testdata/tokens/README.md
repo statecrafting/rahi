@@ -20,4 +20,43 @@ every run. The timestamps are relative to the stub's fixed clock
 and the tests that need an expired or premature one edit the claim they mean.
 
 They are fixtures, not evidence. A run against a real rauthy is AC-2's, and
-it is skipped unless `RAHI_TEST_RAUTHY` names a binary.
+`tests/bearer.rs` opens it when `RAHI_TEST_RAUTHY_URL` names the origin of a
+running one.
+
+## The AC-2 recipe, and where it stops
+
+Every OAuth step AC-2 asks for has been run green by hand against
+`ghcr.io/sebadob/rauthy:0.36.0`, so the criterion is not blocked on the
+authorization server being unavailable. Booted over plain `http` on port 8080
+with `[dynamic_clients] enable = true` and a `reg_token`, a `[bootstrap]`
+admin password, `[encryption]` keys, and a `[webauthn]` block, rauthy answers:
+
+1. `POST /auth/v1/clients_dyn` with the registration token registers a public
+   client whose one redirect URI is a loopback address (B-7, RFC 7591).
+2. `PUT /auth/v1/clients/{id}` as the admin adds a scope to it and sets
+   `allowed_resources` to this cell's origin. Rauthy denies a resource
+   indicator by default, so without this step no token can carry the audience
+   B-3 requires.
+3. `POST /auth/v1/oidc/authorize` with a solved proof of work and an S256
+   challenge answers `202` and a `Location` carrying the code; the proof of
+   work is a SHA-256 with a leading-zero-bit count, which `ring` already
+   computes here.
+4. `POST /auth/v1/oidc/token` with the verifier and `resource` returns an
+   access token whose `aud` holds both the client id and this cell's origin,
+   and whose `scope` is the one that was granted.
+
+What stops there is the handshake before all of it. Spec 021 B-2 fixes this
+cell's issuer at `<public_url>/auth/v1`, and `Discovery::parse` holds the
+published document to it exactly. Rauthy builds its issuer as
+`{scheme}://{pub_url}/auth/v1/` (`src/data/src/rauthy_config.rs`) and offers
+no setting that removes the trailing slash, so the two never compare equal:
+
+```text
+the discovery document is issued by http://localhost:8080/auth/v1/ and this
+cell's issuer is http://localhost:8080/auth/v1: the document belongs to
+another deployment
+```
+
+The same one-character difference would refuse every real token on the `iss`
+check in `ResourceServer::validate`. It is a contradiction in a spec this one
+only extends, so spec 025 reports it rather than reconciling it from here.
