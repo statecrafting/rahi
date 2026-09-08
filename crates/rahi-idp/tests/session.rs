@@ -254,7 +254,7 @@ async fn an_id_token_naming_an_unpublished_key_is_refused() {
     let forged = sign(
         &json!({ "alg": "RS256", "typ": "JWT", "kid": "not-a-published-kid" }),
         &json!({
-            "iss": format!("{}/auth/v1", cell.sessions.origin()),
+            "iss": format!("{}{}", cell.sessions.origin(), rahi_idp::ISSUER_PATH),
             "aud": "hello-cell",
             "exp": oidc::T0 + 3600,
             "sub": SUB,
@@ -274,7 +274,7 @@ async fn an_id_token_naming_an_unpublished_key_is_refused() {
 async fn an_unsigned_id_token_is_refused() {
     let cell = oidc::boot().await;
     let payload = json!({
-        "iss": format!("{}/auth/v1", cell.sessions.origin()),
+        "iss": format!("{}{}", cell.sessions.origin(), rahi_idp::ISSUER_PATH),
         "aud": "hello-cell",
         "exp": oidc::T0 + 3600,
         "sub": SUB,
