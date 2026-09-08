@@ -1,0 +1,15 @@
+{
+  "iss": "https://cell.example.com/auth/v1/",
+  "aud": ["another-cell", "https://another.example.com"],
+  "sub": "rauthy-subject-1",
+  "azp": "another-cell",
+  "typ": "Bearer",
+  "jti": "0195f0e0-9b1e-7c1f-9c0e-2c4a4f2b0a33",
+  "iat": 1767225600,
+  "nbf": 1767225600,
+  "exp": 1767226500,
+  "scope": "openid profile notes.read notes.write",
+  "email": "someone@example.com",
+  "email_verified": true,
+  "roles": ["reader"]
+}

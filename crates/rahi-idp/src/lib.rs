@@ -37,6 +37,20 @@
 //! - **The extractor** ([`extractor`]) makes all of that invisible to a
 //!   handler, and [`RequireRole`] refuses without one into the decision chain.
 //!
+//! Spec 025 adds the half a browser never needed: the resource server.
+//!
+//! - **The resource** ([`resource`]) is what this cell is, published as RFC
+//!   9728 metadata so a client that has never seen this deployment can find
+//!   its authorization server from a 401 alone.
+//! - **The bearer credential** ([`bearer`]) is a rauthy access token,
+//!   validated locally against the same key set, with the audience check that
+//!   makes a token minted for another resource unusable here.
+//! - **The scope gate** ([`scope`]) refuses a token that was not granted
+//!   enough, into the decision chain, and publishes what it requires.
+//! - **Registration** ([`registration`]) is rauthy's endpoint, advertised or
+//!   not; this crate implements no leg of it and mints no credential of its
+//!   own, ever (025 B-1).
+//!
 //! What is not here: rauthy's own configuration file and its supervision
 //! (spec 031); the operator gate and the exposure table (spec 024).
 //!
@@ -52,6 +66,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod bearer;
 pub mod bootstrap;
 pub mod config;
 pub mod discovery;
@@ -62,8 +77,15 @@ pub mod login;
 pub mod principal;
 pub mod proxy;
 pub mod refresh;
+pub mod registration;
+pub mod resource;
+pub mod scope;
 pub mod session;
 
+pub use bearer::{
+    Admission, Bearer, BearerRoute, BearerRoutes, DEFAULT_REVOCATION_LAG, RequireBearer,
+    ResourceServer, is_bearer_route, with_bearer,
+};
 pub use bootstrap::{Bootstrap, ClientSettings, bootstrap_client};
 pub use config::{
     API_KEY_SCHEME, AUTH_PREFIX, CALLBACK_PATH, CLIENT_SECRET_FILE, DISCOVERY_PATH, ISSUER_PATH,
@@ -77,6 +99,9 @@ pub use login::{LoginState, login_cookie, login_cookie_name, session_router};
 pub use principal::{IdpClaims, pinned, principal};
 pub use proxy::{Proxy, proxy_router};
 pub use refresh::{Renewed, ends_the_session, renew};
+pub use registration::Registration;
+pub use resource::{METADATA_PATH, Resource, ResourceMetadata, resource_router};
+pub use scope::{RequireScope, with_scope};
 pub use session::{
     DEFAULT_ACCESS_TTL, SESSION_PREFIX, SESSION_RATE_LIMIT, Session, Sessions, answer,
 };

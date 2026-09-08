@@ -1,0 +1,12 @@
+{
+  "iss": "https://cell.example.com/auth/v1/",
+  "aud": ["hello-cell", "https://cell.example.com"],
+  "sub": "hello-cell",
+  "azp": "hello-cell",
+  "typ": "Bearer",
+  "jti": "0195f0e0-9b1e-7c1f-9c0e-2c4a4f2b0a22",
+  "iat": 1767225600,
+  "nbf": 1767225600,
+  "exp": 1767226500,
+  "scope": "notes.read notes.write"
+}

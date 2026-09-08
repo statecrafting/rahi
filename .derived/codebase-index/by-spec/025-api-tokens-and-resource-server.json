@@ -1,39 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '025-api-tokens-and-resource-server' file unit 'crates/rahi-idp/src/resource.rs' does not exist",
-        "path": "crates/rahi-idp/src/resource.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '025-api-tokens-and-resource-server' file unit 'crates/rahi-idp/src/bearer.rs' does not exist",
-        "path": "crates/rahi-idp/src/bearer.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '025-api-tokens-and-resource-server' file unit 'crates/rahi-idp/src/scope.rs' does not exist",
-        "path": "crates/rahi-idp/src/scope.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '025-api-tokens-and-resource-server' file unit 'crates/rahi-idp/src/registration.rs' does not exist",
-        "path": "crates/rahi-idp/src/registration.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '025-api-tokens-and-resource-server' file unit 'crates/rahi-idp/tests/bearer.rs' does not exist",
-        "path": "crates/rahi-idp/tests/bearer.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '025-api-tokens-and-resource-server' file unit 'crates/rahi-idp/testdata/tokens/' does not exist",
-        "path": "crates/rahi-idp/testdata/tokens/"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "021-idp-proxy-and-discovery",
@@ -41,6 +6,10 @@
       "024-hardening"
     ],
     "implementingPaths": [
+      {
+        "path": "crates/rahi-idp/src/bearer.rs",
+        "source": "spec-edge"
+      },
       {
         "path": "crates/rahi-idp/src/extractor.rs",
         "source": "spec-edge"
@@ -52,11 +21,39 @@
       {
         "path": "crates/rahi-idp/src/principal.rs",
         "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/registration.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/resource.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/scope.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/session.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/testdata/tokens/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/tests/bearer.rs",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/bearer.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -65,7 +62,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/registration.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -74,7 +75,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/resource.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -83,7 +88,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/scope.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -92,7 +101,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/testdata/tokens/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -101,7 +114,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/tests/bearer.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -138,6 +155,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-idp/src/session.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/session.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-idp/src/principal.rs"
           }
         ],
@@ -153,5 +183,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "73995e8a1bcc15cc47355d659dbedf302fe885b5a5a77aecab190ea61ca1e431"
+  "shardHash": "379b5970376ad45d63c803242395a6ef02758643b4fe298b702fda1f4c9a25db"
 }
