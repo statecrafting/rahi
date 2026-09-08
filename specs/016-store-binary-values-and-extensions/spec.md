@@ -215,6 +215,22 @@ before it hands the store bytes.
   session's call, so the contradiction is surfaced rather than resolved.
   See decision D-8.
 
+- **2026-09-08 (third build session).** The authoring edit the note above
+  asked for has landed: spec 030's B-3 now names the store's engine report
+  in its preflight check list, recorded as 030 D-1 (2026-09-07). The
+  contradiction is therefore resolved, and what remains is a scheduled
+  handoff rather than an open question: `crates/rahi-ops` does not exist
+  and spec 030 is still `implementation: pending`, so AC-2 has no subject
+  to run against. 030 D-1 names the closer explicitly, that the session
+  building 030 adds the check and flips this spec in the same change, so
+  this session does not flip it. No `depends_on` edge was added in either
+  direction, by design: nothing depends on 016, and an edge from 030 would
+  make 030 blocked by a spec only 030 can unblock. The gate was re-run
+  whole on this date and is green (`make spine`, `couple`, `make ci`,
+  `index coverage --fail-on-untraced` all exit 0), and AC-1 passes 8 of 8,
+  including the N=3 divergence test of FR-005. Nothing in this spec's
+  territory is outstanding.
+
 ## Verification
 
 ```verify:cli
