@@ -1,5 +1,5 @@
 {
-  "iss": "https://cell.example.com/auth/v1",
+  "iss": "https://cell.example.com/auth/v1/",
   "aud": ["another-cell", "https://another.example.com"],
   "sub": "rauthy-subject-1",
   "azp": "another-cell",

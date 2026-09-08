@@ -6,7 +6,7 @@ kind: "kernel"
 domain: "identity"
 created: "2026-09-03"
 authors: ["Bartek Kus"]
-implementation: in-progress
+implementation: complete
 risk: critical
 wave: 2
 depends_on:
@@ -297,6 +297,23 @@ consumer needs yet.
   spec 022's sessions still unable to reach a real rauthy while hiding the
   defect behind one passing criterion.
 
+- **D-12 (2026-09-08, fourth build session; completes D-10's mechanism).**
+  The live run reads four variables besides `RAHI_TEST_RAUTHY_URL`:
+  `RAHI_TEST_RAUTHY_REG_TOKEN`, `RAHI_TEST_RAUTHY_API_KEY`,
+  `RAHI_TEST_RAUTHY_USER` (default `admin@localhost`), and
+  `RAHI_TEST_RAUTHY_PASSWORD`. Setting the URL is the opt in, so the rest are
+  required rather than defaulted: a run that has opted in and then cannot
+  reach rauthy is a failure, not a skip, because a silent skip is how a
+  criterion rots. AC-2 names dynamic registration and a completed login, and
+  neither is reachable anonymously: B-7's default `token` mode wants the
+  registration token, and rauthy signs `EdDSA` and refuses an unlisted
+  `resource` with `invalid_target`, so the client has to be moved to RS256 and
+  bound to this cell's origin by an admin call first. The test performs that
+  provisioning itself rather than leaving it to a README step, so the
+  criterion is one command. Rejected alternative: assuming
+  `registration = open` and a pre-provisioned client, which tests a rauthy
+  nobody would deploy and leaves B-7's default unexercised.
+
 ## 8. Status
 
 - **2026-09-07 (build session).** B-1 to B-12, FR-001 to FR-006, and AC-1
@@ -392,6 +409,43 @@ consumer needs yet.
   is surfaced rather than resolved. `tests/bearer.rs` now runs the handshake
   against a real rauthy when `RAHI_TEST_RAUTHY_URL` names one and reports
   exactly this, in place of the earlier claim about a missing container.
+
+- **2026-09-08 (fourth build session, AC-2 closed).** Both criteria hold and
+  the spec is `implementation: complete`. The hold the three entries above
+  record is over: spec 021 reconciled its issuer on 2026-09-08 (021 D-10,
+  `fix(021)`, PR #28), `ISSUER_PATH` now carries the trailing slash rauthy
+  publishes, and the contradiction D-11 reported is gone rather than worked
+  around. This session merged that repair into the branch and drove AC-2 green
+  against a live `ghcr.io/sebadob/rauthy:0.36.0`.
+
+  AC-1: `cargo test -p rahi-idp --locked --test bearer` passes sixteen tests.
+  AC-2: with `RAHI_TEST_RAUTHY_URL` naming a running rauthy,
+  `a_real_rauthy_admits_a_registered_client_by_scope` registers a client
+  through `POST /auth/v1/clients_dyn`, completes authorization code with PKCE
+  against a loopback redirect, presents the resulting access token to a route
+  gated on `api:read` and is admitted with `200`, and watches the same token
+  refused with `403` and `error="insufficient_scope", scope="api:write"` by a
+  route requiring a scope it lacks. The run is reproducible: three consecutive
+  green runs, and the arrangement is recorded in `testdata/tokens/README.md`.
+
+  Three things the earlier sessions had not established, each now in the
+  recipe. Rauthy rate limits dynamic registration per IP for sixty seconds by
+  default, so `dynamic_clients.rate_limit_sec = 0` is what makes the criterion
+  repeatable rather than green once an hour. Rauthy refuses a login with an
+  empty `User-Agent`, which `reqwest` sends by default and which surfaces as
+  `Invalid user credentials` rather than as itself. And the token is only
+  audience-bound because the client's `allowed_resources` names this cell's
+  origin; without it rauthy answers `invalid_target` and B-3 would refuse
+  every token for want of the `aud` D-2 makes mandatory.
+
+  Three assertions in this spec's own tests carried the slashless issuer and
+  moved with the repair: the two literals in `resource.rs` and `bearer.rs` now
+  derive from `ISSUER_PATH`, and the recorded claim sets under
+  `testdata/tokens/` carry the issuer rauthy emits. That is the same drift the
+  021 fix names, caught in this spec's territory.
+
+  The edge D-11 recorded as the cost of the hold is paid: spec 026 lists this
+  spec in `depends_on` and is unblocked.
 
 ## Verification
 

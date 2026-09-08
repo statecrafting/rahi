@@ -236,7 +236,7 @@ mod tests {
         assert_eq!(resource.audience(), resource.as_str());
         assert_eq!(
             resource.authorization_server(),
-            "https://cell.example.com/auth/v1"
+            format!("https://cell.example.com{ISSUER_PATH}")
         );
         assert_eq!(
             resource.metadata_url(),
@@ -247,7 +247,7 @@ mod tests {
         assert_eq!(document.resource, "https://cell.example.com");
         assert_eq!(
             document.authorization_servers,
-            vec!["https://cell.example.com/auth/v1".to_owned()],
+            vec![format!("https://cell.example.com{ISSUER_PATH}")],
             "the discovery document is one path below this (FR-002)"
         );
         assert_eq!(document.bearer_methods_supported, vec!["header".to_owned()]);

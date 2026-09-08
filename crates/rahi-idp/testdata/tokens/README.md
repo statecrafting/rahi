@@ -23,40 +23,83 @@ They are fixtures, not evidence. A run against a real rauthy is AC-2's, and
 `tests/bearer.rs` opens it when `RAHI_TEST_RAUTHY_URL` names the origin of a
 running one.
 
-## The AC-2 recipe, and where it stops
+## Running AC-2 against a real rauthy
 
-Every OAuth step AC-2 asks for has been run green by hand against
-`ghcr.io/sebadob/rauthy:0.36.0`, so the criterion is not blocked on the
-authorization server being unavailable. Booted over plain `http` on port 8080
-with `[dynamic_clients] enable = true` and a `reg_token`, a `[bootstrap]`
-admin password, `[encryption]` keys, and a `[webauthn]` block, rauthy answers:
+AC-2 is a live run, not a fixture. `tests/bearer.rs` skips it unless
+`RAHI_TEST_RAUTHY_URL` names the origin of a running rauthy (D-10), and when
+it is set the test does every step the criterion asks for: it registers a
+client through rauthy's dynamic registration endpoint, completes
+authorization code with PKCE against a loopback redirect, presents the
+resulting access token to a scope-gated route, and watches the same token
+refused by a route requiring a scope it lacks.
 
-1. `POST /auth/v1/clients_dyn` with the registration token registers a public
-   client whose one redirect URI is a loopback address (B-7, RFC 7591).
-2. `PUT /auth/v1/clients/{id}` as the admin adds a scope to it and sets
-   `allowed_resources` to this cell's origin. Rauthy denies a resource
-   indicator by default, so without this step no token can carry the audience
-   B-3 requires.
-3. `POST /auth/v1/oidc/authorize` with a solved proof of work and an S256
-   challenge answers `202` and a `Location` carrying the code; the proof of
-   work is a SHA-256 with a leading-zero-bit count, which `ring` already
-   computes here.
-4. `POST /auth/v1/oidc/token` with the verifier and `resource` returns an
-   access token whose `aud` holds both the client id and this cell's origin,
-   and whose `scope` is the one that was granted.
+Setting the URL is the opt in, so the other four variables are then required
+rather than defaulted: a run that has opted in and cannot reach rauthy is a
+failure, not a skip.
 
-What stops there is the handshake before all of it. Spec 021 B-2 fixes this
-cell's issuer at `<public_url>/auth/v1`, and `Discovery::parse` holds the
-published document to it exactly. Rauthy builds its issuer as
-`{scheme}://{pub_url}/auth/v1/` (`src/data/src/rauthy_config.rs`) and offers
-no setting that removes the trailing slash, so the two never compare equal:
+| variable | what it is |
+|---|---|
+| `RAHI_TEST_RAUTHY_URL` | the origin rauthy is published on, for example `http://localhost:8080` |
+| `RAHI_TEST_RAUTHY_REG_TOKEN` | `dynamic_clients.reg_token`, which B-7's default `token` mode requires |
+| `RAHI_TEST_RAUTHY_API_KEY` | an admin API key as `name$secret`, for the two provisioning calls |
+| `RAHI_TEST_RAUTHY_USER` | the person who completes the login, default `admin@localhost` |
+| `RAHI_TEST_RAUTHY_PASSWORD` | that person's password |
 
-```text
-the discovery document is issued by http://localhost:8080/auth/v1/ and this
-cell's issuer is http://localhost:8080/auth/v1: the document belongs to
-another deployment
+### The rauthy this expects
+
+Verified against `ghcr.io/sebadob/rauthy:0.36.0` over plain `http` on port
+8080. Four settings are load bearing:
+
+- `[server] scheme = 'http'`, `port_http = 8080`, `pub_url = 'localhost:8080'`,
+  so the issuer rauthy publishes is `http://localhost:8080/auth/v1/`, which is
+  what `ISSUER_PATH` builds and `Discovery::parse` requires (spec 021 D-10).
+- `[dynamic_clients] enable = true` with a `reg_token`, which is what B-7's
+  `token` mode means.
+- `[dynamic_clients] rate_limit_sec = 0`. rauthy rate limits registration per
+  IP for sixty seconds by default, so with the default a second run inside
+  that window answers `429` and the criterion is not reproducible.
+- `[bootstrap] password_plain` and an `api_key` / `api_key_secret` pair, so a
+  test can log in and provision without a browser.
+
+`[encryption]`, `[cluster]`, and a `[webauthn]` block with `rp_id`,
+`rp_origin`, and `rp_name` are required by rauthy itself; it panics at boot
+without them.
+
+### What the test provisions, and why rauthy needs it
+
+Two calls before the flow, both with the admin API key:
+
+1. `POST /auth/v1/scopes` creates `api:read` and `api:write`. A scope that
+   does not exist cannot be granted, and AC-2 needs one the token carries and
+   one it does not.
+2. `PUT /auth/v1/clients/{id}` sets `access_token_alg` to `RS256` and
+   `allowed_resources` to this cell's origin. Both are refusals otherwise:
+   rauthy signs with `EdDSA` by default and this chassis verifies only RS256
+   (B-3), and rauthy answers `invalid_target` to a `resource` parameter that
+   is not on the client's allow list, so without it no token can carry the
+   audience B-3 demands.
+
+The login itself needs two things a browser would do invisibly: an anonymous
+session from `POST /auth/v1/oidc/session`, whose cookie and CSRF token the
+authorize call echoes, and a solved proof of work from `POST /auth/v1/pow`.
+The challenge is `version:difficulty:expiry:salt:hash:` and the answer
+appends the smallest counter whose SHA-256 opens with `difficulty` zero bits.
+rauthy also refuses a login with an empty `User-Agent`.
+
+### Running it
+
+```sh
+docker run -d --name rauthy -p 8080:8080 \
+  -v "$PWD/config.toml:/app/config.toml:ro" -v rauthy-data:/app/data \
+  ghcr.io/sebadob/rauthy:0.36.0
+
+RAHI_TEST_RAUTHY_URL=http://localhost:8080 \
+RAHI_TEST_RAUTHY_REG_TOKEN=<reg token> \
+RAHI_TEST_RAUTHY_API_KEY='<name>$<secret>' \
+RAHI_TEST_RAUTHY_PASSWORD=<admin password> \
+cargo test -p rahi-idp --locked --test bearer
 ```
 
-The same one-character difference would refuse every real token on the `iss`
-check in `ResourceServer::validate`. It is a contradiction in a spec this one
-only extends, so spec 025 reports it rather than reconciling it from here.
+The token that comes back is the one the fixtures above imitate: RS256 over
+rauthy's own key, `iss` of `http://localhost:8080/auth/v1/`, `aud` holding
+both the client id and this cell's origin, and `scope` of `openid api:read`.

@@ -18,6 +18,7 @@
 mod oidc;
 
 use std::collections::BTreeMap;
+use std::net::ToSocketAddrs as _;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
@@ -27,13 +28,16 @@ use axum::body::Body;
 use axum::http::{HeaderValue, Request, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
-use oidc::{CLIENT_ID, Cell, KID, SUB, T0, send, sign};
+use base64::Engine as _;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use oidc::{CLIENT_ID, Cell, KID, SUB, T0, query_param, send, sign};
 use rahi_idp::{
-    Authenticated, BearerRoutes, Discovery, IdpConfig, Proxy, Registration, RequireBearer,
-    RequireScope, Resource, ResourceServer, SESSION_PREFIX, is_bearer_route, proxy_router,
-    resource_router, session_router, with_bearer, with_scope, with_sessions,
+    Authenticated, BearerRoutes, Discovery, ISSUER_PATH, IdpConfig, Proxy, Registration,
+    RequireBearer, RequireScope, Resource, ResourceServer, SESSION_PREFIX, is_bearer_route,
+    proxy_router, resource_router, session_router, with_bearer, with_scope, with_sessions,
 };
 use rahi_types::Config;
+use ring::digest::{SHA256, digest};
 use serde_json::{Value, json};
 
 /// The subtree a bearer credential is declared on.
@@ -365,6 +369,7 @@ async fn the_challenge_bootstraps_a_client_that_has_never_seen_this_cell() {
         issuer
             .strip_prefix(cell.sessions.origin())
             .expect("the authorization server is on this origin")
+            .trim_end_matches('/')
     );
     let discovery = send(&app, oidc::get_with(&discovery_path, &[])).await;
     assert_eq!(discovery.status, StatusCode::OK, "{}", discovery.body);
@@ -691,7 +696,7 @@ async fn the_proxy_subtree_carries_its_own_credentials_through() {
     assert_eq!(forwarded.status, StatusCode::OK, "{}", forwarded.body);
     assert_eq!(
         forwarded.json()["issuer"],
-        json!(format!("{}/auth/v1", cell.sessions.origin()))
+        json!(format!("{}{ISSUER_PATH}", cell.sessions.origin()))
     );
 }
 
@@ -872,47 +877,455 @@ fn between<'t>(text: &'t str, open: &str, close: &str) -> Option<&'t str> {
 
 // ------------------------------------------------------------- AC-2
 
-/// AC-2: the live-rauthy run, and the handshake it does not get past today.
+/// The origin of an already running rauthy, which opts this run in (D-10).
+const LIVE_URL: &str = "RAHI_TEST_RAUTHY_URL";
+/// The registration token that rauthy's `token` mode requires (B-7).
+const LIVE_REG_TOKEN: &str = "RAHI_TEST_RAUTHY_REG_TOKEN";
+/// An admin API key, `name$secret`, for the two provisioning calls.
+const LIVE_API_KEY: &str = "RAHI_TEST_RAUTHY_API_KEY";
+/// The person who completes the authorization code login.
+const LIVE_USER: &str = "RAHI_TEST_RAUTHY_USER";
+/// That person's password.
+const LIVE_PASSWORD: &str = "RAHI_TEST_RAUTHY_PASSWORD";
+
+/// The scope the registered client is granted, and the gate it opens.
+const LIVE_SCOPE_GRANTED: &str = "api:read";
+/// A scope the same client is never granted, and the gate it does not open.
+const LIVE_SCOPE_WITHHELD: &str = "api:write";
+/// The loopback redirect the client registers, which is never listened on:
+/// rauthy answers the authorization request with the code in a `Location`,
+/// so a CLI reads it there rather than from a browser round trip.
+const LIVE_REDIRECT: &str = "http://127.0.0.1:9876/callback";
+
+/// AC-2: a dynamically registered client, a real PKCE login, a real token.
 ///
-/// With `RAHI_TEST_RAUTHY_URL` naming the origin of a running rauthy, this
-/// opens AC-2's first step against it: derive this cell's identity from that
-/// origin and fetch the discovery document. The steps after it (dynamic
-/// registration, authorization code with PKCE on a loopback redirect, the
-/// token bound to this resource) are the recipe under `testdata/tokens/`, and
-/// each has been run green by hand against rauthy 0.36.0.
+/// With [`LIVE_URL`] naming the origin of a running rauthy, this runs every
+/// step AC-2 names against it: register a client through the dynamic
+/// registration endpoint, complete authorization code with PKCE against a
+/// loopback redirect, present the resulting access token to a scope-gated
+/// route and be admitted, and watch the same token refused by a route
+/// requiring a scope it lacks.
 ///
-/// The handshake is where it stops. Spec 021 B-2 fixes this cell's issuer at
-/// `<public_url>/auth/v1` and `Discovery::parse` holds the document to it
-/// exactly; rauthy builds its own as `{scheme}://{pub_url}/auth/v1/` with no
-/// setting that removes the trailing slash. The two never compare equal, so
-/// no real rauthy is reachable from this chassis, and no real token would
-/// pass the `iss` check in `ResourceServer::validate` either. That is a
-/// contradiction in a spec this one only extends, so it is reported rather
-/// than patched from here.
+/// Nothing here is a fixture. The token is signed by rauthy's own key, the
+/// key set is fetched from rauthy over the network, the issuer is the one
+/// rauthy publishes, and the audience is this cell's origin because the
+/// client asked for it with RFC 8707's `resource`. Only the store and the
+/// kernel are borrowed from the stub cell, because a decision has to be
+/// ledgered somewhere and that fixture already opens both.
+///
+/// `testdata/tokens/README.md` records the rauthy configuration this expects.
 #[tokio::test]
 async fn a_real_rauthy_admits_a_registered_client_by_scope() {
-    let Ok(origin) = std::env::var("RAHI_TEST_RAUTHY_URL") else {
+    let Ok(origin) = std::env::var(LIVE_URL) else {
         eprintln!(
-            "skipped: set RAHI_TEST_RAUTHY_URL to the origin of a running rauthy \
-             (for example http://localhost:8080) to run AC-2's handshake"
+            "skipped: set {LIVE_URL} to the origin of a running rauthy (for example \
+             http://localhost:8080) to run AC-2; see testdata/tokens/README.md"
         );
         return;
     };
+    let origin = origin.trim_end_matches('/').to_owned();
+    let reg_token = required(LIVE_REG_TOKEN);
+    let api_key = required(LIVE_API_KEY);
+    let user = std::env::var(LIVE_USER).unwrap_or_else(|_| "admin@localhost".to_owned());
+    let password = required(LIVE_PASSWORD);
 
-    let env = BTreeMap::from([("RAHI_PUBLIC_URL", origin.as_str())]);
+    // The cell is this origin, so the resource it demands in `aud` is the
+    // origin rauthy itself is published on (B-2, B-3). `RAHI_RAUTHY_ADDR` is
+    // set from that same origin rather than left at its default, because the
+    // discovery fetch goes to the loopback address and the whole point of
+    // this test is that it reaches the rauthy the operator named.
+    let loopback = loopback_addr(&origin);
+    let env = BTreeMap::from([
+        ("RAHI_PUBLIC_URL", origin.as_str()),
+        ("RAHI_RAUTHY_ADDR", loopback.as_str()),
+    ]);
     let config = Config::from_env(&env).expect("the origin is a well formed public url");
     let idp = IdpConfig::derive(&config, CLIENT_ID).expect("the identity configuration derives");
 
-    match Discovery::fetch_within(&idp, Duration::from_secs(5)).await {
-        Ok(discovery) => eprintln!(
-            "the document at {} agrees with the configured issuer {}: AC-2's remaining \
-             steps are the recipe under testdata/tokens/",
-            idp.discovery_url(),
-            discovery.issuer
-        ),
-        Err(err) => eprintln!(
-            "blocked: {err}; this is spec 021 B-2's issuer, which rauthy cannot \
-             publish, so AC-2 stays open until that is reconciled"
-        ),
+    // The handshake spec 021 owns. It is the first thing AC-2 needs and the
+    // thing that was impossible before that spec's issuer carried rauthy's
+    // trailing slash (021 D-10, this spec's D-11).
+    let discovery = Discovery::fetch_within(&idp, Duration::from_secs(10))
+        .await
+        .expect("a real rauthy publishes a document this cell accepts");
+    assert_eq!(
+        discovery.issuer, idp.issuer,
+        "the live issuer is the one this cell derives"
+    );
+
+    let live = Rauthy::new(&origin);
+    live.create_scope(&api_key, LIVE_SCOPE_GRANTED).await;
+    live.create_scope(&api_key, LIVE_SCOPE_WITHHELD).await;
+    let client_id = live.register(&reg_token).await;
+    live.allow_resource(&api_key, &client_id, &origin, LIVE_SCOPE_GRANTED)
+        .await;
+
+    let verifier = pkce_verifier();
+    let code = live
+        .authorize(&client_id, &user, &password, &verifier, &origin)
+        .await;
+    let token = live.exchange(&client_id, &code, &verifier, &origin).await;
+
+    // The cell: rauthy's real key set, this origin's resource, and the store
+    // and kernel of the stub fixture, which the stub itself never serves.
+    let cell = oidc::boot().await;
+    let jwks = rahi_idp::Jwks::load(&discovery)
+        .await
+        .expect("rauthy's key set loads");
+    let resource = Resource::derive(&idp).expect("the resource derives");
+    let server = ResourceServer::new(
+        &config,
+        resource,
+        jwks,
+        cell.sessions.store().clone(),
+        cell.kernel.clone(),
+    );
+
+    let granted = with_scope(
+        RequireScope::new(LIVE_SCOPE_GRANTED, cell.kernel.clone()),
+        Router::new().route("/read", get(|| async { "read" })),
+    );
+    let withheld = with_scope(
+        RequireScope::new(LIVE_SCOPE_WITHHELD, cell.kernel.clone()),
+        Router::new().route("/write", get(|| async { "write" })),
+    );
+    let app = with_bearer(
+        RequireBearer::new(server, BearerRoutes::new().route(API_PREFIX)),
+        Router::new().nest(API_PREFIX, granted.merge(withheld)),
+    );
+
+    let admitted = send(&app, with_token("/api/read", &token)).await;
+    assert_eq!(
+        admitted.status,
+        StatusCode::OK,
+        "a rauthy token bound to this resource opens the scope it carries: {}",
+        admitted.body
+    );
+
+    let refused = send(&app, with_token("/api/write", &token)).await;
+    assert_eq!(
+        refused.status,
+        StatusCode::FORBIDDEN,
+        "the same token does not open a scope it was never granted: {}",
+        refused.body
+    );
+    let challenge = refused
+        .headers
+        .get(header::WWW_AUTHENTICATE)
+        .expect("a scope refusal carries the challenge")
+        .to_str()
+        .expect("the challenge is ascii");
+    assert!(
+        challenge.contains("insufficient_scope"),
+        "the refusal names the failure: {challenge}"
+    );
+    assert!(
+        challenge.contains(LIVE_SCOPE_WITHHELD),
+        "the refusal names the scope it wanted: {challenge}"
+    );
+}
+
+/// The value of `name`, or a failure saying which variable is missing.
+///
+/// Setting [`LIVE_URL`] is the opt in, so a run that has opted in and then
+/// cannot reach rauthy is a failure rather than a skip.
+fn required(name: &str) -> String {
+    std::env::var(name)
+        .unwrap_or_else(|_| panic!("{LIVE_URL} is set, so {name} must be too (AC-2's arrangement)"))
+}
+
+/// The socket address behind an origin, which is what `RAHI_RAUTHY_ADDR`
+/// wants: a resolved `ip:port`, never a host name.
+fn loopback_addr(origin: &str) -> String {
+    let authority = origin.split_once("://").map_or(origin, |(_, rest)| rest);
+    let authority = if authority.contains(':') {
+        authority.to_owned()
+    } else {
+        format!("{authority}:80")
+    };
+    authority
+        .to_socket_addrs()
+        .unwrap_or_else(|err| panic!("{LIVE_URL} names {authority}, which does not resolve: {err}"))
+        .next()
+        .unwrap_or_else(|| panic!("{LIVE_URL} names {authority}, which resolves to nothing"))
+        .to_string()
+}
+
+/// A PKCE verifier: 32 random bytes, base64url without padding (RFC 7636).
+fn pkce_verifier() -> String {
+    let mut bytes = [0u8; 32];
+    getrandom::fill(&mut bytes).expect("the system entropy source answers");
+    URL_SAFE_NO_PAD.encode(bytes)
+}
+
+/// The S256 challenge for a verifier.
+fn pkce_challenge(verifier: &str) -> String {
+    URL_SAFE_NO_PAD.encode(digest(&SHA256, verifier.as_bytes()))
+}
+
+/// A live rauthy, driven over its own HTTP API.
+struct Rauthy {
+    origin: String,
+    http: reqwest::Client,
+}
+
+impl Rauthy {
+    fn new(origin: &str) -> Self {
+        Self {
+            origin: origin.to_owned(),
+            http: reqwest::Client::builder()
+                .redirect(reqwest::redirect::Policy::none())
+                // rauthy refuses a login with an empty `User-Agent`, and a
+                // real command line client sends one.
+                .user_agent("rahi-ac2")
+                .build()
+                .expect("a client builds"),
+        }
     }
+
+    /// Create a scope, tolerating the one that is already there.
+    async fn create_scope(&self, api_key: &str, scope: &str) {
+        let answer = self
+            .http
+            .post(format!("{}/auth/v1/scopes", self.origin))
+            .header(header::AUTHORIZATION, format!("API-Key {api_key}"))
+            .json(&json!({ "scope": scope }))
+            .send()
+            .await
+            .expect("rauthy answers the scope request");
+        let status = answer.status();
+        assert!(
+            status.is_success() || status == reqwest::StatusCode::BAD_REQUEST,
+            "creating the scope {scope} answered {status}: {}",
+            answer.text().await.unwrap_or_default()
+        );
+    }
+
+    /// Register a public client through RFC 7591 dynamic registration (B-7).
+    async fn register(&self, reg_token: &str) -> String {
+        let answer = self
+            .http
+            .post(format!("{}/auth/v1/clients_dyn", self.origin))
+            .header(header::AUTHORIZATION, format!("Bearer {reg_token}"))
+            .json(&json!({
+                "client_name": "rahi-ac2",
+                "redirect_uris": [LIVE_REDIRECT],
+                "grant_types": ["authorization_code", "refresh_token"],
+                "token_endpoint_auth_method": "none",
+            }))
+            .send()
+            .await
+            .expect("rauthy answers the registration");
+        let status = answer.status();
+        let body = answer.text().await.unwrap_or_default();
+        assert!(
+            status.is_success(),
+            "dynamic registration answered {status}: {body} (a 429 means rauthy's \
+             `dynamic_clients.rate_limit_sec` window has not elapsed since the last run)"
+        );
+        let body: Value = serde_json::from_str(&body)
+            .unwrap_or_else(|err| panic!("the registration is json ({err}): {body}"));
+        body["client_id"]
+            .as_str()
+            .expect("a registered client has an id")
+            .to_owned()
+    }
+
+    /// Bind the client to this resource and grant it one scope.
+    ///
+    /// Both halves are rauthy's to enforce: without `allowed_resources` it
+    /// refuses the `resource` parameter with `invalid_target`, so no token
+    /// could carry the audience B-3 demands, and the signing algorithm has to
+    /// be RS256 because that is the only one this chassis verifies (B-3).
+    async fn allow_resource(&self, api_key: &str, client_id: &str, resource: &str, scope: &str) {
+        let answer = self
+            .http
+            .put(format!(
+                "{}/auth/v1/clients/{}",
+                self.origin,
+                urlencoding(client_id)
+            ))
+            .header(header::AUTHORIZATION, format!("API-Key {api_key}"))
+            .json(&json!({
+                "id": client_id,
+                "name": "rahi-ac2",
+                "enabled": true,
+                "confidential": false,
+                "redirect_uris": [LIVE_REDIRECT],
+                "flows_enabled": ["authorization_code", "refresh_token"],
+                "access_token_alg": "RS256",
+                "id_token_alg": "RS256",
+                "auth_code_lifetime": 60,
+                "access_token_lifetime": 1800,
+                "scopes": ["openid", "profile", "email", "groups", scope],
+                "default_scopes": ["openid", scope],
+                "challenges": ["S256"],
+                "force_mfa": false,
+                "claims_at_root": false,
+                "allowed_resources": [resource],
+            }))
+            .send()
+            .await
+            .expect("rauthy answers the client update");
+        let status = answer.status();
+        assert!(
+            status.is_success(),
+            "binding the client to {resource} answered {status}: {}",
+            answer.text().await.unwrap_or_default()
+        );
+    }
+
+    /// An anonymous session, which rauthy's login endpoint requires.
+    async fn session(&self) -> (String, String) {
+        let answer = self
+            .http
+            .post(format!("{}/auth/v1/oidc/session", self.origin))
+            .send()
+            .await
+            .expect("rauthy answers the session request");
+        let cookie = answer
+            .headers()
+            .get(header::SET_COOKIE)
+            .expect("a new session sets a cookie")
+            .to_str()
+            .expect("the cookie is ascii")
+            .split(';')
+            .next()
+            .expect("a cookie has a first pair")
+            .to_owned();
+        let body: Value = answer.json().await.expect("the session is json");
+        let csrf = body["csrf_token"]
+            .as_str()
+            .expect("a session carries a csrf token")
+            .to_owned();
+        (cookie, csrf)
+    }
+
+    /// Fetch a proof of work challenge and solve it.
+    ///
+    /// The challenge is `version:difficulty:expiry:salt:hash:`, and the answer
+    /// appends the smallest counter whose SHA-256 has `difficulty` leading
+    /// zero bits. rauthy asks for this before it will read a password.
+    async fn proof_of_work(&self) -> String {
+        let challenge = self
+            .http
+            .post(format!("{}/auth/v1/pow", self.origin))
+            .send()
+            .await
+            .expect("rauthy answers the proof of work request")
+            .text()
+            .await
+            .expect("the challenge is text");
+        let challenge = challenge.trim().to_owned();
+        let difficulty: u32 = challenge
+            .get(2..4)
+            .and_then(|field| field.parse().ok())
+            .expect("the challenge states its difficulty");
+
+        for counter in 0u64.. {
+            let attempt = format!("{challenge}{counter}");
+            if leading_zero_bits(digest(&SHA256, attempt.as_bytes()).as_ref()) >= difficulty {
+                return attempt;
+            }
+        }
+        unreachable!("the counter is unbounded")
+    }
+
+    /// Complete the authorization code login and read the code rauthy puts in
+    /// the `Location` of its `202`.
+    async fn authorize(
+        &self,
+        client_id: &str,
+        user: &str,
+        password: &str,
+        verifier: &str,
+        resource: &str,
+    ) -> String {
+        let (cookie, csrf) = self.session().await;
+        let answer = self
+            .http
+            .post(format!("{}/auth/v1/oidc/authorize", self.origin))
+            .header(header::COOKIE, cookie)
+            .header("x-csrf-token", csrf)
+            .json(&json!({
+                "email": user,
+                "password": password,
+                "pow": self.proof_of_work().await,
+                "client_id": client_id,
+                "redirect_uri": LIVE_REDIRECT,
+                "scopes": ["openid", LIVE_SCOPE_GRANTED],
+                "code_challenge": pkce_challenge(verifier),
+                "code_challenge_method": "S256",
+                "resource": resource,
+            }))
+            .send()
+            .await
+            .expect("rauthy answers the authorization request");
+        let status = answer.status();
+        let location = answer
+            .headers()
+            .get(header::LOCATION)
+            .map(|value| value.to_str().expect("the location is ascii").to_owned());
+        assert!(
+            status.is_success(),
+            "the authorization request answered {status}: {}",
+            answer.text().await.unwrap_or_default()
+        );
+        let location = location.expect("a completed login redirects to the loopback");
+        query_param(&location, "code").expect("the redirect carries the authorization code")
+    }
+
+    /// Exchange the code for an access token bound to `resource` (RFC 8707).
+    async fn exchange(
+        &self,
+        client_id: &str,
+        code: &str,
+        verifier: &str,
+        resource: &str,
+    ) -> String {
+        let answer = self
+            .http
+            .post(format!("{}/auth/v1/oidc/token", self.origin))
+            .form(&[
+                ("grant_type", "authorization_code"),
+                ("code", code),
+                ("client_id", client_id),
+                ("redirect_uri", LIVE_REDIRECT),
+                ("code_verifier", verifier),
+                ("resource", resource),
+            ])
+            .send()
+            .await
+            .expect("rauthy answers the token request");
+        let status = answer.status();
+        let body = answer.text().await.unwrap_or_default();
+        assert!(
+            status.is_success(),
+            "the token request answered {status}: {body}"
+        );
+        let body: Value = serde_json::from_str(&body)
+            .unwrap_or_else(|err| panic!("the token response is json ({err}): {body}"));
+        body["access_token"]
+            .as_str()
+            .expect("the response carries an access token")
+            .to_owned()
+    }
+}
+
+/// How many leading zero bits `bytes` opens with.
+fn leading_zero_bits(bytes: &[u8]) -> u32 {
+    let mut bits = 0;
+    for byte in bytes {
+        bits += byte.leading_zeros();
+        if *byte != 0 {
+            break;
+        }
+    }
+    bits
+}
+
+/// Percent-encode the one character a rauthy client id carries that a path
+/// segment must not: the `$` of a dynamically registered id.
+fn urlencoding(value: &str) -> String {
+    value.replace('$', "%24")
 }
