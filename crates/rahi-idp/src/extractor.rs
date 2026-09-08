@@ -16,6 +16,14 @@
 //! layer resolved, which is what makes it infallible about renewal and honest
 //! about absence: no layer, no principal, 401.
 //!
+//! Spec 025 adds one refusal on the way in: a request that presents a session
+//! cookie *and* an `Authorization` header is answered 400 before the envelope
+//! is opened (025 B-10). The check is the resource server's
+//! [`both_credentials`], read here as well as there, so the answer does not
+//! depend on which of the two layers the app put outermost, and so an
+//! ambiguous request never causes a renewal round-trip or a rotated cookie on
+//! its way to being refused.
+//!
 //! [`RequireRole`] is the other half. It refuses a principal without the role
 //! and the refusal becomes a record in the decision chain, because a refusal
 //! nobody can audit is indistinguishable from a bug (constitution X). The
@@ -32,6 +40,7 @@ use axum::response::Response;
 use rahi_kernel::Kernel;
 use rahi_types::{Error, Principal, Role};
 
+use crate::bearer::{ambiguous, both_credentials};
 use crate::envelope::{Envelope, cookie_value, open, seal};
 use crate::login::login_cookie;
 use crate::refresh::{ends_the_session, renew};
@@ -89,6 +98,11 @@ where
 /// handler without a principal: this layer authenticates, it does not
 /// authorize, and a public route under it stays public.
 pub async fn resolve(State(sessions): State<Sessions>, request: Request, next: Next) -> Response {
+    // Two credentials is not a session to resolve; it is a request nobody
+    // should be choosing between (spec 025 B-10).
+    if both_credentials(request.headers(), sessions.cookie_scheme()) {
+        return answer(&ambiguous());
+    }
     let cookies = request
         .headers()
         .get(header::COOKIE)

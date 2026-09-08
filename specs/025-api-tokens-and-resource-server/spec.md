@@ -23,6 +23,7 @@ establishes:
 extends:
   - { spec: "021-idp-proxy-and-discovery", unit: "crates/rahi-idp/src/lib.rs", nature: additive }
   - { spec: "022-session-and-principal", unit: "crates/rahi-idp/src/extractor.rs", nature: additive }
+  - { spec: "022-session-and-principal", unit: "crates/rahi-idp/src/session.rs", nature: additive }
 constrains:
   - { flavor: invariant-freeze, unit: "crates/rahi-idp/src/principal.rs", note: "the app mints no credential; rauthy is the only issuer, cookie or bearer" }
 summary: >
@@ -189,6 +190,104 @@ consumer needs yet.
 - **D-2 (2026-09-03, this spec).** Audience is mandatory, not optional.
   A deployment that cannot mint audience-bound tokens is misconfigured and
   `preflight` says so, rather than the resource server relaxing.
+- **D-3 (2026-09-07, build session; sites B-7's setting).** B-7's
+  `Config.idp.registration` is read as the environment variable
+  `RAHI_IDP_REGISTRATION` in this crate's `registration.rs`, not added to
+  `rahi_types::Config`. That type is spec 010's territory, is derived from one
+  public URL, and has no `idp` subtree to hang this on; the identity
+  configuration in this chassis is `IdpConfig` in `rahi-idp`, and the setting
+  has exactly two readers, both here: what B-2 advertises and what the
+  packaging passes to rauthy. Rejected alternative: a field on
+  `rahi_types::Config`, which makes a wave-2 identity setting part of the
+  types crate every wave-1 spec already depends on.
+- **D-4 (2026-09-07, build session; mechanises B-4's detection).** A client
+  credentials token is recognised by `sub == azp`. rauthy omits `sub`
+  entirely for that grant unless `client_credentials_map_sub` is set, in
+  which case `sub` is the client id and `azp` always is; B-4's own rule that
+  a `sub`-less token is rejected already refuses the first shape, so the
+  second is the only one that reaches the check, and there it is exactly the
+  statement "the subject names the client rather than a person". Rejected
+  alternative: reading rauthy's `typ` claim, which says `Bearer` for both
+  grants and so distinguishes nothing.
+- **D-5 (2026-09-07, build session; sites B-12).** The bearer group's counter
+  is incremented inside this crate's bearer layer, in the same cache group
+  and key shape spec 020's limiter uses, rather than by that limiter with an
+  injected resolver. The edge applies its limiter outside the app's mounts,
+  which is before this layer has validated anything, so a resolver there
+  could only key on claims nobody has verified: an attacker picks the
+  `(client_id, sub)` pair it is counted under, and the isolation B-12 asks
+  for becomes an evasion. Counting after validation is the only place the
+  pair is a fact. Rejected alternative: keying the edge's limiter on a hash
+  of the presented token, which is unforgeable but gives every fresh token a
+  fresh budget.
+- **D-6 (2026-09-07, build session; sites B-11's exemption).** The credential
+  kind is declared here, in `BearerRoutes`, and published process-wide as
+  `bearer::is_bearer_route`; the composer applies it to spec 020's CSRF
+  layer. The identity crate is a peer of the edge and never a dependency of
+  it (spec 021 D-6), and spec 020's `csrf::enforce` has no exemption seam
+  today, so the fact lives where it is known and is applied where the router
+  is assembled, exactly as spec 022 B-8's rate limit number does. The half
+  this crate can enforce alone it does enforce: a bearer-authenticated
+  response has its `Set-Cookie` headers removed. **What remains is wiring:**
+  until the seam exists on the edge's CSRF layer and an app passes this
+  predicate to it, an unsafe-method bearer request that passes through that
+  layer is refused for want of a CSRF cookie. Rejected alternative: adding
+  the seam to `rahi-edge` from here, which expands this spec's territory
+  into two other specs' units on a build session's own authority.
+- **D-7 (2026-09-07, build session; reads B-9's "capability").** A scope
+  refusal's Decision payload names the capability as `"<method> <path>"`,
+  beside the required scope and the presented ones. The manifest's capability
+  catalog (spec 015 B-1) addresses resources a service acts on, not routes a
+  client calls, so naming a catalog id here would record a different event
+  than the one that happened. Rejected alternative: a catalog id passed in at
+  gate construction, which asks every app to map routes onto capabilities
+  before it can use a scope.
+- **D-8 (2026-09-07, build session; shares the RS256 path).** The JWT segment
+  decoder, the RS256 verification, the `aud` claim's one-or-many shape, and
+  the JWT header become `pub(crate)` in spec 022's `session.rs` under an
+  additive `extends` edge, and `Sessions::store()` is added beside them.
+  There is one signature check in this crate and there will not be two: a
+  second copy is a second chance to accept a signature that does not verify.
+  Rejected alternative: a private copy in `bearer.rs`, which duplicates
+  cryptographic code across two files that must agree forever.
+- **D-9 (2026-09-07, build session; mechanises AC-2's skip, not AC-2).**
+  The live-rauthy run is written as a test in `tests/bearer.rs` that skips
+  with a message when `RAHI_TEST_RAUTHY` is unset and, when it is set,
+  asserts the binary exists and reports what booting it still needs. That is
+  the arrangement spec 021 held for its own live-rauthy criterion, and the
+  assertion is written where the arrangement will find it. **This decision is
+  about the test, not about the criterion:** whether AC-2 is discharged here,
+  moved to the spec that owns the container, or given a deferral clause is a
+  human authoring act, and section 8 records the hold rather than resolving
+  it. Rejected alternative: reading "with `RAHI_TEST_RAUTHY` set" as a
+  condition that is vacuously true when the variable is unset, which would
+  let a build session flip the spec on its own reading of its own acceptance.
+
+## 8. Status
+
+- **2026-09-07 (build session).** B-1 to B-12, FR-001 to FR-006, and AC-1
+  hold: `cargo test -p rahi-idp --locked --test bearer` passes sixteen tests
+  over a real store, real RS256 signatures, and a real socket, and the whole
+  governed gate is green. **AC-2 does not hold and cannot at this ordinal.**
+  It needs a booted rauthy with dynamic client registration enabled and a
+  user who can complete an authorization code login, and spec 021 D-8 already
+  settled for the same prerequisite that booting rauthy from a test needs the
+  configuration file, the admin API key, and the key set that spec 031 builds
+  (it moved 021 FR-004 to 031 FR-005 for exactly this reason); spec 033
+  FR-002 owns the harness that drives a real rauthy. No session at this
+  position can close it, so this spec stays `implementation: in-progress`.
+
+  Two repairs are available to a human, and both are shapes this corpus has
+  used before. Move AC-2 to the spec that owns the arrangement, as 021 FR-004
+  moved to 031 FR-005. Or give it the deferral clause spec 022's AC-2 already
+  carries ("driven by the harness in 033; recorded here as the wave-2 exit
+  condition, verified in 034"), which is what lets a wave-2 identity spec
+  record a browser-real criterion without holding on it. Amending this
+  spec's acceptance is not a build session's act, so the contradiction is
+  surfaced rather than resolved. See D-9.
+
+  The cost of the hold is one edge: spec 026 lists this spec in `depends_on`
+  and will read as blocked until the repair lands.
 
 ## Verification
 

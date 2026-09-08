@@ -130,15 +130,19 @@ pub struct TokenResponse {
 }
 
 /// An `aud` claim, which is one string or a list of them.
+///
+/// Read by the id token path here and by the access token path of spec 025,
+/// which checks the same claim against the resource identifier rather than
+/// against the client id.
 #[derive(Clone, Debug, Deserialize)]
 #[serde(untagged)]
-enum Audience {
+pub(crate) enum Audience {
     One(String),
     Many(Vec<String>),
 }
 
 impl Audience {
-    fn contains(&self, wanted: &str) -> bool {
+    pub(crate) fn contains(&self, wanted: &str) -> bool {
         match self {
             Self::One(one) => one == wanted,
             Self::Many(many) => many.iter().any(|aud| aud == wanted),
@@ -160,10 +164,10 @@ struct IdTokenPayload {
 
 /// A JWT header, of which two fields matter.
 #[derive(Clone, Debug, Deserialize)]
-struct JwtHeader {
-    alg: String,
+pub(crate) struct JwtHeader {
+    pub(crate) alg: String,
     #[serde(default)]
-    kid: Option<String>,
+    pub(crate) kid: Option<String>,
 }
 
 /// Everything a session operation needs, cloned per request.
@@ -320,6 +324,16 @@ impl Sessions {
     #[must_use]
     pub fn key(&self) -> &SessionKey {
         &self.key
+    }
+
+    /// The store this context caches assertions in.
+    ///
+    /// The resource server of spec 025 keeps its deny-list and its rate limit
+    /// counters in the same cache group, and a cell that has built this
+    /// context has already resolved the handle.
+    #[must_use]
+    pub fn store(&self) -> &StoreHandle {
+        &self.store
     }
 
     /// How long a half-finished login stays valid.
@@ -646,7 +660,13 @@ fn decision_id(error: &Error) -> Option<&str> {
 }
 
 /// Decode one base64url JWT segment into `T`.
-fn decode_segment<T: serde::de::DeserializeOwned>(segment: &str, what: &str) -> Result<T> {
+///
+/// Shared with the access token path of spec 025: a second decoder would be
+/// a second place for a padding rule to drift.
+pub(crate) fn decode_segment<T: serde::de::DeserializeOwned>(
+    segment: &str,
+    what: &str,
+) -> Result<T> {
     let bytes = URL_SAFE_NO_PAD
         .decode(segment)
         .map_err(|_| Error::Unauthorized(format!("the id token's {what} is not base64url")))?;
@@ -659,7 +679,14 @@ fn decode_segment<T: serde::de::DeserializeOwned>(segment: &str, what: &str) -> 
 /// The JWK carries the modulus and the public exponent as base64url integers,
 /// which is exactly the form the verifier takes, so no key is ever reassembled
 /// into a DER document on the way.
-fn verify_rs256(jwk: &serde_json::Value, signing_input: &str, signature: &str) -> Result<()> {
+///
+/// Shared with the access token path of spec 025. One signature check, in one
+/// place: two would be two chances to accept a signature that does not verify.
+pub(crate) fn verify_rs256(
+    jwk: &serde_json::Value,
+    signing_input: &str,
+    signature: &str,
+) -> Result<()> {
     let component = |name: &str| -> Result<Vec<u8>> {
         let raw = jwk
             .get(name)
