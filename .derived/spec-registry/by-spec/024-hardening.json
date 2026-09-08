@@ -49,7 +49,7 @@
       "wave": 2
     },
     "id": "024-hardening",
-    "implementation": "pending",
+    "implementation": "in-progress",
     "kind": "feature",
     "risk": "high",
     "sectionHeadings": [
@@ -68,6 +68,6 @@
     "summary": "X-Forwarded-For is evidence, not identity: it becomes identity only when the operator states how many hops in front of the cell are theirs. This spec adds the client identity resolver the rate limiter keys on, the operator role gate that internal surfaces (the trace ring, ledger inspection, backup triggers) sit behind with no rate limiter on top, and an exposure table that every mounted route must appear in with its authentication class, asserted by a test so an unreviewed public route cannot land. Carries enrahitu://025.\n",
     "title": "Hardening: trusted client identity, the operator role gate, exposure review of every route"
   },
-  "shardHash": "e186c769a446e09176049621ee68ffa6313992554603a8e4ec81b25a3b37e02e",
+  "shardHash": "1e0e368962d106650ef2b3e77caa4ced4d9fe56ea33772bbfba1b555a6345337",
   "specVersion": "1.1.0"
 }
