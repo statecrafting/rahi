@@ -43,13 +43,21 @@
           "kind": "file",
           "path": "crates/rahi-edge/src/middleware/rate_limit.rs"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "020-edge-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/router.rs"
+        }
       }
     ],
     "extraFrontmatter": {
       "wave": 2
     },
     "id": "024-hardening",
-    "implementation": "pending",
+    "implementation": "complete",
     "kind": "feature",
     "risk": "high",
     "sectionHeadings": [
@@ -68,6 +76,6 @@
     "summary": "X-Forwarded-For is evidence, not identity: it becomes identity only when the operator states how many hops in front of the cell are theirs. This spec adds the client identity resolver the rate limiter keys on, the operator role gate that internal surfaces (the trace ring, ledger inspection, backup triggers) sit behind with no rate limiter on top, and an exposure table that every mounted route must appear in with its authentication class, asserted by a test so an unreviewed public route cannot land. Carries enrahitu://025.\n",
     "title": "Hardening: trusted client identity, the operator role gate, exposure review of every route"
   },
-  "shardHash": "e186c769a446e09176049621ee68ffa6313992554603a8e4ec81b25a3b37e02e",
+  "shardHash": "d8f6c0ca637de90843d228b752ffca1ac4872189cb545742a7c106579ee918ed",
   "specVersion": "1.1.0"
 }

@@ -38,9 +38,12 @@ pub const UNKNOWN_IDENTITY: &str = "unknown";
 
 /// How a request's client identity is resolved.
 ///
-/// Spec 024 replaces the default with one that reads the trusted proxy hops;
-/// until then it is the peer address and nothing else, because a header a
-/// client can set is not an identity.
+/// Spec 024 supplies the one the router uses:
+/// [`client_identity::from_config`](crate::client_identity::from_config),
+/// which reads `X-Forwarded-For` only as far as the operator's declared
+/// trusted hops. [`peer_address_resolver`] remains the answer for a cell with
+/// no proxy in front of it, because a header a client can set is not an
+/// identity.
 pub type ClientResolver = Arc<dyn Fn(&Parts) -> String + Send + Sync>;
 
 /// The clock the window ordinal is read from. Injectable so a test can hold
@@ -190,10 +193,15 @@ impl RateLimiter {
 
 /// Count the request, and refuse it when its window is spent.
 ///
-/// A store failure admits the request. The counters are derived state whose
-/// loss changes no decision (constitution IX); refusing traffic because a
-/// memory-resident cache blinked would turn a derived group into a hard
-/// dependency of the whole edge.
+/// **A limiter that cannot count does not admit** (spec 024 B-5). A store
+/// failure answers 503, not 200. The counters are derived state whose loss
+/// changes no decision (constitution IX), and the earlier reading of that was
+/// that losing them should cost nothing; but a ceiling that disappears the
+/// moment its store blinks is a ceiling an attacker can remove by making the
+/// store blink, which is exactly the silent fail-open enrahitu's exposure
+/// review found (enrahitu://025). The answer says the cell is temporarily
+/// unable to serve, which is true, and it is the honest cost of the ceiling
+/// being real.
 pub async fn enforce(State(limiter): State<RateLimiter>, request: Request, next: Next) -> Response {
     let (parts, body) = request.into_parts();
     let now = (limiter.clock)();
@@ -204,12 +212,24 @@ pub async fn enforce(State(limiter): State<RateLimiter>, request: Request, next:
     let request = Request::from_parts(parts, body);
 
     let Ok(count) = limiter.store.counter_add(&key, 1).await else {
-        return next.run(request).await;
+        return unavailable();
     };
     if count > i64::from(limit) {
         return spent(now);
     }
     next.run(request).await
+}
+
+/// The 503 for a limiter that cannot reach its counters (spec 024 B-5).
+///
+/// No `Retry-After`: nothing here knows when the store comes back, and a
+/// number invented for the header would be a worse answer than none.
+fn unavailable() -> Response {
+    error::refusal(
+        StatusCode::SERVICE_UNAVAILABLE,
+        "rate_limit_unavailable",
+        "the rate limiter cannot reach its counters, so this request is not admitted",
+    )
 }
 
 /// The 429 for a spent window, carrying the seconds left in it.

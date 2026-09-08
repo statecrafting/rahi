@@ -28,31 +28,45 @@
 //! whether or not a collector is listening. The observation seam spec 020 left
 //! outermost is where it attaches.
 //!
+//! Spec 024 adds the three that make exposure a property rather than a
+//! review: [`client_identity`] turns `X-Forwarded-For` into an identity only
+//! as far as the operator's declared hops, [`operator`] is the role gate the
+//! internal surfaces sit behind with no limiter on top, and [`exposure`] is
+//! the table every mounted route appears in with its class, checked at build
+//! so that an unreviewed public route cannot land.
+//!
 //! What lives here: the router builder ([`router`]), the state every handler
 //! is given ([`state`]), the three middleware ([`middleware`]), the two
 //! probes ([`probes`]), the static slot ([`static_files`]), and the one
 //! mapping from a workspace error to an HTTP answer ([`error`]).
 //!
-//! What does not: metrics and tracing (spec 023), trusted proxy hops and the
-//! operator gate (spec 024), rauthy's proxy route (spec 021), and sessions
-//! (spec 022). The identity crate is a peer of this one, never a dependency
-//! of it: an app composes both.
+//! What does not: rauthy's proxy route (spec 021) and sessions (spec 022).
+//! The identity crate is a peer of this one, never a dependency of it: an app
+//! composes both. That is why [`operator`] reads the
+//! [`Principal`](rahi_types::Principal) spec 022 leaves in the request
+//! extensions rather than calling into it.
 
 #![forbid(unsafe_code)]
 
+pub mod client_identity;
 pub mod error;
+pub mod exposure;
 pub mod middleware;
 pub mod obs;
+pub mod operator;
 pub mod probes;
 pub mod router;
 pub mod state;
 pub mod static_files;
 
+pub use client_identity::ClientIdentity;
 pub use error::{EdgeError, EdgeResult, status_of};
+pub use exposure::{Exposure, Route, RouteClass};
 pub use middleware::csrf::Csrf;
 pub use middleware::rate_limit::{ClientResolver, Clock, RateLimiter, RateLimits};
 pub use middleware::security_headers::SecurityHeaders;
 pub use obs::{Metrics, Obs, ObsOptions, Ring, Trace, get_trace, list_traces, subscribe};
+pub use operator::RequireOperator;
 pub use probes::{HEALTHZ_PATH, READYZ_PATH};
 pub use router::{Edge, EdgeBuilder};
 pub use state::AppState;
