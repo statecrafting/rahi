@@ -15,7 +15,13 @@ use rahi_types::{Config, Error, Result};
 pub const AUTH_PREFIX: &str = "/auth";
 /// rauthy's API root under that subtree; the issuer is the public URL plus
 /// this.
-pub const ISSUER_PATH: &str = "/auth/v1";
+///
+/// The trailing slash is rauthy's, not a choice: it builds its issuer as
+/// `{scheme}://{pub_url}/auth/v1/` with no setting that drops it, and
+/// [`crate::Discovery::parse`] holds the document to this value exactly, as
+/// RFC 8414 requires. A slashless constant here refuses every real
+/// handshake while every fixture-backed test passes (spec 021 D-10).
+pub const ISSUER_PATH: &str = "/auth/v1/";
 /// Where rauthy sends the browser back after an authorization code.
 /// Deliberately outside `AUTH_PREFIX`: that subtree is forwarded raw to
 /// rauthy (B-2), so a callback inside it is handed straight back to rauthy,
@@ -151,7 +157,7 @@ mod tests {
     fn every_url_derives_from_the_one_public_url() {
         let idp = IdpConfig::derive(&config("https://cell.example.com"), "hello-cell")
             .expect("the fixture derives");
-        assert_eq!(idp.issuer, "https://cell.example.com/auth/v1");
+        assert_eq!(idp.issuer, "https://cell.example.com/auth/v1/");
         assert_eq!(
             idp.redirect_uri,
             "https://cell.example.com/session/callback"
@@ -178,7 +184,26 @@ mod tests {
     fn a_trailing_slash_never_doubles_in_a_derived_url() {
         let idp = IdpConfig::derive(&config("https://cell.example.com/"), "hello-cell")
             .expect("the fixture derives");
-        assert_eq!(idp.issuer, "https://cell.example.com/auth/v1");
+        assert_eq!(idp.issuer, "https://cell.example.com/auth/v1/");
+        assert!(!idp.issuer.contains("//auth"));
+    }
+
+    /// The issuer is rauthy's string, not one this crate would have chosen.
+    ///
+    /// rauthy builds `{scheme}://{pub_url}/auth/v1/` and `Discovery::parse`
+    /// compares exactly, so the slash is load bearing: without it the cell
+    /// refuses every document a real rauthy publishes (D-10).
+    #[test]
+    fn the_issuer_carries_the_slash_rauthy_emits() {
+        assert!(ISSUER_PATH.ends_with('/'));
+        let idp = IdpConfig::derive(&config("https://cell.example.com"), "hello-cell")
+            .expect("the fixture derives");
+        assert!(idp.issuer.ends_with("/auth/v1/"));
+        assert_eq!(
+            idp.issuer.strip_suffix(ISSUER_PATH),
+            Some("https://cell.example.com"),
+            "the origin must still be recoverable from the issuer",
+        );
     }
 
     #[test]

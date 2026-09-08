@@ -25,6 +25,8 @@ establishes:
   - "crates/rahi-idp/testdata/discovery/"
 extends:
   - { spec: "010-workspace-and-core-types", unit: { kind: section, file: "Cargo.toml", anchor: "workspace.dependencies" }, nature: additive }
+  - { spec: "022-session-and-principal", unit: "crates/rahi-idp/tests/session.rs", nature: additive }
+  - { spec: "022-session-and-principal", unit: "crates/rahi-idp/tests/oidc/", nature: additive }
 summary: >
   One public origin for app and IdP: rauthy binds loopback, the app
   reverse-proxies the /auth/* subtree to it raw and unfiltered with bodies
@@ -60,7 +62,8 @@ documents under `testdata/discovery/` and need nothing.
 
 - **B-1 (config).** `IdpConfig` is derived from `rahi_types::Config`:
   `loopback_base` (`http://127.0.0.1:8080`), `issuer`
-  (`<public_url>/auth/v1`), `client_id` (the app name from the manifest),
+  (`<public_url>/auth/v1/`, carrying the trailing slash rauthy emits; see
+  D-10), `client_id` (the app name from the manifest),
   `redirect_uri` (`<public_url>/session/callback`, the app's own callback
   route outside the raw proxy subtree; see D-9), and the client secret path
   under `/data/keys/`.
@@ -256,6 +259,38 @@ IdP (an operator concern documented in 031).
   leaving B-1 alone and having spec 030's composer register both URIs, which
   keeps a broken value in the corpus and defers the fix behind 030, a spec
   that is itself blocked by 022.
+
+- **D-10 (2026-09-08, corpus amendment; the issuer's trailing slash).** B-1
+  fixed `issuer` at `<public_url>/auth/v1` and B-3 holds the discovery
+  document to it exactly, which is what RFC 8414 and the `iss` claim both
+  want. rauthy builds its own issuer as `{scheme}://{pub_url}/auth/v1/`
+  (`rauthy_config.rs:120`) and offers no setting that drops the slash, so
+  `Discovery::parse` refused every document a real rauthy publishes: as the
+  corpus stood, no deployment of this chassis could complete a handshake with
+  the IdP it is built around. `Discovery::fetch_within` is how this spec
+  reaches rauthy at boot and how spec 022 validates a session, and the same
+  character refuses every token on the `iss` check spec 025 adds. Spec 025's
+  third build session found it while driving that spec's AC-2 against a real
+  rauthy image, recorded it as that spec's D-11, and correctly refused to
+  amend this spec, whose B-1 *text* carried the wrong value rather than its
+  code having drifted; the reconciliation was left to a human and is made
+  here.
+
+  `config::ISSUER_PATH` becomes `/auth/v1/` and B-1 states the new value.
+  `DISCOVERY_PATH` and `CLIENTS_PATH` are independent literals and do not
+  move, and `strip_suffix(ISSUER_PATH)` in `session.rs` and `resource.rs`
+  still recovers the origin. The recorded discovery fixtures gain the slash
+  they should always have carried, and a new test in `tests/discovery.rs`
+  holds the fixture to what `ISSUER_PATH` builds: the reason this survived
+  four specs is that the fixture and the constant were written slashless
+  together, so every test asserted the corpus against itself rather than
+  against rauthy. Spec 022's `tests/session.rs` and `tests/oidc/` built the
+  same issuer from their own literals and now derive it from this spec's
+  constant, which is why this spec declares `extends` edges onto both units.
+  Rejected alternative: comparing modulo a trailing slash in
+  `Discovery::parse`, which leaves a value in the corpus that no IdP
+  publishes and softens an exact-equality check on the one field that says
+  which deployment a token came from.
 
 ## Verification
 

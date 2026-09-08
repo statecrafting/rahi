@@ -1,5 +1,5 @@
 {
-  "issuer": "https://another-cell.example.com/auth/v1",
+  "issuer": "https://another-cell.example.com/auth/v1/",
   "authorization_endpoint": "https://cell.example.com/auth/v1/oidc/authorize",
   "backchannel_logout_supported": true,
   "backchannel_logout_session_supported": true,

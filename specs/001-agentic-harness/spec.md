@@ -358,6 +358,36 @@ filed:
 `CODEOWNERS` is added with the same reading: the corpus, the standards, the
 harness, and everything that runs with a token.
 
+D-10 (2026-09-08, corpus amendment; the coherence guard gains a second
+branch). The guard told a build session what to do when its code and its own
+spec disagree, and said nothing about the case that actually arose three
+times in wave 2: the spec being built requires something a `complete` spec
+forbids. Sessions read the silence in opposite directions. Spec 024's session
+resolved two such contradictions on its own authority (D-2, D-3), left both
+specs' text intact, declared `extends` edges, and shipped. Spec 022's and
+spec 025's sessions refused the same shape and held at `in-progress`, which
+cost two sessions and a human PR each time. Both readings were defensible
+against the guard as written, which is the defect: a rule that licenses
+opposite behaviors in the same situation is not governing.
+
+The guard now turns on whether a mechanism exists that honors both
+requirements. When one does, the session takes it, records a dated decision
+naming both requirements and the rejected alternatives, declares the
+`extends` edge, and leaves every spec's text as it found it; a complete
+spec's acceptance criterion outranks a later spec's behavior text, because
+the first has been verified and the second has not. When none does, because
+another spec's requirement text is itself false, the session refuses and
+surfaces it, and the reconciliation is a human's. Spec 024 D-2 and spec 025
+D-11 are named in the rule as the worked examples of each branch.
+
+This ratifies 024's behavior rather than reversing it: its decisions are
+sealed, its reading is now the rule, and 025's refusal remains correct under
+the same rule because no mechanism could have made spec 021 B-1's issuer
+text true. Rejected alternative: requiring refusal in every case, which is
+safest per instance and pays for it in stalled backlog every time, and which
+would have made 024's two contradictions into two more human PRs for
+reconciliations that changed nothing anyone needed to adjudicate.
+
 ## Verification
 
 ```verify:cli

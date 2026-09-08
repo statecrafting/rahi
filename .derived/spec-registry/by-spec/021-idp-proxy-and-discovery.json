@@ -63,6 +63,22 @@
           "file": "Cargo.toml",
           "kind": "section"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "022-session-and-principal",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/session.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "022-session-and-principal",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/oidc/"
+        }
       }
     ],
     "extraFrontmatter": {
@@ -89,6 +105,6 @@
     "summary": "One public origin for app and IdP: rauthy binds loopback, the app reverse-proxies the /auth/* subtree to it raw and unfiltered with bodies streamed, the issuer and every OIDC endpoint live under the app's URL, the driver trusts rauthy's discovery document fetched through the loopback base and caches its JWKS with rotation, and the app's OIDC client is bootstrapped on first boot with authorization-code plus refresh, S256 PKCE, RS256, and redirect URIs derived from the public URL. rauthy is a release binary in the same container and is never forked. Carries enrahitu://005.\n",
     "title": "rauthy behind a same-origin proxy: the raw /auth/* route, discovery, JWKS, client bootstrap"
   },
-  "shardHash": "8370a12222e2078133a603489ec0b8dc0d304be8563a966741afda2bb593994c",
+  "shardHash": "ce3a8477f6ced8f0dcc2fd3a2e33e8fb880c0f30e55295bf7f54e574a5c14d7f",
   "specVersion": "1.1.0"
 }

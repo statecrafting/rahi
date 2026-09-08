@@ -13,7 +13,7 @@ use axum::Router;
 use axum::extract::State;
 use axum::routing::get;
 use rahi_idp::jwks::{JwksOptions, system_clock};
-use rahi_idp::{Discovery, IdpConfig, Jwks};
+use rahi_idp::{Discovery, ISSUER_PATH, IdpConfig, Jwks};
 use serde_json::json;
 
 use common::{idp_config, serve};
@@ -22,7 +22,34 @@ const RAUTHY: &str = include_str!("../testdata/discovery/rauthy.json");
 const WRONG_ISSUER: &str = include_str!("../testdata/discovery/wrong-issuer.json");
 const MISSING_JWKS_URI: &str = include_str!("../testdata/discovery/missing-jwks-uri.json");
 
-const ISSUER: &str = "https://cell.example.com/auth/v1";
+const ISSUER: &str = "https://cell.example.com/auth/v1/";
+
+/// The recorded document and the constant every issuer is built from are one
+/// fact, not two that happen to agree.
+///
+/// rauthy builds its issuer as `{scheme}://{pub_url}/auth/v1/`
+/// (`rauthy_config.rs`), and `Discovery::parse` compares exactly. When this
+/// fixture was written slashless it agreed with a slashless `ISSUER_PATH`,
+/// every test here passed, and no deployment could complete a handshake:
+/// the fixture was asserting the corpus against itself rather than against
+/// rauthy. This test is the coupling that was missing (spec 021 D-10).
+#[test]
+fn the_recorded_issuer_is_the_one_the_constant_builds() {
+    let recorded: serde_json::Value =
+        serde_json::from_str(RAUTHY).expect("the recorded document parses");
+    let issuer = recorded["issuer"].as_str().expect("it carries an issuer");
+
+    assert_eq!(issuer, ISSUER);
+    assert!(
+        ISSUER_PATH.ends_with('/'),
+        "rauthy's issuer ends in a slash and this constant must carry it",
+    );
+    assert_eq!(
+        issuer,
+        format!("https://cell.example.com{ISSUER_PATH}"),
+        "the fixture's issuer must be what ISSUER_PATH builds for this origin",
+    );
+}
 
 // ------------------------------------------------------------ FR-002
 
