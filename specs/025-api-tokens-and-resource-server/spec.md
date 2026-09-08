@@ -289,6 +289,25 @@ consumer needs yet.
   The cost of the hold is one edge: spec 026 lists this spec in `depends_on`
   and will read as blocked until the repair lands.
 
+- **2026-09-07 (second build session, remediation).** The hold is confirmed
+  independently and the frontmatter stays `in-progress`. This session re-ran
+  the whole governed gate (`make ci`, exit 0) and the spec's own verification
+  block: `cargo test -p rahi-idp --locked --test bearer` passes sixteen tests,
+  so AC-1 holds. AC-2 still does not, and the prerequisite was checked rather
+  than assumed: the rauthy checkout beside this repository carries no built
+  binary, and a binary alone would not close AC-2, which needs the
+  configuration file, the admin API key, the key set, and a provisioned user
+  who can complete a browser-real PKCE login. That arrangement is spec 031's
+  container and spec 033's harness, exactly as the entry above records.
+  Building it here would move this spec's territory into two other specs'
+  units, and reading AC-2's condition as vacuous when `RAHI_TEST_RAUTHY` is
+  unset is the alternative D-9 already rejected. The backlog protocol's own
+  instruction for a criterion blocked on a missing sibling is to keep
+  `in-progress`, record what remains, and report it, which is what this entry
+  does. The repair is unchanged and remains a human authoring act: either move
+  AC-2 to the spec that owns the arrangement, as 021 FR-004 moved to 031
+  FR-005, or give it the deferral clause spec 022's AC-2 already carries.
+
 ## Verification
 
 ```verify:cli
