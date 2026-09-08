@@ -6,7 +6,7 @@ kind: "kernel"
 domain: "identity"
 created: "2026-09-03"
 authors: ["Bartek Kus"]
-implementation: in-progress
+implementation: complete
 risk: critical
 wave: 2
 depends_on:
@@ -242,6 +242,25 @@ delegation (a product spec in hqgit).
   login. Rejected alternative: a facade over a chassis-reserved namespace,
   which is a ceiling nobody can lower.
 
+- **D-9 (2026-09-07, third build session; reverses D-4's mechanism, whose
+  reason is now void).** `Sessions::new` reads `IdpConfig::redirect_uri`
+  verbatim rather than rebuilding `<origin>/session/callback` from
+  `SESSION_PREFIX` and `session::CALLBACK_PATH`, and returns `Error::Config`
+  when that value is not the callback route `login_router` mounts. A unit test
+  pins `config::CALLBACK_PATH` to `SESSION_PREFIX` + `session::CALLBACK_PATH`.
+  D-4 derived the URI independently because spec 021 B-1 held a value this
+  spec could not send; spec 021 D-9 corrected that constant, so the reason is
+  gone and only the duplication remained. rauthy matches a `redirect_uri`
+  literally, so the string the authorization request sends must equal the
+  string `bootstrap_client` registers, and two derivations of it agreed only
+  by coincidence: an edit to either constant refused every login, and the only
+  check that caught it was AC-2, which this spec defers to 034. Verified by
+  mutation: restoring `/auth/callback` now fails twelve of the thirteen
+  session integration tests and the new unit test, where before it passed the
+  whole suite. Rejected alternatives: asserting the equality in a test only,
+  which misses a composer that hand-builds `IdpConfig`; leaving both
+  derivations, which is the coincidence that produced D-4's conflict.
+
 ## 8. Status
 
 - **2026-09-07 (build session).** `implementation` stays `in-progress` on one
@@ -298,6 +317,29 @@ delegation (a product spec in hqgit).
   are unaffected. That edit belongs to whoever owns spec 021, not to a
   session implementing 022 (`.claude/rules/adversarial-prompt-refusal.md`),
   which is why this stays `in-progress`.
+
+- **2026-09-07 (third build session; the blocker cleared, and this flips to
+  `complete`).** The conflict D-4 named and the second session narrowed to one
+  constant was reconciled by a human on `main` as spec 021 D-9 (commit
+  `9ecf19e`, PR #24): `config::CALLBACK_PATH` is now `/session/callback`, so
+  `IdpConfig::redirect_uri` and this spec's login send the same string and
+  `bootstrap_client` registers it. Spec 021 is `implementation: complete`.
+  Nothing this spec owns needed changing, which is what the second session
+  predicted.
+
+  The one thing this session changed is D-9, and it closes the trap the
+  reconciliation left behind rather than the conflict it resolved: the two
+  constants now agree, but nothing held them together, so the next edit to
+  either would have refused every login with no test to say so. `Sessions::new`
+  now sends the registered URI and refuses to boot on a mismatch. The gate is
+  green (`compile`, `index check`, `lint --fail-on-warn`, `couple --base
+  origin/main` over 18 paths, `make ci`, all exit 0), both `verify:cli` blocks
+  pass, and **AC-1 passes as 80 tests** across the crate.
+
+  **AC-2 is not this session's to run and does not hold it open.** By its own
+  text it is "driven by the harness in 033; recorded here as the wave-2 exit
+  condition, verified in 034", so it names where it is discharged. Every
+  criterion this spec owns is met, so `implementation` is `complete`.
 
 ## Verification
 

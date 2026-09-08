@@ -203,9 +203,10 @@ impl Sessions {
     ///
     /// # Errors
     ///
-    /// [`Error::Config`] when the HTTP client cannot be built, or when the
+    /// [`Error::Config`] when the HTTP client cannot be built, when the
     /// configured issuer does not end in the issuer path every URL in this
-    /// crate is derived from.
+    /// crate is derived from, or when the registered redirect URI is not the
+    /// callback route this crate mounts.
     pub fn new(
         idp: &IdpConfig,
         config: &Config,
@@ -222,6 +223,15 @@ impl Sessions {
                 idp.issuer
             ))
         })?;
+        let mounted = format!("{origin}{SESSION_PREFIX}{CALLBACK_PATH}");
+        if idp.redirect_uri != mounted {
+            return Err(Error::Config(format!(
+                "the registered redirect URI {:?} is not the callback route this crate \
+                 mounts ({mounted:?}); rauthy matches a redirect URI literally, so a \
+                 login sent against a client registered with the other value is refused",
+                idp.redirect_uri
+            )));
+        }
         let client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .build()
@@ -236,7 +246,7 @@ impl Sessions {
             client_secret: Arc::new(client_secret),
             scheme: config.cookie_scheme,
             origin: Arc::new(origin.to_owned()),
-            redirect_uri: Arc::new(format!("{origin}{SESSION_PREFIX}{CALLBACK_PATH}")),
+            redirect_uri: Arc::new(idp.redirect_uri.clone()),
             access_ttl: DEFAULT_ACCESS_TTL,
             login_ttl: DEFAULT_LOGIN_TTL,
             clock: system_clock(),
@@ -279,8 +289,10 @@ impl Sessions {
     /// Where rauthy sends the authorization code back to.
     ///
     /// `<public_url>/session/callback`: the app's own route, outside the raw
-    /// proxy prefix (B-1). The client registered with rauthy must carry this
-    /// URI among its redirect URIs.
+    /// proxy prefix (B-1). This is [`IdpConfig::redirect_uri`] verbatim, the
+    /// string `bootstrap_client` registers with rauthy (spec 021 B-5, D-9),
+    /// and [`Sessions::new`] refuses to build unless it is the route this
+    /// crate mounts. Sending anything else is a login rauthy refuses.
     #[must_use]
     pub fn redirect_uri(&self) -> &str {
         &self.redirect_uri
@@ -695,6 +707,20 @@ mod tests {
             },
             UnixSeconds::new(expires),
         )
+    }
+
+    #[test]
+    fn the_route_this_crate_mounts_is_the_one_the_bootstrap_registers() {
+        // `config::CALLBACK_PATH` is what `IdpConfig::redirect_uri` is built
+        // from and what `bootstrap_client` registers with rauthy (spec 021
+        // D-9). `SESSION_PREFIX` + `CALLBACK_PATH` is the route `login_router`
+        // mounts. rauthy matches a redirect URI literally, so the day these
+        // two disagree is the day every login is refused, and the only other
+        // thing that catches it is a browser (AC-2, verified in 034).
+        assert_eq!(
+            crate::config::CALLBACK_PATH,
+            format!("{SESSION_PREFIX}{CALLBACK_PATH}"),
+        );
     }
 
     #[test]
