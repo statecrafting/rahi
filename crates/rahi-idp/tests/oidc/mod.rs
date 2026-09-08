@@ -285,7 +285,7 @@ fn stub_router(stub: Shared, addr: SocketAddr) -> Router {
     let base = format!("http://{addr}");
     let state = StubState {
         stub,
-        issuer: format!("{base}/auth/v1"),
+        issuer: format!("{base}{}", rahi_idp::ISSUER_PATH),
         base,
     };
     Router::new()

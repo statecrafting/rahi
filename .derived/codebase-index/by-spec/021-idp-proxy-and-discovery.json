@@ -53,7 +53,15 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-idp/tests/oidc/",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-idp/tests/proxy.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/tests/session.rs",
         "source": "spec-edge"
       }
     ],
@@ -204,6 +212,32 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-idp/tests/oidc/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/oidc/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/tests/session.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/session.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "Cargo.toml",
             "span": {
               "endLine": 89,
@@ -224,5 +258,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "996659e4b8e343e7c6b7f23b5db7e65eb5cb3f8da855ca40d9052344c31b02b7"
+  "shardHash": "622f10ff7543578c8283f6e7cbd16548ad6965968081a7b5f5e8bc36b372b90a"
 }
