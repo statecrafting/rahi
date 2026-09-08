@@ -6,7 +6,7 @@ kind: "kernel"
 domain: "identity"
 created: "2026-09-03"
 authors: ["Bartek Kus"]
-implementation: pending
+implementation: in-progress
 risk: critical
 wave: 2
 depends_on:
