@@ -1,0 +1,12 @@
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "use": "sig",
+      "alg": "RS256",
+      "kid": "rahi-test-1",
+      "n": "t9xvlxYwzt46ab3TR0vwQ_ZDXMmyTu8RvmZBK9DQ6uIiqK2BY26H47OtIe60l1gU2eQbNAhby9C-UVGf2-Gkiiq1Hyzq7G9m6RDORkEK-ZlZFbgK5IBO91tHrYVPOUcxC_JJ0bcwoNM0ch0IZ9bGxr7P2v9S7RyU6FE4Z5xuzeljT2si8Zr9Z9E26_3VjA4eEM5UInPQYBZPl3mHhklidCabCagKHthvhEtvDB9foCcDjbF-HVEoVFqQBHtCCLeOIvUm1tAi7jMnSSf0nOQTKDhemoD-4gAuxH2I0mFryxn0ADz-t1p-JpySoKLP9YWR7BoXkBXEr17rU-NKLy-LBQ",
+      "e": "AQAB"
+    }
+  ]
+}

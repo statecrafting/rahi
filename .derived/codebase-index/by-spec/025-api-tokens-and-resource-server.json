@@ -31,16 +31,6 @@
         "code": "W-001",
         "message": "spec '025-api-tokens-and-resource-server' file unit 'crates/rahi-idp/testdata/tokens/' does not exist",
         "path": "crates/rahi-idp/testdata/tokens/"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '025-api-tokens-and-resource-server' file unit 'crates/rahi-idp/src/extractor.rs' does not exist",
-        "path": "crates/rahi-idp/src/extractor.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '025-api-tokens-and-resource-server' file unit 'crates/rahi-idp/src/principal.rs' does not exist",
-        "path": "crates/rahi-idp/src/principal.rs"
       }
     ]
   },
@@ -52,7 +42,15 @@
     ],
     "implementingPaths": [
       {
+        "path": "crates/rahi-idp/src/extractor.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-idp/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/principal.rs",
         "source": "spec-edge"
       }
     ],
@@ -112,7 +110,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/extractor.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
@@ -134,7 +136,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/principal.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "constrains",
         "unit": {

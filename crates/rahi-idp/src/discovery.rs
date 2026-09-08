@@ -42,6 +42,15 @@ pub struct Discovery {
     pub end_session_endpoint: String,
     /// Where the signing keys live.
     pub jwks_uri: String,
+    /// Where a refresh token is revoked (spec 022 B-7).
+    ///
+    /// Optional because RFC 8414 makes it optional and an authorization server
+    /// that publishes none is still a legal one; rauthy publishes it. Spec 021
+    /// D-7 keeps this list to the endpoints the chassis actually calls, and a
+    /// logout that revokes is a call, so it is modelled here rather than
+    /// guessed from the issuer's path.
+    #[serde(default)]
+    pub revocation_endpoint: Option<String>,
 }
 
 impl Discovery {

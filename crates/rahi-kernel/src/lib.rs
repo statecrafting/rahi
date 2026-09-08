@@ -53,9 +53,9 @@ use std::time::Duration;
 
 use action_gate_core::Gate;
 use action_gate_types::ActionContext;
-use rahi_ledger::{Decision, DecisionId, DecisionKind, Hash, Ledger};
+use rahi_ledger::{Decision, Hash, Ledger};
 use rahi_store::StoreHandle;
-use rahi_types::Error;
+use rahi_types::{Error, Sub};
 use serde_json::json;
 use tokio::sync::mpsc;
 
@@ -72,7 +72,7 @@ pub use facade::{Egress, Governed, Permit, SecretSource, Secrets};
 pub use manifest::{
     App, Auth, Contract, GatePolicy, LedgerPolicy, Manifest, Observability, Resources, Service,
 };
-pub use rahi_ledger::Outcome;
+pub use rahi_ledger::{DecisionId, DecisionKind, Outcome};
 pub use verify::{Usage, scan_crate, scan_source, verify_crate, verify_usage};
 
 /// How many decisions the denial queue holds before it starts dropping.
@@ -268,6 +268,59 @@ impl Kernel {
         }
         let id = self.emit(request, &verdict);
         Err(Error::Denied(format!("{id}: {}", verdict.reason)))
+    }
+
+    /// Ledger a refusal this kernel did not adjudicate (spec 022 B-6).
+    ///
+    /// The identity layer refuses a request whose principal lacks a role.
+    /// That is not a capability question: the manifest declares a ceiling over
+    /// resources, and a role is the IdP's answer about a person, so the gate
+    /// has nothing to say about it and `admit` would have to lie about why it
+    /// denied. What the two refusals share is everything after the answer.
+    /// B-6 is that *every* denial becomes a record without the request path
+    /// waiting for the append, and that mechanism is this kernel's bounded
+    /// queue. A second appender in the identity crate would be a second copy
+    /// of it with its own failure semantics, and a synchronous append there
+    /// would put a Raft write on the request path that B-6 exists to keep off.
+    ///
+    /// Returns the id of the decision the chain will hold, which the caller
+    /// puts in front of its [`Error::Denied`] message so the refusal the
+    /// client reads and the record an auditor finds name the same event.
+    pub fn refuse(
+        &self,
+        kind: &str,
+        actor: &Sub,
+        reason: impl Into<String>,
+        payload: serde_json::Map<String, serde_json::Value>,
+    ) -> DecisionId {
+        let id = self.next_id();
+        let mut payload = payload;
+        payload.insert("manifest".to_owned(), json!(self.inner.hash.as_str()));
+        if let Some(clock) = &self.inner.clock {
+            payload.insert("wall_time".to_owned(), json!(clock()));
+        }
+        let decision = Decision::new(
+            id.clone(),
+            DecisionKind::new(kind),
+            actor.clone(),
+            Outcome::Deny,
+            reason.into(),
+        )
+        .with_payload(serde_json::Value::Object(payload));
+
+        observe::record_decision(&decision);
+        match self.inner.denials.try_send(decision) {
+            Ok(()) => {
+                self.inner.queued.fetch_add(1, Ordering::Relaxed);
+            }
+            Err(err) => {
+                observe::record_dropped(
+                    &id,
+                    &Error::Upstream(format!("the denial queue refused the record: {err}")),
+                );
+            }
+        }
+        id
     }
 
     /// Build the decision for a refusal, observe it, and queue it.

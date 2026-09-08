@@ -59,11 +59,21 @@ tower = { version = "0.5" }
 tower-http = { version = "0.6", default-features = false, features = ["fs"] }
 getrandom = "0.4"
 
-# Identity (spec 021): rauthy is reached over loopback only, so the client is
-# built without a TLS backend at all. `stream` is what keeps the proxy from
-# buffering a body in either direction. reqwest is already in the tree under
-# hiqlite at this version, so this adds no second HTTP client.
-reqwest = { version = "0.13", default-features = false, features = ["stream", "json"] }
+# Identity (specs 021 and 022): rauthy is reached over loopback only, so the
+# client is built without a TLS backend at all. `stream` is what keeps the
+# proxy from buffering a body in either direction, and `form` is how the token
+# and revocation endpoints are addressed: OAuth 2 posts
+# `application/x-www-form-urlencoded` and nothing else. reqwest is already in
+# the tree under hiqlite at this version, so this adds no second HTTP client.
+reqwest = { version = "0.13", default-features = false, features = ["stream", "json", "form"] }
+
+# Sessions (spec 022): one primitive library covers all three of this spec's
+# cryptographic needs. HMAC-SHA256 seals the session envelope, SHA-256 is the
+# PKCE S256 challenge, and RSA PKCS#1 v1.5 verification reads the modulus and
+# exponent a JWK publishes, which is the form rauthy's key set arrives in.
+# ring is already compiled in this tree under hiqlite's TLS stack, so this
+# adds no second cryptographic backend.
+ring = "0.17"
 
 # Observability (spec 023): a process-wide Prometheus registry rendered as
 # text (the protobuf exposition is off, nothing scrapes it), and the

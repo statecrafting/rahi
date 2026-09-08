@@ -1,67 +1,77 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '022-session-and-principal' file unit 'crates/rahi-idp/src/login.rs' does not exist",
-        "path": "crates/rahi-idp/src/login.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '022-session-and-principal' file unit 'crates/rahi-idp/src/session.rs' does not exist",
-        "path": "crates/rahi-idp/src/session.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '022-session-and-principal' file unit 'crates/rahi-idp/src/envelope.rs' does not exist",
-        "path": "crates/rahi-idp/src/envelope.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '022-session-and-principal' file unit 'crates/rahi-idp/src/refresh.rs' does not exist",
-        "path": "crates/rahi-idp/src/refresh.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '022-session-and-principal' file unit 'crates/rahi-idp/src/principal.rs' does not exist",
-        "path": "crates/rahi-idp/src/principal.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '022-session-and-principal' file unit 'crates/rahi-idp/src/extractor.rs' does not exist",
-        "path": "crates/rahi-idp/src/extractor.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '022-session-and-principal' file unit 'crates/rahi-idp/tests/session.rs' does not exist",
-        "path": "crates/rahi-idp/tests/session.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '022-session-and-principal' file unit 'crates/rahi-idp/tests/principal.rs' does not exist",
-        "path": "crates/rahi-idp/tests/principal.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '022-session-and-principal' file unit 'crates/rahi-idp/src/principal.rs' does not exist",
-        "path": "crates/rahi-idp/src/principal.rs"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "021-idp-proxy-and-discovery"
     ],
     "implementingPaths": [
       {
+        "path": "Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/discovery.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/envelope.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/extractor.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-idp/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/login.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/principal.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/refresh.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/session.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/testdata/oidc/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/tests/oidc/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/tests/principal.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/tests/session.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-kernel/src/lib.rs",
         "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/envelope.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -70,7 +80,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/extractor.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -79,7 +93,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/login.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -88,7 +106,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/principal.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -97,7 +119,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/refresh.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -106,7 +132,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/session.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -115,7 +145,37 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/testdata/oidc/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/testdata/oidc/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/tests/oidc/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/oidc/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/tests/principal.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -124,12 +184,42 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/tests/session.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
           "kind": "file",
           "path": "crates/rahi-idp/tests/session.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/discovery.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/discovery.rs"
         }
       },
       {
@@ -146,7 +236,42 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-kernel/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.toml",
+            "span": {
+              "endLine": 89,
+              "startLine": 15
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "anchor": "workspace.dependencies",
+          "file": "Cargo.toml",
+          "kind": "section"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/principal.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "constrains",
         "unit": {
@@ -159,5 +284,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "3df21481bd3b0f9e555b323138e9802632de4efc184a9dd90b994d4ddaf87d1b"
+  "shardHash": "069b7b3a665888c560748fcbbca851a7722572ce3a0b59de86f8cd689b404856"
 }
