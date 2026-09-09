@@ -6,7 +6,7 @@ kind: "kernel"
 domain: "store"
 created: "2026-09-03"
 authors: ["Bartek Kus"]
-implementation: in-progress
+implementation: complete
 risk: high
 wave: 1
 depends_on:
@@ -230,6 +230,13 @@ before it hands the store bytes.
   `index coverage --fail-on-untraced` all exit 0), and AC-1 passes 8 of 8,
   including the N=3 divergence test of FR-005. Nothing in this spec's
   territory is outstanding.
+
+- **2026-09-09 (spec 030's build session).** Closed. `crates/rahi-ops` now
+  exists and its `preflight` prints the engine report as one of its named
+  checks (`PASS engine: extensions: none, max_value_bytes: 1048576`,
+  asserted by `crates/rahi-cli/tests/cli.rs`), so AC-2 holds. This flip is
+  the act 030 D-1 assigned to the session building 030; nothing else in
+  this spec changed.
 
 ## Verification
 

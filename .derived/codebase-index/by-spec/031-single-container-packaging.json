@@ -51,11 +51,6 @@
         "code": "W-001",
         "message": "spec '031-single-container-packaging' file unit '.github/workflows/image.yml' does not exist",
         "path": ".github/workflows/image.yml"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '031-single-container-packaging' file unit 'crates/rahi-ops/src/lib.rs' does not exist",
-        "path": "crates/rahi-ops/src/lib.rs"
       }
     ]
   },
@@ -66,6 +61,10 @@
     "implementingPaths": [
       {
         "path": ".github/workflows/govern.yml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/lib.rs",
         "source": "spec-edge"
       }
     ],
@@ -174,7 +173,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/lib.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
