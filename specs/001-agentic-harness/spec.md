@@ -503,8 +503,7 @@ names "the `spec-dag` check in `make spine`". Spec 000 is
 and the reference is prose about a target this spec owns, not a requirement
 of 000. Editing another spec's text to match a rename this spec made is the
 move the coherence guard exists to refuse, so it is reported rather than
-taken. The untracked `.agents/` and `.codex/` mirrors carry the same stale
-facts and are outside this corpus.
+taken.
 
 ## Verification
 
