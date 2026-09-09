@@ -70,5 +70,5 @@
     "title": "Cluster topology: N=1 primary, N=3 StatefulSet on Kubernetes, one key set, S3 backups"
   },
   "shardHash": "203ffdda98c4a1e0e891fca2628128a6a36a2107e5d62d8e580121092c930e0d",
-  "specVersion": "1.1.0"
+  "specVersion": "1.2.0"
 }

@@ -26,7 +26,7 @@ memory: project
 
 ## rahi Context
 
-rahi is specified before it is built: the corpus under `specs/` is the whole design, spec ordinals are the build order, and code lands one spec per session (`AGENTS.md`, "Working the backlog"). `spec-spine` 0.15.0 governs the corpus; it is a dependency, not source you edit.
+rahi is specified before it is built: the corpus under `specs/` is the whole design, spec ordinals are the build order, and code lands one spec per session (`AGENTS.md`, "Working the backlog"). `spec-spine` 0.18.0 governs the corpus; it is a dependency, not source you edit.
 
 | Surface | Path | Notes |
 |---------|------|-------|
@@ -63,7 +63,7 @@ Read the spec (or request). Identify the layer, the crate, every file in `establ
 
 ### 4. Decompose into Steps
 
-Ordered, atomic steps. For each: **What** (files), **Why** (the B-n, FR, or principle), **Dependencies**, **Verify** (`cargo test -p <crate> --locked`, `make spine`, `make ci`, `scripts/verify-spec.sh <id>`).
+Ordered, atomic steps. For each: **What** (files), **Why** (the B-n, FR, or principle), **Dependencies**, **Verify** (`cargo test -p <crate> --locked`, `make gate`, `make ci`, `spec-spine verify <id>`).
 
 ### 5. Identify Risks
 

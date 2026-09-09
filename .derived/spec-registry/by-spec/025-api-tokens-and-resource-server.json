@@ -97,5 +97,5 @@
     "title": "The resource server: bearer tokens rauthy issued, audience bound, scope gated, never app minted"
   },
   "shardHash": "ad40f4472268cc2da1b2268803649987ce1e3c0bb268a2d5e143ed0fd0081cc2",
-  "specVersion": "1.1.0"
+  "specVersion": "1.2.0"
 }

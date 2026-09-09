@@ -101,5 +101,5 @@
     "title": "Store coordination: fenced leases, local notify, the outbox, and the revision watermark"
   },
   "shardHash": "c5cbc308908e31d1198c838a73edecff7ef7d2fa82b92070b10666d871dfdfab",
-  "specVersion": "1.1.0"
+  "specVersion": "1.2.0"
 }

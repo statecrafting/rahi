@@ -8,13 +8,20 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := ci
 
 SPEC_SPINE ?= spec-spine
-BASE ?= origin/main
 
 # The one place the governance pin is stated. CI reads this literal out of this
 # file (spec 001 D-9), so the pin moves in exactly one place.
-SPEC_SPINE_VERSION ?= 0.15.0
+SPEC_SPINE_VERSION ?= 0.18.0
 
-.PHONY: setup spine spec-dag ci build test lint fmt deny coverage attest verify help
+# The coupling base follows the branch this repository actually has, rather
+# than being assumed to be `origin/main` (spec-spine spec 072). The same three
+# steps the push gate resolves with, in the same order: the environment (make
+# imports it, so `?=` leaves an exported value alone), then the remote's own
+# HEAD, then `main`. An explicit `BASE=` on the command line still wins.
+SPEC_SPINE_DEFAULT_BRANCH ?= $(shell git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
+BASE ?= origin/$(or $(SPEC_SPINE_DEFAULT_BRANCH),main)
+
+.PHONY: setup gate refresh spec-dag ci build test lint fmt deny coverage attest verify help
 
 ## setup: install the pinned spec-spine and prove the governed loop once
 setup:
@@ -27,22 +34,34 @@ setup:
 	fi
 	$(SPEC_SPINE) --version
 
-## spine: the governed gate chain (compile, index, lint, index check, couple, spec-dag)
-spine:
-	$(SPEC_SPINE) compile
-	$(SPEC_SPINE) index
+## gate: the governed loop, READ-ONLY throughout (check, lint, coverage, couple, dag)
+# A gate that writes repairs what it is meant to judge, so this uses `check`
+# and never `compile` or `index`. `check` (spec-spine spec 075) is both
+# freshness reads in one verb; `--fail-on-warn` forwards to its compile half.
+#
+# `--fail-on-unresolved` is deliberately NOT passed. It refuses any unresolved
+# claim, which on a specified-before-built corpus is every unit of every
+# pending spec: 57 of them today, all legitimate. spec-spine's own CI opts in
+# because that repository builds what it claims inside one PR; rahi does not,
+# and will not until the last wave lands.
+gate:
+	$(SPEC_SPINE) check --fail-on-warn
 	$(SPEC_SPINE) lint --fail-on-warn
-	$(SPEC_SPINE) index check
+	$(SPEC_SPINE) index coverage --fail-on-untraced
 	$(SPEC_SPINE) couple --base $(BASE) --head HEAD
 	scripts/spec-dag.sh
+
+## refresh: the writing half, for a live session that can commit the shards
+refresh:
+	$(SPEC_SPINE) compile
+	$(SPEC_SPINE) index
 
 ## spec-dag: depends_on is acyclic and only names lower-numbered specs
 spec-dag:
 	scripts/spec-dag.sh
 
 ## ci: everything CI runs, in order
-ci: spine
-	$(SPEC_SPINE) index coverage --fail-on-untraced
+ci: gate
 	$(MAKE) build
 	$(MAKE) test
 	$(MAKE) lint
@@ -82,10 +101,10 @@ attest:
 	$(SPEC_SPINE) attest --with-coupling > .derived/attestation/corpus.json
 	@echo "attestation written to .derived/attestation/corpus.json"
 
-## verify: run one spec's verify:cli blocks, e.g. make verify SPEC=017-ledger-entry-dag
+## verify: run one spec's declared acceptance, e.g. make verify SPEC=017-ledger-entry-dag
 verify:
-	@test -n "$(SPEC)" || { echo "usage: make verify SPEC=<spec-id>"; exit 2; }
-	scripts/verify-spec.sh $(SPEC)
+	@test -n "$(SPEC)" || { echo "usage: make verify SPEC=<spec-id>"; exit 3; }
+	$(SPEC_SPINE) verify $(SPEC)
 
 ## help: list targets
 help:

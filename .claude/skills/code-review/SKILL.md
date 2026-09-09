@@ -12,17 +12,18 @@ correctness or edge-case bugs, does it still match its owning spec's
 contract, and does it hold the invariants the project's path-scoped rules
 name. Output is an evidence-oriented findings list, each line citing
 `file:line`. Nothing authored is modified. The gate's read-only forms
-(`compile --check`, `index check`) are used so the review never dirties
-the tree; a stale verdict is itself a finding.
+(`spec-spine check`, which reads both committed trees) are used so the
+review never dirties the tree; a stale verdict is itself a finding.
 
 ## Step 0: scope the diff
 
 ```sh
-git fetch origin main
+git fetch origin
+BASE="$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)"   # spec 072: resolved, not assumed
 git status --short && git diff --stat && git log --oneline -10
-git diff origin/main...HEAD --stat    # committed delta
+git diff "$BASE"...HEAD --stat        # committed delta
 git diff HEAD --stat                  # uncommitted delta
-git diff origin/main...HEAD --name-only; git diff HEAD --name-only
+git diff "$BASE"...HEAD --name-only; git diff HEAD --name-only
 ```
 
 Note which classes changed: source, specs (`specs/**/spec.md`), standards
@@ -32,10 +33,9 @@ workflows), scripts, docs, derived shards.
 ## Step 1: the gate stays green
 
 ```sh
-spec-spine compile --check                      # exit 2: committed registry shards are stale
-spec-spine index check                          # exit 2: committed index shards are stale
+spec-spine check                                # exit 2: either committed shard tree is stale
 spec-spine lint --fail-on-warn
-spec-spine couple --base origin/main --head HEAD
+spec-spine couple --base "$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)" --head HEAD
 spec-spine index coverage                       # ownership: unclaimed and floor-only files
 ```
 
@@ -112,8 +112,8 @@ the section silently.
 
 ```
 ## Review: <scope>
-Base: origin/main | Head: <branch> | Files: <n> | +<a>/-<d>
-Gate: compile --check <fresh|stale> | index check <fresh|stale> | lint <ok|N> | couple <ok|C-001|C-002> | coverage <n unclaimed> | stack <ok|FAIL>
+Base: <resolved base ref> | Head: <branch> | Files: <n> | +<a>/-<d>
+Gate: check <registry fresh|stale, index fresh|stale> | lint <ok|N> | couple <ok|C-001|C-002> | coverage <n unclaimed> | stack <ok|FAIL>
 Owning spec: <id> | Mid-build spec edits: <none|legitimate|coherence-guard finding>
 
 ### Findings (severity-ordered)

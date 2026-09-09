@@ -29,18 +29,17 @@ establishes:
   - "CODEOWNERS"
   - ".gitattributes"
   - ".githooks/"
-  - "scripts/verify-spec.sh"
   - "scripts/spec-dag.sh"
 summary: >
   The governed-development loop every human and every driven session runs
   inside: the cross-agent New Sessions protocol and the Working the backlog
-  protocol in AGENTS.md, the Claude Code skills (init, setup, next, build,
-  verify, spec, commit, code-review, ship, shepherd, validate-and-fix,
-  cleanup, implement-plan, research, refactor-claude-md), the four pipeline
-  agents, the standing and path-scoped rules (including the chassis
-  invariants checklist), the hooks that keep the derived artifacts fresh and
-  block an ungated PR, the Makefile that is the one source of truth for what
-  CI validates, and the CI workflow that re-runs the same gate. The harness
+  protocol in AGENTS.md, the Claude Code skills (the eight that sequence the
+  backlog protocol, prime, setup, next, build, verify, spec, ship, shepherd,
+  and the two it calls, commit and code-review), the four pipeline agents,
+  the standing and path-scoped rules (including the chassis invariants
+  checklist), the hooks that report derived-artifact freshness and block an
+  ungated PR, the Makefile that is the one source of truth for what CI
+  validates, and the CI workflow that re-runs the same gate. The harness
   is what makes the corpus buildable by claude-observatory.
 ---
 
@@ -64,7 +63,7 @@ Code needs beyond it), `Makefile` (the CI composite), `spec-spine.toml`,
 constitution itself is in the bypass floor and is amended only by a spec
 that `amends` it), the whole `.claude/` harness, the two CI workflows and the
 dependabot config, `CODEOWNERS`, `.gitattributes`, the `.githooks/` merge
-driver, and the two helper scripts. The build session for any later spec is
+driver, and `scripts/spec-dag.sh`. The build session for any later spec is
 granted authority to append a dated D-n note to this spec when it must
 adjust a hook or a Makefile target to make its own territory buildable; it
 may not change the protocol's substance without an amendment.
@@ -72,18 +71,24 @@ may not change the protocol's substance without an amendment.
 ## 3. Behavior
 
 - **B-1 (AGENTS.md is the protocol).** `AGENTS.md` carries a `## New
-  Sessions` section that `/init` executes verbatim, and a `## Working the
+  Sessions` section that `/prime` executes verbatim, and a `## Working the
   backlog` section that the orchestrator extracts verbatim into every build
   prompt. Both are edited in `AGENTS.md`, never duplicated into a skill.
-- **B-2 (the gate is one composite).** `make spine` runs `spec-spine
-  compile`, `spec-spine index`, `spec-spine lint --fail-on-warn`,
-  `spec-spine index check`, `spec-spine couple --base origin/main --head
-  HEAD`, and `scripts/spec-dag.sh`. `make ci` runs `make spine`, `spec-spine
-  index coverage --fail-on-untraced`, and, whenever `Cargo.toml` exists,
-  `cargo build --workspace --locked`, `cargo test --workspace --locked`,
-  `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo
-  fmt --all --check`, and `cargo deny check` when `deny.toml` exists. Every
-  target is guarded so the composite is green on the specify-only tree.
+- **B-2 (the gate is one composite, and it never writes).** `make gate`
+  runs `spec-spine check --fail-on-warn`, `spec-spine lint --fail-on-warn`,
+  `spec-spine index coverage --fail-on-untraced`, `spec-spine couple --base
+  $(BASE) --head HEAD`, and `scripts/spec-dag.sh`. Every verb is read-only:
+  a gate that repairs the tree it is judging passes unconditionally, so
+  staleness is reported and never fixed in place. `make refresh` is the
+  separate writing half (`spec-spine compile`, `spec-spine index`) that a
+  live session runs before committing the shards it regenerated. `BASE`
+  resolves the default branch from the repository rather than assuming
+  `origin/main`. `make ci` runs `make gate` and, whenever `Cargo.toml`
+  exists, `cargo build --workspace --locked`, `cargo test --workspace
+  --locked`, `cargo clippy --workspace --all-targets --locked -- -D
+  warnings`, `cargo fmt --all --check`, and `cargo deny check` when
+  `deny.toml` exists. Every target is guarded so the composite is green on
+  the specify-only tree.
 - **B-3 (CI is the same gate, behind one check).**
   `.github/workflows/ci.yml` is the only workflow in the gate chain with event
   triggers (`pull_request`, `push` to the default branch, and `merge_group`); a
@@ -91,8 +96,8 @@ may not change the protocol's substance without an amendment.
   keeps its own triggers (spec 031's `image.yml`). It runs
   the cargo gates when a workspace exists, the supply-chain gate when
   `deny.toml` exists, and calls `.github/workflows/govern.yml`, a reusable
-  workflow (`on: workflow_call`) that runs `spec-spine compile --check`,
-  `index check`, `lint --fail-on-warn`, `couple` with the PR body as waiver
+  workflow (`on: workflow_call`) that runs `spec-spine check
+  --fail-on-warn`, `lint --fail-on-warn`, `couple` with the PR body as waiver
   source and both endpoints as the event's frozen SHAs, `index coverage
   --fail-on-untraced`, `scripts/spec-dag.sh`, and `spec-spine attest
   --with-coupling` uploaded as a build artifact. `jobs.ci-gate` (`needs`
@@ -112,25 +117,36 @@ may not change the protocol's substance without an amendment.
   truth. `CODEOWNERS` names a reviewer for the corpus, the standards, the
   harness, and everything that runs with a token.
 - **B-4 (hooks).** `.claude/settings.json` wires: `SessionStart` (report
-  registry and index freshness), `PostToolUse` on `Edit|Write` (recompile
-  after a spec edit; staleness check after any hashed-input edit),
-  `PreToolUse` on `Bash` (block `gh pr create` unless the coupling gate is
-  green or a `Spec-Drift-Waiver:` is inline in the body; block `git push`
-  to the default branch), and `Stop` (auto-regenerate a stale index outside
-  a rebase or merge). Permissions allow the read-only git verbs, `cargo`,
-  `make`, and `spec-spine`; they deny publishing and destructive `gh`
-  verbs.
-- **B-5 (skills).** `.claude/skills/` ships fifteen skills: `/init`,
-  `/setup`, `/next`, `/build <id>`, `/verify <id>`, `/spec`, `/commit`,
-  `/code-review`, `/ship`, `/shepherd`, `/validate-and-fix`, `/cleanup`,
-  `/implement-plan`, `/research`, `/refactor-claude-md`.
+  registry and index freshness through `spec-spine check`), `PostToolUse` on
+  `Edit|Write` (recompile after a spec edit; freshness check after any
+  hashed-input edit), `PreToolUse` on `Bash` (block `gh pr create` unless the
+  freshness read answered fresh, `.derived/` is committed, and the coupling
+  gate is green or a `Spec-Drift-Waiver:` is inline in the body; block a
+  `git push` that would update the default branch, which a tag push does
+  not), and `Stop` (report a stale tree, never regenerate one). Every hook
+  resolves the repository the command acts on and the binary that governs it
+  ($SPEC_SPINE_BIN, then that repository's own release build, then PATH), and
+  the PR gate reads `check`'s four exit codes distinctly, so a binary too old
+  to answer is reported as a read that did not happen rather than as
+  staleness. Permissions allow the read-only git verbs, `cargo`, `make`, and
+  `spec-spine`; they deny publishing and destructive `gh` verbs.
+- **B-5 (skills).** `.claude/skills/` ships ten skills, the closed graph
+  the protocol reaches: eight that sequence "Working the backlog" (`/prime`,
+  `/setup`, `/next`, `/build <id>`, `/verify <id>`, `/spec`, `/ship`,
+  `/shepherd`) and the two that graph calls (`/commit`, `/code-review`).
+  Each is byte-identical to the spec-spine kit's copy; a project fact belongs
+  in `AGENTS.md` or a path-scoped rule, never in a skill.
 - **B-6 (agents).** Four pipeline agents: `architect`, `explorer`,
   `implementer`, `reviewer`. The reviewer applies the chassis-invariants
   rule to any diff under the store, ledger, identity, or kernel crates.
 - **B-7 (rules).** Three standing rules (orchestrator, governed artifact
-  reads, adversarial prompt refusal) and two path-scoped rules
+  reads, adversarial prompt refusal) and three path-scoped rules
   (`chassis-invariants` on `crates/rahi-{store,ledger,idp,kernel}/**`,
-  `build-commands` on `crates/**`, `apps/**`, `docker/**`, `deploy/**`).
+  `build-commands` on `crates/**`, `apps/**`, `docker/**`, `deploy/**`, and
+  `derived-artifacts-are-compiler-output` on `.derived/**`). The scoped
+  reinforcement never replaces the standing rule it echoes: reaching for
+  `jq` instead of a subcommand is a mistake whose whole shape is not opening
+  a shard, so `governed-artifact-reads` stays unconditional.
 - **B-8 (house style).** No em dash anywhere; conventional commits naming
   the spec id (`feat(011): ...`); no AI attribution; no session links in
   commits, PR bodies, or comments.
@@ -141,11 +157,14 @@ may not change the protocol's substance without an amendment.
   (a typed read), refuses any `depends_on` cycle naming the path, refuses a
   dependency on a higher-numbered spec, and refuses a dependency on an
   unknown id. Exit 0 clean, 1 on a violation, 3 when spec-spine is absent.
-- **FR-002.** `scripts/verify-spec.sh <id>` extracts every `verify:cli`
-  fenced block from `specs/<id>/spec.md`, runs each non-comment line in
-  order from the repo root, prints command and exit code, and exits non-zero
-  on the first failure; a spec with no `## Verification` section exits 0
-  and prints `not-declared`.
+- **FR-002.** `spec-spine verify <id>` is the one implementation of the
+  verification protocol: it extracts every `verify:cli` fenced block from
+  `specs/<id>/spec.md`, runs each non-comment line in order from the
+  repository root, stops at the first non-zero exit, and reports
+  `not-declared` as an honest zero for a spec with no `## Verification`
+  section. `make verify SPEC=<id>` and `/verify <id>` both wrap that verb,
+  and the orchestrator's verify stage runs the same one after merge. This
+  repository ships no second implementation of it.
 - **FR-003.** Every hook exits 0 when `spec-spine` or `jq` is absent,
   printing what was skipped, so a missing tool never blocks a session.
 - **FR-004.** The `PreToolUse` PR gate refreshes the index before coupling
@@ -153,11 +172,11 @@ may not change the protocol's substance without an amendment.
 
 ## 5. Acceptance criteria
 
-- **AC-1.** `make spine` exits 0 on the specify-only tree (zero packages,
-  every owning unit `W-001`).
+- **AC-1.** `make gate` exits 0 on the specify-only tree (zero packages,
+  every owning unit `W-001`) and leaves the working tree unmodified.
 - **AC-2.** `scripts/spec-dag.sh` exits 0 on this corpus.
-- **AC-3.** `scripts/verify-spec.sh 001-agentic-harness` runs this spec's
-  block below and exits 0.
+- **AC-3.** `spec-spine verify 001-agentic-harness` runs this spec's block
+  below and exits 0.
 - **AC-4.** Branch protection on `main` requires exactly one check, `ci-gate`,
   and additionally sets: signed commits required, linear history required,
   enforcement for administrators, force pushes and deletions refused. This
@@ -388,12 +407,127 @@ safest per instance and pays for it in stalled backlog every time, and which
 would have made 024's two contradictions into two more human PRs for
 reconciliations that changed nothing anyone needed to adjudicate.
 
+D-11 (2026-09-09, corpus amendment; spec-spine kit v18 adoption). The pin
+moves from 0.15.0 to 0.18.0 in every site that states it (`Makefile`, which
+CI reads, plus the prose in `AGENTS.md`, `README.md` and the architect
+agent). Unlike D-7 and D-9 this is not only a bump: three of the four things
+0.18.0 changed are protocol substance, which the Territory section reserves
+for an amendment, so B-2, B-3, B-4, B-5, B-7, FR-002, AC-1, AC-3, the
+`establishes` list and the summary are amended here rather than annotated.
+
+**The gate stops writing.** `make spine` ran `compile` and `index`, both
+writes, and then `index check`, so it repaired the tree it was about to
+judge and the freshness half could not fail. It is replaced by `make gate`,
+read-only throughout, and `make refresh`, the writing half a live session
+runs before committing the shards it regenerated. `spec-spine check`
+(spec-spine spec 075) reads both committed trees in one verb; the CI job
+runs the same one in place of `compile --check` and `index check`.
+`--fail-on-warn` is passed, which is now reachable from CI at all
+(spec-spine 077). `--fail-on-unresolved` is deliberately not: on a corpus
+specified before it is built, every unit of every pending spec is
+unresolved by design, which is 57 of them today. spec-spine's own CI opts in
+because that repository builds what it claims inside one PR; rahi will not
+until the last wave lands, and taking the flag would refuse every PR.
+
+**`scripts/verify-spec.sh` is retired.** D-9 deferred this with a named
+trigger: "it waits on the kit retiring its copy". spec-spine spec 074 did
+exactly that, so the trigger has fired and FR-002 and AC-3 now name
+`spec-spine verify <id>`, the verb spec-spine 049 added and the one the
+orchestrator's verify stage already runs after merge. Two implementations of
+one protocol is the drift the verb exists to remove; this repository now
+ships none of its own. `make verify SPEC=<id>` and `/verify <id>` wrap it.
+
+**The kit ships ten skills, not fifteen.** spec-spine spec 081 audited the
+set and removed the five nothing in the loop reaches: `implement-plan`
+restates `build`, `validate-and-fix` restates `ship` step 1 and `shepherd`,
+and `cleanup`, `research` and `refactor-claude-md` are generic recipes whose
+one governed sentence each is already a standing rule. A skill nobody calls
+is a rule that goes stale unwatched. `/init` is renamed `/prime`
+(spec-spine 075, which spent the name `init` on the scaffolding verb). The
+ten are byte-identical to the kit, which is what D-8's "a future kit update
+is a copy" promised and what held here: the ten needed no local edit, only
+the copy. Two files deliberately did NOT take the kit's version.
+`.claude/rules/adversarial-prompt-refusal.md` is a superset of the kit's
+since D-10 added the second branch, which is not upstream yet; overwriting
+it would silently revoke D-10. The four agents carry this repository's
+localizations, which is what D-8 intended, so they took the changed project
+facts and not the kit's text. `derived-artifacts-are-compiler-output.md`,
+the kit's one worked example of a path-scoped rule, is added.
+
+**The harness surfaces were never hashed.** Every `[index]
+extra_hashed_inputs` entry that ended in `/**` matched directories only, and
+the hasher keeps files, so `standards/**`, `.claude/agents/**`,
+`.claude/rules/**`, `.claude/skills/**`, `.github/workflows/**`,
+`docs/design/**`, `docker/**` and `deploy/**` had contributed zero bytes to
+any content hash since this repository was scaffolded, along with eight more
+in `[index.slices]`. Editing a skill or a workflow never staled the index,
+and `spec-spine attest` has been sealing a ledger that had not read the
+constitution, the contract or the harness. spec-spine's `L-010` (its specs
+074 and 079) is what surfaced it, and rahi is the adopter that lint was
+written about: fifteen dead patterns, seven in the table the lint could
+already read and eight in the table 079 taught it to read. All fifteen are
+corrected to file-matching form. They are written narrowly, by shape rather
+than as `dir/**/*`, because this list hashes whatever is on disk: a broad
+pattern would fold in the `.DS_Store` files this tree already carries under
+`.claude/skills/` and `.github/`, and make the shard hashes differ per
+machine. Hashing the workflows is safe as of spec-spine 073, which folds a
+workflow as a governance projection with each `uses:` pinned ref stripped,
+so a Dependabot action bump moves no hash while a changed step still does;
+before 073 it would have walled every bot PR on exit 2.
+
+**97 claimed files are declared out of the hash.** With the globs live,
+`L-008` reports every path a spec claims that no content hash covers. Eleven
+of the pre-fix 108 were governance files the corrected globs now hash. Of the
+97 that remain, 96 are Rust sources claimed as bare `file` units: a `file`
+unit carries no span, and only span-backing files enter a shard hash. The
+97th is `apps/.gitkeep`, a placeholder spec 034 deletes when it lands the
+reference app; `deploy/README.md` is listed with them for the day spec 032
+creates it.
+`[lint] unwitnessed_allowed = ["crates/**/*.rs", "apps/.gitkeep",
+"deploy/README.md"]` declares the gap deliberate, which is the same reading
+spec-spine reached for the identical situation in its spec 057. Rejected
+alternative: folding `crates/**/*` into `extra_hashed_inputs`, which the
+`L-008` message itself warns against and spec-spine 057 §3.4 rules out. It
+would make every code edit stale every shard, so every PR would rewrite all
+22 registry shards and reintroduce exactly the conflicts sharding removed,
+and `index check` would start refusing for a condition `couple` already
+refuses better. The gap is not undefended: `couple` refuses a changed source
+file whose owning spec did not change, and `require_ownership` refuses an
+unclaimed one. What it costs is written down here, and the allowance
+suppresses the warning without suppressing the count, so `spec-spine check`
+still prints 97 of 97 on every run and a 98th would be visible.
+
+**Known residue, not fixed here.** `specs/000-rahi-bootstrap/spec.md` §8
+names "the `spec-dag` check in `make spine`". Spec 000 is
+`implementation: n-a` and pinned at the sha256 of its normalized `spec.md`,
+and the reference is prose about a target this spec owns, not a requirement
+of 000. Editing another spec's text to match a rename this spec made is the
+move the coherence guard exists to refuse, so it is reported rather than
+taken. The untracked `.agents/` and `.codex/` mirrors carry the same stale
+facts and are outside this corpus.
+
 ## Verification
 
 ```verify:cli
 scripts/spec-dag.sh
-scripts/verify-spec.sh 000-rahi-bootstrap
-make spine
+spec-spine verify 000-rahi-bootstrap
+make gate
+# B-2: the gate never writes. Anchored on end of line, so `index coverage`,
+# which is a read, is deliberately not matched; the writing verbs are the two
+# that end their line, and they belong to `refresh` alone. No \t in these
+# patterns: BSD grep reads it as a tab and GNU grep as a literal `t`, which
+# would make the negation below pass vacuously on the runner that matters.
+sh -c '! sed -n "/^gate:/,/^$/p" Makefile | grep -qE "SPEC_SPINE\\) (compile|index)$"'
+sh -c 'sed -n "/^refresh:/,/^$/p" Makefile | grep -qE "SPEC_SPINE\\) compile$"'
+sh -c 'sed -n "/^refresh:/,/^$/p" Makefile | grep -qE "SPEC_SPINE\\) index$"'
+# B-5: ten skills, and exactly the ten the protocol reaches.
+sh -c 'test "$(ls -d .claude/skills/*/ | wc -l | tr -d " ")" = 10'
+sh -c 'for s in build code-review commit next prime setup shepherd ship spec verify; do test -f ".claude/skills/$s/SKILL.md" || exit 1; done'
+# B-7: the kit's one worked example of a path-scoped rule.
+test -f .claude/rules/derived-artifacts-are-compiler-output.md
+# FR-002: one verification protocol, one implementation of it.
+sh -c '! test -e scripts/verify-spec.sh'
+sh -c 'sed -n "/^verify:/,/^$/p" Makefile | grep -q "SPEC_SPINE) verify"'
 # B-3: exactly one aggregate gate, named ci-gate, in the one triggered workflow.
 grep -q '^  ci-gate:' .github/workflows/ci.yml
 # B-3: the governance chain is reusable only (no event triggers of its own).
