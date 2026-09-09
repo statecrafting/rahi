@@ -76,7 +76,7 @@
       "wave": 1
     },
     "id": "016-store-binary-values-and-extensions",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "kind": "kernel",
     "risk": "high",
     "sectionHeadings": [
@@ -96,6 +96,6 @@
     "summary": "Applications above the chassis store vectors, thumbnails, and signatures, so the store must round-trip binary values with a declared ceiling and a paged read that never materializes a table. It must also answer, once and in writing, whether a loadable SQLite extension may be used: it may not. hiqlite replicates statements rather than pages, so a node whose engine differs diverges silently, and a virtual table's behavior under snapshot, backup, and restore is unproven. The escape hatch is named here so a later spec can open it with evidence rather than by assumption.\n",
     "title": "Binary values and the extension policy: BLOBs are first class, loadable extensions are refused"
   },
-  "shardHash": "f83128a39a91768184fc16030e9fcb39a936d39f7e4e300ab288ea8c64fa014c",
+  "shardHash": "2cddde2b2e9e5bd796e08fc1bbf8a5aade5449f44960e0a4be7671f8e6c470be",
   "specVersion": "1.2.0"
 }

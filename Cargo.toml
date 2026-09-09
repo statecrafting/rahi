@@ -18,6 +18,8 @@ rahi-store = { path = "crates/rahi-store", version = "0.1.0" }
 rahi-ledger = { path = "crates/rahi-ledger", version = "0.1.0" }
 rahi-kernel = { path = "crates/rahi-kernel", version = "0.1.0" }
 rahi-edge = { path = "crates/rahi-edge", version = "0.1.0" }
+rahi-idp = { path = "crates/rahi-idp", version = "0.1.0" }
+rahi-ops = { path = "crates/rahi-ops", version = "0.1.0" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 hiqlite = { version = "0.14", default-features = false, features = ["sqlite", "cache", "counters", "dlock", "listen_notify_local", "backup", "s3"] }
@@ -86,6 +88,16 @@ tracing-opentelemetry = { version = "0.33", default-features = false }
 opentelemetry = "0.32"
 opentelemetry_sdk = { version = "0.32", default-features = false, features = ["trace", "rt-tokio"] }
 opentelemetry-otlp = { version = "0.32", default-features = false, features = ["grpc-tonic", "trace"] }
+
+# The verbs (spec 030): one backup is one tar stream sealed with age to the
+# deployment's backup recipient, so the stores never travel without the key
+# that reads them (constitution XII). Both are pure Rust and add no second
+# copy of a primitive already in the tree.
+tar = "0.4"
+age = { version = "0.12", default-features = false }
+# Preflight (spec 030 B-3) reads the volume's free space; std has no call
+# for it and the workspace forbids unsafe, so a thin wrapper carries it.
+fs4 = "1"
 
 [workspace.lints.rust]
 unsafe_code = "deny"

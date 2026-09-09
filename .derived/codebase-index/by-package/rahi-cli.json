@@ -1,0 +1,11 @@
+{
+  "package": {
+    "kind": "rust-lib-bin",
+    "name": "rahi-cli",
+    "path": "crates/rahi-cli",
+    "specRef": "030-operational-verbs",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "01e27c3ce3ad2f80380d2496ca51804c0608b78c5764e7a68f65893fd7c87164"
+}

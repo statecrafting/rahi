@@ -1,94 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '030-operational-verbs' file unit 'crates/rahi-ops/Cargo.toml' does not exist",
-        "path": "crates/rahi-ops/Cargo.toml"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '030-operational-verbs' file unit 'crates/rahi-ops/src/lib.rs' does not exist",
-        "path": "crates/rahi-ops/src/lib.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '030-operational-verbs' file unit 'crates/rahi-ops/src/preflight.rs' does not exist",
-        "path": "crates/rahi-ops/src/preflight.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '030-operational-verbs' file unit 'crates/rahi-ops/src/migrate.rs' does not exist",
-        "path": "crates/rahi-ops/src/migrate.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '030-operational-verbs' file unit 'crates/rahi-ops/src/backup.rs' does not exist",
-        "path": "crates/rahi-ops/src/backup.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '030-operational-verbs' file unit 'crates/rahi-ops/src/restore.rs' does not exist",
-        "path": "crates/rahi-ops/src/restore.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '030-operational-verbs' file unit 'crates/rahi-ops/src/archive.rs' does not exist",
-        "path": "crates/rahi-ops/src/archive.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '030-operational-verbs' file unit 'crates/rahi-ops/src/rauthy_api.rs' does not exist",
-        "path": "crates/rahi-ops/src/rauthy_api.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '030-operational-verbs' file unit 'crates/rahi-ops/tests/backup.rs' does not exist",
-        "path": "crates/rahi-ops/tests/backup.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '030-operational-verbs' file unit 'crates/rahi-ops/tests/restore.rs' does not exist",
-        "path": "crates/rahi-ops/tests/restore.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '030-operational-verbs' file unit 'crates/rahi-cli/Cargo.toml' does not exist",
-        "path": "crates/rahi-cli/Cargo.toml"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '030-operational-verbs' file unit 'crates/rahi-cli/src/main.rs' does not exist",
-        "path": "crates/rahi-cli/src/main.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '030-operational-verbs' file unit 'crates/rahi-cli/src/lib.rs' does not exist",
-        "path": "crates/rahi-cli/src/lib.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '030-operational-verbs' file unit 'crates/rahi-cli/src/cell.rs' does not exist",
-        "path": "crates/rahi-cli/src/cell.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '030-operational-verbs' file unit 'crates/rahi-cli/src/serve.rs' does not exist",
-        "path": "crates/rahi-cli/src/serve.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '030-operational-verbs' file unit 'crates/rahi-cli/src/verbs.rs' does not exist",
-        "path": "crates/rahi-cli/src/verbs.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '030-operational-verbs' file unit 'crates/rahi-cli/tests/cli.rs' does not exist",
-        "path": "crates/rahi-cli/tests/cli.rs"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "014-ledger-sealing-and-archive",
@@ -98,11 +8,99 @@
       {
         "path": "Cargo.toml",
         "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "crates/rahi-cli/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/cell.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/main.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/serve.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/verbs.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/tests/cli.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/tests/bearer.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "crates/rahi-ops/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/archive.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/backup.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/migrate.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/preflight.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/rauthy_api.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/restore.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/tests/backup.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/tests/common/mod.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/tests/restore.rs",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-cli/Cargo.toml"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -111,7 +109,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/cell.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -120,7 +122,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/lib.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -129,7 +135,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/main.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -138,7 +148,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/serve.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -147,7 +161,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/verbs.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -156,7 +174,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-cli/tests/cli.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -165,7 +187,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ops/Cargo.toml"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -174,7 +200,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/archive.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -183,7 +213,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/backup.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -192,7 +226,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/lib.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -201,7 +239,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/migrate.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -210,7 +252,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/preflight.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -219,7 +265,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/rauthy_api.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -228,7 +278,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/restore.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -237,7 +291,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ops/tests/backup.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -246,7 +304,24 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ops/tests/common/mod.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/common/mod.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/tests/restore.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -257,9 +332,22 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-idp/tests/bearer.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/bearer.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "Cargo.toml",
             "span": {
-              "endLine": 89,
+              "endLine": 101,
               "startLine": 15
             }
           }
@@ -277,5 +365,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "a63bd2f253586d83883a4e309c9502509a6942b82441f25634b6de4926c21d46"
+  "shardHash": "4f2f14e53e59a924e12c9bbbcffb7aa6dec2d95b434b26d5d05eb289629d27ad"
 }

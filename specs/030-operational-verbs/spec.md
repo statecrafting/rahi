@@ -6,7 +6,7 @@ kind: "kernel"
 domain: "ops"
 created: "2026-09-03"
 authors: ["Bartek Kus"]
-implementation: in-progress
+implementation: complete
 risk: critical
 wave: 3
 depends_on:
@@ -21,6 +21,7 @@ establishes:
   - "crates/rahi-ops/src/restore.rs"
   - "crates/rahi-ops/src/archive.rs"
   - "crates/rahi-ops/src/rauthy_api.rs"
+  - "crates/rahi-ops/tests/common/mod.rs"
   - "crates/rahi-ops/tests/backup.rs"
   - "crates/rahi-ops/tests/restore.rs"
   - "crates/rahi-cli/Cargo.toml"
@@ -32,6 +33,7 @@ establishes:
   - "crates/rahi-cli/tests/cli.rs"
 extends:
   - { spec: "010-workspace-and-core-types", unit: { kind: section, file: "Cargo.toml", anchor: "workspace.dependencies" }, nature: additive }
+  - { spec: "025-api-tokens-and-resource-server", unit: "crates/rahi-idp/tests/bearer.rs", nature: additive }
 summary: >
   Operations that exist. rahi-ops implements preflight (config, keys, both
   stores' health, disk), migrate (spec 011's migrations as a deploy step,
@@ -148,6 +150,111 @@ where archives land in a cluster (032).
   added: 016 is a built crate this spec calls a public method on, and
   declaring the edge would make 030 blocked by a spec that only 030 can
   unblock.
+
+- **D-2 (2026-09-09, build session; mechanises B-6).** `restore` resets
+  the app node at the file level rather than through hiqlite's restore
+  path, and `refuse_env_restore()` runs before every node open. hiqlite
+  0.14's only reachable restore is the `HQL_BACKUP_RESTORE` variable read
+  at node start (`backup::restore_backup` is `pub` inside a private module),
+  and setting a variable in-process is `unsafe` in edition 2024, which the
+  workspace forbids. What that path does is four removals and one copy
+  (`state_machine/db`, `state_machine/snapshots`, `state_machine/lock`,
+  `logs`, then the snapshot placed as `db/hiqlite.db`), so the verb does
+  exactly that; an emptied log is what makes peers rejoin by snapshot. B-6's
+  "no environment variable triggers restore" is thereby enforced rather than
+  assumed: `serve`, `preflight`, and every verb that opens the node refuse
+  while the variable is set, and `preflight` reports it as its own check.
+  rauthy's snapshot is placed under `<data>/restore/rauthy/`, outside
+  rauthy's directory (constitution VIII), and the marker names it; spec
+  031's supervisor is where it is handed to rauthy exactly once, through the
+  child's environment, which is a safe `Command::env`. Spec 031 must also
+  point rauthy's hiqlite at `<data>/rauthy`, since that is the lock file
+  B-6's "neither node is running" probes for existence. Rejected: re-exec
+  of the binary with the variable set (the mechanism B-6 denies, one process
+  removed); calling hiqlite's private function (not reachable).
+- **D-3 (2026-09-09, build session; a hold on B-5 against a real rauthy).**
+  B-5's rauthy snapshot is fetched with the admin token, the API key spec
+  021 B-5 carries in `Authorization: API-Key <token>`, and `rauthy_api.rs`
+  does exactly that; FR-001 holds against a stub that accepts it. Against
+  the rauthy at this repository's sibling checkout (v0.36), all four
+  `/auth/v1/backup*` handlers call `validate_admin_session()` only
+  (`src/api/src/backup.rs`, `principal.rs:534`): an admin *session* cookie,
+  never an API key, with MFA forced for admins by default. No mechanism
+  available to this session honours B-5's text against that rauthy: an API
+  key is refused outright, and a headless admin login is a rauthy
+  configuration change (MFA off for a backup principal) that is not a build
+  session's to make. The verb is built to the spec's text and the mismatch
+  is recorded here and in `## 8. Status` rather than papered over with a
+  read of rauthy's directory, which constitution VIII forbids. The options a
+  human can choose between: a rauthy change accepting an API key on the
+  backup routes (upstream, or a fork this repository does not want), or a
+  dedicated backup admin whose session the verb establishes. Spec 031's
+  smoke test and spec 034's e2e are where a real rauthy first meets this
+  verb.
+- **D-4 (2026-09-09, build session; fixes the key file contract).** The
+  key set is five files under `keys/`, named in `rahi_ops::KeySet`:
+  `ledger.key` (base64 Ed25519 seed, spec 013's loader), `session.key`
+  (raw HMAC bytes, spec 022's loader), `hiqlite.json` (a JSON
+  `rahi_store::StoreSecrets`), `backup.key` (one age X25519 identity;
+  the recipient is derived, so a backup and a restore need nothing else),
+  and `rauthy_admin_token`; `rauthy_client_secret` is the sixth, minted at
+  bootstrap and not required before it. Files are `0600`, the directory
+  `0700`, and `preflight` checks the modes. Spec 031's `first-boot` writes
+  these names and no others.
+- **D-5 (2026-09-09, build session; refines B-1).** `Cell` gains two
+  defaulted methods beyond B-1's four, `exposed() -> Vec<Route>` and
+  `static_dir() -> Option<PathBuf>`, because spec 034's cell serves a page
+  (020 B-7) and names public routes inside its root merge (024 B-3), and a
+  trait with no way to say either would force every app to reach around the
+  composer. `routes` is merged at the root and classified authenticated;
+  `operator_routes` is nested under `/operator` behind the role gate. The
+  `rahi` binary is `EmptyCell`, the chassis with no app, so AC-2 and FR-005
+  have a subject and an operator can preflight a volume with the binary
+  that will serve it.
+- **D-6 (2026-09-09, build session; three environment variables B-2 needs
+  and spec 010 does not carry).** `RAHI_LISTEN_ADDR` (default
+  `0.0.0.0:8443`, the port spec 031 exposes) is where `serve` binds;
+  `Config` has no listen address because spec 010 derives everything from
+  the public URL, and a bind address is not derivable from it.
+  `RAHI_RAUTHY_MODE=none` serves without identity, which spec 033 B-2 needs
+  for a harness with no rauthy; the default `required` mounts the proxy,
+  the session routes, and the resource metadata and refuses to serve without
+  discovery. `RAHI_LEDGER_ARCHIVE_DIR` (default `<data>/ledger-archive`) is
+  the filesystem archive `ledger verify --full` fetches segment bodies from;
+  an object-store archive is spec 032's to configure.
+- **D-7 (2026-09-09, build session; reads B-5's `--to`).** `--to` is a
+  directory (the archive is written to `<name>.partial` and renamed) or
+  `s3://bucket/prefix`, uploaded through `rahi_ledger::S3Archive` with
+  credentials from `RAHI_BACKUP_S3_{ENDPOINT,REGION,ACCESS_KEY,SECRET_KEY,
+  PATH_STYLE}`; spec 010 B-7 keeps credentials out of `Config` and spec 032
+  provisions them. The default is `<data>/backups`. Reusing the ledger's
+  bucket client adds no second S3 implementation.
+- **D-8 (2026-09-09, build session; reads B-3 and B-4).** Three readings.
+  `preflight` verifies the chain only when `kernel_decisions` exists and
+  holds a record, because spec 013's `open` writes genesis on an empty
+  table and B-3 says never mutates; an empty chain is reported as a pass
+  that names what `serve` will do. The disk floor is 512 MiB, read through
+  `fs4` because std has no free-space call and the workspace forbids
+  `unsafe`. B-4's "refuses on a follower with the leader named" names the
+  declared peers, because `rahi-store` exposes `is_leader()` and no leader
+  accessor; adding one is spec 011's territory. The refusal is
+  `Error::Stale` (exit 2) on purpose: like a store behind on migrations,
+  a follower is a node that cannot proceed from where it is, and the
+  message names where to go.
+
+## 8. Status
+
+- **2026-09-09.** B-1 to B-7, FR-001 to FR-005, AC-1, and AC-2 hold:
+  `cargo test -p rahi-ops --locked` (10 tests) and `cargo test -p rahi-cli
+  --locked` (11 tests) pass, `cargo run -p rahi-cli -- --help` lists the
+  nine verbs of B-1 and no other, and a hand-driven `migrate`, `serve`,
+  probes, SIGTERM, `ledger verify` round trip is clean. Spec 016's AC-2
+  holds through this spec's preflight (`PASS engine: extensions: none,
+  max_value_bytes: 1048576`) and 016 is flipped complete in this change per
+  D-1. One thing is known and not closed: D-3, the backup verb's admin
+  token against a real rauthy's backup routes. It needs a human choice
+  between a rauthy-side change and a dedicated backup session, and it is
+  first exercised by spec 031's smoke test.
 
 ## Verification
 

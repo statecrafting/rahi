@@ -752,6 +752,14 @@ fn no_credential_is_minted_anywhere_in_this_workspace() {
             "crates/rahi-ledger/src/archive.rs",
             "the operator's S3 access key for the segment archive",
         ),
+        (
+            "crates/rahi-ops/src/backup.rs",
+            "the operator's S3 access key for an s3:// backup destination (spec 030 D-7)",
+        ),
+        (
+            "crates/rahi-ops/src/rauthy_api.rs",
+            "presents rauthy's admin key on the backup calls (spec 030 B-5)",
+        ),
     ]);
 
     let mut offenders: Vec<String> = Vec::new();
