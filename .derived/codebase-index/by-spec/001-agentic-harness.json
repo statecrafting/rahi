@@ -65,10 +65,6 @@
         "source": "spec-edge"
       },
       {
-        "path": "scripts/verify-spec.sh",
-        "source": "spec-edge"
-      },
-      {
         "path": "spec-spine.toml",
         "source": "spec-edge"
       },
@@ -280,19 +276,6 @@
       {
         "locations": [
           {
-            "file": "scripts/verify-spec.sh"
-          }
-        ],
-        "ownership": true,
-        "sourceField": "establishes",
-        "unit": {
-          "kind": "file",
-          "path": "scripts/verify-spec.sh"
-        }
-      },
-      {
-        "locations": [
-          {
             "file": "spec-spine.toml"
           }
         ],
@@ -334,5 +317,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "e460cb754b6bb24ab7ac15f6ea5fce1743cbbd0fda67e77011a1337b4c1a08e6"
+  "shardHash": "c1e18466b4bbe2f7d8f6bab7095c9b306e7afc087a3b7824a51ac55b6f01d7c4"
 }

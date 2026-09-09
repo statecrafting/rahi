@@ -106,5 +106,5 @@
     "title": "rauthy behind a same-origin proxy: the raw /auth/* route, discovery, JWKS, client bootstrap"
   },
   "shardHash": "ce3a8477f6ced8f0dcc2fd3a2e33e8fb880c0f30e55295bf7f54e574a5c14d7f",
-  "specVersion": "1.1.0"
+  "specVersion": "1.2.0"
 }

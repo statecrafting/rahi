@@ -66,7 +66,7 @@ Then edit `specs/<id>/spec.md`:
   behavior with MUST/SHOULD/MAY, functional requirements, acceptance
   criteria, out of scope, resolved decisions, `## Verification`). The
   Verification block holds the `verify:cli` commands that prove the
-  acceptance criteria; `scripts/verify-spec.sh` runs them after merge, so
+  acceptance criteria; `spec-spine verify <id>` runs them after merge, so
   each must exist once the spec is built.
 - No em dash anywhere in the text.
 
@@ -96,7 +96,7 @@ dependency cycle is refused by `compile` itself (`V-014`).
 Then the real gate, which regenerates and checks the committed shards:
 
 ```sh
-spec-spine compile && spec-spine index && spec-spine lint --fail-on-warn && spec-spine index check
+spec-spine compile && spec-spine index && spec-spine lint --fail-on-warn && spec-spine check
 spec-spine registry plan
 ```
 

@@ -69,19 +69,23 @@ is a `C-002` refusal.
 
 ## The gate chain
 
-`make spine`: `compile` → `index` → `lint --fail-on-warn` → `index check` →
-`couple --base origin/main --head HEAD` → `scripts/spec-dag.sh`.
-`make ci`: `make spine` → `index coverage --fail-on-untraced` → the cargo
-gates when `Cargo.toml` exists. CI (`govern.yml`) runs the same set with
-`compile --check` in place of `compile`. The escape valve is a scoped
-`Spec-Drift-Waiver:` line in the PR body, approved by a human.
+`make gate`, read-only throughout: `check --fail-on-warn` → `lint
+--fail-on-warn` → `index coverage --fail-on-untraced` → `couple --base
+<resolved default branch> --head HEAD` → `scripts/spec-dag.sh`.
+`make ci`: `make gate` → the cargo gates when `Cargo.toml` exists. CI
+(`govern.yml`) runs the same set. A gate never writes: it judges the
+committed trees, and `make refresh` (`compile` → `index`) is the separate
+writing half a live session runs before committing the shards it regenerated.
+The escape valve is a scoped `Spec-Drift-Waiver:` line in the PR body,
+approved by a human.
 
 ## Verification
 
 Every ordinary spec ends with `## Verification` holding `verify:cli` fenced
 blocks: one shell command per line, run from the repo root after merge by
-the verify stage (`scripts/verify-spec.sh <id>` locally). A spec with no
-observable command says so in that section rather than omitting it.
+the verify stage (`spec-spine verify <id>` locally, which is the same verb).
+A spec with no observable command says so in that section rather than
+omitting it.
 
 ## Determinism
 

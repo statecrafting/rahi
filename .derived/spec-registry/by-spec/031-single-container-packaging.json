@@ -92,5 +92,5 @@
     "title": "Single-container packaging: one image, one volume, first boot, keys, die-together supervision"
   },
   "shardHash": "eb5e6d26b69f5b04a95e899971bd3c83cafc0f91138305ae4cf1e450cbd8b909",
-  "specVersion": "1.1.0"
+  "specVersion": "1.2.0"
 }

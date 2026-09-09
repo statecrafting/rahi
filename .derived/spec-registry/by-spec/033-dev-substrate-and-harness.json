@@ -66,5 +66,5 @@
     "title": "The dev substrate and the harness: compose for N=1, boot the real binary, wait on /readyz, a cookie jar"
   },
   "shardHash": "584f4053b1d24542be6a96102174068873c3db074defa1fa916499a02d74601c",
-  "specVersion": "1.1.0"
+  "specVersion": "1.2.0"
 }

@@ -61,16 +61,17 @@ binary in the same container and never forked.
 ## Governance
 
 The corpus is governed by [spec-spine](https://github.com/statecrafting/spec-spine)
-0.15.0. `make spine` runs the gate (compile, index, lint, index check,
-couple, DAG check); `make ci` adds ownership coverage and the cargo gates
-once a workspace exists. Derived artifacts under `.derived/` are committed
+0.18.0. `make gate` runs the gate, read-only throughout (freshness, lint,
+ownership coverage, coupling, DAG check); `make refresh` is the writing half,
+for a session that can commit the regenerated shards; `make ci` adds the
+cargo gates once a workspace exists. Derived artifacts under `.derived/` are committed
 and read only through `spec-spine` subcommands. Every source file inside a
 crate must be specifically claimed by a spec; a session that adds a file
 claims it in the spec it is implementing.
 
 ```sh
-cargo install spec-spine-cli --locked   # or: npm i -g spec-spine@0.15.0
-make spine
+cargo install spec-spine-cli --locked   # the pin lives in the Makefile: 0.18.0
+make gate
 spec-spine registry list
 scripts/spec-dag.sh
 ```

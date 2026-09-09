@@ -78,11 +78,17 @@ jobs:
             | SPEC_SPINE_VERSION="v${ver}" SPEC_SPINE_BIN_DIR="$HOME/.local/bin" sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - run: spec-spine --version
-      # `compile --check` validates the corpus AND proves the committed
-      # registry shards match it, without writing. Never run it after a
-      # plain `compile` in the same job.
-      - run: spec-spine compile --check
-      - run: spec-spine index check
+      # One verb, both committed trees (spec-spine spec 075). It validates the
+      # corpus AND proves the committed registry and index shards match it,
+      # without writing: a gate that repairs the tree it is judging passes
+      # unconditionally. Never sequence it after a plain `compile` or `index`.
+      #
+      # `--fail-on-warn` forwards to the compile half, so a warning-tier
+      # violation refuses the merge instead of scrolling past in a log.
+      # `--fail-on-unresolved` is deliberately absent: on a corpus specified
+      # before it is built, every unit of every pending spec is unresolved by
+      # design (spec 001 D-11).
+      - run: spec-spine check --fail-on-warn
       - run: spec-spine lint --fail-on-warn
       # PR-only: the gate reads the PR-body waiver, which push and merge_group
       # do not carry. Diff the event's frozen SHAs, never the checked-out merge

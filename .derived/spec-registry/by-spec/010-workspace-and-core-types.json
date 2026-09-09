@@ -82,5 +82,5 @@
     "title": "Cargo workspace and the core types: Error, Principal, Revision, FenceToken, Config"
   },
   "shardHash": "f60f10c8b74de9113bd1f238f8c8793c8f07e489a1f430bb0c8389b42dce870b",
-  "specVersion": "1.1.0"
+  "specVersion": "1.2.0"
 }

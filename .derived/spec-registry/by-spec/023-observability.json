@@ -125,5 +125,5 @@
     "title": "Observability: /metrics always on, an in-process OTel tracer with a ring buffer, decisions on spans"
   },
   "shardHash": "f37bb9c9442173bfda81183db5bfccfcecaeca8a5abefefd97da90de949a5ff8",
-  "specVersion": "1.1.0"
+  "specVersion": "1.2.0"
 }

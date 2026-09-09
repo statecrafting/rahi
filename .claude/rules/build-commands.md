@@ -12,7 +12,7 @@ The `Makefile` is the source of truth for what CI validates; `make ci`
 green locally means a green CI run. These are the commands behind it.
 
 ```sh
-make spine                                                   # the spec-spine gate chain
+make gate                                                    # the spec-spine gate chain, read-only
 make ci                                                      # spine + coverage + every cargo gate
 cargo build --workspace --locked
 cargo test --workspace --locked
@@ -20,7 +20,7 @@ cargo test -p rahi-store --locked --test txn                 # one crate, one te
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo fmt --all --check                                      # fix with: cargo fmt --all
 cargo deny check                                             # supply chain (deny.toml, spec 010)
-scripts/verify-spec.sh <spec-id>                             # the spec's verify:cli blocks
+spec-spine verify <spec-id>                                  # the spec's declared acceptance
 ```
 
 Rules:

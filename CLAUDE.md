@@ -25,8 +25,9 @@ and code lands one spec per session. Before spec 010 lands there is no
 ## Commands
 
 ```sh
-make spine      # spec-spine compile, index, lint --fail-on-warn, index check, couple, spec-dag
-make ci         # make spine + index coverage --fail-on-untraced + the cargo gates (when Cargo.toml exists)
+make gate       # read-only: spec-spine check --fail-on-warn, lint --fail-on-warn, index coverage --fail-on-untraced, couple, spec-dag
+make refresh    # the writing half: spec-spine compile + index, for a session that can commit the shards
+make ci         # make gate + the cargo gates (when Cargo.toml exists)
 make build      # cargo build --workspace --locked
 make test       # cargo test  --workspace --locked
 make lint       # cargo clippy --workspace --all-targets --locked -- -D warnings
@@ -34,7 +35,7 @@ make fmt        # cargo fmt --all --check
 make deny       # cargo deny check (when deny.toml exists)
 make coverage   # spec-spine index coverage
 make attest     # spec-spine attest --with-coupling -> .derived/attestation/
-scripts/verify-spec.sh <id>   # run a spec's verify:cli blocks (what the verify stage runs after merge)
+make verify SPEC=<id>         # one spec's declared acceptance (what the verify stage runs after merge)
 scripts/spec-dag.sh           # depends_on is acyclic and only points to lower-numbered specs
 
 # One crate, one test:

@@ -53,39 +53,109 @@ standalone_npm_packages = []
 state_dir = "data"
 
 [index]
-# Beyond the always-hashed core (manifests, specs, span-backing sources): the
-# surfaces that steer driven sessions, the deployment files, and the design
-# notes the thesis cites.
+# Files folded into the global-inputs scalar, so a change to one stales every
+# shard. Every pattern is deliberately narrow, and none of them ends in `/**`.
+#
+# In the `glob` crate `dir/**` enumerates DIRECTORIES, so it can contribute no
+# bytes: files need `dir/**/*`. Every entry here and in [index.slices] below
+# carried the dead form until 2026-09-09, which meant the standards, the whole
+# `.claude/` harness, both workflows and the design notes had never entered any
+# content hash, and `spec-spine attest` was sealing a ledger that had not read
+# them. spec-spine's `L-010` (its specs 074 and 079) now refuses the form in
+# both tables, and rahi is the adopter that lint was written about.
+#
+# Narrow, not `.claude/**/*`, for a second reason: this list hashes whatever is
+# on disk, tracked or not, so a broad pattern would fold in `.DS_Store`,
+# `agent-memory/` and `settings.local.json` and make the shard hashes
+# machine-dependent.
 extra_hashed_inputs = [
-  "standards/**",
-  ".github/workflows/**",
-  ".claude/agents/**",
-  ".claude/rules/**",
-  ".claude/skills/**",
+  # The standard and the corpus contract.
+  "standards/**/*.md",
+  # Both workflows. Safe to hash since spec-spine spec 073: a workflow folds as
+  # its governance projection, with the pinned ref of each `uses:` removed, so
+  # a Dependabot action bump moves no hash while a changed step still does.
+  ".github/workflows/*.yml",
+  ".github/dependabot.yml",
+  # The surfaces that steer driven sessions.
   ".claude/settings.json",
+  ".claude/agents/*.md",
+  ".claude/rules/*.md",
+  ".claude/skills/*/*.md",
+  ".mcp.json",
   "AGENTS.md",
   "CLAUDE.md",
+  # The gate composite, the helper script, the merge driver, the review map.
   "Makefile",
-  "docs/design/**",
-  "docker/**",
-  "deploy/**",
+  "scripts/*.sh",
+  ".githooks/*.sh",
+  ".gitattributes",
+  "CODEOWNERS",
+  # The toolchain and supply-chain pins (spec 010). Dependabot's cargo
+  # ecosystem moves Cargo.toml, which folds as its own projection, and
+  # Cargo.lock, which is in the bypass floor; neither of these two.
+  "rust-toolchain.toml",
+  "deny.toml",
+  # The design notes the thesis cites.
+  "docs/design/**/*.md",
+  # The deployment files (specs 031 and 032). Named by shape rather than as
+  # `docker/**/*`, so a stray `.DS_Store` under either directory cannot reach
+  # a shard hash on one contributor's machine and not another's.
+  "docker/Dockerfile",
+  "docker/*.yml",
+  "docker/*.sh",
+  "docker/*.template",
+  "deploy/**/*.yaml",
 ]
 resolver_exclusions = ["target", "node_modules", ".derived", "dist", "build"]
 
 # Named hash slices (spec-spine spec 012): a PR that touches only one
-# surface can be gated on that slice alone.
+# surface can be gated on that slice alone. `L-010` reads this table too
+# since spec-spine spec 079, so the same `/**/*` discipline applies here.
 [index.slices]
 governance = [
-  "standards/**",
+  "standards/**/*.md",
   ".claude/settings.json",
-  ".claude/agents/**",
-  ".claude/rules/**",
-  ".claude/skills/**",
+  ".claude/agents/*.md",
+  ".claude/rules/*.md",
+  ".claude/skills/*/*.md",
   "AGENTS.md",
   "CLAUDE.md",
-  ".github/workflows/**",
+  ".github/workflows/*.yml",
 ]
-deployment = ["docker/**", "deploy/**"]
+deployment = [
+  "docker/Dockerfile",
+  "docker/*.yml",
+  "docker/*.sh",
+  "docker/*.template",
+  "deploy/**/*.yaml",
+]
+
+[lint]
+# Claimed paths this corpus deliberately leaves out of every content hash
+# (spec-spine spec 057). A `file` unit carries no span, and only span-backing
+# files enter a shard hash, so every Rust source claimed as a bare file unit is
+# invisible to the ledger. Folding them in is a different change that spec-spine
+# 057 puts out of scope: it would make every code edit stale every shard, and
+# cost the sharding property that keeps two specs' PRs from conflicting.
+#
+# They are not undefended. The coupling gate refuses a changed source file whose
+# owning spec did not change, and `require_ownership` refuses an unclaimed one;
+# those are the checks that actually protect them. What the gap costs is
+# narrower and is written down here: `index check` will not call the index stale
+# for an edit to one, and the attestation covers a ledger that never hashed
+# their bytes.
+#
+# This suppresses the WARNING, never the COUNT. `spec-spine check` reports the
+# total on every run and how many of it this list covers, so the exception stays
+# explicit instead of turning the check off.
+unwitnessed_allowed = [
+  "crates/**/*.rs",
+  # A placeholder that spec 034 deletes when it lands the reference app.
+  "apps/.gitkeep",
+  # In the coupling bypass floor already, so hashing it would restale every
+  # shard for a doc edit the gate deliberately ignores.
+  "deploy/README.md",
+]
 
 [branding]
 compiler_id = "spec-spine"

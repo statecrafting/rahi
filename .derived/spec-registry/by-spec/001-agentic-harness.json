@@ -79,10 +79,6 @@
       },
       {
         "kind": "file",
-        "path": "scripts/verify-spec.sh"
-      },
-      {
-        "kind": "file",
         "path": "scripts/spec-dag.sh"
       }
     ],
@@ -106,9 +102,9 @@
     ],
     "specPath": "specs/001-agentic-harness/spec.md",
     "status": "approved",
-    "summary": "The governed-development loop every human and every driven session runs inside: the cross-agent New Sessions protocol and the Working the backlog protocol in AGENTS.md, the Claude Code skills (init, setup, next, build, verify, spec, commit, code-review, ship, shepherd, validate-and-fix, cleanup, implement-plan, research, refactor-claude-md), the four pipeline agents, the standing and path-scoped rules (including the chassis invariants checklist), the hooks that keep the derived artifacts fresh and block an ungated PR, the Makefile that is the one source of truth for what CI validates, and the CI workflow that re-runs the same gate. The harness is what makes the corpus buildable by claude-observatory.\n",
+    "summary": "The governed-development loop every human and every driven session runs inside: the cross-agent New Sessions protocol and the Working the backlog protocol in AGENTS.md, the Claude Code skills (the eight that sequence the backlog protocol, prime, setup, next, build, verify, spec, ship, shepherd, and the two it calls, commit and code-review), the four pipeline agents, the standing and path-scoped rules (including the chassis invariants checklist), the hooks that report derived-artifact freshness and block an ungated PR, the Makefile that is the one source of truth for what CI validates, and the CI workflow that re-runs the same gate. The harness is what makes the corpus buildable by claude-observatory.\n",
     "title": "Agentic engineering harness: session protocol, skills, agents, hooks, gate"
   },
-  "shardHash": "cf62969dab74d27be4355eb7e59ac4e343a96e525fd5ca15d31bdad049e93903",
-  "specVersion": "1.1.0"
+  "shardHash": "519f9b84b4251f5ee5a448316866baa01be6ebbaecc08ff1a3f303957126c686",
+  "specVersion": "1.2.0"
 }

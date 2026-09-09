@@ -59,7 +59,7 @@ Read the files that will change and the seams the dependency specs expose (trait
 - `cargo test -p <crate> --locked` after each module
 - `cargo clippy -p <crate> --all-targets --locked -- -D warnings` and `cargo fmt --all`
 - `spec-spine compile && spec-spine index` after any spec edit, then `spec-spine lint --fail-on-warn`
-- `make spine` before every commit; `make ci` before flipping to `complete`
+- `make gate` before every commit; `make ci` before flipping to `complete`. `make gate` never writes: when it reports staleness, `make refresh` is the fix and the shards are committed with the change
 - Never continue past a failure
 
 ### 5. Report What Changed
@@ -80,9 +80,9 @@ Files changed with paths, verification results, deviations from the plan, and an
 ### Verification Summary
 - cargo test: [pass/fail]
 - clippy + fmt: [pass/fail]
-- make spine: [pass/fail]
+- make gate: [pass/fail]
 - make ci: [pass/fail/not run]
-- scripts/verify-spec.sh: [pass/fail/not run]
+- spec-spine verify: [pass/fail/not run]
 
 ### Decisions recorded
 - [D-n: one line each, or "None"]

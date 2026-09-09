@@ -85,5 +85,5 @@
     "title": "Ledger sealing: a resident hot window, immutable segments archived to object storage"
   },
   "shardHash": "016b9fa4b5bf590751f1d4630e8fd6473bd456ac6382ec8a2f1b22676e5afb1a",
-  "specVersion": "1.1.0"
+  "specVersion": "1.2.0"
 }

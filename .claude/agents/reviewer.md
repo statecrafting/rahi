@@ -41,7 +41,7 @@ memory: project
 
 ### 2. Gate Evidence
 
-Run `make spine` and capture the output; a red gate is the headline finding. Run `spec-spine index coverage` and confirm zero unclaimed and zero floor-only files.
+Run `make gate` and capture the output; a red gate is the headline finding. It is read-only, so it never repairs the tree it is judging. Run `spec-spine index coverage` and confirm zero unclaimed and zero floor-only files.
 
 ### 3. Spec Compliance
 
@@ -74,7 +74,7 @@ Input validation at boundaries, no secrets or seeds logged, path handling, new d
 [approve / approve with notes / request changes, one sentence]
 
 ### Gate
-make spine: [ok/FAIL] | coverage: [n claimed, m unclaimed]
+make gate: [ok/FAIL] | coverage: [n claimed, m unclaimed]
 
 ### Critical Issues
 1. **[title]**
