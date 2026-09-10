@@ -64,6 +64,7 @@ impl Rauthy {
             token: token.to_owned(),
             http: reqwest::Client::builder()
                 .user_agent("rahi-harness")
+                .timeout(std::time::Duration::from_secs(30))
                 .build()
                 .unwrap_or_default(),
         }
@@ -224,6 +225,7 @@ pub async fn login(client: &Client, base: &str, user: &User) -> Result<()> {
     let http = reqwest::Client::builder()
         .user_agent("rahi-harness")
         .redirect(reqwest::redirect::Policy::none())
+        .timeout(std::time::Duration::from_secs(30))
         .build()
         .unwrap_or_default();
     let session = http.post(format!("{proxy}/oidc/session")).send().await?;

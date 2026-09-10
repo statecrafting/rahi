@@ -106,7 +106,10 @@ impl Client {
     /// As [`Self::csrf`], for a non-safe method.
     pub async fn request(&self, method: Method, path: &str) -> Result<reqwest::RequestBuilder> {
         let safe = matches!(method, Method::GET | Method::HEAD | Method::OPTIONS);
-        let exempt = self.path_of(path).starts_with("/auth/");
+        // The chassis exempts rauthy's proxy prefix (spec 020 B-4): `/auth`
+        // itself and everything under it.
+        let request_path = self.path_of(path);
+        let exempt = request_path == "/auth" || request_path.starts_with("/auth/");
         let mut builder = self.builder(method, path);
         if !safe && !exempt {
             builder = builder.header(CSRF_HEADER, self.csrf().await?);

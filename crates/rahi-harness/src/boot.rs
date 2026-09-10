@@ -542,8 +542,12 @@ fn tail(path: &Path, lines: usize) -> String {
     if file.seek(SeekFrom::Start(start)).is_err() {
         return String::new();
     }
-    let mut buf = String::new();
-    let _ = file.read_to_string(&mut buf);
+    // Raw bytes, decoded leniently: the window may open inside a multi-byte
+    // character, and a tail that vanished on that account would be worse
+    // than one with a replacement character at its head.
+    let mut bytes = Vec::new();
+    let _ = file.read_to_end(&mut bytes);
+    let buf = String::from_utf8_lossy(&bytes);
     let all: Vec<&str> = buf.lines().collect();
     let from = all.len().saturating_sub(lines);
     all.get(from..).unwrap_or(&[]).join("\n")
