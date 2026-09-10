@@ -55,7 +55,7 @@
       "wave": 3
     },
     "id": "034-hello-cell",
-    "implementation": "pending",
+    "implementation": "in-progress",
     "kind": "feature",
     "risk": "medium",
     "sectionHeadings": [
@@ -74,6 +74,6 @@
     "summary": "The smallest complete governed cell and the thing consumers copy from: a manifest declaring one table, one kv prefix, and the grants a notes service needs; a Cell implementation whose main is one line; a notes resource with create, list, and delete behind login, each write staged with an outbox row and stamped with a revision, each denial ledgered; a static page that logs in through the proxy and lists notes; an operator route exposing the trace ring; and an end-to-end test through the harness that logs in, writes, reads, is denied an ungranted operation, verifies the ledger, takes a backup, and restores it into a fresh directory.\n",
     "title": "hello-cell: the reference app that composes every crate and proves the chassis end to end"
   },
-  "shardHash": "6015d2ef6ab6023e1b6394f5b40b713992231ff97d371f07a333ea8a4b0bcf1e",
+  "shardHash": "e329f29bbd5192a2a75c2efbd8297ee4b57062354afda51c132c6cef0073e3da",
   "specVersion": "1.2.0"
 }
