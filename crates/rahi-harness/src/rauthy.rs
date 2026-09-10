@@ -98,13 +98,59 @@ impl Rauthy {
             .find(|u| u.get("email").and_then(Value::as_str) == Some(email)))
     }
 
-    /// Create `user` if absent, then set its password, roles, and mark it
-    /// enabled and verified so it can log in at once.
+    /// Create `role` if rauthy does not have it. rauthy keeps of a user's
+    /// roles only those that exist (`Role::sanitize`), so a role granted
+    /// before it is created is silently dropped (spec 034 D-8).
     ///
     /// # Errors
     ///
-    /// [`Error::Rauthy`] when either call refuses.
+    /// [`Error::Rauthy`] when the admin API refuses.
+    pub async fn ensure_role(&self, role: &str) -> Result<()> {
+        let response = self
+            .auth(self.http.get(format!("{}/auth/v1/roles", self.base)))
+            .send()
+            .await?;
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        if !status.is_success() {
+            return Err(Error::Rauthy(format!(
+                "GET /roles answered {status}: {body}"
+            )));
+        }
+        let roles: Vec<Value> = serde_json::from_str(&body)
+            .map_err(|err| Error::Rauthy(format!("the role list is not json: {err}")))?;
+        if roles
+            .iter()
+            .any(|r| r.get("name").and_then(Value::as_str) == Some(role))
+        {
+            return Ok(());
+        }
+        let response = self
+            .auth(self.http.post(format!("{}/auth/v1/roles", self.base)))
+            .json(&json!({ "role": role }))
+            .send()
+            .await?;
+        let status = response.status();
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            return Err(Error::Rauthy(format!(
+                "POST /roles answered {status}: {body}"
+            )));
+        }
+        Ok(())
+    }
+
+    /// Create `user` if absent, then set its password, roles, and mark it
+    /// enabled and verified so it can log in at once. Every role named is
+    /// created first if rauthy lacks it.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Rauthy`] when any call refuses.
     pub async fn ensure_user(&self, user: &User) -> Result<String> {
+        for role in &user.roles {
+            self.ensure_role(role).await?;
+        }
         let (local, _) = user.email.split_once('@').unwrap_or((&user.email, ""));
         let id = match self.find_user(&user.email).await? {
             Some(existing) => existing

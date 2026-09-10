@@ -1,0 +1,74 @@
+# hello-cell's declared ceiling (spec 034 B-1). What is not here is denied,
+# and every denial is a record in the chain (constitution X).
+#
+# `db.migrate` on `notes` is deliberately absent: the notes service reaches
+# for it through `POST /api/notes/migrate`, the kernel refuses, and the
+# end-to-end test reads the decision id off the 403. That is the
+# demonstration, not an oversight.
+
+[app]
+name = "hello-cell"
+org = "statecrafting"
+
+[resources]
+tables = ["notes"]
+kv = ["hello"]
+
+[[capabilities]]
+id = "notes-read"
+kind = "db.read"
+resource = "notes"
+
+[[capabilities]]
+id = "notes-write"
+kind = "db.write"
+resource = "notes"
+
+[[capabilities]]
+id = "notes-txn"
+kind = "db.txn"
+resource = "notes"
+
+[[capabilities]]
+id = "hello-get"
+kind = "kv.get"
+resource = "hello"
+constraints = { key_prefix = "hello:" }
+
+[[capabilities]]
+id = "hello-put"
+kind = "kv.put"
+resource = "hello"
+constraints = { key_prefix = "hello:" }
+
+[[capabilities]]
+id = "note-publish"
+kind = "notify.publish"
+resource = "notes"
+
+[services.notes]
+capabilities = [
+  "notes-read",
+  "notes-write",
+  "notes-txn",
+  "hello-get",
+  "hello-put",
+  "note-publish",
+]
+
+[gate]
+checks = ["secrets"]
+
+[ledger]
+schema_version = "1.0.0"
+max_record_bytes = 65536
+
+[observability]
+metrics_path = "/metrics"
+otel = false
+
+[auth]
+operator_role = "hello_operator"
+
+[contract]
+version = "1.0.0"

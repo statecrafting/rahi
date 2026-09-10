@@ -1,0 +1,39 @@
+[package]
+name = "hello-cell"
+version = "0.1.0"
+description = "The reference cell of the rahi chassis: a manifest, one migration, a notes resource behind login, a page, and the end-to-end proof"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[package.metadata.spec-spine]
+spec = "034-hello-cell"
+
+[[bin]]
+name = "hello-cell"
+path = "src/main.rs"
+
+[dependencies]
+rahi-types = { workspace = true }
+rahi-store = { workspace = true }
+rahi-kernel = { workspace = true }
+rahi-edge = { workspace = true }
+rahi-idp = { workspace = true }
+rahi-cli = { workspace = true }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+rahi-harness = { workspace = true }
+rahi-ops = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread"] }
+tempfile = { workspace = true }
+axum = { workspace = true }
+
+[lints]
+workspace = true

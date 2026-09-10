@@ -55,6 +55,16 @@ pub struct BootSpec {
     /// test that needs a knob the harness does not set (an OTLP endpoint,
     /// a deliberately wrong value). Explicit, never inherited (B-4).
     pub env: Vec<(String, String)>,
+    /// An existing volume to boot on instead of a fresh one: a directory a
+    /// `restore` filled (spec 034 B-5). `first-boot` then verifies the keys
+    /// it finds and mints nothing. The harness never deletes it.
+    pub data_dir: Option<PathBuf>,
+    /// The ports to use instead of fresh ones: those of the instance a
+    /// volume came from. hiqlite binds a node to the addresses in its
+    /// stored membership, so a volume reopened on other ports never
+    /// elects (spec 034 D-5); a deployment's ports are fixed by contract,
+    /// and a test that reopens a volume pins them the same way.
+    pub ports: Option<Ports>,
 }
 
 impl BootSpec {
@@ -66,7 +76,23 @@ impl BootSpec {
             manifest_dir: None,
             rauthy: RauthyMode::None,
             env: Vec::new(),
+            data_dir: None,
+            ports: None,
         }
+    }
+
+    /// On these ports, typically [`Instance::ports`] of a stopped cell.
+    #[must_use]
+    pub fn with_ports(mut self, ports: Ports) -> Self {
+        self.ports = Some(ports);
+        self
+    }
+
+    /// On an existing volume.
+    #[must_use]
+    pub fn on_data_dir(mut self, dir: impl Into<PathBuf>) -> Self {
+        self.data_dir = Some(dir.into());
+        self
     }
 
     /// With rauthy at `binary`.
@@ -132,7 +158,12 @@ pub struct Instance {
     admin_token: String,
     ports: Ports,
     rauthy: RauthyMode,
-    dir: tempfile::TempDir,
+    /// Held for its `Drop`: the throwaway tree, logs included, goes with
+    /// the instance.
+    _dir: tempfile::TempDir,
+    data_dir: PathBuf,
+    env: Vec<(String, String)>,
+    binary: PathBuf,
     child: Mutex<Option<Child>>,
     stderr_path: PathBuf,
     stdout_path: PathBuf,
@@ -176,9 +207,15 @@ impl Harness {
     /// [`READY_BUDGET`], with the child's stderr tail.
     pub fn boot(spec: BootSpec) -> Result<Instance> {
         let dir = tempfile::Builder::new().prefix("rahi-harness-").tempdir()?;
-        let data_dir = dir.path().join("data");
+        let data_dir = match &spec.data_dir {
+            Some(existing) => existing.clone(),
+            None => dir.path().join("data"),
+        };
         std::fs::create_dir_all(&data_dir)?;
-        let ports = Ports::allocate()?;
+        let ports = match spec.ports {
+            Some(pinned) => pinned,
+            None => Ports::allocate()?,
+        };
         // `localhost`, not the address: rauthy derives its WebAuthn relying
         // party id from the public host and refuses an IP literal (D-3).
         let base_url = format!("http://localhost:{}", ports.app);
@@ -190,7 +227,9 @@ impl Harness {
 
         // first-boot, then migrate, as the entrypoint does (D-2).
         let first_boot = run_verb(&spec.binary, "first-boot", &env, &cwd)?;
-        std::fs::write(data_dir.join(FIRST_BOOT_LOG), &first_boot)?;
+        if spec.data_dir.is_none() || !data_dir.join(FIRST_BOOT_LOG).exists() {
+            std::fs::write(data_dir.join(FIRST_BOOT_LOG), &first_boot)?;
+        }
         run_verb(&spec.binary, "migrate", &env, &cwd)?;
 
         let admin_token = std::fs::read_to_string(data_dir.join("keys").join("rauthy_admin_token"))
@@ -224,7 +263,10 @@ impl Harness {
             admin_token,
             ports,
             rauthy: spec.rauthy,
-            dir,
+            _dir: dir,
+            data_dir,
+            env,
+            binary: spec.binary,
             child: Mutex::new(Some(child)),
             stderr_path,
             stdout_path,
@@ -384,10 +426,34 @@ impl Instance {
         &self.admin_token
     }
 
-    /// The throwaway data directory (`/data` of this cell).
+    /// The data directory (`/data` of this cell): throwaway unless the spec
+    /// named one.
     #[must_use]
     pub fn data_dir(&self) -> PathBuf {
-        self.dir.path().join("data")
+        self.data_dir.clone()
+    }
+
+    /// The child's whole environment (B-4), for a verb a test runs itself.
+    #[must_use]
+    pub fn env(&self) -> &[(String, String)] {
+        &self.env
+    }
+
+    /// A command for `verb` on this cell's binary with this cell's
+    /// environment and nothing inherited: `ledger export`, `backup`, a
+    /// `restore` on another volume with `RAHI_DATA_DIR` overridden by the
+    /// caller. Run it while the cell is stopped for a verb that opens the
+    /// node itself.
+    #[must_use]
+    pub fn command(&self, args: &[&str]) -> Command {
+        let mut command = Command::new(&self.binary);
+        command
+            .args(args)
+            .current_dir(&self.data_dir)
+            .env_clear()
+            .envs(self.env.iter().map(|(k, v)| (k.as_str(), v.as_str())))
+            .stdin(Stdio::null());
+        command
     }
 
     /// The ports this instance owns.

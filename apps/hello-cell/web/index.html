@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>hello-cell</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+    body { max-width: 40rem; margin: 3rem auto; padding: 0 1rem; line-height: 1.5; }
+    header { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+    h1 { font-size: 1.4rem; margin: 0; }
+    ul { padding: 0; list-style: none; }
+    li { display: flex; justify-content: space-between; gap: 1rem; padding: .5rem 0; border-bottom: 1px solid #8884; }
+    form { display: flex; gap: .5rem; margin-top: 1rem; }
+    input[type=text] { flex: 1; padding: .4rem .6rem; }
+    button { padding: .4rem .8rem; cursor: pointer; }
+    #status { color: #888; min-height: 1.5rem; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>hello-cell</h1>
+    <nav>
+      <a id="login" href="/session/login">Log in</a>
+      <form id="logout" method="post" action="/session/logout" hidden>
+        <button type="submit">Log out</button>
+      </form>
+    </nav>
+  </header>
+  <p id="status">Loading.</p>
+  <ul id="notes"></ul>
+  <form id="add" hidden>
+    <input type="text" name="body" placeholder="A note" required autocomplete="off">
+    <button type="submit">Add</button>
+  </form>
+  <script src="/app.js"></script>
+</body>
+</html>

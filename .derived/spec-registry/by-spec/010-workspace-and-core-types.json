@@ -23,10 +23,6 @@
       },
       {
         "kind": "file",
-        "path": "apps/.gitkeep"
-      },
-      {
-        "kind": "file",
         "path": "crates/rahi-types/Cargo.toml"
       },
       {
@@ -81,6 +77,6 @@
     "summary": "The first build: a virtual Cargo workspace with the toolchain pinned, unsafe denied, one shared dependency table, and a supply-chain policy; plus rahi-types, the plain-data substrate every other crate depends on and that depends on nothing in the workspace. It fixes the Error enum with the four exit codes, the Principal as the IdP's subject plus claims, the Revision and FenceToken newtypes the store's invariants are written against, the Config tree derived from one public URL, and the schema version constants.\n",
     "title": "Cargo workspace and the core types: Error, Principal, Revision, FenceToken, Config"
   },
-  "shardHash": "f60f10c8b74de9113bd1f238f8c8793c8f07e489a1f430bb0c8389b42dce870b",
+  "shardHash": "4c64f7b96704bb88c455aeaa2791d0de285113d9d4f6068c467c29fe70c05d85",
   "specVersion": "1.2.0"
 }
