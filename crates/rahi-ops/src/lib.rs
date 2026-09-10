@@ -32,10 +32,14 @@
 
 pub mod archive;
 pub mod backup;
+pub mod first_boot;
+pub mod keys;
 pub mod migrate;
 pub mod preflight;
 pub mod rauthy_api;
+pub mod rauthy_env;
 pub mod restore;
+pub mod supervise;
 
 use std::os::unix::fs::PermissionsExt as _;
 use std::path::{Path, PathBuf};
@@ -65,6 +69,13 @@ pub const BACKUP_KEY_FILE: &str = "backup.key";
 /// rauthy's admin API key, the credential the bootstrap and backup calls
 /// carry (spec 021 B-5).
 pub const ADMIN_TOKEN_FILE: &str = "rauthy_admin_token";
+
+/// rauthy's own secrets (spec 031 B-2): a JSON `rauthy_env::RauthySecrets`
+/// holding its encryption key, its hiqlite secrets, the bootstrap admin
+/// password, and the API key that is [`ADMIN_TOKEN_FILE`]'s other half.
+/// Kept under `keys/` so a backup carries what decrypts rauthy's store; not
+/// in [`KeySet::REQUIRED`], because nothing before `supervise` reads it.
+pub const RAUTHY_SECRETS_FILE: &str = "rauthy.json";
 
 /// The mode every key file must have (spec 031 B-1).
 pub const KEY_FILE_MODE: u32 = 0o600;

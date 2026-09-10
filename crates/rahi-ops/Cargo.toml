@@ -23,9 +23,11 @@ base64 = { workspace = true }
 reqwest = { workspace = true }
 ring = { workspace = true }
 fs4 = { workspace = true }
+getrandom = { workspace = true }
+nix = { workspace = true }
 tar = { workspace = true }
 age = { workspace = true }
-tokio = { workspace = true, features = ["fs", "net", "time"] }
+tokio = { workspace = true, features = ["fs", "macros", "net", "process", "signal", "time"] }
 
 [dev-dependencies]
 axum = { workspace = true }

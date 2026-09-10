@@ -83,7 +83,7 @@ pub fn run_with<C: Cell>(args: &[String], env: &dyn EnvReader) -> i32 {
         }
     };
     match runtime.block_on(dispatch::<C>(verb, env)) {
-        Ok(()) => 0,
+        Ok(code) => code,
         Err(err) => {
             eprintln!("error: {err}");
             err.exit_code()
@@ -91,9 +91,75 @@ pub fn run_with<C: Cell>(args: &[String], env: &dyn EnvReader) -> i32 {
     }
 }
 
-async fn dispatch<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
+/// Run `verb`; the code is the process exit code, which only `supervise`
+/// (spec 031 B-3, the child's code) makes anything but zero on `Ok`.
+async fn dispatch<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<i32> {
     match verb {
-        Verb::Help | Verb::Version => Ok(()),
+        Verb::Supervise => supervise::<C>(env).await,
+        Verb::FirstBoot => first_boot::<C>(env).await.map(|()| 0),
+        other => verbs_030::<C>(other, env).await.map(|()| 0),
+    }
+}
+
+/// Spec 031 B-2: mint keys once, or verify them.
+async fn first_boot<C: Cell>(env: &dyn EnvReader) -> Result<()> {
+    let manifest = rahi_kernel::Manifest::parse(C::manifest())?;
+    match rahi_ops::first_boot::run(env, manifest.app.name.as_str()).await? {
+        rahi_ops::first_boot::Outcome::Generated(credentials) => {
+            println!("{}", rahi_ops::first_boot::announce(&credentials));
+        }
+        rahi_ops::first_boot::Outcome::Verified { env_rendered } => {
+            println!(
+                "first-boot: keys present and verified; nothing generated{}",
+                if env_rendered {
+                    "; rauthy's environment rendered"
+                } else {
+                    ""
+                }
+            );
+        }
+    }
+    Ok(())
+}
+
+/// Spec 031 B-3: rauthy and serve as one lifetime.
+async fn supervise<C: Cell>(env: &dyn EnvReader) -> Result<i32> {
+    use rahi_ops::supervise as sup;
+    let config = rahi_types::Config::from_env(env)?;
+    let keys = rahi_ops::KeySet::of(&config);
+    keys.check()?;
+    let manifest = rahi_kernel::Manifest::parse(C::manifest())?;
+    let app_name = manifest.app.name.as_str().to_owned();
+    let rauthy = sup::rauthy_command(&config, env)?;
+    let api = rahi_ops::rauthy_api::RauthyApi::new(config.rauthy_base_url(), keys.admin_token()?)?;
+    let ready = async {
+        sup::wait_healthy(&api, sup::HEALTH_BUDGET).await?;
+        sup::custody_client(&config, &keys, &app_name).await?;
+        println!(
+            "supervise: rauthy is healthy at {}, client {app_name} custodied",
+            api.base()
+        );
+        Ok(())
+    };
+    let exit = sup::supervise(
+        rauthy,
+        ready,
+        |stop| {
+            serve::serve_until::<C>(env, async {
+                let _ = stop.await;
+            })
+        },
+        sup::shutdown_signal(),
+    )
+    .await;
+    println!("supervise: exiting {} ({:?})", exit.code, exit.reason);
+    Ok(exit.code)
+}
+
+/// The verbs of spec 030.
+async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
+    match verb {
+        Verb::Help | Verb::Version | Verb::Supervise | Verb::FirstBoot => Ok(()),
         Verb::Serve => serve::serve::<C>(env).await,
         Verb::Preflight => {
             let report = rahi_ops::preflight::run(env, C::manifest()).await;
@@ -178,12 +244,6 @@ async fn dispatch<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
             booted.shutdown().await;
             result
         }
-        Verb::Supervise => Err(Error::Config(
-            "supervise is not in this build; it arrives with spec 031".to_owned(),
-        )),
-        Verb::FirstBoot => Err(Error::Config(
-            "first-boot is not in this build; it arrives with spec 031".to_owned(),
-        )),
     }
 }
 

@@ -1,0 +1,10 @@
+# Only the sources the image build reads (spec 031 B-4).
+target/
+.git/
+.derived/
+data/
+docs/
+specs/
+standards/
+.github/
+.claude/
