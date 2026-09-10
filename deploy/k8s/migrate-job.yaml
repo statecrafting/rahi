@@ -12,6 +12,8 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: rahi-migrate
+  labels:
+    app.kubernetes.io/name: rahi-migrate
 spec:
   backoffLimit: 3
   ttlSecondsAfterFinished: 3600

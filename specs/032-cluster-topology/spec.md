@@ -149,9 +149,11 @@ Helm packaging; multi-cluster; the object store's own lifecycle rules.
   environment carries `HQL_NODE_ID`, `HQL_NODES`, and the listen addresses
   from the same values; `rahi first-boot --export` mints a set into a
   private temporary directory and prints it as a `Secret`; and
-  `KeySet::check` accepts a directory nobody can write to (no group or
-  world write bit, and a create probe fails) whose files carry no write
-  bit and no world bit, while a writable directory is still held to
+  `KeySet::check` accepts a directory this process cannot create a file
+  in (a create probe fails; the mode bits are not consulted, because the
+  kubelet mounts a Secret on a tmpfs whose root is `1777` and `readOnly`
+  is what makes it unwritable) whose files carry no write bit and no
+  world bit, while a writable directory is still held to
   `0700` and `0600`. Spec 030's text stays true for the volume first boot
   writes; the read-only mount is a directory first boot never writes, and
   `first_boot::layout` skips the chmod on it. Rejected: an initContainer

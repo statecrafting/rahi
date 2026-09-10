@@ -216,6 +216,6 @@
     "summary": "What multiplies and what does not. At N=1 nothing changes. At N=3 every replica is identical: a StatefulSet pod running the supervisor, with its own volume, two Raft clusters per replica (rauthy's and the app's), peers discovered by stable pod DNS, one key set injected as a Secret and custodied once, the public origin on an Ingress that terminates TLS and keeps /metrics off it, a CronJob that runs backup --to s3:// against the leader, and a ServiceMonitor example. Rate limiting is per node and says so. A shared volume between Raft members is refused by the manifests themselves. Carries enrahitu://030.\n",
     "title": "Cluster topology: N=1 primary, N=3 StatefulSet on Kubernetes, one key set, S3 backups"
   },
-  "shardHash": "88b3cd4fd45995d0b11e296e00a7aa308c4262d48fd682f678e0f20eeb7ab7a3",
+  "shardHash": "ce5b638970b907dc37bccea2e0ed9dab98e16e2beddfe1781ccc30806dd42acf",
   "specVersion": "1.2.0"
 }

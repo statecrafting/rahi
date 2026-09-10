@@ -281,7 +281,10 @@ async fn a_read_only_key_mount_is_accepted_and_a_writable_wide_one_is_not() {
     first_boot::run(&env, "cell").await.unwrap();
     let keys = KeySet::of(&config);
 
-    // A read-only mount: no write bits for the process, none for others.
+    // A read-only mount. The kubelet's Secret tmpfs is 1777 at the root
+    // and unwritable only because the mount is; a non-root test process
+    // cannot mount, so the nearest thing is a directory it cannot create
+    // in. The bits the kubelet would show are not what decides.
     std::fs::set_permissions(keys.dir(), std::fs::Permissions::from_mode(0o555)).unwrap();
     keys.check()
         .expect("a read-only mount with 0600 files passes");

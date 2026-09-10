@@ -353,14 +353,13 @@ pub fn generate_backup_identity() -> String {
 }
 
 /// Whether `dir` is a read-only mount as far as this deployment is
-/// concerned (spec 032 B-2): neither the group nor the world may write to
-/// it, and this process cannot either.
+/// concerned (spec 032 B-2): this process cannot create a file in it. The
+/// mode bits say nothing here; the kubelet mounts a Secret on a tmpfs
+/// whose root is `1777` regardless of `defaultMode`, and `readOnly: true`
+/// is what makes it unwritable.
 #[must_use]
 pub fn is_read_only_dir(dir: &Path) -> bool {
-    let Ok(meta) = std::fs::metadata(dir) else {
-        return false;
-    };
-    meta.permissions().mode() & 0o022 == 0 && !dir_is_writable(dir)
+    dir.is_dir() && !dir_is_writable(dir)
 }
 
 /// Whether this process can create a file in `dir`.
