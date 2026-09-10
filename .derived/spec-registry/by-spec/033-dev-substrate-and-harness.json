@@ -42,11 +42,21 @@
         "path": "crates/rahi-harness/tests/boot.rs"
       }
     ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_env.rs"
+        }
+      }
+    ],
     "extraFrontmatter": {
       "wave": 3
     },
     "id": "033-dev-substrate-and-harness",
-    "implementation": "pending",
+    "implementation": "complete",
     "kind": "tooling",
     "risk": "medium",
     "sectionHeadings": [
@@ -58,6 +68,7 @@
       "5. Acceptance criteria",
       "6. Out of scope",
       "7. Resolved decisions",
+      "8. Status",
       "Verification"
     ],
     "specPath": "specs/033-dev-substrate-and-harness/spec.md",
@@ -65,6 +76,6 @@
     "summary": "Two things a contributor needs: a compose file that runs the N=1 topology (the image with a bind-mounted volume, watched rebuilds) and a harness crate that boots a built cell binary under a throwaway data directory with fresh keys and OS-allocated ports, starts a rauthy on loopback when one is available, waits on /readyz and never on /healthz, and hands back an HTTP client with a cookie jar so authenticated flows are testable. One instance per test file, never per test. Carries enrahitu://033.\n",
     "title": "The dev substrate and the harness: compose for N=1, boot the real binary, wait on /readyz, a cookie jar"
   },
-  "shardHash": "584f4053b1d24542be6a96102174068873c3db074defa1fa916499a02d74601c",
+  "shardHash": "52b09f571938ad1de083a2fb52f45dd1dfbc5f5c089703467c09a79da8f049bb",
   "specVersion": "1.2.0"
 }

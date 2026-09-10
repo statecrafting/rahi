@@ -1,0 +1,11 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "rahi-harness",
+    "path": "crates/rahi-harness",
+    "specRef": "033-dev-substrate-and-harness",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "8a014d2e986c154ea6d8f4e5a430ee81fd2f56acd36c282df349c2b76473d709"
+}

@@ -1,0 +1,41 @@
+# The developer setup, whole (spec 033 B-1): the N=1 topology from the
+# image spec 031 builds, the volume bind-mounted at ./.data so a contributor
+# can read the keys and the rendered rauthy environment, one published
+# port, and a watch that rebuilds the image when the source changes.
+#
+#   docker compose -f docker/compose.yml up --watch
+#
+# The public URL is the published port on localhost, over plain http, so
+# the cookies take their plain-scheme names (spec 010 D-4). First boot
+# prints the rauthy admin credentials once: `docker compose logs rahi`.
+name: rahi
+
+services:
+  rahi:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: rahi:dev
+    ports:
+      - "127.0.0.1:8080:8443"
+    environment:
+      RAHI_PUBLIC_URL: http://localhost:8080
+    volumes:
+      - ./.data:/data
+    # Readiness is the cell's own: `curl -s localhost:8080/readyz`. The
+    # image carries no shell beyond the entrypoint, so there is no
+    # healthcheck command to run inside it.
+    develop:
+      watch:
+        - action: rebuild
+          path: ../crates
+        - action: rebuild
+          path: ../apps
+        - action: rebuild
+          path: ../Cargo.toml
+        - action: rebuild
+          path: ../Cargo.lock
+        - action: rebuild
+          path: ../docker/Dockerfile
+        - action: rebuild
+          path: ../docker/entrypoint.sh

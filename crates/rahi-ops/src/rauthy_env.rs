@@ -139,12 +139,13 @@ pub fn render_nodes(nodes: &[NodeLine]) -> String {
 }
 
 /// What rauthy's bootstrap API key may do: the client registration and
-/// update spec 021 B-5 performs, and the secret read the supervisor
-/// performs. Nothing wider: rauthy re-applies this access from the rendered
-/// environment at every start, so a later spec that needs more (033's
-/// harness administers users) widens it by re-rendering, not by minting a
-/// broad key today.
-pub const API_KEY_ACCESS: &str = r#"[{"group":"Clients","access_rights":["read","create","update"]},{"group":"Secrets","access_rights":["read"]}]"#;
+/// update spec 021 B-5 performs, the secret read the supervisor performs,
+/// and the user administration spec 033's harness performs (create a
+/// test user, set its password). Nothing wider: rauthy re-applies this
+/// access from the rendered environment at every start, so a later spec
+/// that needs more widens it here by re-rendering, not by minting a broad
+/// key ahead of its use (spec 031 D-8).
+pub const API_KEY_ACCESS: &str = r#"[{"group":"Clients","access_rights":["read","create","update"]},{"group":"Secrets","access_rights":["read"]},{"group":"Users","access_rights":["read","create","update"]}]"#;
 
 /// rauthy's secrets, custodied as `keys/rauthy.json`.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
