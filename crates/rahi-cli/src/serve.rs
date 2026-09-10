@@ -11,7 +11,9 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 
 use axum::Router;
-use rahi_edge::{AppState, Edge, Route, RouteClass};
+use rahi_edge::{
+    AppState, Edge, Route, RouteClass, StreamHub, StreamIdentityResolver, StreamOptions,
+};
 use rahi_idp::{
     AUTH_PREFIX, CLIENT_SECRET_FILE, Discovery, IdpConfig, Jwks, Proxy, Resource, SessionKey,
     Sessions, proxy_router, resource_router, session_router,
@@ -44,6 +46,51 @@ pub const DEFAULT_LEDGER_ARCHIVE_DIR: &str = "ledger-archive";
 
 /// The session prefix identity mounts under (spec 022).
 pub const SESSION_PREFIX: &str = rahi_idp::session::SESSION_PREFIX;
+
+/// Open streams one identity may hold (spec 026 B-5); the default is four.
+pub const ENV_MAX_CONCURRENT_STREAMS: &str = "RAHI_MAX_CONCURRENT_STREAMS";
+
+/// Seconds a shutdown waits for open streams to close (spec 026 B-7); the
+/// default is ten.
+pub const ENV_STREAM_DRAIN_TIMEOUT: &str = "RAHI_STREAM_DRAIN_TIMEOUT_SECS";
+
+/// The stream options the environment describes (spec 026).
+///
+/// # Errors
+///
+/// [`Error::Config`] when a value is not a number.
+pub fn stream_options(env: &dyn EnvReader) -> Result<StreamOptions> {
+    let mut options = StreamOptions::default();
+    if let Some(raw) = env.get(ENV_MAX_CONCURRENT_STREAMS) {
+        options.max_concurrent_streams = raw.parse().map_err(|_| {
+            Error::Config(format!(
+                "{ENV_MAX_CONCURRENT_STREAMS} {raw:?} is not a count"
+            ))
+        })?;
+    }
+    if let Some(raw) = env.get(ENV_STREAM_DRAIN_TIMEOUT) {
+        let secs: u64 = raw.parse().map_err(|_| {
+            Error::Config(format!(
+                "{ENV_STREAM_DRAIN_TIMEOUT} {raw:?} is not a number of seconds"
+            ))
+        })?;
+        options.drain_timeout = std::time::Duration::from_secs(secs);
+    }
+    Ok(options)
+}
+
+/// The identity a stream counts against (spec 026 B-5): the bearer
+/// credential's `(client_id, sub)` pair when spec 025's layer left one on
+/// the request, else nothing, so the edge falls back to the principal and
+/// then the client address.
+fn stream_identity() -> StreamIdentityResolver {
+    std::sync::Arc::new(|request: &axum::extract::Request| {
+        request
+            .extensions()
+            .get::<rahi_idp::Bearer>()
+            .map(rahi_idp::Bearer::identity)
+    })
+}
 
 /// How rauthy is treated at boot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -166,7 +213,11 @@ pub fn listen_addr(env: &dyn EnvReader) -> Result<SocketAddr> {
 /// [`Error::Integrity`] when the chain does not verify; [`Error::Config`]
 /// when identity cannot be derived or a route is unclassified;
 /// [`Error::Upstream`] when rauthy is required and does not answer.
-pub async fn compose<C: Cell>(booted: &Booted, env: &dyn EnvReader) -> Result<Router> {
+pub async fn compose<C: Cell>(
+    booted: &Booted,
+    env: &dyn EnvReader,
+    streams: &StreamHub,
+) -> Result<Router> {
     rahi_ops::migrate::check_current(&booted.store, C::migrations()).await?;
     let ledger = booted.ledger().await?;
     let kernel = Kernel::boot(
@@ -179,8 +230,10 @@ pub async fn compose<C: Cell>(booted: &Booted, env: &dyn EnvReader) -> Result<Ro
         .with_service_name(booted.manifest.app.name.as_str());
     rahi_edge::obs::init(obs)?;
 
-    let state = AppState::new(kernel, booted.store.handle(), ledger, booted.config.clone());
+    let state = AppState::new(kernel, booted.store.handle(), ledger, booted.config.clone())
+        .with_extension(streams.clone());
     let mut edge = Edge::builder(state.clone())
+        .stream_identity(stream_identity())
         .mount("/", C::routes(state.clone()))
         .mount_operator(OPERATOR_PREFIX, C::operator_routes(state.clone()));
     for route in C::exposed() {
@@ -259,8 +312,9 @@ pub async fn serve_until<C: Cell>(
     stop: impl Future<Output = ()> + Send + 'static,
 ) -> Result<()> {
     let addr = listen_addr(env)?;
+    let streams = StreamHub::new(stream_options(env)?);
     let booted = Booted::open::<C>(env).await?;
-    let router = match compose::<C>(&booted, env).await {
+    let router = match compose::<C>(&booted, env, &streams).await {
         Ok(router) => router,
         Err(err) => {
             booted.shutdown().await;
@@ -285,8 +339,17 @@ pub async fn serve_until<C: Cell>(
     let stopped = std::sync::Arc::new(tokio::sync::Notify::new());
     let until = {
         let stopped = stopped.clone();
+        let streams = streams.clone();
         async move {
             stop.await;
+            // Spec 026 B-7: every open stream hears the shutdown and has the
+            // drain timeout to close before the listener stops.
+            let remaining = streams.drain().await;
+            if remaining > 0 {
+                eprintln!(
+                    "serve: {remaining} stream(s) still open after the drain timeout; closing them"
+                );
+            }
             stopped.notify_one();
         }
     };

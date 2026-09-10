@@ -89,7 +89,11 @@ pub fn refusal(status: StatusCode, kind: &str, message: &str) -> Response {
     build(status, json!({ "error": kind, "message": message }))
 }
 
-fn build(status: StatusCode, body: serde_json::Value) -> Response {
+/// A response with `status` and the JSON `body`, for a caller whose status
+/// is not in [`status_of`]'s table (a 429 or a 504 that also carries a
+/// decision id, spec 026).
+#[must_use]
+pub fn build(status: StatusCode, body: serde_json::Value) -> Response {
     (
         status,
         [(header::CONTENT_TYPE, PROBLEM_CONTENT_TYPE)],

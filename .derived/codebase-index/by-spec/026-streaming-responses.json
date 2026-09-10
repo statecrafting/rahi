@@ -1,19 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '026-streaming-responses' file unit 'crates/rahi-edge/src/stream.rs' does not exist",
-        "path": "crates/rahi-edge/src/stream.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '026-streaming-responses' file unit 'crates/rahi-edge/tests/stream.rs' does not exist",
-        "path": "crates/rahi-edge/tests/stream.rs"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "020-edge-server",
@@ -22,17 +7,45 @@
     ],
     "implementingPaths": [
       {
+        "path": "crates/rahi-cli/src/serve.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/error.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-edge/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/obs/metrics.rs",
         "source": "spec-edge"
       },
       {
         "path": "crates/rahi-edge/src/router.rs",
         "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/stream.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/tests/stream.rs",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/stream.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -41,12 +54,55 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-edge/tests/stream.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
           "kind": "file",
           "path": "crates/rahi-edge/tests/stream.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/serve.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/error.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/error.rs"
         }
       },
       {
@@ -60,6 +116,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-edge/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/obs/metrics.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/obs/metrics.rs"
         }
       },
       {
@@ -80,5 +149,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "350ab74fe67d3c478770b704c2308dbad92c35f075664aa981bf90eb2b0b0eeb"
+  "shardHash": "2cf497ae5c161ec95338c5fc75f11e6f651ac0c7f786c3c5f396e82c06c2f59c"
 }

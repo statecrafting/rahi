@@ -12,7 +12,8 @@
 use std::time::Duration;
 
 use prometheus::{
-    Histogram, HistogramOpts, HistogramVec, IntCounter, IntCounterVec, Opts, Registry, TextEncoder,
+    Histogram, HistogramOpts, HistogramVec, IntCounter, IntCounterVec, IntGauge, Opts, Registry,
+    TextEncoder,
 };
 use rahi_types::{Error, Result};
 
@@ -28,6 +29,20 @@ pub const STORE_DURATION: &str = "store_op_duration_seconds";
 pub const KERNEL_DECISIONS: &str = "kernel_decisions_total";
 /// Appends of a decision that failed (spec 015 B-6).
 pub const KERNEL_LEDGER_FAILURES: &str = "kernel_ledger_failures_total";
+/// Streams open right now (spec 026 B-9).
+pub const STREAMS_OPEN: &str = "rahi_streams_open";
+/// How long a stream stayed open (spec 026 B-9).
+pub const STREAM_DURATION: &str = "rahi_stream_duration_seconds";
+/// Events delivered over streams (spec 026 B-9).
+pub const STREAM_EVENTS: &str = "rahi_stream_events_total";
+/// Streams closed, by outcome (spec 026 B-9).
+pub const STREAMS_CLOSED: &str = "rahi_streams_closed_total";
+
+/// The buckets a stream's lifetime falls into, in seconds: a stream lives
+/// seconds to hours, not milliseconds.
+pub const STREAM_BUCKETS: [f64; 10] = [
+    0.1, 0.5, 1.0, 5.0, 15.0, 60.0, 300.0, 900.0, 3600.0, 14400.0,
+];
 
 /// The buckets a request duration falls into, in seconds.
 pub const REQUEST_BUCKETS: [f64; 11] = [
@@ -44,6 +59,10 @@ pub struct Metrics {
     store_duration: HistogramVec,
     kernel_decisions: IntCounterVec,
     kernel_ledger_failures: IntCounter,
+    streams_open: IntGauge,
+    stream_duration: Histogram,
+    stream_events: IntCounter,
+    streams_closed: IntCounterVec,
 }
 
 impl Metrics {
@@ -109,6 +128,42 @@ impl Metrics {
         registry
             .register(Box::new(kernel_ledger_failures.clone()))
             .map_err(config)?;
+
+        // Spec 026 B-9: one gauge, one histogram, two counters per stream.
+        // The closed counter is initialised for every outcome, so a scrape
+        // sees the whole vocabulary before any stream has closed.
+        let streams_open = IntGauge::with_opts(Opts::new(STREAMS_OPEN, "Streams open right now"))
+            .map_err(config)?;
+        let stream_duration = Histogram::with_opts(
+            HistogramOpts::new(STREAM_DURATION, "How long a stream stayed open")
+                .buckets(STREAM_BUCKETS.to_vec()),
+        )
+        .map_err(config)?;
+        let stream_events =
+            IntCounter::with_opts(Opts::new(STREAM_EVENTS, "Events delivered over streams"))
+                .map_err(config)?;
+        let streams_closed = IntCounterVec::new(
+            Opts::new(STREAMS_CLOSED, "Streams closed, by outcome"),
+            &["outcome"],
+        )
+        .map_err(config)?;
+        for outcome in crate::stream::Outcome::ALL {
+            streams_closed
+                .with_label_values(&[outcome.as_str()])
+                .inc_by(0);
+        }
+        registry
+            .register(Box::new(streams_open.clone()))
+            .map_err(config)?;
+        registry
+            .register(Box::new(stream_duration.clone()))
+            .map_err(config)?;
+        registry
+            .register(Box::new(stream_events.clone()))
+            .map_err(config)?;
+        registry
+            .register(Box::new(streams_closed.clone()))
+            .map_err(config)?;
         register_process_collector(&registry)?;
 
         Ok(Self {
@@ -119,6 +174,10 @@ impl Metrics {
             store_duration,
             kernel_decisions,
             kernel_ledger_failures,
+            streams_open,
+            stream_duration,
+            stream_events,
+            streams_closed,
         })
     }
 
@@ -168,6 +227,33 @@ impl Metrics {
     /// Count one decision the ledger could not be told about.
     pub fn record_ledger_failure(&self) {
         self.kernel_ledger_failures.inc();
+    }
+
+    /// One more stream is open (spec 026 B-9).
+    pub fn record_stream_open(&self) {
+        self.streams_open.inc();
+    }
+
+    /// A stream closed with `outcome` after `elapsed`, having delivered
+    /// `events` (spec 026 B-9).
+    pub fn record_stream_closed(
+        &self,
+        outcome: crate::stream::Outcome,
+        elapsed: Duration,
+        events: u64,
+    ) {
+        self.streams_open.dec();
+        self.stream_duration.observe(elapsed.as_secs_f64());
+        self.stream_events.inc_by(events);
+        self.streams_closed
+            .with_label_values(&[outcome.as_str()])
+            .inc();
+    }
+
+    /// Streams open right now, for a test or a probe.
+    #[must_use]
+    pub fn streams_open(&self) -> i64 {
+        self.streams_open.get()
     }
 
     /// The current value of a request counter, for a test or a probe.
