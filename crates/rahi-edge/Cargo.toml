@@ -28,7 +28,10 @@ tracing-opentelemetry = { workspace = true }
 opentelemetry = { workspace = true }
 opentelemetry_sdk = { workspace = true }
 opentelemetry-otlp = { workspace = true }
-tokio = { workspace = true, features = ["rt", "sync"] }
+tokio = { workspace = true, features = ["macros", "rt", "sync", "time"] }
+# Streaming (spec 026): the response body is a hand-rolled `Stream` over a
+# bounded channel, so the trait is named here; nothing else is added.
+futures-core = { workspace = true }
 
 # The process collector reads /proc, so it exists where a cell actually runs
 # and is absent on a developer's macOS box (spec 023 D-2).

@@ -3138,6 +3138,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "base64 0.22.1",
+ "futures-core",
  "getrandom 0.4.3",
  "opentelemetry",
  "opentelemetry-otlp",

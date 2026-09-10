@@ -36,13 +36,45 @@
           "kind": "file",
           "path": "crates/rahi-edge/src/lib.rs"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "020-edge-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/error.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "020-edge-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/Cargo.toml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "023-observability",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/obs/metrics.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
       }
     ],
     "extraFrontmatter": {
       "wave": 2
     },
     "id": "026-streaming-responses",
-    "implementation": "pending",
+    "implementation": "complete",
     "kind": "kernel",
     "risk": "medium",
     "sectionHeadings": [
@@ -54,6 +86,7 @@
       "5. Acceptance criteria",
       "6. Out of scope",
       "7. Resolved decisions",
+      "8. Status",
       "Verification"
     ],
     "specPath": "specs/026-streaming-responses/spec.md",
@@ -61,6 +94,6 @@
     "summary": "A response that is produced over seconds rather than milliseconds breaks every default the edge holds: compression buffers it, the request timeout kills it, the rate limiter counts it once and forgets it, and graceful shutdown drops it mid-sentence. This spec adds one streaming mechanism, server-sent events, and makes a streaming route declare itself so those four defaults are turned off deliberately rather than discovered in production. Streams are bounded by a per-stream channel and a per-client concurrency limit, are cancellation-aware, close cleanly on shutdown, and are one span each in the tracer.\n",
     "title": "Streaming responses: server-sent events as the one mechanism, declared per route, bounded and cancellable"
   },
-  "shardHash": "0ace102b2a06e5fd370784986b48d28bceb5ce5c8a205d11dbe4b0e265fdabaf",
+  "shardHash": "ce9b6672b576cba74e3570abdfcc4292ce4fc3ced928197857077ba82e0bd67b",
   "specVersion": "1.2.0"
 }

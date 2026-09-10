@@ -25,6 +25,7 @@ use crate::middleware::security_headers::SecurityHeaders;
 use crate::middleware::{csrf, observation, rate_limit, security_headers};
 use crate::operator::{self, RequireOperator};
 use crate::state::AppState;
+use crate::stream::{self, StreamGate, StreamHub, StreamIdentityResolver};
 use crate::{error, probes, static_files};
 
 /// The edge. Its only job is to hand out a [`EdgeBuilder`].
@@ -58,6 +59,7 @@ pub struct EdgeBuilder {
     limits: RateLimits,
     resolver: Option<ClientResolver>,
     clock: Option<Clock>,
+    stream_identity: Option<StreamIdentityResolver>,
 }
 
 impl std::fmt::Debug for EdgeBuilder {
@@ -91,6 +93,7 @@ impl EdgeBuilder {
             limits: RateLimits::new(),
             resolver: None,
             clock: None,
+            stream_identity: None,
         }
     }
 
@@ -195,6 +198,20 @@ impl EdgeBuilder {
         self
     }
 
+    /// Resolve the identity a stream counts against (spec 026 B-5) with
+    /// `resolver`, ahead of the principal's subject and the client address.
+    #[must_use]
+    pub fn stream_identity(mut self, resolver: StreamIdentityResolver) -> Self {
+        self.stream_identity = Some(resolver);
+        self
+    }
+
+    /// The declared streaming routes (spec 026 B-3), sorted.
+    #[must_use]
+    pub fn streams(&self) -> Vec<String> {
+        stream::declared()
+    }
+
     /// The exposure table this builder will publish (spec 024 B-3).
     ///
     /// Pure: it reads the declarations and nothing else, so an app can print
@@ -283,15 +300,29 @@ impl EdgeBuilder {
             guarded = guarded.merge(static_files::service(dir));
         }
 
+        let resolver = self
+            .resolver
+            .unwrap_or_else(|| client_identity::from_config(self.state.config()));
         let mut limiter = RateLimiter::new(self.state.store().clone(), self.limits);
-        limiter = limiter.with_resolver(
-            self.resolver
-                .unwrap_or_else(|| client_identity::from_config(self.state.config())),
-        );
+        limiter = limiter.with_resolver(resolver.clone());
         if let Some(clock) = self.clock {
             limiter = limiter.with_clock(clock);
         }
         let guarded = guarded.layer(from_fn_with_state(limiter, rate_limit::enforce));
+
+        // Spec 026: the stream gate sits just outside the limiter, so the
+        // limiter admits a streaming request once and the gate counts it
+        // against the concurrency budget from then on (026 B-4). The hub is
+        // the composer's when it put one in the state, so a shutdown can
+        // drain it; a builder with none gets a default.
+        let hub = self.state.extension::<StreamHub>().unwrap_or_default();
+        let gate = StreamGate::new(
+            hub,
+            self.state.kernel().clone(),
+            resolver,
+            self.stream_identity,
+        );
+        let guarded = guarded.layer(from_fn_with_state(gate, stream::enforce));
 
         // Merged after the limiter went on and before the CSRF check does:
         // that is the whole of B-2's placement. Skipped entirely when the app

@@ -58,6 +58,7 @@ pub mod probes;
 pub mod router;
 pub mod state;
 pub mod static_files;
+pub mod stream;
 
 pub use client_identity::ClientIdentity;
 pub use error::{EdgeError, EdgeResult, status_of};
@@ -70,3 +71,7 @@ pub use operator::RequireOperator;
 pub use probes::{HEALTHZ_PATH, READYZ_PATH};
 pub use router::{Edge, EdgeBuilder};
 pub use state::AppState;
+pub use stream::{
+    Closed, Event, Outcome as StreamOutcome, Producer, Receiver, StreamHub, StreamIdentityResolver,
+    StreamOptions, StreamRoutes, channel, stream,
+};
