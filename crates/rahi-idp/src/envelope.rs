@@ -201,6 +201,13 @@ impl SessionKey {
                 path.display()
             ))
         })?;
+        // A raw key is exactly MIN_KEY_BYTES of entropy and is used whole: a
+        // random last byte that happens to be a whitespace value is part of
+        // the key, not a line ending (spec 034 D-4). Anything else is text
+        // an operator wrote, and its trailing whitespace is not key material.
+        if bytes.len() == MIN_KEY_BYTES {
+            return Self::from_bytes(&bytes);
+        }
         let trimmed: &[u8] = match bytes.iter().rposition(|b| !b.is_ascii_whitespace()) {
             Some(last) => bytes.get(..=last).unwrap_or(&bytes),
             None => &[],
@@ -372,6 +379,35 @@ pub fn cookie_value<'h>(header: &'h str, name: &str) -> Option<&'h str> {
 #[allow(clippy::expect_used)]
 mod tests {
     use super::*;
+
+    /// A raw key whose last byte is a whitespace value loads whole (spec
+    /// 034 D-4: one boot in fifty lost a byte to the trim and refused to
+    /// serve); a longer text key still loses its line ending.
+    #[test]
+    fn a_raw_key_ending_in_a_whitespace_byte_is_used_whole() {
+        let dir = std::env::temp_dir().join(format!("rahi-session-key-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let mut raw = [7u8; MIN_KEY_BYTES];
+        raw[MIN_KEY_BYTES - 1] = b'\n';
+        let path = dir.join("raw.key");
+        std::fs::write(&path, raw).expect("write");
+        let loaded = SessionKey::load(&path).expect("the raw key loads whole");
+        let whole = SessionKey::from_bytes(&raw).expect("32 bytes");
+        assert_eq!(
+            seal(&"x", &loaded).expect("seals"),
+            seal(&"x", &whole).expect("seals"),
+            "the whitespace byte is key material"
+        );
+        let text = dir.join("text.key");
+        std::fs::write(&text, [[b'k'; 40].as_slice(), b"\n"].concat()).expect("write");
+        let loaded = SessionKey::load(&text).expect("the text key loads");
+        let trimmed = SessionKey::from_bytes(&[b'k'; 40]).expect("40");
+        assert_eq!(
+            seal(&"x", &loaded).expect("seals"),
+            seal(&"x", &trimmed).expect("seals")
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     fn envelope() -> Envelope {
         Envelope::new(

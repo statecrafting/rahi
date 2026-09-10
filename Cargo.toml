@@ -20,6 +20,8 @@ rahi-kernel = { path = "crates/rahi-kernel", version = "0.1.0" }
 rahi-edge = { path = "crates/rahi-edge", version = "0.1.0" }
 rahi-idp = { path = "crates/rahi-idp", version = "0.1.0" }
 rahi-ops = { path = "crates/rahi-ops", version = "0.1.0" }
+rahi-cli = { path = "crates/rahi-cli", version = "0.1.0" }
+rahi-harness = { path = "crates/rahi-harness", version = "0.1.0" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 hiqlite = { version = "0.14", default-features = false, features = ["sqlite", "cache", "counters", "dlock", "listen_notify_local", "backup", "s3"] }

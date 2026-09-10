@@ -150,8 +150,13 @@ deployment = [
 # explicit instead of turning the check off.
 unwitnessed_allowed = [
   "crates/**/*.rs",
-  # A placeholder that spec 034 deletes when it lands the reference app.
-  "apps/.gitkeep",
+  # The reference app (spec 034): its Rust sources for the same reason as the
+  # crates', and its manifest, page, and README, which are bare file units
+  # too. The coupling gate and `require_ownership` defend them the same way.
+  "apps/**/*.rs",
+  "apps/*/manifest.toml",
+  "apps/*/web/*",
+  "apps/*/README.md",
   # In the coupling bypass floor already, so hashing it would restale every
   # shard for a doc edit the gate deliberately ignores.
   "deploy/README.md",

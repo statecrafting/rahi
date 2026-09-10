@@ -16,7 +16,7 @@ use rahi_edge::{
 };
 use rahi_idp::{
     AUTH_PREFIX, Discovery, IdpConfig, Jwks, Proxy, Resource, SessionKey, Sessions, proxy_router,
-    resource_router, session_router,
+    resource_router, session_router, with_sessions,
 };
 use rahi_kernel::{Kernel, Manifest};
 use rahi_ledger::{FsArchive, Hash, Ledger};
@@ -271,6 +271,7 @@ pub async fn compose<C: Cell>(
         edge = edge.static_slot(dir);
     }
 
+    let mut resolver: Option<Sessions> = None;
     if RauthyMode::from_env(env)? == RauthyMode::Required {
         let idp = IdpConfig::derive(&booted.config, booted.manifest.app.name.as_str())?;
         let discovery = Discovery::fetch(&idp).await?;
@@ -307,12 +308,22 @@ pub async fn compose<C: Cell>(
         edge = edge
             .mount("/", proxy_router(Proxy::new(&idp)?))
             .expose(Route::new(AUTH_PREFIX, RouteClass::Proxy))
-            .mount_public(SESSION_PREFIX, session_router(sessions))
+            .mount_public(SESSION_PREFIX, session_router(sessions.clone()))
             .mount("/", resource_router(resource))
             .expose(Route::new(rahi_idp::METADATA_PATH, RouteClass::Public));
+        resolver = Some(sessions);
     }
 
-    edge.try_build().map_err(|err| err.0)
+    let router = edge.try_build().map_err(|err| err.0)?;
+    // Spec 022's layer, outermost: it opens the session cookie, renews the
+    // assertion, and leaves the `Principal` in the request extensions that
+    // `Authenticated` and the operator gate read. Outside it every
+    // authenticated route answers 401 (022 D-3), which is what an app with
+    // a login would have met here before the first app existed (034 D-2).
+    Ok(match resolver {
+        Some(sessions) => with_sessions(sessions, router),
+        None => router,
+    })
 }
 
 /// How long in-flight connections have to finish once serve is told to

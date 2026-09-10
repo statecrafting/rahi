@@ -9,10 +9,6 @@
         "source": "spec-edge"
       },
       {
-        "path": "apps/.gitkeep",
-        "source": "spec-edge"
-      },
-      {
         "path": "crates/rahi-types",
         "source": "manifest-metadata"
       },
@@ -69,19 +65,6 @@
         "unit": {
           "kind": "file",
           "path": "Cargo.toml"
-        }
-      },
-      {
-        "locations": [
-          {
-            "file": "apps/.gitkeep"
-          }
-        ],
-        "ownership": true,
-        "sourceField": "establishes",
-        "unit": {
-          "kind": "file",
-          "path": "apps/.gitkeep"
         }
       },
       {
@@ -219,5 +202,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "80fd07705bb43c82f6346a240e41f46ff502ddefee62044673cdacef832ed4c7"
+  "shardHash": "276fe6bb7aaaa8ac98a46e8990b02212138833897ed6e2b549d7ce0971efc1e1"
 }

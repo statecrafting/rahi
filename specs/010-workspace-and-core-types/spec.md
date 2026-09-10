@@ -15,7 +15,6 @@ establishes:
   - "Cargo.toml"
   - "rust-toolchain.toml"
   - "deny.toml"
-  - "apps/.gitkeep"
   - "crates/rahi-types/Cargo.toml"
   - "crates/rahi-types/src/lib.rs"
   - "crates/rahi-types/src/error.rs"

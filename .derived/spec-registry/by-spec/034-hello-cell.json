@@ -48,14 +48,77 @@
       },
       {
         "kind": "file",
+        "path": "apps/hello-cell/tests/verify.rs"
+      },
+      {
+        "kind": "file",
         "path": "apps/hello-cell/README.md"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "010-workspace-and-core-types",
+        "unit": {
+          "anchor": "workspace.dependencies",
+          "file": "Cargo.toml",
+          "kind": "section"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "033-dev-substrate-and-harness",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-harness/src/boot.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "022-session-and-principal",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/envelope.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_env.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "033-dev-substrate-and-harness",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-harness/src/rauthy.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-agentic-harness",
+        "unit": {
+          "kind": "file",
+          "path": "spec-spine.toml"
+        }
       }
     ],
     "extraFrontmatter": {
       "wave": 3
     },
     "id": "034-hello-cell",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "kind": "feature",
     "risk": "medium",
     "sectionHeadings": [
@@ -67,6 +130,7 @@
       "5. Acceptance criteria",
       "6. Out of scope",
       "7. Resolved decisions",
+      "8. Status",
       "Verification"
     ],
     "specPath": "specs/034-hello-cell/spec.md",
@@ -74,6 +138,6 @@
     "summary": "The smallest complete governed cell and the thing consumers copy from: a manifest declaring one table, one kv prefix, and the grants a notes service needs; a Cell implementation whose main is one line; a notes resource with create, list, and delete behind login, each write staged with an outbox row and stamped with a revision, each denial ledgered; a static page that logs in through the proxy and lists notes; an operator route exposing the trace ring; and an end-to-end test through the harness that logs in, writes, reads, is denied an ungranted operation, verifies the ledger, takes a backup, and restores it into a fresh directory.\n",
     "title": "hello-cell: the reference app that composes every crate and proves the chassis end to end"
   },
-  "shardHash": "e329f29bbd5192a2a75c2efbd8297ee4b57062354afda51c132c6cef0073e3da",
+  "shardHash": "5b6c13d65cf33cf74c14af3d6486f11e3bb746e2527babcf3b895d922700b5d3",
   "specVersion": "1.2.0"
 }

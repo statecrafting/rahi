@@ -145,7 +145,7 @@ pub fn render_nodes(nodes: &[NodeLine]) -> String {
 /// access from the rendered environment at every start, so a later spec
 /// that needs more widens it here by re-rendering, not by minting a broad
 /// key ahead of its use (spec 031 D-8).
-pub const API_KEY_ACCESS: &str = r#"[{"group":"Clients","access_rights":["read","create","update"]},{"group":"Secrets","access_rights":["read"]},{"group":"Users","access_rights":["read","create","update"]}]"#;
+pub const API_KEY_ACCESS: &str = r#"[{"group":"Clients","access_rights":["read","create","update"]},{"group":"Secrets","access_rights":["read"]},{"group":"Users","access_rights":["read","create","update"]},{"group":"Roles","access_rights":["read","create"]}]"#;
 
 /// rauthy's secrets, custodied as `keys/rauthy.json`.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]

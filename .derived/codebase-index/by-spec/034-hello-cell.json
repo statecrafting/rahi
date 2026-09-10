@@ -1,68 +1,94 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '034-hello-cell' file unit 'apps/hello-cell/Cargo.toml' does not exist",
-        "path": "apps/hello-cell/Cargo.toml"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '034-hello-cell' file unit 'apps/hello-cell/manifest.toml' does not exist",
-        "path": "apps/hello-cell/manifest.toml"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '034-hello-cell' file unit 'apps/hello-cell/src/main.rs' does not exist",
-        "path": "apps/hello-cell/src/main.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '034-hello-cell' file unit 'apps/hello-cell/src/cell.rs' does not exist",
-        "path": "apps/hello-cell/src/cell.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '034-hello-cell' file unit 'apps/hello-cell/src/notes.rs' does not exist",
-        "path": "apps/hello-cell/src/notes.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '034-hello-cell' file unit 'apps/hello-cell/src/migrations.rs' does not exist",
-        "path": "apps/hello-cell/src/migrations.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '034-hello-cell' file unit 'apps/hello-cell/web/index.html' does not exist",
-        "path": "apps/hello-cell/web/index.html"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '034-hello-cell' file unit 'apps/hello-cell/web/app.js' does not exist",
-        "path": "apps/hello-cell/web/app.js"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '034-hello-cell' file unit 'apps/hello-cell/tests/e2e.rs' does not exist",
-        "path": "apps/hello-cell/tests/e2e.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '034-hello-cell' file unit 'apps/hello-cell/README.md' does not exist",
-        "path": "apps/hello-cell/README.md"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "033-dev-substrate-and-harness",
       "032-cluster-topology"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "apps/hello-cell",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "apps/hello-cell/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "apps/hello-cell/README.md",
+        "source": "spec-edge"
+      },
+      {
+        "path": "apps/hello-cell/manifest.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "apps/hello-cell/src/cell.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "apps/hello-cell/src/main.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "apps/hello-cell/src/migrations.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "apps/hello-cell/src/notes.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "apps/hello-cell/tests/e2e.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "apps/hello-cell/tests/verify.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "apps/hello-cell/web/app.js",
+        "source": "spec-edge"
+      },
+      {
+        "path": "apps/hello-cell/web/index.html",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/serve.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-harness/src/boot.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-harness/src/rauthy.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/envelope.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/rauthy_env.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "spec-spine.toml",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "apps/hello-cell/Cargo.toml"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -71,7 +97,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "apps/hello-cell/README.md"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -80,7 +110,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "apps/hello-cell/manifest.toml"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -89,7 +123,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "apps/hello-cell/src/cell.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -98,7 +136,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "apps/hello-cell/src/main.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -107,7 +149,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "apps/hello-cell/src/migrations.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -116,7 +162,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "apps/hello-cell/src/notes.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -125,7 +175,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "apps/hello-cell/tests/e2e.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -134,7 +188,24 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "apps/hello-cell/tests/verify.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/tests/verify.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "apps/hello-cell/web/app.js"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -143,12 +214,112 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "apps/hello-cell/web/index.html"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
           "kind": "file",
           "path": "apps/hello-cell/web/index.html"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/serve.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-harness/src/boot.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-harness/src/boot.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-harness/src/rauthy.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-harness/src/rauthy.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/envelope.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/envelope.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/rauthy_env.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_env.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "spec-spine.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "spec-spine.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.toml",
+            "span": {
+              "endLine": 106,
+              "startLine": 15
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "anchor": "workspace.dependencies",
+          "file": "Cargo.toml",
+          "kind": "section"
         }
       }
     ],
@@ -156,5 +327,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "d9f96ccf94483ad0c7b9f7b5e7ccd0cb818580f458d03a24774e7136f486c0eb"
+  "shardHash": "3d3b6b16a3cbbb8a8fd9bcd0e03db409edf833c9108af55a2aab033262c868b9"
 }
