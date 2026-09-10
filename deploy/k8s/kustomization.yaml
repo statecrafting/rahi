@@ -1,0 +1,26 @@
+# The N=1 cell on Kubernetes (spec 032): one StatefulSet, one replica, one
+# volume, both Raft clusters inside the pod, keys from a Secret, TLS at
+# the Ingress, backups to S3 from a CronJob, migrations from a Job.
+# `deploy/n3` is the documented patch that sets three replicas.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: rahi
+
+labels:
+  - includeSelectors: true
+    pairs:
+      app.kubernetes.io/part-of: rahi
+
+resources:
+  - configmap.yaml
+  - service.yaml
+  - statefulset.yaml
+  - ingress.yaml
+  - migrate-job.yaml
+  - backup-cronjob.yaml
+  - servicemonitor.yaml
+
+images:
+  - name: ghcr.io/bartekus/rahi
+    newTag: latest

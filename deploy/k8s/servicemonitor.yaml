@@ -1,0 +1,16 @@
+# In-cluster scrape of /metrics (spec 023 B-1) through the ClusterIP
+# Service, which is the only way /metrics is reached (spec 032 B-3).
+# Needs the Prometheus Operator CRDs; drop this resource from the
+# kustomization on a cluster without them.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: rahi
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rahi
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s

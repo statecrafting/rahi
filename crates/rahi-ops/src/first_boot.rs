@@ -72,7 +72,11 @@ pub fn layout(config: &Config) -> Result<()> {
         std::fs::create_dir_all(&dir)
             .map_err(|err| Error::Io(format!("{} cannot be created: {err}", dir.display())))?;
     }
-    crate::set_mode(&config.keys_dir(), KEY_DIR_MODE)?;
+    // A key set that is a read-only Secret mount (spec 032 B-2) cannot be
+    // re-moded and does not need to be: `KeySet::check` accepts it as it is.
+    if !crate::is_read_only_dir(&config.keys_dir()) {
+        crate::set_mode(&config.keys_dir(), KEY_DIR_MODE)?;
+    }
     crate::set_mode(&crate::rauthy_dir(config), KEY_DIR_MODE)
 }
 
@@ -139,4 +143,44 @@ pub fn announce(credentials: &AdminCredentials) -> String {
          change it at first login.",
         credentials.email, credentials.password, credentials.api_token
     )
+}
+
+/// The Secret name `export` renders (spec 032 B-2).
+pub const EXPORT_SECRET_NAME: &str = "rahi-keys";
+
+/// `first-boot --export` (spec 032 B-2): mint one key set into a private
+/// temporary directory and render it as a Kubernetes Secret the operator
+/// custodies and mounts read-only at `/data/keys` on every replica. The
+/// credentials are inside the document (rauthy's bootstrap password and
+/// the admin token are keys like any other), which is why the document
+/// goes to stdout once and nowhere else.
+///
+/// # Errors
+///
+/// [`Error::Io`] when entropy is refused or the temporary directory cannot
+/// be written.
+pub fn export() -> Result<String> {
+    use base64::Engine as _;
+    let dir = tempfile::tempdir().map_err(|err| {
+        Error::Io(format!(
+            "a private temporary directory cannot be made: {err}"
+        ))
+    })?;
+    let keys = KeySet::at(dir.path().join("keys"));
+    keys::generate(&keys)?;
+    let mut out = String::new();
+    out.push_str(&format!(
+        "# Rendered once by `rahi first-boot --export` (spec 032 B-2). Custody this\n\
+         # document: it is every key of the deployment, including rauthy's bootstrap\n\
+         # admin password. Apply it before the first rollout; first boot detects the\n\
+         # mounted keys and generates nothing.\n\
+         apiVersion: v1\nkind: Secret\nmetadata:\n  name: {EXPORT_SECRET_NAME}\ntype: Opaque\ndata:\n"
+    ));
+    for (name, bytes) in keys.export()? {
+        out.push_str(&format!(
+            "  {name}: {}\n",
+            base64::engine::general_purpose::STANDARD.encode(bytes)
+        ));
+    }
+    Ok(out)
 }

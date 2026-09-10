@@ -118,6 +118,31 @@ pub async fn wait_healthy(api: &RauthyApi, budget: Duration) -> Result<()> {
     }
 }
 
+/// Where the OIDC client secret is custodied: under the key set when it is
+/// writable or already holds one, else beside rauthy's rendered
+/// environment on the volume, for a key set that is a read-only Secret
+/// mount (spec 032 B-2). The secret is rauthy's to mint and lives in
+/// rauthy's replicated store, so a backup carries it either way.
+#[must_use]
+pub fn client_secret_path(config: &Config) -> PathBuf {
+    let keys = KeySet::of(config);
+    let in_keys = keys.path(CLIENT_SECRET_FILE);
+    if in_keys.exists() || crate::dir_is_writable(keys.dir()) {
+        return in_keys;
+    }
+    crate::rauthy_dir(config).join(CLIENT_SECRET_FILE)
+}
+
+fn write_client_secret(config: &Config, secret: &str) -> Result<()> {
+    let path = client_secret_path(config);
+    if path.starts_with(config.keys_dir()) {
+        return KeySet::of(config).write(CLIENT_SECRET_FILE, secret.as_bytes());
+    }
+    std::fs::write(&path, secret.as_bytes())
+        .map_err(|err| Error::Io(format!("{} cannot be written: {err}", path.display())))?;
+    crate::set_mode(&path, crate::KEY_FILE_MODE)
+}
+
 /// Register the cell's OIDC client and custody its secret (spec 021 B-5),
 /// after rauthy is healthy and before serve.
 ///
@@ -134,13 +159,12 @@ pub async fn custody_client(config: &Config, keys: &KeySet, app_name: &str) -> R
         } => Some(secret),
         Bootstrap::Created { secret: None } | Bootstrap::Unchanged => None,
     };
-    let secret_path = keys.path(CLIENT_SECRET_FILE);
     match minted {
-        Some(secret) => keys.write(CLIENT_SECRET_FILE, secret.as_bytes()),
-        None if secret_path.exists() => Ok(()),
+        Some(secret) => write_client_secret(config, &secret),
+        None if client_secret_path(config).exists() => Ok(()),
         None => {
             let secret = read_client_secret(&idp, &token).await?;
-            keys.write(CLIENT_SECRET_FILE, secret.as_bytes())
+            write_client_secret(config, &secret)
         }
     }
 }

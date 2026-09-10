@@ -96,7 +96,11 @@ pub fn run_with<C: Cell>(args: &[String], env: &dyn EnvReader) -> i32 {
 async fn dispatch<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<i32> {
     match verb {
         Verb::Supervise => supervise::<C>(env).await,
-        Verb::FirstBoot => first_boot::<C>(env).await.map(|()| 0),
+        Verb::FirstBoot { export: true } => {
+            print!("{}", rahi_ops::first_boot::export()?);
+            Ok(0)
+        }
+        Verb::FirstBoot { export: false } => first_boot::<C>(env).await.map(|()| 0),
         other => verbs_030::<C>(other, env).await.map(|()| 0),
     }
 }
@@ -159,7 +163,7 @@ async fn supervise<C: Cell>(env: &dyn EnvReader) -> Result<i32> {
 /// The verbs of spec 030.
 async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
     match verb {
-        Verb::Help | Verb::Version | Verb::Supervise | Verb::FirstBoot => Ok(()),
+        Verb::Help | Verb::Version | Verb::Supervise | Verb::FirstBoot { .. } => Ok(()),
         Verb::Serve => serve::serve::<C>(env).await,
         Verb::Preflight => {
             let report = rahi_ops::preflight::run(env, C::manifest()).await;
@@ -171,13 +175,13 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
             }
         }
         Verb::Migrate { backup } => {
-            let booted = Booted::open::<C>(env).await?;
+            let booted = Booted::open_or_attach::<C>(env).await?;
             let result = migrate::<C>(&booted, backup, env).await;
             booted.shutdown().await;
             result
         }
         Verb::Backup { to } => {
-            let booted = Booted::open::<C>(env).await?;
+            let booted = Booted::open_or_attach::<C>(env).await?;
             let to = match to {
                 Some(raw) => Destination::parse(&raw)?,
                 None => Destination::default_for(&booted.config),

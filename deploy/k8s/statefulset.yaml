@@ -1,0 +1,115 @@
+# One StatefulSet, `replicas: 1` by default; deploy/n3 sets three (spec
+# 032 B-1). Every replica is identical: one container (the supervisor of
+# spec 031), one volume at /data from the claim template, both Raft
+# clusters inside the pod, the key set from a Secret mounted read-only at
+# /data/keys (B-2), probes on the chassis paths (B-4).
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rahi
+spec:
+  serviceName: rahi-hl
+  replicas: 1
+  # Every replica starts at once: a Raft cluster needs its peers up to
+  # elect, and an ordered start would wait on an election that cannot
+  # happen (B-1).
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rahi
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rahi
+    spec:
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+        - name: rahi
+          image: ghcr.io/bartekus/rahi
+          # The image's entrypoint (spec 031 B-3) runs first-boot, migrate,
+          # then supervise. At N=1 a container start is the deployment and
+          # the entrypoint is right as it is; deploy/n3 wraps the migrate
+          # step so a follower's refusal (exit 2, spec 030 B-4) does not
+          # stop the pod, and the migration Job carries new migrations
+          # before a rollout (B-6).
+          ports:
+            - name: http
+              containerPort: 8443
+            - name: hiqlite-api
+              containerPort: 8300
+            - name: hiqlite-raft
+              containerPort: 8400
+            - name: rauthy-api
+              containerPort: 8200
+            - name: rauthy-raft
+              containerPort: 8100
+          env:
+            # The pod ordinal; the chassis derives both node ids from it
+            # (ordinal + 1). The label is stamped by the StatefulSet
+            # controller from Kubernetes 1.28 on.
+            - name: RAHI_POD_INDEX
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['apps.kubernetes.io/pod-index']
+          envFrom:
+            - configMapRef:
+                name: rahi-config
+            # The S3 endpoint and credentials `rahi backup --to s3://` reads
+            # (B-5); the verb runs inside the pod, so the pod carries them.
+            - secretRef:
+                name: rahi-s3
+                optional: true
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: keys
+              mountPath: /data/keys
+              readOnly: true
+          startupProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            # Ninety seconds for the two elections (B-4).
+            periodSeconds: 5
+            failureThreshold: 18
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+      volumes:
+        - name: keys
+          secret:
+            secretName: rahi-keys
+            # 0400 to root; the kubelet grants the pod's fsGroup a read bit.
+            # Nobody can write and the world cannot read, which is what the
+            # chassis checks on a read-only mount.
+            defaultMode: 0400
+  # One claim per replica: ReadWriteOnce, never shared. Two Raft members on
+  # one volume is corruption by construction, and scripts/k8s-validate.sh
+  # refuses any ReadWriteMany claim in the render (B-7).
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi

@@ -21,7 +21,7 @@ SPEC_SPINE_VERSION ?= 0.18.0
 SPEC_SPINE_DEFAULT_BRANCH ?= $(shell git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
 BASE ?= origin/$(or $(SPEC_SPINE_DEFAULT_BRANCH),main)
 
-.PHONY: setup gate refresh spec-dag ci build test lint fmt deny coverage attest verify help
+.PHONY: setup gate refresh spec-dag k8s ci build test lint fmt deny coverage attest verify help
 
 ## setup: install the pinned spec-spine and prove the governed loop once
 setup:
@@ -60,8 +60,13 @@ refresh:
 spec-dag:
 	scripts/spec-dag.sh
 
+## k8s: the manifests against the chassis's port and volume contract (spec 032 B-7; guarded on the script)
+k8s:
+	@if [ -x scripts/k8s-validate.sh ]; then scripts/k8s-validate.sh; else echo "k8s: no scripts/k8s-validate.sh yet (lands with spec 032)"; fi
+
 ## ci: everything CI runs, in order
 ci: gate
+	$(MAKE) k8s
 	$(MAKE) build
 	$(MAKE) test
 	$(MAKE) lint

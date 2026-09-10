@@ -1,0 +1,86 @@
+# The nightly backup (spec 032 B-5): `rahi backup --to s3://<bucket>/<app>/`
+# runs inside the replica that leads the app's Raft, because the archive is
+# built from that replica's own snapshot, keys, and rauthy. The verb
+# attaches to the running node (it never starts a second one) and exits 2
+# on a follower, so the job walks the pods in ordinal order until one
+# succeeds. The S3 endpoint and credentials come from the rahi-s3 Secret
+# the StatefulSet already carries. Retention is the bucket's lifecycle
+# rule, not the chassis's.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rahi-backup
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: rahi-backup
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: rahi-backup
+subjects:
+  - kind: ServiceAccount
+    name: rahi-backup
+roleRef:
+  kind: Role
+  name: rahi-backup
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: rahi-backup
+spec:
+  schedule: "15 3 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: rahi-backup
+        spec:
+          restartPolicy: Never
+          serviceAccountName: rahi-backup
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+          containers:
+            - name: backup
+              image: bitnami/kubectl:1.31
+              env:
+                - name: RAHI_BACKUP_TARGET
+                  value: s3://rahi-backups/cell/
+              command: ["/bin/sh", "-ec"]
+              args:
+                - |
+                  pods=$(kubectl get pods -l app.kubernetes.io/name=rahi \
+                    -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | sort)
+                  [ -n "$pods" ] || { echo "no rahi pods"; exit 1; }
+                  for pod in $pods; do
+                    echo "backup: trying $pod"
+                    if kubectl exec "$pod" -c rahi -- rahi backup --to "$RAHI_BACKUP_TARGET"; then
+                      echo "backup: $pod is the leader; done"
+                      exit 0
+                    fi
+                    code=$?
+                    if [ "$code" -ne 2 ]; then
+                      echo "backup: $pod failed with $code"
+                      exit "$code"
+                    fi
+                    echo "backup: $pod is a follower (exit 2); next"
+                  done
+                  echo "backup: no leader among: $pods"
+                  exit 2

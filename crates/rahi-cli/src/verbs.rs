@@ -60,8 +60,12 @@ pub enum Verb {
     },
     /// Spec 031.
     Supervise,
-    /// Spec 031.
-    FirstBoot,
+    /// Spec 031; `export` is `--export` (spec 032 B-2).
+    FirstBoot {
+        /// Render a Kubernetes Secret holding a freshly minted key set
+        /// instead of writing the volume.
+        export: bool,
+    },
 }
 
 /// The usage text.
@@ -146,7 +150,11 @@ where
         "serve" => no_options(verb, &rest, Verb::Serve),
         "preflight" => no_options(verb, &rest, Verb::Preflight),
         "supervise" => no_options(verb, &rest, Verb::Supervise),
-        "first-boot" => no_options(verb, &rest, Verb::FirstBoot),
+        "first-boot" => match rest.as_slice() {
+            [] => Ok(Verb::FirstBoot { export: false }),
+            ["--export"] => Ok(Verb::FirstBoot { export: true }),
+            _ => Err(unexpected(verb, &rest)),
+        },
         "migrate" => match rest.as_slice() {
             [] => Ok(Verb::Migrate { backup: false }),
             ["--backup"] => Ok(Verb::Migrate { backup: true }),

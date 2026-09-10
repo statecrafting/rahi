@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rahi-config
+data:
+  # Three peers for each cluster: the app's on 8400/8300, rauthy's on
+  # 8100/8200. Ordinal n is node n+1.
+  RAHI_HIQ_NODES: |
+    1 rahi-0.rahi-hl:8400 rahi-0.rahi-hl:8300
+    2 rahi-1.rahi-hl:8400 rahi-1.rahi-hl:8300
+    3 rahi-2.rahi-hl:8400 rahi-2.rahi-hl:8300
+  RAHI_RAUTHY_HQL_NODES: |
+    1 rahi-0.rahi-hl:8100 rahi-0.rahi-hl:8200
+    2 rahi-1.rahi-hl:8100 rahi-1.rahi-hl:8200
+    3 rahi-2.rahi-hl:8100 rahi-2.rahi-hl:8200

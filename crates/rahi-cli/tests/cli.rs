@@ -5,6 +5,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 
+use std::collections::BTreeMap;
 use std::net::TcpListener;
 use std::os::unix::fs::PermissionsExt as _;
 use std::path::{Path, PathBuf};
@@ -471,6 +472,118 @@ fn backup_and_restore_round_trip_through_the_binary() {
     ]);
     assert_eq!(run.code, 0, "{}", run.stderr);
     assert!(run.stdout.contains("was already applied"), "{}", run.stdout);
+}
+
+#[test]
+fn backup_inside_a_running_replica_attaches_to_its_node_instead_of_opening_a_second() {
+    let rauthy = stub_rauthy();
+    let mut volume = Volume::new();
+    volume.env.retain(|(k, _)| k != "RAHI_RAUTHY_ADDR");
+    volume
+        .env
+        .push(("RAHI_RAUTHY_ADDR".to_owned(), rauthy.addr.clone()));
+    assert_eq!(volume.run(&["migrate"]).code, 0);
+
+    // The node runs here, the way `serve` holds it inside a pod; the verb
+    // runs in another process against the same volume (spec 032 B-5).
+    let env: BTreeMap<String, String> = volume.env.iter().cloned().collect();
+    let config = rahi_types::Config::from_env(&env).unwrap();
+    let secrets = KeySet::of(&config).store_secrets().unwrap();
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .unwrap();
+    let store = runtime
+        .block_on(rahi_store::Store::open(
+            &rahi_ops::store_config(&config, &env, secrets).unwrap(),
+        ))
+        .unwrap();
+    assert!(
+        rahi_ops::app_lock_file(&config).exists(),
+        "the node holds its lock"
+    );
+
+    let elsewhere = tempfile::tempdir().unwrap();
+    let run = volume.run(&["backup", "--to", elsewhere.path().to_str().unwrap()]);
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert!(
+        run.stdout.starts_with("backup: rahi-backup-"),
+        "{}",
+        run.stdout
+    );
+    assert_eq!(std::fs::read_dir(elsewhere.path()).unwrap().count(), 1);
+    assert!(
+        rahi_ops::app_lock_file(&config).exists(),
+        "the running node's lock survives the verb"
+    );
+
+    // The migration Job (spec 032 B-6): no volume of its own, a pure client
+    // of the peers, the same verb.
+    let job = tempfile::tempdir().unwrap();
+    let job_keys = job.path().join("keys");
+    std::fs::create_dir_all(&job_keys).unwrap();
+    for entry in std::fs::read_dir(volume.path().join("keys")).unwrap() {
+        let entry = entry.unwrap();
+        std::fs::copy(entry.path(), job_keys.join(entry.file_name())).unwrap();
+    }
+    std::fs::set_permissions(&job_keys, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let mut client = Volume::new();
+    client.env.retain(|(k, _)| {
+        k != "RAHI_DATA_DIR" && k != "RAHI_HIQLITE_API_ADDR" && k != "RAHI_HIQLITE_RAFT_ADDR"
+    });
+    client
+        .env
+        .push(("RAHI_DATA_DIR".to_owned(), job.path().display().to_string()));
+    client
+        .env
+        .push(("RAHI_STORE_CLIENT".to_owned(), "true".to_owned()));
+    client.env.push((
+        "RAHI_HIQ_NODES".to_owned(),
+        format!("1 {} {}", config.hiqlite.raft_addr, config.hiqlite.api_addr),
+    ));
+    let run = client.run(&["migrate"]);
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert!(
+        run.stdout.contains("applied: none"),
+        "the store is current: {}",
+        run.stdout
+    );
+    assert!(
+        !job.path().join("hiqlite").exists(),
+        "a client opens no node of its own"
+    );
+    runtime.block_on(store.shutdown()).unwrap();
+}
+
+#[test]
+fn first_boot_export_renders_a_secret_with_every_key_and_touches_no_volume() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_rahi"));
+    cmd.args(["first-boot", "--export"])
+        .env("RAHI_PUBLIC_URL", "https://cell.example.com")
+        .env("RAHI_DATA_DIR", dir.path());
+    let run = Run::of(cmd.output().unwrap());
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert!(run.stdout.contains("kind: Secret"), "{}", run.stdout);
+    assert!(run.stdout.contains("name: rahi-keys"));
+    for name in [
+        "ledger.key",
+        "session.key",
+        "hiqlite.json",
+        "backup.key",
+        "rauthy.json",
+        "rauthy_admin_token",
+    ] {
+        assert!(
+            run.stdout.contains(&format!("  {name}: ")),
+            "{name} in the Secret"
+        );
+    }
+    assert!(
+        std::fs::read_dir(dir.path()).unwrap().next().is_none(),
+        "the volume was not touched"
+    );
 }
 
 #[test]

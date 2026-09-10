@@ -223,6 +223,9 @@ fn the_template_and_the_renderer_agree_on_every_placeholder() {
         rauthy_env::HqlPorts {
             raft: 8100,
             api: 8200,
+            node_id: 1,
+            nodes: None,
+            listen_addr: "127.0.0.1".to_owned(),
         },
     )
     .unwrap();
@@ -232,4 +235,77 @@ fn the_template_and_the_renderer_agree_on_every_placeholder() {
     assert_eq!(values["RP_ORIGIN"], "https://cell.example.com:8443");
     assert_eq!(values["PUB_URL"], "cell.example.com:8443");
     assert_eq!(values["RP_ID"], "cell.example.com");
+}
+
+#[tokio::test]
+async fn a_replica_renders_its_ordinal_and_its_peers_into_rauthys_environment() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut env = env(dir.path(), "https://cell.example.com");
+    env.insert("RAHI_POD_INDEX".to_owned(), "1".to_owned());
+    env.insert(
+        "RAHI_RAUTHY_HQL_NODES".to_owned(),
+        "1 rahi-0.rahi:8100 rahi-0.rahi:8200;2 rahi-1.rahi:8100 rahi-1.rahi:8200;3 rahi-2.rahi:8100 rahi-2.rahi:8200".to_owned(),
+    );
+    env.insert(
+        "RAHI_RAUTHY_HQL_LISTEN_ADDR".to_owned(),
+        "0.0.0.0".to_owned(),
+    );
+    first_boot::run(&env, "cell").await.unwrap();
+    let rendered =
+        std::fs::read_to_string(rauthy_env::env_path(&Config::from_env(&env).unwrap())).unwrap();
+    let pairs: BTreeMap<String, String> = rauthy_env::parse(&rendered).into_iter().collect();
+    assert_eq!(pairs["HQL_NODE_ID"], "2", "ordinal 1 is node 2");
+    assert_eq!(pairs["HQL_LISTEN_ADDR_API"], "0.0.0.0");
+    assert_eq!(pairs["HQL_LISTEN_ADDR_RAFT"], "0.0.0.0");
+    let nodes: Vec<&str> = rendered
+        .lines()
+        .filter(|l| {
+            l.starts_with("HQL_NODES=") || l.chars().next().is_some_and(|c| c.is_ascii_digit())
+        })
+        .collect();
+    assert_eq!(nodes.len(), 3, "three peers, one per line: {nodes:?}");
+    assert!(nodes[0].ends_with("1 rahi-0.rahi:8100 rahi-0.rahi:8200"));
+    assert_eq!(nodes[2], "3 rahi-2.rahi:8100 rahi-2.rahi:8200");
+    assert_eq!(rauthy_env::node_id(&env).unwrap(), 2);
+    assert!(
+        rauthy_env::parse_nodes("1 a:1").is_err(),
+        "a pair is not a triple"
+    );
+}
+
+#[tokio::test]
+async fn a_read_only_key_mount_is_accepted_and_a_writable_wide_one_is_not() {
+    let dir = tempfile::tempdir().unwrap();
+    let env = env(dir.path(), "http://localhost:8080");
+    let config = Config::from_env(&env).unwrap();
+    first_boot::run(&env, "cell").await.unwrap();
+    let keys = KeySet::of(&config);
+
+    // A read-only mount: no write bits for the process, none for others.
+    std::fs::set_permissions(keys.dir(), std::fs::Permissions::from_mode(0o555)).unwrap();
+    keys.check()
+        .expect("a read-only mount with 0600 files passes");
+    let outcome = first_boot::run(&env, "cell").await.unwrap();
+    assert_eq!(
+        outcome,
+        Outcome::Verified {
+            env_rendered: false
+        }
+    );
+
+    // A kubelet-owned file on that mount: root-owned, group-readable, no
+    // write bit anywhere. Accepted there, refused on a writable directory.
+    let ledger = keys.path(rahi_ops::LEDGER_KEY_FILE);
+    std::fs::set_permissions(&ledger, std::fs::Permissions::from_mode(0o440)).unwrap();
+    keys.check().expect("0440 on a read-only mount is private");
+    std::fs::set_permissions(&ledger, std::fs::Permissions::from_mode(0o444)).unwrap();
+    let err = keys.check().unwrap_err();
+    assert!(err.to_string().contains("has mode 0444"), "{err}");
+    std::fs::set_permissions(&ledger, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+    // Writable and readable by the group: refused.
+    std::fs::set_permissions(keys.dir(), std::fs::Permissions::from_mode(0o775)).unwrap();
+    let err = keys.check().unwrap_err();
+    assert!(err.to_string().contains("has mode 0775"), "{err}");
+    std::fs::set_permissions(keys.dir(), std::fs::Permissions::from_mode(0o700)).unwrap();
 }
