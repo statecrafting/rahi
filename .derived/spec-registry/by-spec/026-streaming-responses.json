@@ -42,7 +42,7 @@
       "wave": 2
     },
     "id": "026-streaming-responses",
-    "implementation": "pending",
+    "implementation": "in-progress",
     "kind": "kernel",
     "risk": "medium",
     "sectionHeadings": [
@@ -61,6 +61,6 @@
     "summary": "A response that is produced over seconds rather than milliseconds breaks every default the edge holds: compression buffers it, the request timeout kills it, the rate limiter counts it once and forgets it, and graceful shutdown drops it mid-sentence. This spec adds one streaming mechanism, server-sent events, and makes a streaming route declare itself so those four defaults are turned off deliberately rather than discovered in production. Streams are bounded by a per-stream channel and a per-client concurrency limit, are cancellation-aware, close cleanly on shutdown, and are one span each in the tracer.\n",
     "title": "Streaming responses: server-sent events as the one mechanism, declared per route, bounded and cancellable"
   },
-  "shardHash": "0ace102b2a06e5fd370784986b48d28bceb5ce5c8a205d11dbe4b0e265fdabaf",
+  "shardHash": "88526e4ba9330bc97913fd8e55b56702b5c703ef9ccf54545a6a452a54eb971d",
   "specVersion": "1.2.0"
 }
