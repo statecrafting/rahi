@@ -3159,6 +3159,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "rahi-harness"
+version = "0.1.0"
+dependencies = [
+ "reqwest",
+ "ring",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "rahi-idp"
 version = "0.1.0"
 dependencies = [

@@ -1,0 +1,29 @@
+[package]
+name = "rahi-harness"
+version = "0.1.0"
+description = "The test harness of the rahi chassis: boot a built cell binary under a throwaway volume, wait on /readyz, hand back a client with a cookie jar"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[package.metadata.spec-spine]
+spec = "033-dev-substrate-and-harness"
+
+# No chassis crate is a dependency (spec 033 B-2): the harness drives any
+# built cell, including one in another repository, through its binary
+# and its HTTP surface alone.
+[dependencies]
+reqwest = { workspace = true }
+ring = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "sync", "time"] }
+url = { workspace = true }
+
+[dev-dependencies]
+
+[lints]
+workspace = true

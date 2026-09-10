@@ -1,57 +1,57 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '033-dev-substrate-and-harness' file unit 'docker/compose.yml' does not exist",
-        "path": "docker/compose.yml"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '033-dev-substrate-and-harness' file unit 'crates/rahi-harness/Cargo.toml' does not exist",
-        "path": "crates/rahi-harness/Cargo.toml"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '033-dev-substrate-and-harness' file unit 'crates/rahi-harness/src/lib.rs' does not exist",
-        "path": "crates/rahi-harness/src/lib.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '033-dev-substrate-and-harness' file unit 'crates/rahi-harness/src/boot.rs' does not exist",
-        "path": "crates/rahi-harness/src/boot.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '033-dev-substrate-and-harness' file unit 'crates/rahi-harness/src/client.rs' does not exist",
-        "path": "crates/rahi-harness/src/client.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '033-dev-substrate-and-harness' file unit 'crates/rahi-harness/src/cookies.rs' does not exist",
-        "path": "crates/rahi-harness/src/cookies.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '033-dev-substrate-and-harness' file unit 'crates/rahi-harness/src/rauthy.rs' does not exist",
-        "path": "crates/rahi-harness/src/rauthy.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '033-dev-substrate-and-harness' file unit 'crates/rahi-harness/tests/boot.rs' does not exist",
-        "path": "crates/rahi-harness/tests/boot.rs"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "031-single-container-packaging"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "crates/rahi-harness",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "crates/rahi-harness/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-harness/src/boot.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-harness/src/client.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-harness/src/cookies.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-harness/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-harness/src/rauthy.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-harness/tests/boot.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/rauthy_env.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "docker/compose.yml",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-harness/Cargo.toml"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -60,7 +60,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-harness/src/boot.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -69,7 +73,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-harness/src/client.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -78,7 +86,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-harness/src/cookies.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -87,7 +99,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-harness/src/lib.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -96,7 +112,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-harness/src/rauthy.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -105,7 +125,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-harness/tests/boot.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -114,12 +138,29 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "docker/compose.yml"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
           "kind": "file",
           "path": "docker/compose.yml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/rauthy_env.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_env.rs"
         }
       }
     ],
@@ -127,5 +168,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "26b442d82fa2e4164d9986e46f8ebb3ec15baa3dee8ac7b050b81af7b7a0832f"
+  "shardHash": "570a98f6510315a4d249211374ce4e2c1c98f55c7bf74dec3c1999c30a754ee0"
 }

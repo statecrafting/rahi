@@ -31,3 +31,6 @@ data/
 
 # subagent scratch memory written by the reviewer agent; never corpus truth
 .claude/agent-memory/
+
+# the compose volume of docker/compose.yml (spec 033 B-1)
+docker/.data/
