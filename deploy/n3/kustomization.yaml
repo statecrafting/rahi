@@ -1,0 +1,19 @@
+# The documented patch that sets three replicas (spec 032 B-1). Every
+# replica is identical; what changes is the count, the peer lists, and
+# the entrypoint's migrate step, which a follower refuses with exit 2
+# (spec 030 B-4) and which must not stop the pod.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../k8s
+
+patches:
+  - path: peers.yaml
+    target:
+      kind: ConfigMap
+      name: rahi-config
+  - path: replicas.yaml
+    target:
+      kind: StatefulSet
+      name: rahi

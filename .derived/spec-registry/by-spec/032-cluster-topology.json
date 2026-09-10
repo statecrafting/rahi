@@ -15,6 +15,10 @@
       },
       {
         "kind": "file",
+        "path": "deploy/k8s/configmap.yaml"
+      },
+      {
+        "kind": "file",
         "path": "deploy/k8s/statefulset.yaml"
       },
       {
@@ -24,6 +28,10 @@
       {
         "kind": "file",
         "path": "deploy/k8s/ingress.yaml"
+      },
+      {
+        "kind": "file",
+        "path": "deploy/k8s/migrate-job.yaml"
       },
       {
         "kind": "file",
@@ -39,18 +47,156 @@
       },
       {
         "kind": "file",
+        "path": "deploy/n3/"
+      },
+      {
+        "kind": "file",
         "path": "deploy/README.md"
       },
       {
         "kind": "file",
         "path": "scripts/k8s-validate.sh"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-store/tests/attach.rs"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "011-store-hiqlite",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/store.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "011-store-hiqlite",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/backup.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/Cargo.toml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/preflight.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/verbs.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/cli.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/first_boot.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_env.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/supervise.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/first_boot.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "docker/rauthy.env.template"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-agentic-harness",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-agentic-harness",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/govern.yml"
+        }
       }
     ],
     "extraFrontmatter": {
       "wave": 3
     },
     "id": "032-cluster-topology",
-    "implementation": "pending",
+    "implementation": "complete",
     "kind": "tooling",
     "risk": "high",
     "sectionHeadings": [
@@ -62,6 +208,7 @@
       "5. Acceptance criteria",
       "6. Out of scope",
       "7. Resolved decisions",
+      "8. Status",
       "Verification"
     ],
     "specPath": "specs/032-cluster-topology/spec.md",
@@ -69,6 +216,6 @@
     "summary": "What multiplies and what does not. At N=1 nothing changes. At N=3 every replica is identical: a StatefulSet pod running the supervisor, with its own volume, two Raft clusters per replica (rauthy's and the app's), peers discovered by stable pod DNS, one key set injected as a Secret and custodied once, the public origin on an Ingress that terminates TLS and keeps /metrics off it, a CronJob that runs backup --to s3:// against the leader, and a ServiceMonitor example. Rate limiting is per node and says so. A shared volume between Raft members is refused by the manifests themselves. Carries enrahitu://030.\n",
     "title": "Cluster topology: N=1 primary, N=3 StatefulSet on Kubernetes, one key set, S3 backups"
   },
-  "shardHash": "203ffdda98c4a1e0e891fca2628128a6a36a2107e5d62d8e580121092c930e0d",
+  "shardHash": "ce5b638970b907dc37bccea2e0ed9dab98e16e2beddfe1781ccc30806dd42acf",
   "specVersion": "1.2.0"
 }

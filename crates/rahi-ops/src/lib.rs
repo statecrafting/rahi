@@ -171,9 +171,13 @@ impl KeySet {
             ))
         })?;
         let dir_mode = dir_meta.permissions().mode() & 0o777;
-        if dir_mode != KEY_DIR_MODE {
+        // A Secret mounted read-only (spec 032 B-2) carries the mount's own
+        // directory mode; what matters is that nobody else can write to it
+        // and that this process cannot either. Anything else must be 0700.
+        let read_only_mount = is_read_only_dir(&self.dir);
+        if dir_mode != KEY_DIR_MODE && !read_only_mount {
             return Err(Error::Config(format!(
-                "key directory {} has mode {dir_mode:04o}, expected {KEY_DIR_MODE:04o}",
+                "key directory {} has mode {dir_mode:04o}, expected {KEY_DIR_MODE:04o} (or a read-only mount)",
                 self.dir.display()
             )));
         }
@@ -183,7 +187,11 @@ impl KeySet {
                 Error::Config(format!("key file {} is missing: {err}", path.display()))
             })?;
             let mode = meta.permissions().mode() & 0o777;
-            if mode != KEY_FILE_MODE {
+            // On a read-only mount the kubelet owns the files (root, the
+            // pod's fsGroup) and grants the group a read bit; a file nobody
+            // can write and the world cannot read is as private as 0600.
+            let private_on_mount = read_only_mount && mode & 0o400 != 0 && mode & 0o227 == 0;
+            if mode != KEY_FILE_MODE && !private_on_mount {
                 return Err(Error::Config(format!(
                     "key file {} has mode {mode:04o}, expected {KEY_FILE_MODE:04o}",
                     path.display()
@@ -344,6 +352,33 @@ pub fn generate_backup_identity() -> String {
         .to_owned()
 }
 
+/// Whether `dir` is a read-only mount as far as this deployment is
+/// concerned (spec 032 B-2): this process cannot create a file in it. The
+/// mode bits say nothing here; the kubelet mounts a Secret on a tmpfs
+/// whose root is `1777` regardless of `defaultMode`, and `readOnly: true`
+/// is what makes it unwritable.
+#[must_use]
+pub fn is_read_only_dir(dir: &Path) -> bool {
+    dir.is_dir() && !dir_is_writable(dir)
+}
+
+/// Whether this process can create a file in `dir`.
+#[must_use]
+pub fn dir_is_writable(dir: &Path) -> bool {
+    let probe = dir.join(format!(".rahi-probe-{}", std::process::id()));
+    match std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&probe)
+    {
+        Ok(_) => {
+            let _ = std::fs::remove_file(&probe);
+            true
+        }
+        Err(_) => false,
+    }
+}
+
 /// Set `path`'s mode bits.
 ///
 /// # Errors
@@ -382,6 +417,58 @@ pub fn restore_marker(config: &Config) -> PathBuf {
 #[must_use]
 pub fn backups_dir(config: &Config) -> PathBuf {
     config.data_dir.join(BACKUPS_DIR)
+}
+
+/// The app's hiqlite peers, one `<id> <raft_addr> <api_addr>` per line or
+/// separated by `;` (spec 032 B-1). Unset means the one node the
+/// configuration's own addresses describe.
+pub const ENV_HIQ_NODES: &str = "RAHI_HIQ_NODES";
+
+/// `true` (or `1`) makes a verb a pure client of the cluster named by
+/// [`ENV_HIQ_NODES`], starting no node of its own (spec 032 B-6): the
+/// migration Job that runs the new image before a rollout.
+pub const ENV_STORE_CLIENT: &str = "RAHI_STORE_CLIENT";
+
+/// Whether [`ENV_STORE_CLIENT`] asks for a pure client.
+#[must_use]
+pub fn store_client_requested(env: &dyn rahi_types::EnvReader) -> bool {
+    env.get(ENV_STORE_CLIENT)
+        .is_some_and(|v| v.eq_ignore_ascii_case("true") || v == "1")
+}
+
+/// The store configuration for this replica: spec 011's derivation from
+/// the configuration tree, with the node id and the peers spec 032 B-1
+/// renders into the environment at N=3.
+///
+/// # Errors
+///
+/// [`Error::Config`] when the node id or the peer list does not parse, or
+/// when the peers do not name this node.
+pub fn store_config(
+    config: &Config,
+    env: &dyn rahi_types::EnvReader,
+    secrets: StoreSecrets,
+) -> Result<rahi_store::StoreConfig> {
+    let mut store = rahi_store::StoreConfig::from_config(config, secrets);
+    store.node_id = rauthy_env::node_id(env)?;
+    if let Some(raw) = env.get(ENV_HIQ_NODES) {
+        let nodes = rauthy_env::parse_nodes(&raw)?;
+        if !nodes.iter().any(|n| n.id == store.node_id) {
+            return Err(Error::Config(format!(
+                "{ENV_HIQ_NODES} names no node {}; this replica is not in its own peer list",
+                store.node_id
+            )));
+        }
+        store.nodes = nodes
+            .into_iter()
+            .map(|n| rahi_store::Peer {
+                id: n.id,
+                raft_addr: n.raft_addr,
+                api_addr: n.api_addr,
+            })
+            .collect();
+    }
+    Ok(store)
 }
 
 /// Refuse to proceed while [`RESTORE_ENV_VAR`] is set in this process.

@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rahi
+spec:
+  replicas: 3
+  template:
+    spec:
+      # Pods of a StatefulSet share a node only if the scheduler is told
+      # nothing; three Raft members on one machine is one failure domain.
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: rahi
+      containers:
+        - name: rahi
+          # The entrypoint's three steps (spec 031 B-3), with the migrate
+          # step tolerating a follower's exit 2: the leader applies the
+          # migrations and the followers carry on to supervise. New
+          # migrations arrive by the Job (B-6) before a rollout; this only
+          # covers the first start of a fresh cluster.
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              rahi first-boot
+              rahi migrate || [ "$?" -eq 2 ]
+              exec rahi supervise

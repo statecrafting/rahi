@@ -10,7 +10,7 @@ use std::fmt;
 
 use rahi_kernel::Manifest;
 use rahi_ledger::Ledger;
-use rahi_store::{Store, StoreConfig};
+use rahi_store::Store;
 use rahi_types::{Config, EnvReader, Error, Result};
 
 use crate::KeySet;
@@ -137,6 +137,10 @@ impl fmt::Display for Report {
 /// Run every check against `env` for the cell whose manifest is
 /// `manifest_text`.
 pub async fn run(env: &dyn EnvReader, manifest_text: &str) -> Report {
+    run_inner(env, manifest_text).await
+}
+
+async fn run_inner(env: &dyn EnvReader, manifest_text: &str) -> Report {
     let mut checks = Vec::with_capacity(CHECKS.len());
 
     let config = match Config::from_env(env) {
@@ -187,7 +191,7 @@ pub async fn run(env: &dyn EnvReader, manifest_text: &str) -> Report {
     // restore variable at start and would apply it, and a key set that does
     // not read cannot open the store anyway.
     let store = match (&keys_ok, &restore_ok) {
-        (Ok(()), Ok(())) => open_store(&config, &keys).await,
+        (Ok(()), Ok(())) => open_store(&config, env, &keys).await,
         (Err(_), _) => Err(Error::Config(
             "skipped: the key set did not check".to_owned(),
         )),
@@ -254,7 +258,11 @@ fn data_dir_writable(config: &Config) -> Result<String> {
     Ok(format!("{} is writable", dir.display()))
 }
 
-async fn open_store(config: &Config, keys: &KeySet) -> Result<(Store, String)> {
+async fn open_store(
+    config: &Config,
+    env: &dyn EnvReader,
+    keys: &KeySet,
+) -> Result<(Store, String)> {
     let lock = crate::app_lock_file(config);
     if lock.exists() {
         return Err(Error::Conflict(format!(
@@ -263,7 +271,7 @@ async fn open_store(config: &Config, keys: &KeySet) -> Result<(Store, String)> {
         )));
     }
     let secrets = keys.store_secrets()?;
-    let cfg = StoreConfig::from_config(config, secrets);
+    let cfg = crate::store_config(config, env, secrets)?;
     let store = Store::open(&cfg).await?;
     store.health().await?;
     let role = if store.is_leader().await {
@@ -272,8 +280,10 @@ async fn open_store(config: &Config, keys: &KeySet) -> Result<(Store, String)> {
         "follower"
     };
     let detail = format!(
-        "node {} opened at {} and is {role}",
-        cfg.node_id, cfg.api_addr
+        "node {} of {} opened at {} and is {role}",
+        cfg.node_id,
+        cfg.nodes.len().max(1),
+        cfg.api_addr
     );
     Ok((store, detail))
 }

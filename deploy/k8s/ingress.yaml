@@ -1,0 +1,31 @@
+# TLS terminates here; the cell sees one trusted hop (spec 032 B-3).
+# /metrics is not routed: the ServiceMonitor scrapes it in-cluster. The
+# ingress-nginx snippet below closes it at the edge, because a `/` prefix
+# would otherwise carry it; another ingress class needs its equivalent.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rahi
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-body-size: 16m
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/server-snippet: |
+      location = /metrics { return 404; }
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - cell.example.com
+      secretName: rahi-tls
+  rules:
+    - host: cell.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: rahi
+                port:
+                  name: http

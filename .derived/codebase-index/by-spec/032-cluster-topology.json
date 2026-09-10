@@ -1,62 +1,146 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '032-cluster-topology' file unit 'deploy/k8s/kustomization.yaml' does not exist",
-        "path": "deploy/k8s/kustomization.yaml"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '032-cluster-topology' file unit 'deploy/k8s/statefulset.yaml' does not exist",
-        "path": "deploy/k8s/statefulset.yaml"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '032-cluster-topology' file unit 'deploy/k8s/service.yaml' does not exist",
-        "path": "deploy/k8s/service.yaml"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '032-cluster-topology' file unit 'deploy/k8s/ingress.yaml' does not exist",
-        "path": "deploy/k8s/ingress.yaml"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '032-cluster-topology' file unit 'deploy/k8s/backup-cronjob.yaml' does not exist",
-        "path": "deploy/k8s/backup-cronjob.yaml"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '032-cluster-topology' file unit 'deploy/k8s/servicemonitor.yaml' does not exist",
-        "path": "deploy/k8s/servicemonitor.yaml"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '032-cluster-topology' file unit 'deploy/k8s/secret.example.yaml' does not exist",
-        "path": "deploy/k8s/secret.example.yaml"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '032-cluster-topology' file unit 'deploy/README.md' does not exist",
-        "path": "deploy/README.md"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '032-cluster-topology' file unit 'scripts/k8s-validate.sh' does not exist",
-        "path": "scripts/k8s-validate.sh"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "031-single-container-packaging"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": ".github/workflows/govern.yml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Makefile",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/serve.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/verbs.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/tests/cli.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/first_boot.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/preflight.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/rauthy_env.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/supervise.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/tests/first_boot.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/src/backup.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/src/store.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/tests/attach.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/README.md",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/k8s/backup-cronjob.yaml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/k8s/configmap.yaml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/k8s/ingress.yaml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/k8s/kustomization.yaml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/k8s/migrate-job.yaml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/k8s/secret.example.yaml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/k8s/service.yaml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/k8s/servicemonitor.yaml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/k8s/statefulset.yaml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/n3/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "docker/rauthy.env.template",
+        "source": "spec-edge"
+      },
+      {
+        "path": "scripts/k8s-validate.sh",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-store/tests/attach.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/attach.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "deploy/README.md"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -65,7 +149,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "deploy/k8s/backup-cronjob.yaml"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -74,7 +162,24 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "deploy/k8s/configmap.yaml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/configmap.yaml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "deploy/k8s/ingress.yaml"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -83,7 +188,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "deploy/k8s/kustomization.yaml"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -92,7 +201,24 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "deploy/k8s/migrate-job.yaml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/migrate-job.yaml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "deploy/k8s/secret.example.yaml"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -101,7 +227,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "deploy/k8s/service.yaml"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -110,7 +240,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "deploy/k8s/servicemonitor.yaml"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -119,7 +253,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "deploy/k8s/statefulset.yaml"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -128,12 +266,237 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "deploy/n3/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/n3/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "scripts/k8s-validate.sh"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
           "kind": "file",
           "path": "scripts/k8s-validate.sh"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": ".github/workflows/govern.yml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/govern.yml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Makefile"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/serve.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/verbs.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/verbs.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/tests/cli.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/cli.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/first_boot.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/first_boot.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/preflight.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/preflight.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/rauthy_env.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_env.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/supervise.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/supervise.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/tests/first_boot.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/first_boot.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-store/src/backup.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/backup.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-store/src/store.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/store.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docker/rauthy.env.template"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "docker/rauthy.env.template"
         }
       }
     ],
@@ -141,5 +504,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "754a187784d33557cce643f10a062d408c3dab0713eb9e29041e451af17a3829"
+  "shardHash": "58668168c9d2319636210434d8442fdf75ea749618709c537d935e5749721be0"
 }

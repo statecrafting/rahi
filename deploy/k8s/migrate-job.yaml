@@ -1,0 +1,55 @@
+# Migrations are a Job, run once, before the rollout (spec 032 B-6). The
+# Job runs the new image as a pure client of the running cluster
+# (RAHI_STORE_CLIENT, spec 030 `migrate` through the peers in
+# RAHI_HIQ_NODES): it has no volume and starts no node, and hiqlite routes
+# the migration to the leader. Apply it with the new image tag, wait for
+# completion, then roll the StatefulSet.
+#
+# On a fresh cluster there is nothing to reach yet: the pods' own start
+# runs `rahi migrate` (the image's entrypoint, spec 031 B-3), so this Job
+# is for every rollout after the first.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: rahi-migrate
+  labels:
+    app.kubernetes.io/name: rahi-migrate
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rahi-migrate
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      containers:
+        - name: migrate
+          image: ghcr.io/bartekus/rahi
+          command: ["rahi", "migrate"]
+          env:
+            - name: RAHI_STORE_CLIENT
+              value: "true"
+            - name: RAHI_DATA_DIR
+              value: /data
+          envFrom:
+            - configMapRef:
+                name: rahi-config
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: keys
+              mountPath: /data/keys
+              readOnly: true
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: keys
+          secret:
+            secretName: rahi-keys
+            defaultMode: 0400

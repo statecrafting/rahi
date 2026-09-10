@@ -1,0 +1,25 @@
+# The cell's environment (spec 032 B-1, B-3). RAHI_PUBLIC_URL is the one
+# required input (spec 031 B-5); everything else here is the cluster shape.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rahi-config
+data:
+  # https: TLS ends at the Ingress and the cell sees one trusted hop (B-3).
+  RAHI_PUBLIC_URL: https://cell.example.com
+  RAHI_TRUSTED_PROXY_HOPS: "1"
+  # The app's hiqlite listens on the pod network so peers can reach it;
+  # the ports are the chassis defaults (spec 011 B-1).
+  RAHI_HIQLITE_API_ADDR: 0.0.0.0:8300
+  RAHI_HIQLITE_RAFT_ADDR: 0.0.0.0:8400
+  # rauthy's hiqlite: its own cluster, its own ports (constitution VIII),
+  # also on the pod network.
+  RAHI_RAUTHY_HQL_LISTEN_ADDR: 0.0.0.0
+  RAHI_RAUTHY_HQL_RAFT_PORT: "8100"
+  RAHI_RAUTHY_HQL_API_PORT: "8200"
+  # The peers, one `<id> <raft> <api>` per line, named by stable pod DNS
+  # through the headless Service. One node here; deploy/n3 names three.
+  RAHI_HIQ_NODES: |
+    1 rahi-0.rahi-hl:8400 rahi-0.rahi-hl:8300
+  RAHI_RAUTHY_HQL_NODES: |
+    1 rahi-0.rahi-hl:8100 rahi-0.rahi-hl:8200

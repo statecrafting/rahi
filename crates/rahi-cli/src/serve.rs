@@ -15,13 +15,13 @@ use rahi_edge::{
     AppState, Edge, Route, RouteClass, StreamHub, StreamIdentityResolver, StreamOptions,
 };
 use rahi_idp::{
-    AUTH_PREFIX, CLIENT_SECRET_FILE, Discovery, IdpConfig, Jwks, Proxy, Resource, SessionKey,
-    Sessions, proxy_router, resource_router, session_router,
+    AUTH_PREFIX, Discovery, IdpConfig, Jwks, Proxy, Resource, SessionKey, Sessions, proxy_router,
+    resource_router, session_router,
 };
 use rahi_kernel::{Kernel, Manifest};
 use rahi_ledger::{FsArchive, Hash, Ledger};
 use rahi_ops::KeySet;
-use rahi_store::{Store, StoreConfig};
+use rahi_store::Store;
 use rahi_types::{Config, EnvReader, Error, Result};
 
 use crate::cell::{Cell, OPERATOR_PREFIX};
@@ -142,13 +142,41 @@ impl Booted {
     /// wrong, or when [`rahi_ops::RESTORE_ENV_VAR`] is set; a store failure
     /// as itself.
     pub async fn open<C: Cell>(env: &dyn EnvReader) -> Result<Self> {
+        Self::boot::<C>(env, false).await
+    }
+
+    /// As [`Self::open`], for a verb that may run beside a running cluster
+    /// (spec 032 B-5 and B-6). With [`rahi_ops::ENV_STORE_CLIENT`] set, the
+    /// process is a pure client of the peers in [`rahi_ops::ENV_HIQ_NODES`]
+    /// and starts no node: the migration Job. When this data directory's
+    /// node is already running in another process (its lock file exists),
+    /// it attaches to that node instead of starting a second one: `rahi
+    /// backup` inside a replica whose `serve` holds the node. Otherwise it
+    /// opens the node as [`Self::open`] does.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`]; [`Error::Upstream`] when the running node does
+    /// not answer.
+    pub async fn open_or_attach<C: Cell>(env: &dyn EnvReader) -> Result<Self> {
+        Self::boot::<C>(env, true).await
+    }
+
+    async fn boot<C: Cell>(env: &dyn EnvReader, may_attach: bool) -> Result<Self> {
         let config = Config::from_env(env)?;
         rahi_ops::refuse_env_restore()?;
         let keys = KeySet::of(&config);
         keys.check()?;
         let manifest = Manifest::parse(C::manifest())?;
         let hash = manifest.hash()?;
-        let store = Store::open(&StoreConfig::from_config(&config, keys.store_secrets()?)).await?;
+        let store_cfg = rahi_ops::store_config(&config, env, keys.store_secrets()?)?;
+        let store = if may_attach && rahi_ops::store_client_requested(env) {
+            Store::connect(&store_cfg).await?
+        } else if may_attach && rahi_ops::app_lock_file(&config).exists() {
+            Store::attach(&store_cfg).await?
+        } else {
+            Store::open(&store_cfg).await?
+        };
         Ok(Self {
             config,
             keys,
@@ -254,11 +282,15 @@ pub async fn compose<C: Cell>(
         on_loopback.jwks_uri = back_channel(&idp, &discovery.jwks_uri);
         let jwks = Jwks::load(&on_loopback).await?;
         let key = SessionKey::load(&booted.keys.path(rahi_ops::SESSION_KEY_FILE))?;
-        let client_secret = booted.keys.read_text(CLIENT_SECRET_FILE).map_err(|err| {
-            Error::Config(format!(
-                "the OIDC client secret is not custodied yet; run the client bootstrap (spec 021 B-5) first: {err}"
-            ))
-        })?;
+        let secret_path = rahi_ops::supervise::client_secret_path(&booted.config);
+        let client_secret = std::fs::read_to_string(&secret_path)
+            .map(|text| text.trim().to_owned())
+            .map_err(|err| {
+                Error::Config(format!(
+                    "the OIDC client secret at {} is not custodied yet; run the client bootstrap (spec 021 B-5) first: {err}",
+                    secret_path.display()
+                ))
+            })?;
         let sessions = Sessions::new(
             &idp,
             &booted.config,

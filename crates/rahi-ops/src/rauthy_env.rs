@@ -41,6 +41,103 @@ pub const ENV_HQL_API_PORT: &str = "RAHI_RAUTHY_HQL_API_PORT";
 /// container.
 pub const TRUSTED_PROXY: &str = "127.0.0.1/32";
 
+/// This replica's hiqlite node id, for both clusters (spec 032 B-1). Unset
+/// means node `1` of a single-node deployment; [`ENV_POD_INDEX`] plus one
+/// when only the pod ordinal is known.
+pub const ENV_NODE_ID: &str = "RAHI_HIQ_NODE_ID";
+
+/// The pod's ordinal (Kubernetes' `apps.kubernetes.io/pod-index`), from
+/// which the node id is the ordinal plus one (spec 032 B-1).
+pub const ENV_POD_INDEX: &str = "RAHI_POD_INDEX";
+
+/// rauthy's hiqlite peers, one `<id> <raft_addr> <api_addr>` per line or
+/// separated by `;` (spec 032 B-1). Unset means the one loopback node.
+pub const ENV_RAUTHY_HQL_NODES: &str = "RAHI_RAUTHY_HQL_NODES";
+
+/// The address rauthy's hiqlite listens on: loopback by default, the pod
+/// network (`0.0.0.0`) in a cluster (spec 032 B-1).
+pub const ENV_RAUTHY_HQL_LISTEN_ADDR: &str = "RAHI_RAUTHY_HQL_LISTEN_ADDR";
+
+/// This replica's node id from the environment (spec 032 B-1).
+///
+/// # Errors
+///
+/// [`Error::Config`] when the value is not a positive integer.
+pub fn node_id(env: &dyn rahi_types::EnvReader) -> Result<u64> {
+    if let Some(raw) = env.get(ENV_NODE_ID) {
+        let id: u64 = raw
+            .parse()
+            .map_err(|_| Error::Config(format!("{ENV_NODE_ID} {raw:?} is not a node id")))?;
+        if id == 0 {
+            return Err(Error::Config(format!("{ENV_NODE_ID} must be at least 1")));
+        }
+        return Ok(id);
+    }
+    if let Some(raw) = env.get(ENV_POD_INDEX) {
+        let index: u64 = raw
+            .parse()
+            .map_err(|_| Error::Config(format!("{ENV_POD_INDEX} {raw:?} is not an ordinal")))?;
+        return Ok(index.saturating_add(1));
+    }
+    Ok(1)
+}
+
+/// One `<id> <raft_addr> <api_addr>` triple.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NodeLine {
+    /// The node id.
+    pub id: u64,
+    /// The Raft address, `host:port`.
+    pub raft_addr: String,
+    /// The API address, `host:port`.
+    pub api_addr: String,
+}
+
+/// Parse a peer list: triples separated by newlines or `;`.
+///
+/// # Errors
+///
+/// [`Error::Config`] naming the line that is not a triple.
+pub fn parse_nodes(raw: &str) -> Result<Vec<NodeLine>> {
+    let mut nodes = Vec::new();
+    for line in raw
+        .split(['\n', ';'])
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+    {
+        let mut parts = line.split_whitespace();
+        let (Some(id), Some(raft), Some(api), None) =
+            (parts.next(), parts.next(), parts.next(), parts.next())
+        else {
+            return Err(Error::Config(format!(
+                "node line {line:?} is not `<id> <raft_addr> <api_addr>`"
+            )));
+        };
+        let id: u64 = id
+            .parse()
+            .map_err(|_| Error::Config(format!("node id {id:?} is not a number")))?;
+        nodes.push(NodeLine {
+            id,
+            raft_addr: raft.to_owned(),
+            api_addr: api.to_owned(),
+        });
+    }
+    if nodes.is_empty() {
+        return Err(Error::Config("the node list is empty".to_owned()));
+    }
+    Ok(nodes)
+}
+
+/// The peer list rendered the way hiqlite reads it: one triple per line.
+#[must_use]
+pub fn render_nodes(nodes: &[NodeLine]) -> String {
+    nodes
+        .iter()
+        .map(|n| format!("{} {} {}", n.id, n.raft_addr, n.api_addr))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 /// What rauthy's bootstrap API key may do: the client registration and
 /// update spec 021 B-5 performs, and the secret read the supervisor
 /// performs. Nothing wider: rauthy re-applies this access from the rendered
@@ -98,13 +195,20 @@ impl RauthySecrets {
     }
 }
 
-/// The ports rauthy's hiqlite binds on loopback.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// rauthy's hiqlite topology: the ports, and at N=3 the node id, the peers,
+/// and the listen address (spec 032 B-1).
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HqlPorts {
     /// The Raft port.
     pub raft: u16,
     /// The API port.
     pub api: u16,
+    /// This replica's node id.
+    pub node_id: u64,
+    /// The peers, when the deployment names them; `None` is the one node.
+    pub nodes: Option<Vec<NodeLine>>,
+    /// The address the listeners bind.
+    pub listen_addr: String,
 }
 
 impl HqlPorts {
@@ -122,9 +226,18 @@ impl HqlPorts {
                     .map_err(|_| Error::Config(format!("{key} {raw:?} is not a port"))),
             }
         };
+        let nodes = match env.get(ENV_RAUTHY_HQL_NODES) {
+            Some(raw) => Some(parse_nodes(&raw)?),
+            None => None,
+        };
         Ok(Self {
             raft: port(ENV_HQL_RAFT_PORT, DEFAULT_HQL_RAFT_PORT)?,
             api: port(ENV_HQL_API_PORT, DEFAULT_HQL_API_PORT)?,
+            node_id: node_id(env)?,
+            nodes,
+            listen_addr: env
+                .get(ENV_RAUTHY_HQL_LISTEN_ADDR)
+                .unwrap_or_else(|| "127.0.0.1".to_owned()),
         })
     }
 }
@@ -180,7 +293,14 @@ pub fn values(
         .to_str()
         .ok_or_else(|| Error::Config("the data directory is not UTF-8".to_owned()))?
         .to_owned();
+    let hql_nodes = match &ports.nodes {
+        Some(nodes) => render_nodes(nodes),
+        None => format!("1 127.0.0.1:{} 127.0.0.1:{}", ports.raft, ports.api),
+    };
     Ok(BTreeMap::from([
+        ("HQL_NODE_ID", ports.node_id.to_string()),
+        ("HQL_NODES", hql_nodes),
+        ("HQL_LISTEN_ADDR", ports.listen_addr.clone()),
         ("PUB_URL", authority.to_owned()),
         ("LISTEN_ADDRESS", config.rauthy_addr.ip().to_string()),
         ("LISTEN_PORT", config.rauthy_addr.port().to_string()),
@@ -188,8 +308,6 @@ pub fn values(
         ("RP_ID", host.to_owned()),
         ("RP_ORIGIN", origin_with_port),
         ("RP_NAME", app_name.to_owned()),
-        ("HQL_RAFT_PORT", ports.raft.to_string()),
-        ("HQL_API_PORT", ports.api.to_string()),
         ("HQL_DATA_DIR", data_dir),
         ("HQL_SECRET_RAFT", secrets.secret_raft.clone()),
         ("HQL_SECRET_API", secrets.secret_api.clone()),
@@ -233,15 +351,27 @@ pub fn render(
 }
 
 /// Parse a rendered environment back into pairs: `KEY=VALUE` lines, with
-/// comments and blank lines skipped.
+/// comments and blank lines skipped. A line with no `=` continues the
+/// previous value on a new line, which is how a peer list (one node per
+/// line, as hiqlite reads it) survives the file.
 #[must_use]
 pub fn parse(text: &str) -> Vec<(String, String)> {
-    text.lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty() && !line.starts_with('#'))
-        .filter_map(|line| {
-            line.split_once('=')
-                .map(|(k, v)| (k.trim().to_owned(), v.to_owned()))
-        })
-        .collect()
+    let mut pairs: Vec<(String, String)> = Vec::new();
+    for line in text.lines().map(str::trim) {
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        match line.split_once('=') {
+            Some((key, value)) if !key.contains(char::is_whitespace) => {
+                pairs.push((key.trim().to_owned(), value.to_owned()));
+            }
+            _ => {
+                if let Some((_, value)) = pairs.last_mut() {
+                    value.push('\n');
+                    value.push_str(line);
+                }
+            }
+        }
+    }
+    pairs
 }

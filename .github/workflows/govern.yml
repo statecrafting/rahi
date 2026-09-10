@@ -115,6 +115,16 @@ jobs:
       # is specifically claimed by a spec (spec 032 of spec-spine).
       - run: spec-spine index coverage --fail-on-untraced
       - run: scripts/spec-dag.sh
+      # The manifests are held to the chassis's port and volume contract
+      # (spec 032 B-7); the runner image carries kubectl.
+      - name: Kubernetes manifests
+        run: |
+          set -euo pipefail
+          if [ -x scripts/k8s-validate.sh ]; then
+            scripts/k8s-validate.sh
+          else
+            echo "::notice::k8s gate INACTIVE: no scripts/k8s-validate.sh (lands with spec 032)"
+          fi
 
   attest:
     name: corpus attestation

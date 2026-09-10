@@ -49,10 +49,29 @@ pub struct Store {
 pub struct StoreHandle {
     client: Client,
     has_s3: bool,
+    /// Set when this handle is a client attached to a node another process
+    /// runs (spec 032 B-5): the node's id, for the leader question, and its
+    /// backup directory, for the local listing hiqlite only answers from
+    /// inside the node.
+    attached: Option<Attached>,
     /// The size a single parameter is refused above (spec 016 B-2). Set from
     /// [`crate::MAX_VALUE_BYTES`] at open and lowered, never raised, by
     /// [`StoreHandle::with_max_value_bytes`].
     pub(crate) max_value_bytes: usize,
+}
+
+/// What an attached handle knows about the node it reaches: the node's
+/// identity and backup directory when it is this replica's own node, and
+/// nothing when the handle is a pure client of the cluster.
+#[derive(Clone, Debug)]
+struct Attached {
+    local: Option<LocalNode>,
+}
+
+#[derive(Clone, Debug)]
+struct LocalNode {
+    node_id: u64,
+    backup_dir: std::path::PathBuf,
 }
 
 impl std::fmt::Debug for Store {
@@ -93,6 +112,7 @@ impl Store {
         let handle = StoreHandle {
             client,
             has_s3: cfg.s3.is_some(),
+            attached: None,
             max_value_bytes: blob::MAX_VALUE_BYTES,
         };
         if let Err(refused) = blob::assert_extensions_refused(&handle).await {
@@ -107,6 +127,91 @@ impl Store {
         })
     }
 
+    /// Attach to the node another process of this deployment already runs
+    /// at `cfg.api_addr`, as a client (spec 032 B-5).
+    ///
+    /// Nothing is started and no data directory is opened: `rahi backup`
+    /// inside a replica whose `serve` holds the node reaches it this way.
+    /// The handle answers [`StoreHandle::is_leader`] from the cluster's
+    /// Raft metrics and [`StoreHandle::backup_list_local`] from
+    /// `cfg.backup_dir()` on this replica's own volume, since hiqlite only
+    /// lists local backups from inside the node.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Upstream`] when the node does not answer.
+    pub async fn attach(cfg: &StoreConfig) -> Result<Self, Error> {
+        cfg.check_data_dir()?;
+        let dial = if cfg.api_addr.ip().is_unspecified() {
+            std::net::SocketAddr::from((std::net::Ipv4Addr::LOCALHOST, cfg.api_addr.port()))
+        } else {
+            cfg.api_addr
+        };
+        let local = LocalNode {
+            node_id: cfg.node_id,
+            backup_dir: cfg.backup_dir(),
+        };
+        Self::client(cfg, vec![dial.to_string()], Some(local)).await
+    }
+
+    /// Reach the cluster as a pure client through the API addresses of
+    /// `cfg.nodes` (spec 032 B-6): a process with no volume and no node of
+    /// its own, such as the migration Job that runs the new image before a
+    /// rollout. hiqlite routes every write to the leader, so the handle
+    /// answers [`StoreHandle::is_leader`] with `true`; it has no local
+    /// backup directory, so [`StoreHandle::backup_list_local`] is
+    /// [`Error::Config`].
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Config`] when `cfg.nodes` is empty; [`Error::Upstream`]
+    /// when no node answers.
+    pub async fn connect(cfg: &StoreConfig) -> Result<Self, Error> {
+        if cfg.nodes.is_empty() {
+            return Err(Error::Config(
+                "connecting as a client needs the peer list; none is configured".to_owned(),
+            ));
+        }
+        let addrs = cfg.nodes.iter().map(|p| p.api_addr.clone()).collect();
+        Self::client(cfg, addrs, None).await
+    }
+
+    async fn client(
+        cfg: &StoreConfig,
+        addrs: Vec<String>,
+        local: Option<LocalNode>,
+    ) -> Result<Self, Error> {
+        let client = Client::remote(
+            addrs,
+            false,
+            false,
+            cfg.secrets.secret_api.clone(),
+            false,
+            None,
+            None,
+        )
+        .await
+        .map_err(map)?;
+        let handle = StoreHandle {
+            client,
+            has_s3: cfg.s3.is_some(),
+            attached: Some(Attached { local }),
+            max_value_bytes: blob::MAX_VALUE_BYTES,
+        };
+        handle.health().await?;
+        Ok(Self {
+            handle,
+            cfg: cfg.clone(),
+        })
+    }
+
+    /// Whether this store is a client attached to a node another process
+    /// runs, rather than the node itself.
+    #[must_use]
+    pub fn is_attached(&self) -> bool {
+        self.handle.attached.is_some()
+    }
+
     /// A clone of the client for another crate.
     #[must_use]
     pub fn handle(&self) -> StoreHandle {
@@ -119,12 +224,16 @@ impl Store {
         &self.cfg
     }
 
-    /// Stop the node. Idempotent from hiqlite's side.
+    /// Stop the node. Idempotent from hiqlite's side. An attached client
+    /// has no node to stop and drops its connections instead.
     ///
     /// # Errors
     ///
     /// [`Error::Upstream`] when hiqlite reports a shutdown failure.
     pub async fn shutdown(&self) -> Result<(), Error> {
+        if self.is_attached() {
+            return Ok(());
+        }
         self.handle.client.shutdown().await.map_err(map)
     }
 }
@@ -156,9 +265,25 @@ impl StoreHandle {
         self.client.is_healthy_cache().await.map_err(map)
     }
 
-    /// Whether this node currently leads the SQL group.
+    /// Whether this node currently leads the SQL group. An attached handle
+    /// asks the cluster's metrics, because a remote client leads nothing.
     pub async fn is_leader(&self) -> bool {
-        self.client.is_leader_db().await
+        match &self.attached {
+            None => self.client.is_leader_db().await,
+            Some(Attached { local: None }) => true,
+            Some(Attached { local: Some(node) }) => match self.client.metrics_db().await {
+                Ok(metrics) => metrics.current_leader == Some(node.node_id),
+                Err(_) => false,
+            },
+        }
+    }
+
+    /// `Some` when attached: the local node's backup directory, or `None`
+    /// inside for a pure client that has none.
+    pub(crate) fn attached_backup_dir(&self) -> Option<Option<&std::path::Path>> {
+        self.attached
+            .as_ref()
+            .map(|a| a.local.as_ref().map(|n| n.backup_dir.as_path()))
     }
 
     /// One statement, one write.
