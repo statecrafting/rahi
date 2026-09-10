@@ -6,6 +6,7 @@
 //! booted cell shares the front of this sequence through [`Booted`], so a
 //! backup and a serve agree about which store and which manifest they mean.
 
+use std::future::{Future, IntoFuture as _};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
@@ -192,7 +193,13 @@ pub async fn compose<C: Cell>(booted: &Booted, env: &dyn EnvReader) -> Result<Ro
     if RauthyMode::from_env(env)? == RauthyMode::Required {
         let idp = IdpConfig::derive(&booted.config, booted.manifest.app.name.as_str())?;
         let discovery = Discovery::fetch(&idp).await?;
-        let jwks = Jwks::load(&discovery).await?;
+        // rauthy publishes its endpoints on the public origin, which is not
+        // reachable from inside the container; the key set is fetched over
+        // the same loopback base every other back-channel call uses (spec
+        // 021 B-1, spec 031 D-3).
+        let mut on_loopback = discovery.clone();
+        on_loopback.jwks_uri = back_channel(&idp, &discovery.jwks_uri);
+        let jwks = Jwks::load(&on_loopback).await?;
         let key = SessionKey::load(&booted.keys.path(rahi_ops::SESSION_KEY_FILE))?;
         let client_secret = booted.keys.read_text(CLIENT_SECRET_FILE).map_err(|err| {
             Error::Config(format!(
@@ -209,8 +216,12 @@ pub async fn compose<C: Cell>(booted: &Booted, env: &dyn EnvReader) -> Result<Ro
             client_secret,
         )?;
         let resource = Resource::derive(&idp)?;
+        // The proxy and the resource metadata carry their full paths, so they
+        // merge at the root and are named in the exposure table by prefix;
+        // the session routes are relative and nest under their prefix.
         edge = edge
-            .mount(AUTH_PREFIX, proxy_router(Proxy::new(&idp)?))
+            .mount("/", proxy_router(Proxy::new(&idp)?))
+            .expose(Route::new(AUTH_PREFIX, RouteClass::Proxy))
             .mount_public(SESSION_PREFIX, session_router(sessions))
             .mount("/", resource_router(resource))
             .expose(Route::new(rahi_idp::METADATA_PATH, RouteClass::Public));
@@ -219,6 +230,12 @@ pub async fn compose<C: Cell>(booted: &Booted, env: &dyn EnvReader) -> Result<Ro
     edge.try_build().map_err(|err| err.0)
 }
 
+/// How long in-flight connections have to finish once serve is told to
+/// stop. Past this the listener is dropped, the connections with it, and
+/// the node is shut down regardless: a lock file must never outlive the
+/// process (spec 031 D-4).
+pub const DRAIN_BUDGET: std::time::Duration = std::time::Duration::from_secs(10);
+
 /// B-2: boot, compose, listen until SIGTERM or Ctrl-C.
 ///
 /// # Errors
@@ -226,6 +243,21 @@ pub async fn compose<C: Cell>(booted: &Booted, env: &dyn EnvReader) -> Result<Ro
 /// As [`Booted::open`] and [`compose`], plus [`Error::Io`] when the address
 /// cannot be bound.
 pub async fn serve<C: Cell>(env: &dyn EnvReader) -> Result<()> {
+    serve_until::<C>(env, shutdown_signal()).await
+}
+
+/// [`serve`] that stops when `stop` resolves, and only then: under the
+/// supervisor (spec 031 B-3) `stop` is the supervisor's hand, so that one
+/// SIGTERM has one listener and one ordered shutdown. The node is shut
+/// down on every exit, within [`DRAIN_BUDGET`] of the stop.
+///
+/// # Errors
+///
+/// As [`serve`].
+pub async fn serve_until<C: Cell>(
+    env: &dyn EnvReader,
+    stop: impl Future<Output = ()> + Send + 'static,
+) -> Result<()> {
     let addr = listen_addr(env)?;
     let booted = Booted::open::<C>(env).await?;
     let router = match compose::<C>(&booted, env).await {
@@ -235,9 +267,13 @@ pub async fn serve<C: Cell>(env: &dyn EnvReader) -> Result<()> {
             return Err(err);
         }
     };
-    let listener = tokio::net::TcpListener::bind(addr)
-        .await
-        .map_err(|err| Error::Io(format!("cannot listen on {addr}: {err}")))?;
+    let listener = match tokio::net::TcpListener::bind(addr).await {
+        Ok(listener) => listener,
+        Err(err) => {
+            booted.shutdown().await;
+            return Err(Error::Io(format!("cannot listen on {addr}: {err}")));
+        }
+    };
     let bound = listener
         .local_addr()
         .map_err(|err| Error::Io(format!("bound address unknown: {err}")))?;
@@ -246,12 +282,47 @@ pub async fn serve<C: Cell>(env: &dyn EnvReader) -> Result<()> {
         booted.manifest.app.name.as_str(),
         booted.config.public_url.origin()
     );
-    let served = axum::serve(listener, router)
-        .with_graceful_shutdown(shutdown_signal())
-        .await
-        .map_err(|err| Error::Io(format!("the listener failed: {err}")));
+    let stopped = std::sync::Arc::new(tokio::sync::Notify::new());
+    let until = {
+        let stopped = stopped.clone();
+        async move {
+            stop.await;
+            stopped.notify_one();
+        }
+    };
+    let mut server = Box::pin(
+        axum::serve(listener, router)
+            .with_graceful_shutdown(until)
+            .into_future(),
+    );
+    let served = tokio::select! {
+        result = &mut server => {
+            result.map_err(|err| Error::Io(format!("the listener failed: {err}")))
+        }
+        () = async {
+            stopped.notified().await;
+            tokio::time::sleep(DRAIN_BUDGET).await;
+        } => {
+            eprintln!("serve: connections still open after the drain budget; closing them");
+            Ok(())
+        }
+    };
+    drop(server);
     booted.shutdown().await;
     served
+}
+
+/// `endpoint` on the loopback base when it is on the public origin, as
+/// `rahi_idp::Sessions::back_channel` rewrites it.
+fn back_channel(idp: &IdpConfig, endpoint: &str) -> String {
+    let origin = idp
+        .issuer
+        .strip_suffix(rahi_idp::ISSUER_PATH)
+        .unwrap_or(&idp.issuer);
+    endpoint.strip_prefix(origin).map_or_else(
+        || endpoint.to_owned(),
+        |path| format!("{}{path}", idp.loopback_base),
+    )
 }
 
 async fn shutdown_signal() {

@@ -1,0 +1,129 @@
+# The image workflow (spec 031 B-6): build the container on main and on
+# tags, smoke it against a real rauthy, and push it on tags only.
+#
+# This workflow publishes no PR status check and sits outside the ci-gate
+# chain (spec 001 D-9): a release artifact is built after the gate, not as
+# part of it. Each architecture builds on its own native runner, which is
+# how a Rust release build stays minutes rather than the hour QEMU makes of
+# it; the per-architecture images are pushed by digest and joined into one
+# multi-architecture tag by the last job.
+
+name: image
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  build:
+    name: build and smoke (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build the image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          load: true
+          tags: rahi:smoke
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,scope=${{ matrix.arch }},mode=max
+
+      # B-6 and FR-005: a temp volume, /readyz within the budget, discovery
+      # fetched through the proxy, the issuer asserted to be the public URL,
+      # and a clean exit on SIGTERM. The same script runs locally (AC-2).
+      - name: Smoke test
+        run: docker/smoke.sh rahi:smoke 18443
+
+      - name: Log in to the registry
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push by digest
+        if: startsWith(github.ref, 'refs/tags/v')
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.arch }}
+
+      - name: Record the digest
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/digests
+          digest="${{ steps.push.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload the digest
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  manifest:
+    name: publish the multi-architecture tag
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digest-*
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push the manifest list
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          refs=""
+          for d in /tmp/digests/*; do
+            refs="$refs ${IMAGE}@sha256:$(basename "$d")"
+          done
+          # shellcheck disable=SC2086
+          docker buildx imagetools create \
+            -t "${IMAGE}:${tag}" \
+            -t "${IMAGE}:${tag#v}" \
+            $refs
+          docker buildx imagetools inspect "${IMAGE}:${tag}"

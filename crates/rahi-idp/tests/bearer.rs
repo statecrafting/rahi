@@ -760,6 +760,22 @@ fn no_credential_is_minted_anywhere_in_this_workspace() {
             "crates/rahi-ops/src/rauthy_api.rs",
             "presents rauthy's admin key on the backup calls (spec 030 B-5)",
         ),
+        (
+            "crates/rahi-ops/src/keys.rs",
+            "first boot provisions rauthy's own bootstrap API key (spec 031 B-2)",
+        ),
+        (
+            "crates/rahi-ops/src/rauthy_env.rs",
+            "renders that key into rauthy's environment (spec 031 B-2)",
+        ),
+        (
+            "crates/rahi-ops/src/supervise.rs",
+            "presents that key on the client bootstrap and secret read (spec 031 B-3)",
+        ),
+        (
+            "crates/rahi-ops/tests/first_boot.rs",
+            "asserts the provisioned key and rauthy's floor on its length",
+        ),
     ]);
 
     let mut offenders: Vec<String> = Vec::new();

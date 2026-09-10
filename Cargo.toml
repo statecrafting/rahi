@@ -98,6 +98,9 @@ age = { version = "0.12", default-features = false }
 # Preflight (spec 030 B-3) reads the volume's free space; std has no call
 # for it and the workspace forbids unsafe, so a thin wrapper carries it.
 fs4 = "1"
+# The supervisor (spec 031 B-3) sends SIGTERM to its child; std can only
+# SIGKILL, and the workspace forbids the unsafe libc call, so nix carries it.
+nix = { version = "0.31", default-features = false, features = ["signal"] }
 
 [workspace.lints.rust]
 unsafe_code = "deny"

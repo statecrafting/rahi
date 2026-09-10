@@ -482,14 +482,53 @@ fn restore_of_a_missing_archive_is_exit_3() {
 }
 
 #[test]
-fn the_031_verbs_parse_and_report_their_absence() {
-    for verb in ["supervise", "first-boot"] {
-        let run = bare(&[verb]);
-        assert_eq!(run.code, 3, "{verb}: {}", run.stderr);
-        assert!(
-            run.stderr.contains("arrives with spec 031"),
-            "{}",
-            run.stderr
-        );
-    }
+fn first_boot_then_supervise_without_a_rauthy_binary_is_exit_3() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_rahi"));
+    cmd.arg("first-boot")
+        .env("RAHI_PUBLIC_URL", "http://localhost:8080")
+        .env("RAHI_DATA_DIR", dir.path());
+    let run = Run::of(cmd.output().unwrap());
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert!(
+        run.stdout.contains("first-boot: keys generated"),
+        "{}",
+        run.stdout
+    );
+    assert!(
+        run.stdout.contains("rauthy api token:  rahi$"),
+        "{}",
+        run.stdout
+    );
+    assert!(
+        dir.path()
+            .join("keys")
+            .join(rahi_ops::ADMIN_TOKEN_FILE)
+            .is_file()
+    );
+
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_rahi"));
+    cmd.arg("first-boot")
+        .env("RAHI_PUBLIC_URL", "http://localhost:8080")
+        .env("RAHI_DATA_DIR", dir.path());
+    let run = Run::of(cmd.output().unwrap());
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert!(
+        run.stdout.contains("keys present and verified"),
+        "{}",
+        run.stdout
+    );
+
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_rahi"));
+    cmd.arg("supervise")
+        .env("RAHI_PUBLIC_URL", "http://localhost:8080")
+        .env("RAHI_DATA_DIR", dir.path())
+        .env("RAHI_RAUTHY_BIN", "/nonexistent/rauthy");
+    let run = Run::of(cmd.output().unwrap());
+    assert_eq!(run.code, 3, "{}\n{}", run.stdout, run.stderr);
+    assert!(
+        run.stderr.contains("rauthy cannot be spawned"),
+        "{}",
+        run.stderr
+    );
 }
