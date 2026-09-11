@@ -407,7 +407,9 @@ stages envelopes also runs the drain loop (spec 012 §6).
   resets the app node, restores the keys, and places rauthy's snapshot
   under `/data/restore/rauthy/`. **Nothing hands that snapshot to rauthy.**
   030 D-2 said spec 031's supervisor would; 031 does not, and the
-  supervisor starts rauthy from its rendered environment only. A restored
+  supervisor starts rauthy from its rendered environment only. The module
+  comment of `crates/rahi-ops/src/restore.rs` still says the supervisor
+  hands it over; the code does not. A restored
   cell keeps its rows, its chain, and its keys, and its rauthy starts from
   whatever `/data/rauthy` holds, which on a fresh volume is nothing.
 - Every principal id in app rows is rauthy's `sub` (constitution VII). A
@@ -506,7 +508,7 @@ specs 021, 022, 025; rauthy source at the pinned tag):
 | browser session | `__Host-session` (`session` over http), no `Max-Age`; a cached assertion for 900 seconds, then a renewal round trip that re-reads roles |
 | bearer lifetime | not configured by rahi; rauthy's client default, 1800 seconds in 0.36.2 |
 | revocation, browser | at the next renewal, so within 900 seconds of a user being disabled |
-| revocation, bearer | none before `exp`: the `jti` deny-list exists and nothing writes to it (025 B-5 says logout and a verb would); `preflight` does not report the bound |
+| revocation, bearer | none before `exp`: the `jti` deny-list and its writer (`ResourceServer::deny`) exist, and nothing calls the writer outside a test (025 B-5 says logout and a verb would); `preflight` does not report the bound |
 | introspection | rauthy has `/auth/v1/oidc/introspect`; the cell never calls it (025 D-1) |
 | the cell's own client | one confidential client bootstrapped at first boot through rauthy's admin API; redirect `<origin>/session/callback` |
 | dynamic registration | rauthy's `/auth/v1/clients_dyn` through the proxy, advertised in the resource metadata; `RAHI_IDP_REGISTRATION` defaults to `token` |

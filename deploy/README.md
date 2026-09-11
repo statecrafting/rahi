@@ -155,8 +155,9 @@ bound. As built:
   never introspected, and accepted until its `exp` plus sixty seconds of
   leeway. rahi sets no token lifetime, so the lifetime is rauthy's client
   default: 1800 seconds in rauthy 0.36.2. The `jti` deny-list the resource
-  server consults exists, and nothing writes to it yet (neither logout nor
-  a verb), so a bearer token cannot be revoked before it expires.
+  server consults exists with its writer, and nothing calls the writer yet
+  (neither logout nor a verb), so a bearer token cannot be revoked before
+  it expires.
 - `preflight` does not report the bound yet.
 
 ## What does not span replicas
