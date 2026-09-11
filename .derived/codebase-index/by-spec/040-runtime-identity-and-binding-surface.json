@@ -1,0 +1,335 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '040-runtime-identity-and-binding-surface' file unit 'crates/rahi-ops/src/binding.rs' does not exist",
+        "path": "crates/rahi-ops/src/binding.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '040-runtime-identity-and-binding-surface' file unit 'crates/rahi-edge/src/binding.rs' does not exist",
+        "path": "crates/rahi-edge/src/binding.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '040-runtime-identity-and-binding-surface' file unit 'crates/rahi-cli/tests/binding.rs' does not exist",
+        "path": "crates/rahi-cli/tests/binding.rs"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "015-kernel-manifest-and-adjudication",
+      "020-edge-server",
+      "023-observability",
+      "030-operational-verbs",
+      "031-single-container-packaging",
+      "032-cluster-topology"
+    ],
+    "implementingPaths": [
+      {
+        "path": ".github/workflows/image.yml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/serve.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/obs/metrics.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/obs/mod.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/obs/tracer.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/router.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/tests/obs.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/README.md",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/k8s/ingress.yaml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/k8s/statefulset.yaml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "docker/Dockerfile",
+        "source": "spec-edge"
+      },
+      {
+        "path": "scripts/k8s-validate.sh",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/binding.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/binding.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/binding.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": ".github/workflows/image.yml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/image.yml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/serve.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/obs/metrics.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/obs/metrics.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/obs/mod.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/obs/mod.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/obs/tracer.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/obs/tracer.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/router.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/router.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/tests/obs.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/tests/obs.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "deploy/README.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/README.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "deploy/k8s/ingress.yaml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/ingress.yaml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "deploy/k8s/statefulset.yaml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/statefulset.yaml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docker/Dockerfile"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "docker/Dockerfile"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "scripts/k8s-validate.sh"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/k8s-validate.sh"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/01-consumer-contract.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-consumer-contract.md"
+        }
+      }
+    ],
+    "specId": "040-runtime-identity-and-binding-surface",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "16795bec6b1b8f241cebb78516e3f036f65246e19541b65e3aff2a5aa96b697f"
+}

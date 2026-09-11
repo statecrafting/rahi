@@ -1,0 +1,186 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-11",
+    "dependsOn": [
+      "015-kernel-manifest-and-adjudication",
+      "020-edge-server",
+      "023-observability",
+      "030-operational-verbs",
+      "031-single-container-packaging",
+      "032-cluster-topology"
+    ],
+    "domain": "edge",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/src/binding.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/src/binding.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-cli/tests/binding.rs"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "020-edge-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "020-edge-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/router.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "023-observability",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/obs/tracer.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "023-observability",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/obs/metrics.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "023-observability",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/obs/mod.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "023-observability",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/tests/obs.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "docker/Dockerfile"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/image.yml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "032-cluster-topology",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/statefulset.yaml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "032-cluster-topology",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/ingress.yaml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "032-cluster-topology",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/k8s-validate.sh"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "032-cluster-topology",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/README.md"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 3
+    },
+    "id": "040-runtime-identity-and-binding-surface",
+    "implementation": "pending",
+    "kind": "feature",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-consumer-contract.md"
+        }
+      }
+    ],
+    "risk": "medium",
+    "sectionHeadings": [
+      "040: Runtime identity and the binding surface",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/040-runtime-identity-and-binding-surface/spec.md",
+    "status": "draft",
+    "summary": "A consumer that correlates an immutable artifact, an authority snapshot, a deployment, and a running replica needs the replica to say what it is. Today it says almost nothing: rahi version prints the crate version, the manifest hash is visible only inside a ledger export or a backup, the OTel resource carries service.name alone, the image has no labels, and the deploy manifests pin no digest. This spec makes a replica report its measured executable digest, its booted manifest hash, its declared image and build revision, and a per-boot instance id, each with its basis (measured, declared, or absent), on one unguarded document at /binding kept off the ingress like /metrics, on the OTel resource, and in one build-info metric whose labels are versions only. It states what the telemetry does not observe or count. It writes nothing to the chain; deployment epochs are spec 041.\n",
+    "title": "Runtime identity: a replica states which bits it runs, which ceiling it enforces, and which instance it is, with every value's basis named, on bounded surfaces"
+  },
+  "shardHash": "bef95e224d802e5ba45396294344ffae2ff9f9e2928694746a03930a1005c694",
+  "specVersion": "1.2.0"
+}
