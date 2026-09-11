@@ -1,0 +1,95 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-11",
+    "dependsOn": [
+      "015-kernel-manifest-and-adjudication",
+      "023-observability",
+      "030-operational-verbs"
+    ],
+    "domain": "kernel",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "crates/rahi-cli/tests/shutdown.rs"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "015-kernel-manifest-and-adjudication",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "015-kernel-manifest-and-adjudication",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/observe.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "023-observability",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/obs/metrics.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "023-observability",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/obs/mod.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 3
+    },
+    "id": "035-denials-survive-shutdown",
+    "implementation": "pending",
+    "kind": "kernel",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-consumer-contract.md"
+        }
+      }
+    ],
+    "risk": "high",
+    "sectionHeadings": [
+      "035: Denials survive a graceful shutdown",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/035-denials-survive-shutdown/spec.md",
+    "status": "draft",
+    "summary": "Constitution X says the kernel ledgers every denial. Spec 015 answers a denial before its record is durable and drains the records through a bounded queue, and serve never drains that queue on shutdown, so a graceful stop silently loses the denials still queued (reproduced: 50 denials answered 403 with decision ids, 33 and 40 of them in the chain after SIGTERM, nothing counted). This spec drains the queue within a bound when serve stops, counts what the bound abandons, and separates a dropped record from a failed append on /metrics, so the only uncounted loss left is a process that is killed.\n",
+    "title": "Denials survive a graceful shutdown, and every lost denial is counted by its cause"
+  },
+  "shardHash": "131cecdf01bfd387e893b6883df703d60e54dbf6bec34386bda97a4a4eb1de0f",
+  "specVersion": "1.2.0"
+}
