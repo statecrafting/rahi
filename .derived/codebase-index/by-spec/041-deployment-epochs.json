@@ -1,0 +1,296 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '041-deployment-epochs' file unit 'crates/rahi-ledger/src/epoch.rs' does not exist",
+        "path": "crates/rahi-ledger/src/epoch.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '041-deployment-epochs' file unit 'crates/rahi-ledger/tests/epoch.rs' does not exist",
+        "path": "crates/rahi-ledger/tests/epoch.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '041-deployment-epochs' file unit 'crates/rahi-cli/tests/epochs.rs' does not exist",
+        "path": "crates/rahi-cli/tests/epochs.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '041-deployment-epochs' file unit 'crates/rahi-cli/testdata/binding/' does not exist",
+        "path": "crates/rahi-cli/testdata/binding/"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '041-deployment-epochs' file unit 'crates/rahi-ops/src/binding.rs' does not exist",
+        "path": "crates/rahi-ops/src/binding.rs"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "013-ledger-decision-chain",
+      "014-ledger-sealing-and-archive",
+      "015-kernel-manifest-and-adjudication",
+      "030-operational-verbs",
+      "032-cluster-topology",
+      "036-manifest-and-schema-evolution",
+      "040-runtime-identity-and-binding-surface"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/rahi-cli/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/serve.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/obs/metrics.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-kernel/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ledger/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ledger/src/seal.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ledger/src/segment.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/archive.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/migrate.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/README.md",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/k8s/migrate-job.yaml",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/testdata/binding/"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/epochs.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/src/epoch.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/tests/epoch.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/serve.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/obs/metrics.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/obs/metrics.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-kernel/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ledger/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ledger/src/seal.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/src/seal.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ledger/src/segment.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/src/segment.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/archive.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/archive.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/binding.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/migrate.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/migrate.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "deploy/README.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/README.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "deploy/k8s/migrate-job.yaml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/migrate-job.yaml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/01-consumer-contract.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-consumer-contract.md"
+        }
+      }
+    ],
+    "specId": "041-deployment-epochs",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "631071b0becb77d4494c1f005d7cafb6f2eb3189cd188b3ec8771a7804c4368b"
+}

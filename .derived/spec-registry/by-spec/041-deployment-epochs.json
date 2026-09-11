@@ -1,0 +1,172 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-11",
+    "dependsOn": [
+      "013-ledger-decision-chain",
+      "014-ledger-sealing-and-archive",
+      "015-kernel-manifest-and-adjudication",
+      "030-operational-verbs",
+      "032-cluster-topology",
+      "036-manifest-and-schema-evolution",
+      "040-runtime-identity-and-binding-surface"
+    ],
+    "domain": "ledger",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "crates/rahi-ledger/src/epoch.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ledger/tests/epoch.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-cli/tests/epochs.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-cli/testdata/binding/"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "013-ledger-decision-chain",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "014-ledger-sealing-and-archive",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/src/segment.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "014-ledger-sealing-and-archive",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/src/seal.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "015-kernel-manifest-and-adjudication",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "023-observability",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/obs/metrics.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/migrate.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/archive.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "032-cluster-topology",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/migrate-job.yaml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "032-cluster-topology",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/README.md"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "040-runtime-identity-and-binding-surface",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/binding.rs"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 3
+    },
+    "id": "041-deployment-epochs",
+    "implementation": "pending",
+    "kind": "kernel",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-consumer-contract.md"
+        }
+      }
+    ],
+    "risk": "critical",
+    "sectionHeadings": [
+      "041: Deployment epochs",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "The record",
+      "When an epoch is appended",
+      "What a replica does with it",
+      "Backup, restore, and export",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "The worked consumer example",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/041-deployment-epochs/spec.md",
+    "status": "draft",
+    "summary": "The chain commits to the first manifest (genesis) and, with spec 036, to every manifest adopted since. It records nothing about which build a replica runs or which deployment put it there, so a consumer cannot join a decision to an artifact, an authority snapshot, or a rollout, and an upgrade, a rollback, and a restore look the same in the chain. This spec appends one epoch record at each deploy step that changes what is deployed: the manifest current after the step, the artifact (the binary measured by the deploy step, the image digest the deployer declares), and typed opaque references to the external build provenance, the deployment record, and the authority snapshot. The genesis and every existing record stay byte for byte; no history is rehashed; nothing is embedded in a built artifact; every reference points from the later record to the earlier one, so no hash cycle is possible. Replicas bind to the current epoch at boot and report a mismatch without refusing, every decision names its epoch and instance, and the chain becomes readable from a running cell.\n",
+    "title": "Deployment epochs: the chain records each deployment it serves under, appended at the deploy step, linked to external build and deployment records it never rewrites"
+  },
+  "shardHash": "d9aaa3bcdaf9aa6ece1280f61138f93ea719e3231d7355bdb32b2bf77a7746fe",
+  "specVersion": "1.2.0"
+}
