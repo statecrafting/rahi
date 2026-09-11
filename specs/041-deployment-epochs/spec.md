@@ -202,9 +202,10 @@ composes.
   only when a deploy step appended 036's transition and failed before its
   epoch; it says the step did not finish.
 - **B-9 (decisions name their epoch and instance).** Every decision the
-  kernel emits from this spec on carries `epoch` (the replica's booted
-  epoch number) and `instance` (040 B-4) in its payload beside the
-  `manifest` it already names. Records already in a chain are untouched,
+  kernel emits from this spec on carries two scalar keys in its payload
+  beside the `manifest` it already names: `epoch`, the replica's booted
+  epoch number, and `instance`, the string `instance.id` of 040 B-4 (not
+  040's whole `instance` object). Records already in a chain are untouched,
   and a payload without the keys was written before this spec. During an
   N=3 rollout, decisions from old and new replicas interleave, and each
   names its own epoch; position in the chain never assigns one.
@@ -256,8 +257,9 @@ composes.
   0 and the genesis hash.
 - **FR-002.** 013's `testdata/chains/` fixtures and 014's seal fixtures
   verify unchanged without regeneration, and an export containing epoch
-  records passes `attest-ledger verify` (skipped with a message when the
-  separately released CLI is absent, as 013 FR-004 is).
+  records passes `attest-ledger verify` (the `attest-ledger` binary of the
+  `attest-ledger-cli` package; skipped with a message when it is not
+  installed, as 013 FR-004 is).
 - **FR-003 (the composed consumer fixture).** `tests/epochs.rs` plays each
   producer in order from the templates in `testdata/binding/`: a fixture
   authority snapshot digest; a build provenance Statement whose subjects
@@ -368,6 +370,9 @@ other repositories:
   036 can land without waiting for the cross-repository agreement) or one
   (the epoch carrying the transition), which changes 036 before either is
   approved;
+- 040's document schema version with this spec's additions in view: B-8
+  adds `epoch` and `match` to the document 040 names, so 040's version
+  either reserves them or this spec bumps it;
 - whether a mismatch stays a signal (proposed) or may refuse the boot
   under a manifest option;
 - whether the ledger's `schema_version` moves when payloads gain keys

@@ -614,9 +614,10 @@ These are requests, not decisions made for those repositories.
    number alone, which a restore can reuse (section 11, draft 041 B-7).
 
 The runtime binding of section 11 adds these, which are requests for
-agreement before either side implements, not decisions made here:
+agreement before either side implements, not decisions made here. They
+continue the numbered lists above.
 
-**Statecraft**:
+**Statecraft**, continued from item 5:
 
 6. Name the deployment record's type URI and schema version and publish
    one fixture. The epoch record (draft 041 B-3) stores `{type, digest,
@@ -634,7 +635,8 @@ agreement before either side implements, not decisions made here:
     permit was issued against with the cell's current one. The chassis
     reports the epoch; it evaluates no validity predicate.
 
-**statecraft-cli** (as the proposed home of the neutral verifier):
+**statecraft-cli**, continued from item 5 (as the proposed home of the
+neutral verifier):
 
 6. Agree the in-toto Statement and SLSA provenance versions and how a
    provenance names a cell's binary (its sha256, one subject per

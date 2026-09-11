@@ -167,6 +167,6 @@
     "summary": "The chain commits to the first manifest (genesis) and, with spec 036, to every manifest adopted since. It records nothing about which build a replica runs or which deployment put it there, so a consumer cannot join a decision to an artifact, an authority snapshot, or a rollout, and an upgrade, a rollback, and a restore look the same in the chain. This spec appends one epoch record at each deploy step that changes what is deployed: the manifest current after the step, the artifact (the binary measured by the deploy step, the image digest the deployer declares), and typed opaque references to the external build provenance, the deployment record, and the authority snapshot. The genesis and every existing record stay byte for byte; no history is rehashed; nothing is embedded in a built artifact; every reference points from the later record to the earlier one, so no hash cycle is possible. Replicas bind to the current epoch at boot and report a mismatch without refusing, every decision names its epoch and instance, and the chain becomes readable from a running cell.\n",
     "title": "Deployment epochs: the chain records each deployment it serves under, appended at the deploy step, linked to external build and deployment records it never rewrites"
   },
-  "shardHash": "d9aaa3bcdaf9aa6ece1280f61138f93ea719e3231d7355bdb32b2bf77a7746fe",
+  "shardHash": "c1a47b339b20cc38d61b3176e0309a17db800e64ee9715c755e44f83cbaf8c69",
   "specVersion": "1.2.0"
 }
