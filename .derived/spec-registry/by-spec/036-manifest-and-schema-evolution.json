@@ -1,0 +1,176 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-11",
+    "dependsOn": [
+      "011-store-hiqlite",
+      "013-ledger-decision-chain",
+      "014-ledger-sealing-and-archive",
+      "015-kernel-manifest-and-adjudication",
+      "030-operational-verbs",
+      "031-single-container-packaging",
+      "032-cluster-topology"
+    ],
+    "domain": "kernel",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "crates/rahi-ledger/src/transition.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ledger/tests/transition.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-cli/tests/evolution.rs"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "013-ledger-decision-chain",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/src/chain.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "013-ledger-decision-chain",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/src/verify.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "013-ledger-decision-chain",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "014-ledger-sealing-and-archive",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/src/segment.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "015-kernel-manifest-and-adjudication",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "011-store-hiqlite",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/migrate.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/migrate.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/restore.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/archive.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "docker/entrypoint.sh"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "032-cluster-topology",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/migrate-job.yaml"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 3
+    },
+    "id": "036-manifest-and-schema-evolution",
+    "implementation": "pending",
+    "kind": "kernel",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-consumer-contract.md"
+        }
+      }
+    ],
+    "risk": "critical",
+    "sectionHeadings": [
+      "036: Manifest and schema evolution",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "Manifests",
+      "Migrations",
+      "Restore",
+      "Rolling updates at N=3",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "The worked consumer example",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/036-manifest-and-schema-evolution/spec.md",
+    "status": "draft",
+    "summary": "Today a cell's manifest is frozen at its first boot: the manifest hash is the chain's genesis parent, Ledger::open checks the first record against the booted manifest on every open, and any change to the manifest (one added grant, otel switched on) makes serve exit 1 with an integrity error on the existing volume. Spec 015 B-8 names the missing step, \"a deploy genesis record\", and nothing defines it. Migrations have the mirror problems: serve accepts a store ahead of the binary, a changed migration under an applied version is skipped silently, and restore checks no compatibility. This spec makes a manifest change a signed transition record appended at deploy, checks the booted manifest against the chain's current manifest, records a checksum per migration, lets an older binary serve a newer schema only across migrations declared additive, and makes restore refuse an archive it cannot serve. It carries the worked consumer example for an upgrade, a rollback, and a restore.\n",
+    "title": "Manifest and schema evolution: a ledgered manifest transition, a checked migration history, and a restore that refuses what it cannot serve"
+  },
+  "shardHash": "de405e915d280db9428aedd3bb7d39e549ac14e3c0543886a73120d44cc2cd88",
+  "specVersion": "1.2.0"
+}
