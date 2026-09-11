@@ -1,0 +1,268 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '038-native-clients-and-bearer-revocation' file unit 'crates/rahi-idp/src/native.rs' does not exist",
+        "path": "crates/rahi-idp/src/native.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '038-native-clients-and-bearer-revocation' file unit 'crates/rahi-idp/src/revoke.rs' does not exist",
+        "path": "crates/rahi-idp/src/revoke.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '038-native-clients-and-bearer-revocation' file unit 'crates/rahi-idp/tests/native.rs' does not exist",
+        "path": "crates/rahi-idp/tests/native.rs"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "015-kernel-manifest-and-adjudication",
+      "020-edge-server",
+      "022-session-and-principal",
+      "025-api-tokens-and-resource-server",
+      "030-operational-verbs",
+      "031-single-container-packaging",
+      "034-hello-cell"
+    ],
+    "implementingPaths": [
+      {
+        "path": "apps/hello-cell/manifest.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "apps/hello-cell/src/notes.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "apps/hello-cell/tests/e2e.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/serve.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/middleware/csrf.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/bearer.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/bootstrap.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-kernel/src/manifest.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/preflight.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/supervise.rs",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/native.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/revoke.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/native.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "apps/hello-cell/manifest.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/manifest.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "apps/hello-cell/src/notes.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/src/notes.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "apps/hello-cell/tests/e2e.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/tests/e2e.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/serve.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/middleware/csrf.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/middleware/csrf.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/bearer.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/bearer.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/bootstrap.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/bootstrap.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-kernel/src/manifest.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/manifest.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/preflight.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/preflight.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/supervise.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/supervise.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/01-consumer-contract.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-consumer-contract.md"
+        }
+      }
+    ],
+    "specId": "038-native-clients-and-bearer-revocation",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "8adacbc6942642b3a291bf0d2c7ca2177aea01b4a9de9dc718b4f11ba359cecb"
+}
