@@ -15,17 +15,29 @@ the chassis; it never forks it.
 The name is the lineage: enrahitu was Encore, Rauthy, Hiqlite, Turso. Drop
 Encore and Turso and what remains is what this is.
 
-## Status: wave 1 built, wave 2 under way
+## Status: all three waves built
 
 This repository is a complete specification corpus, the harness that
-builds it, and the code built so far. All 22 specs are `status: approved`;
+builds it, and the code it specifies. All 22 specs are `status: approved`;
 spec ordinals are the build order; and each spec is bounded to one driven
-session's territory. Six crates exist (`rahi-types`, `rahi-store`,
-`rahi-ledger`, `rahi-kernel`, `rahi-edge`, `rahi-idp`), every one of their
-86 source files specifically claimed by the spec that built it. Wave 1 is
-complete except 016; wave 2 has the edge (020) and observability (023)
-landed; wave 3, the operational verbs and packaging, is not started.
-`spec-spine registry plan` is the live answer to what is buildable now.
+session's territory. Twenty are `implementation: complete`, and the two
+records, 000 and 002, are `n-a`. Nine crates and the reference app exist
+(`rahi-types`, `rahi-store`, `rahi-ledger`, `rahi-kernel`, `rahi-edge`,
+`rahi-idp`, `rahi-ops`, `rahi-cli`, `rahi-harness`, and `apps/hello-cell`),
+every one of their 142 source files specifically claimed by the spec that
+built it. `spec-spine registry plan` is the live answer to what is
+buildable now.
+
+Complete is not the same as proven against a real rauthy in automation.
+CI runs the whole suite without a rauthy; the identity-dependent end-to-end
+path runs only where `RAHI_TEST_RAUTHY` names a rauthy binary. One hold is
+open: rauthy's backup routes refuse the admin API key the `backup` verb
+presents (spec 030 D-3), and a backup with a missing part is an error, so
+`rahi backup` against a real rauthy fails today.
+`docs/design/01-consumer-contract.md`
+states what is proven, by which test, against which identity provider,
+and what is not.
+
 The corpus is built by
 [claude-observatory](https://github.com/bartekus/claude-observatory), which
 schedules the lowest-numbered ready spec, drives one fresh session through
@@ -42,6 +54,7 @@ spec's `## Verification` block after merge. Done is never self-authored.
 | `standards/spec/constitution.md` | the fourteen principles, seven of them frozen at tier 1 |
 | `specs/000-rahi-bootstrap/spec.md` | what a spec is, and the frozen invariants |
 | `AGENTS.md` | the session protocol and the backlog discipline |
+| `docs/design/01-consumer-contract.md` | how to consume the chassis today, and the exact guarantees it gives |
 
 The crate topology:
 
@@ -53,6 +66,7 @@ rahi-idp   rahi-edge   rauthy proxy, discovery, sessions   axum, middleware, pro
 rahi-kernel rahi-ledger manifest and adjudication          decision chain, sealing  (013-015)
 rahi-store             hiqlite: txn, query, lock, notify, watermark, migrate, backup  (011, 012)
 rahi-types             Error and exit codes, Principal, Revision, Fence, config  (010)
+rahi-harness           dev-dependency only: boots the built binary, waits on /readyz  (033)
 ```
 
 Rust throughout; no Node, no Encore. rauthy is consumed as a released
@@ -82,7 +96,7 @@ scripts/spec-dag.sh
 cd ../claude-observatory
 bun src/index.ts orchestrator projects add /path/to/rahi   # registers, qualifies, arms
 bun src/index.ts orchestrator dag                          # the readiness view
-bun src/index.ts orchestrator next                         # 010-workspace-and-core-types
+bun src/index.ts orchestrator next                         # the lowest-numbered ready spec
 bun src/index.ts orchestrator daemon start
 ```
 

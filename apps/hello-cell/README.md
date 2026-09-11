@@ -110,6 +110,13 @@ table as an operator, verify the ledger and assert the denial is the last
 record, back up, restore into a fresh volume, boot again on the restored
 volume, and assert the remaining note and the same ledger head.
 
+Two parts of that path do not touch the real rauthy. The backup's rauthy
+part is answered by a stub on rauthy's address, because a live rauthy
+refuses the admin API key on its backup routes (spec 030 D-3); and the
+boot on the restored volume mounts no identity, because nothing yet hands
+the restored rauthy snapshot to rauthy. What the round trip proves is the
+app's store, its chain, and its keys.
+
 ```sh
 RAHI_TEST_RAUTHY=/path/to/rauthy cargo test -p hello-cell --locked
 ```
