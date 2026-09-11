@@ -24,6 +24,10 @@
     ],
     "implementingPaths": [
       {
+        "path": "apps/hello-cell/README.md",
+        "source": "spec-edge"
+      },
+      {
         "path": "apps/hello-cell/tests/e2e.rs",
         "source": "spec-edge"
       },
@@ -50,6 +54,10 @@
       {
         "path": "crates/rahi-store/src/backup.rs",
         "source": "spec-edge"
+      },
+      {
+        "path": "deploy/README.md",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
@@ -69,6 +77,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-ops/tests/rauthy_restore.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "apps/hello-cell/README.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/README.md"
         }
       },
       {
@@ -165,6 +186,19 @@
       {
         "locations": [
           {
+            "file": "deploy/README.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/README.md"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "docs/design/01-consumer-contract.md"
           }
         ],
@@ -180,5 +214,5 @@
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "7b3b1f5f7962e9c03fe36cb093d1c5f894a24d7fae828cea09dd27b4d069ab34"
+  "shardHash": "76aac0cff5a8fc970cfbcc7e2e823fd404f13dd8afaaac0ee0ebbb2666588422"
 }

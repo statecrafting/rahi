@@ -33,6 +33,7 @@ extends:
   - { spec: "034-hello-cell", unit: "apps/hello-cell/manifest.toml", nature: additive }
   - { spec: "034-hello-cell", unit: "apps/hello-cell/src/notes.rs", nature: additive }
   - { spec: "034-hello-cell", unit: "apps/hello-cell/tests/e2e.rs", nature: additive }
+  - { spec: "034-hello-cell", unit: "apps/hello-cell/README.md", nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/01-consumer-contract.md" }, role: context }
 summary: >

@@ -116,6 +116,14 @@
           "kind": "file",
           "path": "apps/hello-cell/tests/e2e.rs"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "034-hello-cell",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/README.md"
+        }
       }
     ],
     "extraFrontmatter": {
@@ -150,6 +158,6 @@
     "summary": "A hosted control plane built as a cell and a command-line client that logs in to it need four things the chassis does not yet give. The CSRF layer exempts only /auth/*, so a POST with a bearer token is refused 403 csrf (025 B-11 promised the exemption; D-6 left the wiring). No public client exists: the one client first boot creates is confidential, and a rauthy client defaults to EdDSA with no audience binding, so no CLI token passes the resource server without an admin's hand. Token lifetime is rauthy's default, 1800 seconds, not the fifteen minutes 025 B-5 states. And nothing writes the jti deny-list, so a bearer token cannot be revoked before it expires. This spec wires the exemption, declares native clients in the manifest and provisions them at boot bound to RS256 and the cell's audience, sets lifetimes explicitly, adds revocation by token and by subject, reports the bound in preflight, and gives hello-cell a scope-gated bearer route and a device-code login in its end-to-end test.\n",
     "title": "Native clients and bearer revocation: the CSRF exemption wired, a public client for a CLI declared in the manifest, token lifetimes set, and a token that can be revoked"
   },
-  "shardHash": "c263969e67b0df24b355b3e76ee27191f57b01721b8b6f49736456bbd603f3f1",
+  "shardHash": "e7225e22561a3179996e39bf11fce15f8696e877c3d715a8c19e3b55873dd367",
   "specVersion": "1.2.0"
 }

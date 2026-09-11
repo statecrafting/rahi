@@ -37,6 +37,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "apps/hello-cell/README.md",
+        "source": "spec-edge"
+      },
+      {
         "path": "apps/hello-cell/src/cell.rs",
         "source": "spec-edge"
       },
@@ -46,6 +50,10 @@
       },
       {
         "path": "crates/rahi-ops/src/rauthy_env.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/README.md",
         "source": "spec-edge"
       },
       {
@@ -109,6 +117,19 @@
       {
         "locations": [
           {
+            "file": "apps/hello-cell/README.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/README.md"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "apps/hello-cell/src/cell.rs"
           }
         ],
@@ -143,6 +164,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-ops/src/rauthy_env.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "deploy/README.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/README.md"
         }
       },
       {
@@ -246,5 +280,5 @@
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "d0eee2e306598c143198d2997a169ec63eb577fbc656f4c658fefea583101eaa"
+  "shardHash": "8ac0752c234743d6bf9e107a68d82d82d60db41eaf4fed9ba5788cd72238ac83"
 }

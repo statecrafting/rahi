@@ -29,6 +29,8 @@ extends:
   - { spec: "032-cluster-topology", unit: "deploy/k8s/migrate-job.yaml", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/serve.rs", nature: additive }
   - { spec: "034-hello-cell", unit: "apps/hello-cell/src/cell.rs", nature: additive }
+  - { spec: "032-cluster-topology", unit: "deploy/README.md", nature: additive }
+  - { spec: "034-hello-cell", unit: "apps/hello-cell/README.md", nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/01-consumer-contract.md" }, role: context }
   - { unit: { kind: file, path: "docs/design/00-lineage.md" }, role: context }

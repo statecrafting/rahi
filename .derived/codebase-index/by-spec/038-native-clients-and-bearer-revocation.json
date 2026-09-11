@@ -31,6 +31,10 @@
     ],
     "implementingPaths": [
       {
+        "path": "apps/hello-cell/README.md",
+        "source": "spec-edge"
+      },
+      {
         "path": "apps/hello-cell/manifest.toml",
         "source": "spec-edge"
       },
@@ -101,6 +105,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-idp/tests/native.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "apps/hello-cell/README.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/README.md"
         }
       },
       {
@@ -264,5 +281,5 @@
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "8adacbc6942642b3a291bf0d2c7ca2177aea01b4a9de9dc718b4f11ba359cecb"
+  "shardHash": "3b9ba23321dda20e1acb0a6e25597ebd6d9678d75c66089716f6de3f8fb90c18"
 }

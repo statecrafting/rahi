@@ -26,6 +26,8 @@ extends:
   - { spec: "033-dev-substrate-and-harness", unit: "crates/rahi-harness/src/boot.rs", nature: additive }
   - { spec: "034-hello-cell", unit: "apps/hello-cell/tests/e2e.rs", nature: additive }
   - { spec: "021-idp-proxy-and-discovery", unit: "crates/rahi-idp/tests/discovery.rs", nature: additive }
+  - { spec: "032-cluster-topology", unit: "deploy/README.md", nature: additive }
+  - { spec: "034-hello-cell", unit: "apps/hello-cell/README.md", nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/01-consumer-contract.md" }, role: context }
 summary: >

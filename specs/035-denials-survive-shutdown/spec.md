@@ -21,6 +21,7 @@ extends:
   - { spec: "023-observability", unit: "crates/rahi-edge/src/obs/metrics.rs", nature: additive }
   - { spec: "023-observability", unit: "crates/rahi-edge/src/obs/mod.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/serve.rs", nature: additive }
+  - { spec: "032-cluster-topology", unit: "deploy/README.md", nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/01-consumer-contract.md" }, role: context }
 summary: >

@@ -35,6 +35,10 @@
       {
         "path": "crates/rahi-kernel/src/observe.rs",
         "source": "spec-edge"
+      },
+      {
+        "path": "deploy/README.md",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
@@ -115,6 +119,19 @@
       {
         "locations": [
           {
+            "file": "deploy/README.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/README.md"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "docs/design/01-consumer-contract.md"
           }
         ],
@@ -130,5 +147,5 @@
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "68cc8fbe157eb73da178114bd6ac23625dcf4f1e9f7c8e26d4bd311d2dd5ab5f"
+  "shardHash": "87351f29668f1291fb71e43a226a5a512e633ebca4b3bbb04747be5686a4b81f"
 }
