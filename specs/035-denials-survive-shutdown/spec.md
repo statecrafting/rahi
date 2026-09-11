@@ -15,6 +15,7 @@ depends_on:
   - "030-operational-verbs"
 establishes:
   - "crates/rahi-cli/tests/shutdown.rs"
+  - "crates/rahi-kernel/tests/replicas.rs"
 extends:
   - { spec: "015-kernel-manifest-and-adjudication", unit: "crates/rahi-kernel/src/lib.rs", nature: additive }
   - { spec: "015-kernel-manifest-and-adjudication", unit: "crates/rahi-kernel/src/observe.rs", nature: additive }
@@ -30,10 +31,15 @@ summary: >
   bounded queue, and serve never drains that queue on shutdown, so a
   graceful stop silently loses the denials still queued (reproduced: 50
   denials answered 403 with decision ids, 33 and 40 of them in the chain
-  after SIGTERM, nothing counted). This spec drains the queue within a
-  bound when serve stops, counts what the bound abandons, and separates a
-  dropped record from a failed append on /metrics, so the only uncounted
-  loss left is a process that is killed.
+  after SIGTERM, nothing counted). A second loss is structural: a decision
+  id is the chain head at boot plus a counter, so replicas of spec 032's
+  StatefulSet that boot on the same head mint the same ids, and the second
+  append of an id is refused as a conflict (reproduced in process: two
+  kernels on one chain both answered with the same id and one record
+  landed). This spec drains the queue within a bound when serve stops,
+  counts what the bound abandons, separates a dropped record from a failed
+  append on /metrics, and names the replica in every decision id, so the
+  only uncounted loss left is a process that is killed.
 ---
 
 # 035: Denials survive a graceful shutdown
@@ -56,8 +62,25 @@ failure that must never be silent". Two losses escape that rule today.
   that increments `kernel_ledger_failures_total` for a dropped record and
   for a failed append alike. An operator reading `/metrics` cannot tell a
   saturated queue from a failing store.
+- **Replicas share an id space.** Spec 015 D-8 mints a decision id as
+  `kernel:<last 16 hex of the chain head at boot>:<12-digit counter>` and
+  argues that two boots collide only when the earlier one appended
+  nothing. That holds for boots in sequence. Spec 032 runs three replicas
+  with `podManagementPolicy: Parallel`, each booting on the head it reads
+  through the leader, so replicas that boot with no append between them
+  share the nonce, and their counters both start at zero. The second
+  replica to append a given id is refused `Error::Conflict` by
+  `Ledger::append` (013 D-5), the record is lost and counted as a ledger
+  failure, and two callers hold the same id for two different denials, of
+  which the chain names one. Added 2026-09-11 by the runtime-binding
+  session: two kernels booted over one store and one chain, as two
+  replicas reading the same head are, each denied one request; both
+  answered `kernel:0910ee4a5d5baaf1:000000000000`, the chain holds one
+  record under that id, and the observer reported one `conflict`. Not
+  reproduced on a live three-node cluster, where the head read goes
+  through the leader and the result is the same by construction.
 
-This spec closes both. It serves constitution X and spec 015 D-7 and
+This spec closes all three. It serves constitution X and spec 015 D-7 and
 changes neither text: it makes the kernel's existing promise true under a
 graceful stop, and it states the remaining limit.
 
@@ -67,7 +90,9 @@ No new crate. Additive changes to four units others own, and one new test
 file in `rahi-cli`.
 
 - `crates/rahi-kernel/src/lib.rs` (015): `Kernel::flush` reports what it
-  abandoned; a `Kernel::drain` for the shutdown path.
+  abandoned; a `Kernel::drain` for the shutdown path; the replica's node
+  id in every decision id (B-6).
+- `crates/rahi-kernel/tests/replicas.rs` (new): two kernels on one chain.
 - `crates/rahi-kernel/src/observe.rs` (015): the failure observer learns
   the cause.
 - `crates/rahi-edge/src/obs/metrics.rs` and `obs/mod.rs` (023): two new
@@ -98,9 +123,19 @@ file in `rahi-cli`.
   in the chain unless the queue was full, the append failed, the drain
   bound expired, or the process was killed without a stop signal. The
   first three are counted by name; the fourth cannot be, and the
-  deployment documentation says so.
+  deployment documentation says so. The id names that denial and no
+  other (B-6).
 - **B-5 (no request waits).** The request path still never awaits an
   append (015 B-6). This spec adds no synchronous mode.
+- **B-6 (an id names one decision across replicas).** The kernel MUST mint
+  ids no other replica of the same chain can mint. `KernelOptions` carries
+  the replica's hiqlite node id (`StoreConfig::node_id`, the pod ordinal
+  plus one under spec 032), and the id becomes
+  `kernel:<nonce>:<node>:<counter>`, where the nonce stays 015 D-8's last
+  16 hex of the head at boot. The id is still reproducible from the chain
+  and the node id, reads no clock, and uses no randomness. Ids already in
+  a chain are never rewritten; a verifier that parsed ids (none in this
+  repository does) reads both shapes.
 
 ## 4. Functional requirements
 
@@ -115,11 +150,17 @@ file in `rahi-cli`.
 - **FR-003.** A kernel test fills a queue of capacity 1 and asserts the
   overflow reaches the observer as `dropped`, not `failed`; an edge test
   asserts the three counter families render on `/metrics`.
+- **FR-004.** `tests/replicas.rs` boots two kernels over one store and one
+  chain with node ids 1 and 2, has each deny one request before either
+  appends, flushes both, and asserts two distinct ids, both resident in
+  the chain, and no failure reported. The same test with equal node ids
+  is the regression the old shape fails.
 
 ## 5. Acceptance criteria
 
 - **AC-1.** `cargo test -p rahi-kernel --locked`, `cargo test -p rahi-edge
-  --locked`, and `cargo test -p rahi-cli --locked --test shutdown` pass.
+  --locked`, and `cargo test -p rahi-cli --locked --test shutdown` pass;
+  `tests/replicas.rs` is part of the first.
 - **AC-2.** Spec 015 AC-2 still holds: `cargo tree -p rahi-kernel` shows
   `rahi-ledger`, `rahi-store`, and `rahi-types` as its only workspace
   dependencies.
@@ -142,7 +183,14 @@ None yet. Before approval a human decides:
 - the default bound (5 seconds proposed; spec 026's stream drain is the
   sibling setting);
 - whether a manifest may opt into synchronous denials (`[ledger] denials =
-  "sync"`), which this draft leaves out.
+  "sync"`), which this draft leaves out;
+- B-6's id shape, which changes the format spec 015 D-8 records for a
+  complete spec. The alternatives are folding the node id into the nonce
+  (`tail16(sha256(head, node))`, which keeps D-8's three-part shape and
+  hides the replica) or offsetting each node's counter (which keeps the
+  text shape and changes what the counter means). The draft proposes the
+  visible node segment because it keeps the id legible and lets an
+  auditor attribute a decision to a replica from the id alone.
 
 ## Verification
 

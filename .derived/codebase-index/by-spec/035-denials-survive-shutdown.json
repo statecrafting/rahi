@@ -6,6 +6,11 @@
         "code": "W-001",
         "message": "spec '035-denials-survive-shutdown' file unit 'crates/rahi-cli/tests/shutdown.rs' does not exist",
         "path": "crates/rahi-cli/tests/shutdown.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '035-denials-survive-shutdown' file unit 'crates/rahi-kernel/tests/replicas.rs' does not exist",
+        "path": "crates/rahi-kernel/tests/replicas.rs"
       }
     ]
   },
@@ -49,6 +54,15 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-cli/tests/shutdown.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/tests/replicas.rs"
         }
       },
       {
@@ -147,5 +161,5 @@
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "f445b0348ee0dae435a6a9f378cc603cfde057f055f58d9358c0b494a3ed2663"
+  "shardHash": "9f704c439f0d77726a184f5e0ea137a6257c8b1a6fb2060dad7f5637ab09a3bb"
 }
