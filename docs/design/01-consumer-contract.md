@@ -1,10 +1,11 @@
 # The consumer contract, as built
 
-Version 0, 2026-09-11, for review. This note is a consumer's view of the
-chassis: how to depend on it today, what it guarantees, what it does not,
-and which of the gaps are proposed for change. The design truth stays the
-corpus; nothing here amends a spec. The behavior changes this note asks
-for are the draft specs 035 to 039, which a human approves or rejects.
+Version 0, 2026-09-11, for review; revised the same day with the runtime
+binding of section 11. This note is a consumer's view of the chassis: how
+to depend on it today, what it guarantees, what it does not, and which of
+the gaps are proposed for change. The design truth stays the corpus;
+nothing here amends a spec. The behavior changes this note asks for are
+the draft specs 035 to 041, which a human approves or rejects.
 
 Every statement carries one of three tags.
 
@@ -313,7 +314,7 @@ and to every cell, so it waits for a release line (spec 039).
 | anything a cell does outside a facade | never |
 
 A deny or degrade is answered before its record is durable. The record
-is lost in three ways:
+is lost in four ways:
 
 1. **The queue is full.** 1024 records by default; `try_send` fails and
    the record is dropped. Counted.
@@ -325,15 +326,33 @@ is lost in three ways:
    one answered `403` with a decision id, then SIGTERM; in two runs 40 and
    33 of the 50 reached the chain, and nothing in the log or the metrics
    said so.
+4. **Two replicas mint the same id.** A decision id is
+   `kernel:<last 16 hex of the chain head at boot>:<counter>` (spec 015
+   D-8), with no replica in it. Replicas that boot on the same head, which
+   spec 032's `podManagementPolicy: Parallel` makes the usual case, share
+   the id sequence; the second append of an id is refused
+   `Error::Conflict` (`crates/rahi-ledger/src/append.rs`, `classify`), so
+   that denial is lost, and two callers hold one id for two denials.
+   Counted, as a ledger failure. **Verified** in process: two kernels
+   booted over one store and one chain, as two replicas reading the head
+   through the leader are, each denied one request; both answered
+   `kernel:0910ee4a5d5baaf1:000000000000`, one record landed, and the
+   observer reported one `conflict`. Not reproduced on a live three-node
+   cluster.
 
 Counted means one `kernel_ledger_failures_total` increment and one error
 line at target `rahi.decision`. `/metrics` does not separate a dropped
 record from a failed append; only the log line's text does.
 
+A decision id is therefore unique within a single replica's life, not
+across replicas, and not across a restore, which rewinds the head the ids
+are minted from.
+
 Constitution X says the kernel "ledgers every denial". Under a graceful
-shutdown it does not. **Recommendation** (draft spec 035): drain the queue
-on shutdown within a bound, count what the bound abandons, and expose a
-separate dropped counter.
+shutdown it does not, and at N=3 it does not for colliding ids.
+**Recommendation** (draft spec 035): drain the queue on shutdown within a
+bound, count what the bound abandons, expose a separate dropped counter,
+and put the replica's node id in every decision id.
 
 What is guaranteed durable, **Verified**: any `txn` is one Raft entry and
 one SQLite transaction, replicated before it returns; an outbox row and
@@ -589,8 +608,44 @@ These are requests, not decisions made for those repositories.
 2. hqgit spec 003 B-2 lists the chassis crates without `rahi-cli`, the one
    that exports `Cell` and `run`; add it.
 3. Note that the chain records denials, not allows, and loses queued
-   denials at shutdown until spec 035 lands; evidence that must be
-   complete belongs in hqgit's own records.
+   denials at shutdown and colliding denials at N=3 until spec 035 lands;
+   evidence that must be complete belongs in hqgit's own records.
+4. Reference a rahi deployment epoch by its record hash, never by its
+   number alone, which a restore can reuse (section 11, draft 041 B-7).
+
+The runtime binding of section 11 adds these, which are requests for
+agreement before either side implements, not decisions made here:
+
+**Statecraft**:
+
+6. Name the deployment record's type URI and schema version and publish
+   one fixture. The epoch record (draft 041 B-3) stores `{type, digest,
+   id}` for it and never parses it.
+7. Decide whether the composing envelope wraps a replica's `/binding`
+   document or references it by digest, and name the schema you will
+   accept (`rahi.binding/v0` in draft 040 is a placeholder).
+8. Key runtime observations by `service.instance.id` and the epoch's
+   record hash. Do not ask the chassis for a digest, an instance id, or a
+   deployment id as a metric label (draft 040 B-9).
+9. When you deploy a cell, set `RAHI_ARTIFACT_IMAGE` to the digest you
+   pinned and `RAHI_DEPLOYMENT_REFS` on the migration Job, and after a
+   restore run the Job before the replicas start (draft 041 B-12).
+10. Keep effect-time revalidation in the broker: compare the epoch a
+    permit was issued against with the cell's current one. The chassis
+    reports the epoch; it evaluates no validity predicate.
+
+**statecraft-cli** (as the proposed home of the neutral verifier):
+
+6. Agree the in-toto Statement and SLSA provenance versions and how a
+   provenance names a cell's binary (its sha256, one subject per
+   platform), which the verifier checks against the epoch record's
+   `artifact.binary`.
+
+**spec-spine**:
+
+1. Name the authority snapshot's type URI and digest rules, so that a
+   build provenance can list the snapshot as a material and the epoch
+   record's `refs.authority` can carry it without rahi interpreting it.
 
 **aicortex** (not in the assignment, surfaced because it is a consumer):
 its spec 010 D-1 requires rahi from a registry by exact version, which
@@ -606,4 +661,124 @@ cannot be met until spec 039 publishes; its B-2 also omits `rahi-cli`.
 | release channel | git tags only, or tags plus crates.io | draft 039 |
 | image for out-of-tree cells | a published base image carrying rauthy and the entrypoint, or a documented Dockerfile each consumer copies | draft 039 |
 | the raw store handle | keep, or replace with a facade factory in a release line | section 4 |
+| a decision id across replicas | a node segment in the id (proposed), the node folded into the nonce, or a counter offset per node; each changes the shape 015 D-8 records | draft 035 B-6 |
+| where `/binding` is exposed | beside `/metrics`, kept off the ingress (proposed), behind the operator role, or behind a bearer scope | draft 040 |
+| manifest transition and deployment epoch | two record kinds (proposed, so 036 is not held by the cross-repository agreement 041 needs) or one | drafts 036, 041 |
+| a binding mismatch at boot | a signal only (proposed) or refusable under a manifest option | draft 041 B-8 |
 | the sequencing plan | the drafts sit outside thesis §5's waves; adding them there is a thesis change | spec 002 |
+
+## 11. Runtime binding
+
+The family's evidence chain (the September 11 realignment) wants a
+control plane to correlate an immutable artifact, the authority snapshot
+it was built under, a deployment and its epoch, and a running replica,
+without a hash cycle. rahi's share is identity and metadata a replica
+reports reliably, and a record in its own chain of each deployment it
+serves under. Evaluating any of it is the consumer's.
+
+### 11.1 What a replica can say about itself today
+
+**Verified** at `444bcf8` by reading the code:
+
+| Identifier | Where it exists | Readable by an operator or consumer |
+|---|---|---|
+| chassis version | `CARGO_PKG_VERSION` | `rahi version` prints `rahi 0.1.0`; a backup's `manifest.json` records it |
+| build revision | nowhere: no `build.rs`, no `option_env!` | no |
+| executable digest | nowhere | no |
+| image digest | `image.yml` logs it and names a one-day workflow artifact after it; no provenance, no SBOM; the Dockerfile has no `LABEL`; `deploy/k8s` pins no digest | no |
+| manifest hash | computed at boot (015 B-2) | only as the genesis record in `ledger export`, in a backup's `manifest.json`, and in every denial's payload; not on `/readyz`, `/metrics`, preflight, or a log line |
+| `contract.version`, `app.org` | parsed and validated | read by nothing |
+| chain identity | the genesis record; the ledger public key beside every record | `ledger export`, on a stopped volume only (11.4) |
+| replica | hiqlite node id, the pod ordinal plus one | not reported; OTel resource carries `service.name` only |
+| process incarnation | nothing names one | no |
+| metrics | every label a closed vocabulary (023) | no build or identity family |
+| traces | batch exporter, default sampler keeps every span, ring of 1,000 | export loss is not counted |
+
+### 11.2 A record order with no cycle
+
+**Recommendation** (drafts 040 and 041). Each record names only records
+that exist before it:
+
+```
+authority snapshot   spec-spine                over source
+build provenance     the build platform        in-toto Statement, SLSA predicate;
+                                                subjects: image digest, cell binary sha256 per platform;
+                                                materials: source revision, authority snapshot
+deployment record    Statecraft or operator    names the provenance and the image
+epoch record         rahi chain (041)          names deployment, provenance, snapshot,
+                                                measured binary, declared image, current manifest
+replica binding      rahi /binding (040, 041)  names its epoch, binary, manifest, instance
+decisions            rahi chain (041 B-9)      name their epoch, instance, and manifest
+observations         the consumer's collector  name instance, epoch, interval, coverage
+```
+
+The image contains none of these: it cannot contain its own digest, and
+the chassis writes no deployment id, epoch, or snapshot into a built
+file. The manifest stays the ceiling and the TOML it is written in; no
+extracted application model replaces it. The genesis and every record
+already in a chain stay byte for byte; epoch 0 is the genesis and needs
+no backfill. A deployment outcome the consumer writes after the rollout
+may name the epoch record's hash; that keeps the direction.
+
+Every value a replica reports carries its basis: `measured` (computed by
+the process from bytes it read: its executable's digest, the manifest
+hash), `declared` (given to it and unchecked: the image digest, the build
+revision, the deployment references), or `absent` with a reason. A digest
+the process measures of itself catches the wrong image or a stale node;
+it does not stand against an adversary inside the process.
+
+### 11.3 Upgrade, changed manifest, rollback, restore
+
+**Recommendation** (draft 041, whose worked example is the reference):
+
+- **Upgrade.** The deploy step (the Job at N=3, the entrypoint at N=1)
+  applies migrations, appends 036's transition when the manifest changed,
+  then appends one epoch naming the artifact it measured and the
+  references it was given. Replicas roll; until the rollout ends, old
+  replicas report the previous epoch and their decisions say so.
+- **Changed manifest.** Always through 036's transition, in the same
+  step; the epoch names the transition. A replica on the old image that
+  restarts after the transition is refused by 036, not by 041.
+- **Rollback.** Deploying an older image is a new epoch whose artifact
+  equals an earlier epoch's. An artifact never names an epoch; an epoch
+  names an artifact, and one artifact can appear in many epochs.
+- **Restore.** The archive names the epoch it was taken under. The next
+  deploy step appends an epoch with `cause: restore` whose predecessor is
+  that archived epoch. What the chain held after the backup is not in the
+  restored chain; an epoch is identified by its record hash because a
+  restore can reuse a number.
+- **N=3, multiple architectures.** The Job measures one platform's
+  binary; a replica on another platform reports its binary as `unknown`,
+  and the consumer resolves it against the provenance's subjects.
+
+### 11.4 What a consumer can do before 040 and 041
+
+**Verified** as available today, with the limits named:
+
+- Correlate a decision to a ceiling: every denial's payload names the
+  manifest hash, and `ledger export` names the genesis.
+- Pin the image by digest in the pod spec and read the kubelet's
+  `imageID` from the pod status. That is the platform's observation of
+  the image, not the cell's.
+- Read a live cell's chain: **not possible** today, by reading the code.
+  `migrate` and `backup` attach to a running node or connect as a store
+  client (`Booted::open_or_attach`, `crates/rahi-cli/src/lib.rs`);
+  `ledger verify` and `ledger export` use `Booted::open`, which starts a
+  node on the data directory, so they run on a stopped volume only. A
+  consumer cannot mark a deployment by the chain head without stopping a
+  replica. Draft 041 B-14 proposes the attach path for both.
+- Attribute a decision to a replica: **not possible** today. The id names
+  no replica and collides at N=3 (section 5).
+
+### 11.5 Trust windows and audit bundles
+
+**Recommendation**. For a validity predicate revalidated at effect time,
+the chassis supplies the current epoch's record hash on `/binding` and in
+the chain as a freshness input; the broker evaluates the predicate. The
+chassis evaluates no trust window (015 §6 leaves that to a later spec; the
+sibling `trust-window` crate is not a chassis dependency). For an
+independent audit bundle, the chassis supplies the `ledger export` lines
+as the original bytes, the verifying public key, the segment references,
+and, with draft 041 B-13, a coverage file that states what the export
+does not contain: allows, lost denials, and archived segments. The
+bundle's envelope is the consumer's.

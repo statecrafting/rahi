@@ -18,10 +18,13 @@ Encore and Turso and what remains is what this is.
 ## Status: all three waves built
 
 This repository is a complete specification corpus, the harness that
-builds it, and the code it specifies. All 22 specs are `status: approved`;
-spec ordinals are the build order; and each spec is bounded to one driven
-session's territory. Twenty are `implementation: complete`, and the two
-records, 000 and 002, are `n-a`. Nine crates and the reference app exist
+builds it, and the code it specifies. The 22 specs of the three waves are
+`status: approved`; spec ordinals are the build order; and each spec is
+bounded to one driven session's territory. Twenty are `implementation:
+complete`, and the two records, 000 and 002, are `n-a`. Seven more, 035 to
+041, are `status: draft`: proposals from the consumer contract below that
+schedule nothing until a human approves them. Nine crates and the
+reference app exist
 (`rahi-types`, `rahi-store`, `rahi-ledger`, `rahi-kernel`, `rahi-edge`,
 `rahi-idp`, `rahi-ops`, `rahi-cli`, `rahi-harness`, and `apps/hello-cell`),
 every one of their 142 source files specifically claimed by the spec that
