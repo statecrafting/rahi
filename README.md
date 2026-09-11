@@ -34,7 +34,7 @@ path runs only where `RAHI_TEST_RAUTHY` names a rauthy binary. One hold is
 open: rauthy's backup routes refuse the admin API key the `backup` verb
 presents (spec 030 D-3), and a backup with a missing part is an error, so
 `rahi backup` against a real rauthy fails today.
-`docs/design/01-consumer-contract.md`
+[`docs/design/01-consumer-contract.md`](docs/design/01-consumer-contract.md)
 states what is proven, by which test, against which identity provider,
 and what is not.
 
