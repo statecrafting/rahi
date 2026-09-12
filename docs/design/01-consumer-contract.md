@@ -7,6 +7,11 @@ the gaps are proposed for change. The design truth stays the corpus;
 nothing here amends a spec. The behavior changes this note asks for are
 the draft specs 035 to 041, which a human approves or rejects.
 
+Revised 2026-09-12: `02-operational-prerequisites.md` re-ran the gaps below
+against `c13cc70` (whose crate sources equal `444bcf8`) and the pinned
+rauthy release, answered the consumers' questions, and proposed the open
+decisions. Statements it supersedes are marked in place.
+
 Every statement carries one of three tags.
 
 - **Verified**: checked against commit `444bcf8` (`main`) by reading the
@@ -267,7 +272,10 @@ rahi does not depend on that branch's `at+jwt` header. The same run
 passed again at `444bcf8` on 2026-09-11 (76 seconds, with the exported
 chain verified by the independent `attest-ledger` CLI). The pinned
 release, 0.36.2, has met the chassis in `docker/smoke.sh` and in the image
-run of 2.5, never in a login. `crates/rahi-idp/tests/discovery.rs` line
+run of 2.5, never in a login. *Superseded 2026-09-12:* by hand, in a Linux
+container, the pinned 0.36.2 binary drove hello-cell's end-to-end test and
+the harness's login test green, and a restore with identity was
+demonstrated; still not in CI (note 02 sections 1 and 4). `crates/rahi-idp/tests/discovery.rs` line
 307 is gated on `RAHI_TEST_RAUTHY` and never boots anything even when it
 is set.
 
@@ -338,7 +346,10 @@ is lost in four ways:
    through the leader are, each denied one request; both answered
    `kernel:0910ee4a5d5baaf1:000000000000`, one record landed, and the
    observer reported one `conflict`. Not reproduced on a live three-node
-   cluster.
+   cluster. *Superseded 2026-09-12:* reproduced with three independent
+   processes forming one three-node cluster on loopback (not Kubernetes):
+   30 denials answered, 10 distinct ids, 10 records, 20 lost; and the
+   shutdown loss re-measured at 142 to 196 of 200 (note 02 sections 2, 3).
 
 Counted means one `kernel_ledger_failures_total` increment and one error
 line at target `rahi.decision`. `/metrics` does not separate a dropped
@@ -414,7 +425,9 @@ stages envelopes also runs the drain loop (spec 012 §6).
   Observed in the hello-cell image with rauthy 0.36.2: `rahi backup`
   inside the running container ends with `unauthorized: rauthy refused
   the admin token at .../auth/v1/backup (401 Unauthorized)` and writes no
-  archive.
+  archive. *Added 2026-09-12:* an admin session is refused `406
+  MfaRequired` under rauthy's defaults, and the only way past it,
+  `ADMIN_FORCE_MFA=false`, is instance-wide (note 02 section 4).
 - The app half of the verb races. hiqlite 0.14 documents that
   `Client::backup` returns before the file exists, and `Store::backup`
   lists the backup directory once, immediately after, so it can report
@@ -564,7 +577,12 @@ tokens are held by the CLI (rauthy's device-grant refresh lifetime
 defaults to 72 hours), and whether a runner authenticates as a user, as a
 client-credentials service principal, or through a token the control
 plane mints. The chassis never mints one (025 B-1), so the last option is
-a consumer design outside the chassis.
+a consumer design outside the chassis. *Added 2026-09-12:* note 02 section
+6.1 answers Statecraft R-1 and CLI D72, separates today's validation from
+the proposed renewal, and recommends a client-credentials principal per
+runner; 025 B-5's "fifteen minutes" is the revocation lag (900 s), not a
+lifetime the chassis enforces, and it is shorter than rauthy's default
+token lifetime.
 
 ## 9. Requests to other repositories
 
@@ -654,6 +672,9 @@ its spec 010 D-1 requires rahi from a registry by exact version, which
 cannot be met until spec 039 publishes; its B-2 also omits `rahi-cli`.
 
 ## 10. Open decisions for the rahi maintainer
+
+*Updated 2026-09-12:* note 02 section 8 carries these with a proposal and
+the evidence for each, plus the decisions owned by Statecraft and hqgit.
 
 | Decision | Options | Where |
 |---|---|---|
