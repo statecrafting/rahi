@@ -102,9 +102,13 @@ the manifest's `[auth]` table (015), the serve composition and preflight
   declared bearer (025 D-6's `is_bearer_route`) that carries an
   `Authorization` header and no session cookie. Every other request is
   checked as today. A request with both credentials is still refused
-  (025 B-10).
+  (025 B-10). Cookie-session CSRF protection is unchanged, and a bearer
+  write never depends on the client presenting an equal `csrf` cookie and
+  `X-CSRF-Token` header of its own choosing: no test, example, or document
+  uses that pair as the way a bearer client writes (D-2).
 - **B-2 (native clients in the manifest).** `[[auth.native_clients]]`
-  declares `id`, `flows` (`device_code`, `authorization_code`, or both),
+  declares `id`, `flows` (`device_code`, `authorization_code`, or both,
+  and `refresh_token` beside either, D-1),
   `scopes`, and, for `authorization_code`, loopback `redirect_uris`
   (RFC 8252). The manifest validates them: ids unique, scopes a subset of
   the scopes the cell's bearer routes declare, redirect URIs loopback
@@ -118,8 +122,13 @@ the manifest's `[auth]` table (015), the serve composition and preflight
   client it did not declare.
 - **B-4 (lifetimes set).** `[auth] access_token_lifetime_secs` (default
   600) is applied to the cell's own client and every native client, and
-  is the deny-list's TTL. The browser session's assertion stays at 900
-  seconds (022).
+  is the deny-list's TTL. `[auth] native_refresh_lifetime_secs` (default
+  86,400) is applied as rauthy's refresh token lifetime for every native
+  client whose flows include `refresh_token`, in place of rauthy's
+  72-hour device-grant default. hello-cell's manifest states both values.
+  A client never derives expiry from the manifest: it reads the expiry
+  the token response carries (`expires_in`) and renews on that (D-1). The
+  browser session's assertion stays at 900 seconds (022).
 - **B-5 (revocation).** Two deny-lists in the cache group, each with the
   lifetime as TTL: by `jti`, and by subject with an instant (a token for
   that `sub` issued before the instant is refused). A bearer request to
@@ -136,7 +145,9 @@ the manifest's `[auth]` table (015), the serve composition and preflight
   `hello-cli` with the device flow. Its end-to-end test, on the rauthy
   path, runs the device grant against rauthy through the cell's origin,
   approves it as the test user, polls the token, posts a note with the
-  bearer token and no CSRF pair, revokes the token, and is refused.
+  bearer token and no CSRF pair, renews with the `refresh_token` grant at
+  the issuer's token endpoint and posts again with the new access token,
+  revokes the token, and is refused.
 
 ## 4. Functional requirements
 
@@ -153,6 +164,12 @@ the manifest's `[auth]` table (015), the serve composition and preflight
   one issued after.
 - **FR-005.** hello-cell's end-to-end test does B-7 against the pinned
   rauthy release.
+- **FR-006 (audience, expiry, revocation, renewal).** Added 2026-09-12
+  (D-1). Resource-server tests refuse a token whose `aud` is not the
+  cell's origin and a token past `exp` plus the leeway, and admit a token
+  obtained by refresh; FR-004 covers revocation. On the rauthy path, B-7
+  asserts that the access token's lifetime as issued equals the manifest's
+  600 seconds and that the client's renewal was driven by `expires_in`.
 
 ## 5. Acceptance criteria
 
@@ -170,13 +187,48 @@ the manifest's `[auth]` table (015), the serve composition and preflight
 - Token exchange (RFC 8693) and delegation chains (025 §6).
 - Introspection on the request path (025 D-1).
 - How a runner authenticates to a control plane: a consumer contract.
+  Service-principal runner enrollment in particular is deferred (D-3).
 - The CLI's own implementation of the device grant.
+- Issuing, storing, or refreshing a token for a bearer client in the
+  chassis: a native client renews at the issuer (D-1).
 
 ## 7. Resolved decisions
 
-None yet. Before approval a human decides:
+The owner decided the lifetimes, bearer writes, device refresh, and runners
+on 2026-09-12 (decision RH-04 of the revision-3 register, which names P-1 to
+P-3). The spec stays `draft` until a human flips it.
 
-- the default access token lifetime (600 seconds proposed);
+- **D-1 (2026-09-12, owner decision RH-04; lifetimes and device refresh).**
+  The manifest configures a 600-second access token lifetime and an
+  86,400-second refresh token lifetime (B-4), and clients still read the
+  actual expiry from the token response rather than assuming either value.
+  Device refresh is implemented for real: a native client's flows may
+  include `refresh_token` (B-2), rauthy's refresh lifetime comes from the
+  manifest, and B-7 renews through the issuer. This takes P-2. P-1's
+  division of labor is recorded as part of it because it is the only
+  renewal that keeps 025 B-1, not because the decision names it
+  separately: the chassis issues, stores, and refreshes nothing for a
+  bearer client, and 022's browser renewal is not offered to one. Tests cover audience, expiry, revocation, and renewal (FR-004,
+  FR-006). Noticed for the build session and not decided here: a subject
+  revocation (B-5) refuses tokens issued before its instant, and a refresh
+  after the instant yields a token issued after it, so ending a refresh
+  chain also needs the refresh token ended at rauthy; the build names the
+  rauthy call it uses, or records that subject revocation stops at access
+  tokens, and tests whichever it built.
+- **D-2 (2026-09-12, owner decision RH-04; bearer writes and CSRF).** Real
+  authenticated bearer writes are implemented through B-1's exemption.
+  Cookie-session CSRF protection is kept. The equal cookie and header
+  workaround that the evidence below shows passing the layer today is not
+  authorized as a way for a bearer client to write, and nothing in this
+  spec's build relies on it.
+- **D-3 (2026-09-12, owner decision RH-04; runners).** Service-principal
+  runner enrollment is deferred, following Statecraft's decision G-09 that
+  first-pilot runners use an enrolled person's device-grant session renewed
+  by refresh token. P-3 is not adopted; its text stays as the record of the
+  alternative for when unattended runners are reopened.
+
+Still open before approval:
+
 - whether native clients belong in the manifest (proposed, since they are
   part of what the cell permits) or in deployment configuration;
 - whether `RAHI_IDP_REGISTRATION` should default to `off` once declared
@@ -188,7 +240,8 @@ None yet. Before approval a human decides:
 
 ### Evidence and proposals (2026-09-12)
 
-Recorded by the operational-prerequisites session; none adopted.
+Recorded by the operational-prerequisites session and kept as written. P-1
+and P-2 were adopted on 2026-09-12 (D-1); P-3 was deferred (D-3).
 
 - **Evidence (B-1).** At `c13cc70`, a `POST` carrying `Authorization:
   Bearer` and no CSRF pair is answered `403` `csrf` before any
