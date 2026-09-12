@@ -147,7 +147,11 @@ file in `rahi-cli`.
   bound expired, or the process was killed without a stop signal. The
   first three are counted by name; the fourth cannot be, and the
   deployment documentation says so. The id names that denial and no
-  other (B-6).
+  other (B-6), with one stated residual (D-3): an id held for a lost
+  denial can be re-minted by the same replica after a restart on an
+  unmoved head, and B-7's boot line is what makes the re-mint visible.
+  The drain is bounded: it is not a guarantee against process death or
+  storage failure.
 - **B-5 (no request waits).** The request path still never awaits an
   append (015 B-6). This spec adds no synchronous mode.
 - **B-6 (an id names one decision across replicas).** The kernel MUST mint
@@ -159,13 +163,22 @@ file in `rahi-cli`.
   and the node id, reads no clock, and uses no randomness. Ids already in
   a chain are never rewritten; a verifier that parsed ids (none in this
   repository does) reads both shapes.
+- **B-7 (the boot identity, reported).** Added 2026-09-12 (D-3). After the
+  kernel boots and before `serve` listens, `serve` writes one info line at
+  target `rahi.decision` naming the nonce and the node id the kernel mints
+  under, so an auditor can pair any id with the boot that minted it and
+  can see two boots of one replica on one nonce.
 
 ## 4. Functional requirements
 
 - **FR-001.** `tests/shutdown.rs` boots a fixture cell whose route is
   denied, sends 200 concurrent requests, asserts 200 answers of `403` each
   carrying a decision id, sends SIGTERM, waits for exit `0`, and asserts
-  `ledger verify` reports every one of the 200 ids in the chain.
+  `ledger verify` reports every one of the 200 ids in the chain. No loss
+  is unexplained (D-4): any id the chain lacks fails the test unless the
+  counters of B-3 account for it by cause, and under the default bound the
+  expected count of such ids is zero. The test runs on a release build
+  (P-5) and asserts B-7's boot line.
 - **FR-002.** A kernel test holds the appender behind a gate longer than a
   one-second bound, stops, and asserts the abandoned count equals the
   records still queued and that each abandoned id reached the observer
@@ -178,12 +191,13 @@ file in `rahi-cli`.
   appends, flushes both, and asserts two distinct ids, both resident in
   the chain, and no failure reported. The same test with equal node ids
   is the regression the old shape fails.
-- **FR-005 (independent replicas).** Proposed 2026-09-12, because two
-  kernels in one process share a runtime and a store handle and three
-  replicas do not. A test in `tests/shutdown.rs` (or a sibling the build
-  session claims) starts three fixture-cell processes as one three-node
-  cluster on loopback, has each deny ten requests concurrently, and asserts
-  30 distinct ids, 30 denial records in the chain, and every
+- **FR-005 (independent replicas).** Proposed 2026-09-12 and required by
+  D-4, because two kernels in one process share a runtime and a store
+  handle and three replicas do not. A test in `tests/shutdown.rs` (or a
+  sibling the build session claims) starts three fixture-cell processes as
+  one three-node cluster on loopback, has each deny ten requests
+  concurrently, and asserts 30 distinct ids, 30 denial records in the
+  chain, and every
   `kernel_decisions_dropped_total`, `kernel_decisions_abandoned_total`, and
   `kernel_ledger_failures_total` at zero. The procedure of
   `docs/design/02-operational-prerequisites.md` section 3 is the template;
@@ -197,8 +211,9 @@ file in `rahi-cli`.
 - **AC-2.** Spec 015 AC-2 still holds: `cargo tree -p rahi-kernel` shows
   `rahi-ledger`, `rahi-store`, and `rahi-types` as its only workspace
   dependencies.
-- **AC-3.** `deploy/README.md` states B-4's promise and its one uncounted
-  case.
+- **AC-3.** `deploy/README.md` states B-4's promise, its one uncounted
+  case, the re-mint residual of D-3, and that the drain is bounded, not a
+  guarantee against process death or storage failure.
 
 ## 6. Out of scope
 
@@ -211,25 +226,55 @@ file in `rahi-cli`.
 
 ## 7. Resolved decisions
 
-None yet. Before approval a human decides:
+The owner decided P-1, P-3, and P-4 on 2026-09-12 (decision RH-01 of the
+revision-3 register); D-1 to D-4 record them. The spec stays `draft` until a
+human flips it. P-2 was not part of that decision: synchronous denials stay
+out of scope (§6) exactly as drafted.
 
-- the default bound (5 seconds proposed; spec 026's stream drain is the
-  sibling setting);
-- whether a manifest may opt into synchronous denials (`[ledger] denials =
-  "sync"`), which this draft leaves out;
-- B-6's id shape, which changes the format spec 015 D-8 records for a
-  complete spec. The alternatives are folding the node id into the nonce
-  (`tail16(sha256(head, node))`, which keeps D-8's three-part shape and
-  hides the replica) or offsetting each node's counter (which keeps the
-  text shape and changes what the counter means). The draft proposes the
-  visible node segment because it keeps the id legible and lets an
-  auditor attribute a decision to a replica from the id alone.
+- **D-1 (2026-09-12, owner decision RH-01; adopts P-1).** The drain bound
+  is five seconds, `RAHI_DENIAL_DRAIN_TIMEOUT_SECS`. The owner named it
+  bounded draining, not a guarantee against process death or storage
+  failure, and B-4 now says so. The build session checks that the
+  supervisor's stop budget (031) exceeds the stream drain (026) plus this
+  bound and records the sum as a decision of its own.
+- **D-2 (2026-09-12, owner decision RH-01; adopts P-3).** The decision id
+  is `kernel:<nonce>:<node>:<counter>` (B-6). Of the three shapes this
+  section weighed, it is the one whose uniqueness an auditor checks from
+  the id and the deployment's node list without recomputing a hash, and it
+  keeps 015 D-8's reproducibility: no clock, no randomness. The change is
+  recorded here and not in spec 015's text; 015 D-8 stays as the history of
+  the three-part shape. Rejected: folding the node into the nonce
+  (`tail16(sha256(head, node))`), which hides the replica; offsetting each
+  node's counter, which changes what the counter means.
+- **D-3 (2026-09-12, owner decision RH-01; adopts P-4).** The re-mint
+  residual is accepted: a replica whose denials were all lost and which
+  restarts before any replica appends boots on the same head with the same
+  node id and mints the ids its lost denials' callers hold. The owner
+  accepted it on two conditions, both now requirements: the boot identity
+  is explicit (B-7, the nonce and node logged at boot) and every loss that
+  can be counted is reported by cause (B-2, B-3). B-4 states the residual.
+  Rejected: a per-boot sequence per node kept in the store and read at
+  boot, which closes the case at the cost of a store write on every boot
+  for a case that needs a lost denial and an unmoved cluster-wide head.
+- **D-4 (2026-09-12, owner decision RH-01; the evidence).** The build
+  proves three things. No unexplained loss on a graceful shutdown (FR-001:
+  every answered id is in the chain or counted by cause, and with the
+  default bound none is missing). Unique ids across three independent
+  processes (FR-005, which this decision makes a requirement rather than a
+  proposal; FR-004 in process is not a substitute). Exhaustion is
+  observable. This spec reads "exhaustion" as the two bounded resources it
+  owns: the drain bound (FR-002: the abandoned count, one error line per
+  abandoned id, one warning line) and the queue's capacity (FR-003: the
+  dropped count, distinct from a failed append on `/metrics`). The counter
+  segment is a zero-padded `u64` that widens past twelve digits rather than
+  wrapping in any reachable run, so it is not a third bound; a reader who
+  meant something else by "exhaustion" corrects this entry before approval.
 
 ### Proposals for the owner (2026-09-12)
 
 Recorded by the operational-prerequisites session from the measurements in
-section 1. Each is a proposal; none is adopted until a human approves this
-spec.
+section 1. Kept as written; P-1, P-3, and P-4 were adopted on 2026-09-12
+(D-1 to D-3), P-5 is D-4's starting point, and P-2 was not taken up.
 
 - **P-1 (bound).** Keep 5 seconds. A 200-record backlog drained in 0.27
   seconds on a release build and 0.60 on a debug build at N=1; the default
