@@ -155,7 +155,9 @@ extends it from "what happened" to "what is running", with the same rule
   (020 B-2, 023 D-8): no session, no CSRF check, no rate limit, not
   instrumented (023 B-5). It carries no secret, no principal, and no
   per-request value, and the deployment MUST keep it off the public
-  ingress exactly as it keeps `/metrics` off (032 B-3).
+  ingress exactly as it keeps `/metrics` off (032 B-3). The document is an
+  observation with bases and authorizes nothing: a consumer's permission
+  to deploy is separate and is judged by the consumer (041 B-10a, D-1).
 - **B-7 (what is not observed, stated).** `observation` states coverage
   and loss rather than implying completeness: `traces` (export on or off,
   the sampler, `export_loss: "uncounted"`, the ring capacity),
@@ -238,7 +240,20 @@ extends it from "what happened" to "what is running", with the same rule
 
 ## 7. Resolved decisions
 
-None yet. Before approval a human decides:
+- **D-1 (2026-09-12, owner decision RH-07; the contract kept, the build
+  deferred).** Three rules this draft already states are retained as the
+  contract. A runtime observation is keyed by instance identity together
+  with 041's epoch reference (the chain hash and the epoch record hash),
+  never by pod, node, or epoch number alone; `instance.id` (B-4) is this
+  spec's share. An observation grants no deployment permission (B-6, which
+  now says so, taking P-2). No identity value is a metric label (B-9).
+  Implementation is deferred until the first hosted pilot's prerequisites
+  are built, which takes P-4; the owner judged that these contracts can be
+  aligned with the consumers now without building the binding system. P-1
+  and P-3 are not decided by this entry. The spec stays `draft` until a
+  human flips it.
+
+Still open before approval:
 
 - the document's `schema` name and version (`rahi.binding/v0` proposed)
   and whether a consumer's envelope wraps the document or references it,
@@ -256,7 +271,8 @@ None yet. Before approval a human decides:
 
 ### Proposals (2026-09-12)
 
-Recorded by the operational-prerequisites session; none adopted.
+Recorded by the operational-prerequisites session and kept as written. P-2
+and P-4 were adopted on 2026-09-12 (D-1); P-1 and P-3 are not decided.
 
 - **P-1 (schema).** Name the document `rahi.binding/v0` and reserve 041's
   members in it from the start: `epoch` and `match` present with basis

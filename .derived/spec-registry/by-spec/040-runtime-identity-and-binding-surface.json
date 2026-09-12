@@ -189,6 +189,6 @@
     "summary": "A consumer that correlates an immutable artifact, an authority snapshot, a deployment, and a running replica needs the replica to say what it is. Today it says almost nothing: rahi version prints the crate version, the manifest hash is visible only inside a ledger export or a backup, the OTel resource carries service.name alone, the image has no labels, and the deploy manifests pin no digest. This spec makes a replica report its measured executable digest, its booted manifest hash, its declared image and build revision, and a per-boot instance id, each with its basis (measured, declared, or absent), on one unguarded document at /binding kept off the ingress like /metrics, on the OTel resource, and in one build-info metric whose labels are versions only. It states what the telemetry does not observe or count. It writes nothing to the chain; deployment epochs are spec 041.\n",
     "title": "Runtime identity: a replica states which bits it runs, which ceiling it enforces, and which instance it is, with every value's basis named, on bounded surfaces"
   },
-  "shardHash": "486048a837c96fa6bfd4122406f686df8424b77a8e3f8df69985bdb03f200ebd",
+  "shardHash": "26b2d3906e01812dc5b6b8417bbeee068f5a4db3a4ae6a91e4ec3514d94bd126",
   "specVersion": "1.2.0"
 }
