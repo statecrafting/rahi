@@ -43,8 +43,9 @@ the whole repository:
 states what a consumer gets and what is proven, by which test, against which
 identity provider;
 [`docs/design/02-operational-prerequisites.md`](docs/design/02-operational-prerequisites.md)
-records the measurements behind the table above and the decisions still
-open.
+records the measurements behind the table above, the maintainer's decisions
+of 2026-09-12 on them (section 8.1, recorded in the drafts; no draft is
+approved by them), and the decisions still open.
 
 The corpus is built by
 [claude-observatory](https://github.com/bartekus/claude-observatory), which

@@ -6,7 +6,9 @@ expansion"). The handoff is planning input: it approves no draft, and nothing
 here amends a spec. It records what ran, what it showed, the answers to the
 consumers' questions, and proposals a human accepts or rejects. The
 contract itself stays `01-consumer-contract.md`; where this note supersedes
-a statement there, that section says so.
+a statement there, that section says so. The rahi maintainer's decisions on
+these proposals, taken later the same day, are indexed in section 8.1 and
+recorded in the specs they govern; the evidence sections are unchanged.
 
 Tags as in note 01: **Verified** (ran or read, and the section says where),
 **Recommendation** (this note's proposal), **Unresolved** (a named owner
@@ -557,6 +559,29 @@ no three-replica claim before that.
 | publishing these branches | the user | the repository is public and the notes describe security-relevant gaps; nothing is pushed | |
 | release line | rahi maintainer | draft 039 | note 01 section 2 |
 
+### 8.1 Decided on 2026-09-12
+
+The rahi maintainer's rows above were decided on 2026-09-12, as decisions
+RH-01 to RH-08 of the revision-3 register. Each is recorded as a dated
+decision in the spec it governs, and that entry is the authority; this table
+only points there. No draft is approved by these decisions: every draft stays
+`status: draft` until a human flips it.
+
+| Decision | Resolution | Recorded in |
+|---|---|---|
+| 035 drain bound, id shape, re-minted id | a five-second bounded drain (not a guarantee against process death or storage failure); `kernel:<nonce>:<node>:<counter>`; the re-mint residual accepted with the boot identity logged and every countable loss reported by cause; tests show no unexplained loss at a graceful stop, unique ids across three processes, and observable exhaustion | 035 D-1 to D-4 (RH-01) |
+| 037 backup mechanism | a software-passkey spike first, with rauthy's admin MFA left on, then the mechanism it proves; no waiting on an upstream API-key route and never `ADMIN_FORCE_MFA=false`; if automation fails, only a rehearsed operator-assisted procedure, and no unattended recovery claim | 037 D-1 (RH-02) |
+| 037 hand-off at N=3 | deferred; the candidate (one node restores, the others rejoin, then test) is recorded and not adopted | 037 D-2 (RH-03) |
+| 038 lifetimes and refresh | 600 s access and 86,400 s refresh in the manifest, clients read the actual expiry; real bearer writes and device refresh; cookie-session CSRF kept and the equal cookie and header workaround not authorized; service-principal runners deferred under Statecraft's G-09 | 038 D-1 to D-3 (RH-04) |
+| release line | registry publication of all nine chassis crates, `rahi-cli` included, with matching release tags and pinned images; packaging implemented and tested locally, publication at the release checkpoint | 039 D-1 (RH-05) |
+| manifest version, capability kinds, hiqlite provenance | the manifest version wired and validated and unknown sections refused; a new capability kind is a reviewed minor schema change with compatibility tests, a breaking change a new major; upstream hiqlite kept and the July fork proposal reversed; 012 B-1, B-4, and B-6 amended to the implementation; no renewable chassis lease | 039 D-2, 015 D-9, 011 D-10 and D-11, 012 D-10 (RH-06) |
+| binding and epoch shapes, rahi's side | the chain hash plus the epoch record hash plus instance identity retained; an observation grants no deployment permission; no identity value in a metric label; implementation deferred past the pilot's prerequisites | 040 D-1, 041 D-1 to D-4 (RH-07) |
+| the `AGENTS.md` claim count | corrected with no hardcoded count, on `corpus/001-claim-count` off `main`, not on this branch | 001 D-12 (RH-08) |
+
+Not decided by these: the rows owned by Statecraft, spec-spine, the CLI, and
+hqgit; publishing the branches; the approval flips; and the items each
+draft's section 7 still lists as open.
+
 ## 9. The next smallest increment
 
 **Recommendation**: approve draft 035 with P-1, P-3, and P-4, and build it as
@@ -564,6 +589,12 @@ the next spec. It is one kernel change, one serve change, and two counters;
 it closes the two losses this note measured; its acceptance reuses sections
 2 and 3 as FR-001 and FR-005. In parallel, the maintainer picks 037's
 mechanism, because every recovery claim of the pilot waits on it.
+
+Update, 2026-09-12, after section 8.1: both have happened. P-1, P-3, and P-4
+are adopted as 035 D-1 to D-3, and 037's mechanism is chosen (D-1). What
+stands between 035 and its build is the human flip to `approved` and the
+corpus reaching `main`. 037's FR-005 spike is the parallel increment, since
+its outcome decides which branch of 037 D-1 is built.
 
 ## Appendix A: the probes
 

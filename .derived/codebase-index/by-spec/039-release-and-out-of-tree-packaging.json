@@ -22,6 +22,7 @@
   "mapping": {
     "dependsOn": [
       "010-workspace-and-core-types",
+      "015-kernel-manifest-and-adjudication",
       "030-operational-verbs",
       "031-single-container-packaging",
       "032-cluster-topology",
@@ -41,11 +42,27 @@
         "source": "spec-edge"
       },
       {
+        "path": "apps/hello-cell/manifest.toml",
+        "source": "spec-edge"
+      },
+      {
         "path": "apps/hello-cell/src/cell.rs",
         "source": "spec-edge"
       },
       {
         "path": "crates/rahi-cli/src/serve.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-kernel/src/manifest.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-kernel/testdata/manifests/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-kernel/tests/manifest.rs",
         "source": "spec-edge"
       },
       {
@@ -130,6 +147,19 @@
       {
         "locations": [
           {
+            "file": "apps/hello-cell/manifest.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/manifest.toml"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "apps/hello-cell/src/cell.rs"
           }
         ],
@@ -151,6 +181,45 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-kernel/src/manifest.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/manifest.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-kernel/testdata/manifests/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/testdata/manifests/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-kernel/tests/manifest.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/tests/manifest.rs"
         }
       },
       {
@@ -280,5 +349,5 @@
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "b67df026d802c397ddd41d7eb763fcdaeadd2ece2070eced1b9abd3592cf773a"
+  "shardHash": "ff0297a753a2f697170a329f99523571e56f69a29f56c3220f33c0565fbac6c2"
 }
