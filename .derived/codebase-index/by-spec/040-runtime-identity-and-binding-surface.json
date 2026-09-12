@@ -325,11 +325,24 @@
           "kind": "file",
           "path": "docs/design/01-consumer-contract.md"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/02-operational-prerequisites.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-operational-prerequisites.md"
+        }
       }
     ],
     "specId": "040-runtime-identity-and-binding-surface",
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "8add71e6fc1e99ae79e3010d5eba7b33079fc21cd504786c917d501ed123f7e3"
+  "shardHash": "c56fbc294b55ac10a86b31065bf6374d1bbb08f7bb85f3e60cd18f29b0e4681c"
 }

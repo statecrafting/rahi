@@ -38,6 +38,7 @@ extends:
   - { spec: "032-cluster-topology", unit: "deploy/README.md", nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/01-consumer-contract.md" }, role: context }
+  - { unit: { kind: file, path: "docs/design/02-operational-prerequisites.md" }, role: context }
 summary: >
   A consumer that correlates an immutable artifact, an authority snapshot,
   a deployment, and a running replica needs the replica to say what it is.
@@ -252,6 +253,27 @@ None yet. Before approval a human decides:
   the first request;
 - whether `rahi version`'s longer output is a consumer contract change
   under spec 039 B-1.
+
+### Proposals (2026-09-12)
+
+Recorded by the operational-prerequisites session; none adopted.
+
+- **P-1 (schema).** Name the document `rahi.binding/v0` and reserve 041's
+  members in it from the start: `epoch` and `match` present with basis
+  `absent` and reason `"no deployment epochs (spec 041 not built)"`, so
+  041 fills values without a version bump and a consumer's parser sees one
+  shape. The shape proposed to Statecraft is in
+  `docs/design/02-operational-prerequisites.md` section 7.
+- **P-2 (what the document is).** State in B-6 that the document is an
+  observation with bases and authorizes nothing; a consumer's permit to
+  deploy is separate and is judged by the consumer (041 B-10a).
+- **P-3 (exposure and hashing).** Keep `/binding` beside `/metrics`, off
+  the ingress, and hash the executable at every boot. The hello-cell release
+  binary is 40,713,088 bytes; one sha256 pass over it is not a boot-time
+  concern next to the ledger verification that already runs.
+- **P-4 (sequencing).** 040 is not a prerequisite of the first hosted
+  pilot (section 7 of the note) and should not be approved ahead of 035 and
+  the pilot's parts of 036 to 038.
 
 ## Verification
 
