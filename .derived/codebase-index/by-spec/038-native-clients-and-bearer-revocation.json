@@ -275,11 +275,24 @@
           "kind": "file",
           "path": "docs/design/01-consumer-contract.md"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/02-operational-prerequisites.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-operational-prerequisites.md"
+        }
       }
     ],
     "specId": "038-native-clients-and-bearer-revocation",
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "af0f0371443d70bf7f794b5ef512f12588611646171fd488316da8677488b564"
+  "shardHash": "b348e6bde64f3e4723523a087799115d924cae9c781b82e9af204fecae1ed803"
 }

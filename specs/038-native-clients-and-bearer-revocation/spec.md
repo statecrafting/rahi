@@ -36,6 +36,7 @@ extends:
   - { spec: "034-hello-cell", unit: "apps/hello-cell/README.md", nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/01-consumer-contract.md" }, role: context }
+  - { unit: { kind: file, path: "docs/design/02-operational-prerequisites.md" }, role: context }
 summary: >
   A hosted control plane built as a cell and a command-line client that
   logs in to it need four things the chassis does not yet give. The CSRF
@@ -184,6 +185,45 @@ None yet. Before approval a human decides:
   `token`);
 - whether the operator revocation surface is the route proposed here or
   a verb, which would amend spec 030 AC-2's exact verb list.
+
+### Evidence and proposals (2026-09-12)
+
+Recorded by the operational-prerequisites session; none adopted.
+
+- **Evidence (B-1).** At `c13cc70`, a `POST` carrying `Authorization:
+  Bearer` and no CSRF pair is answered `403` `csrf` before any
+  authentication runs; with an equal `csrf` cookie and `X-CSRF-Token` header
+  of the client's own choosing it passes the layer and reaches
+  authentication. `docs/design/02-operational-prerequisites.md` section 5.
+- **Evidence (B-4, B-5).** The resource server checks `exp` and `nbf` with 60
+  seconds of leeway and enforces no maximum lifetime; its revocation lag,
+  `DEFAULT_REVOCATION_LAG`, is 900 seconds; rauthy 0.36.2's default access
+  token lifetime is 1800 seconds. A deny-list entry written today would
+  lapse while its token still validates. B-4's "lifetime is the TTL" is the
+  rule that closes it; the build must also refuse (in preflight, B-6) a
+  client whose lifetime exceeds the lag.
+- **P-1 (renewal is the client's, and stays outside the request path).**
+  Add to §6 and to the consumer note: the chassis issues, stores, and
+  refreshes nothing for a bearer client. A native client renews with
+  rauthy's `refresh_token` grant at the issuer's token endpoint and presents
+  each new access token, which the resource server validates like any other.
+  The browser session's renewal (022 B-5) is a different mechanism and is
+  not offered to bearer clients.
+- **P-2 (refresh tokens for native clients).** Allow `refresh_token` in a
+  declared native client's flows, with rauthy's refresh lifetime set from
+  the manifest (proposed `[auth] native_refresh_lifetime_secs`, default
+  86,400) rather than rauthy's 72-hour device-grant default, and revocation
+  by subject (B-5) ending every token the refresh chain produced before the
+  instant.
+- **P-3 (runners).** Recommend to Statecraft that a runner authenticate as a
+  client-credentials service principal (025 D-4, `sub == azp`), one rauthy
+  client per enrolled runner created by the control plane through rauthy's
+  admin API, renewing by requesting a new token before `exp` (no refresh
+  token), revoked by disabling the client and deny-listing its `sub`. Job
+  continuity across tokens is the control plane's lease fence, not token
+  lifetime. This keeps 025 B-1 (the chassis mints nothing) and needs no
+  chassis change beyond B-3's lifetime and audience settings applied to
+  those clients by whoever creates them.
 
 ## Verification
 
