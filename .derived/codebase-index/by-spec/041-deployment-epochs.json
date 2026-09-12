@@ -286,11 +286,24 @@
           "kind": "file",
           "path": "docs/design/01-consumer-contract.md"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/02-operational-prerequisites.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-operational-prerequisites.md"
+        }
       }
     ],
     "specId": "041-deployment-epochs",
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "c742b5c95f7ebc55af99941ab696ec8d512d0728a88e122385d3b646a60fced1"
+  "shardHash": "cf9ea261bc4553c916b15e955ee703033d5bc8bd556855ce8800e72d696900fb"
 }

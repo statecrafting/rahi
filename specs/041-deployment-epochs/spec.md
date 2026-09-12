@@ -37,6 +37,7 @@ extends:
   - { spec: "040-runtime-identity-and-binding-surface", unit: "crates/rahi-ops/src/binding.rs", nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/01-consumer-contract.md" }, role: context }
+  - { unit: { kind: file, path: "docs/design/02-operational-prerequisites.md" }, role: context }
 summary: >
   The chain commits to the first manifest (genesis) and, with spec 036, to
   every manifest adopted since. It records nothing about which build a
@@ -202,17 +203,33 @@ composes.
   only when a deploy step appended 036's transition and failed before its
   epoch; it says the step did not finish.
 - **B-9 (decisions name their epoch and instance).** Every decision the
-  kernel emits from this spec on carries two scalar keys in its payload
-  beside the `manifest` it already names: `epoch`, the replica's booted
-  epoch number, and `instance`, the string `instance.id` of 040 B-4 (not
-  040's whole `instance` object). Records already in a chain are untouched,
-  and a payload without the keys was written before this spec. During an
-  N=3 rollout, decisions from old and new replicas interleave, and each
-  names its own epoch; position in the chain never assigns one.
+  kernel emits from this spec on carries three scalar keys in its payload
+  beside the `manifest` it already names: `epoch`, the record hash of the
+  replica's booted epoch (B-7; the genesis record's hash at epoch 0),
+  `epoch_number`, that epoch's number, which orders and never identifies,
+  and `instance`, the string `instance.id` of 040 B-4 (not 040's whole
+  `instance` object). Records already in a chain are untouched, and a
+  payload without the keys was written before this spec. During an N=3
+  rollout, decisions from old and new replicas interleave, and each names
+  its own epoch; position in the chain never assigns one. (Revised
+  2026-09-12 from a number-only `epoch`, so that no chassis surface asks a
+  consumer to correlate by number; see section 7.)
 - **B-10 (bounded signals).** `/metrics` gains `rahi_binding_epoch`, a
   gauge whose value is the booted epoch number with no label, and
   `rahi_binding_mismatch{kind}`, a gauge of 0 or 1 whose `kind` is B-8's
-  closed set. No digest, reference, or instance id is a label.
+  closed set. No digest, reference, or instance id is a label. The gauge's
+  value is for a dashboard; it is not an epoch's identity (B-7), and a
+  consumer that joins on it conflates timelines.
+- **B-10a (an observation is not a permission).** Added 2026-09-12. Nothing
+  this spec records or reports authorizes a deployment. The deploy step
+  appends the references it is given without fetching or judging them and
+  never refuses a deploy for a missing, unknown, or unverified reference;
+  a replica never refuses a boot for a mismatch (B-8); `match: bound` says
+  the replica runs what the epoch names, not that the epoch was permitted.
+  Whether a deployment was allowed is the consumer's permit, evaluated by
+  the consumer's broker against these observations and against the
+  permit's own artifact digest and environment. The chassis reads no
+  permit.
 
 ### Backup, restore, and export
 
@@ -382,6 +399,33 @@ other repositories:
   built from it would be refused `Error::Conflict` (014 B-5). B-12 removes
   the reuse on the N=1 path; the N=3 ordering and the key scheme are
   inferred from the code, not reproduced, and want a maintainer's look.
+
+### The reference contract, proposed to Statecraft (2026-09-12)
+
+Statecraft's drafts on `014-rahi-realignment` (016 section 10.1) state the
+concept, a detached binding carrying an epoch, and name no type, schema, or
+fixture; none of this spec's requests to Statecraft is answered there yet.
+So this is a counterproposal for agreement, not an agreement:
+
+- **An epoch reference** is `{type: "rahi.epoch-ref/v0", chain, epoch,
+  number}`: `chain` the chain's genesis record hash, `epoch` the epoch
+  record's hash (B-7), `number` informative. Equality is `chain` and
+  `epoch`; `number` never participates.
+- **A replica reference** is an epoch reference plus `instance`, 040's
+  `instance.id`. A runtime observation a consumer stores names a replica
+  reference and the interval it covers; a decision names both through
+  B-9's keys.
+- **Metric labels** carry none of these (B-10, 040 B-9).
+- **Permission is separate** (B-10a): a consumer's permit names an artifact
+  digest and an environment; its broker compares them with the epoch's
+  `artifact` and the binding's measured binary at effect time.
+- **The fixture** is the one FR-003 composes: `testdata/binding/` holds an
+  authority snapshot digest, an in-toto Statement, a deployment record, the
+  resulting epoch record, one `/binding` document, and one denial, each as
+  the original bytes. The proposed document shapes are in
+  `docs/design/02-operational-prerequisites.md` section 7; Statecraft names
+  its deployment record's type URI and either accepts these shapes or
+  counterproposes before either side implements.
 
 ## Verification
 
