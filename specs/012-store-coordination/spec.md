@@ -234,9 +234,8 @@ which uses `txn` plus a unique index and no primitive from here (013).
   outbox text be amended to match real behavior, so B-1 now names the token
   `lease_fence` mints (D-1), B-6 now states that hiqlite replays the cache
   group and what the test asserts instead (D-6), and B-4 now states what the
-  outbox
-  already does: delivery at least once, a drain the chassis never runs,
-  and tables the application migrates (D-5). No code changed except a doc
+  outbox already does: delivery at least once, a drain the chassis never
+  runs, and tables the application migrates (D-5). No code changed except a doc
   comment in `tests/cache.rs` that quoted B-6's old text, and no
   requirement moved away from what `cargo test -p rahi-store` already
   proves. The same decision refused a renewable chassis lease API, which
