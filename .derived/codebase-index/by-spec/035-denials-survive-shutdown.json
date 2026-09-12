@@ -155,11 +155,24 @@
           "kind": "file",
           "path": "docs/design/01-consumer-contract.md"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/02-operational-prerequisites.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-operational-prerequisites.md"
+        }
       }
     ],
     "specId": "035-denials-survive-shutdown",
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "b56795fd1c29a2d8b18aa38315ba784d0c450415dd195b0d66ec64dea357e1a7"
+  "shardHash": "8ed94b3e77a131884fe97702f44736f49e1eed8fdf993de524a4ffa7c88c13f6"
 }

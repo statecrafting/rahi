@@ -25,6 +25,7 @@ extends:
   - { spec: "032-cluster-topology", unit: "deploy/README.md", nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/01-consumer-contract.md" }, role: context }
+  - { unit: { kind: file, path: "docs/design/02-operational-prerequisites.md" }, role: context }
 summary: >
   Constitution X says the kernel ledgers every denial. Spec 015 answers a
   denial before its record is durable and drains the records through a
@@ -79,6 +80,28 @@ failure that must never be silent". Two losses escape that rule today.
   record under that id, and the observer reported one `conflict`. Not
   reproduced on a live three-node cluster, where the head read goes
   through the leader and the result is the same by construction.
+
+Measured again on 2026-09-12 at `c13cc70`, whose crate sources equal
+`444bcf8` (method, environment, and output in
+`docs/design/02-operational-prerequisites.md` sections 2 and 3):
+
+- **Shutdown, 200 concurrent denials, SIGTERM at once.** Every request was
+  answered `403` with a distinct id and `serve` exited `0`. The chain kept
+  4, 13, 10, 10, and 14 of the 200 on a debug build and 50 and 58 on a
+  release build; no line was logged and no counter moved. The control run,
+  fifteen seconds between the last answer and SIGTERM, kept 200 of 200 twice.
+  Draining a backlog of 200 took 0.26 to 0.27 seconds on a release build and
+  0.59 to 0.60 on a debug build, single node, loopback.
+- **Three independent replicas.** Three `probe-cell` processes formed one
+  three-node hiqlite cluster on loopback (not Kubernetes), started as
+  `deploy/README.md` describes N=3: shared keys, `migrate` on every replica
+  (the leader exited `0`, the followers `2`), then `serve`. Each replica
+  answered ten concurrent denials. All 30 were `403`; the three replicas
+  minted the same ten ids, `kernel:e60bab25ba6375f5:000000000000` to
+  `...009`; the chain holds ten denial records; replicas 2 and 3 each report
+  `kernel_ledger_failures_total 10`. Twenty callers hold an id whose record
+  is another replica's denial. The collision is not confined to boot: every
+  counter value repeats on every replica for the life of the processes.
 
 This spec closes all three. It serves constitution X and spec 015 D-7 and
 changes neither text: it makes the kernel's existing promise true under a
@@ -155,6 +178,16 @@ file in `rahi-cli`.
   appends, flushes both, and asserts two distinct ids, both resident in
   the chain, and no failure reported. The same test with equal node ids
   is the regression the old shape fails.
+- **FR-005 (independent replicas).** Proposed 2026-09-12, because two
+  kernels in one process share a runtime and a store handle and three
+  replicas do not. A test in `tests/shutdown.rs` (or a sibling the build
+  session claims) starts three fixture-cell processes as one three-node
+  cluster on loopback, has each deny ten requests concurrently, and asserts
+  30 distinct ids, 30 denial records in the chain, and every
+  `kernel_decisions_dropped_total`, `kernel_decisions_abandoned_total`, and
+  `kernel_ledger_failures_total` at zero. The procedure of
+  `docs/design/02-operational-prerequisites.md` section 3 is the template;
+  at `c13cc70` it yields 10 distinct ids and 10 records.
 
 ## 5. Acceptance criteria
 
@@ -191,6 +224,48 @@ None yet. Before approval a human decides:
   text shape and changes what the counter means). The draft proposes the
   visible node segment because it keeps the id legible and lets an
   auditor attribute a decision to a replica from the id alone.
+
+### Proposals for the owner (2026-09-12)
+
+Recorded by the operational-prerequisites session from the measurements in
+section 1. Each is a proposal; none is adopted until a human approves this
+spec.
+
+- **P-1 (bound).** Keep 5 seconds. A 200-record backlog drained in 0.27
+  seconds on a release build and 0.60 on a debug build at N=1; the default
+  queue holds 1024. The appender at N=3 writes through the leader over the
+  network and is not measured here, so B-2's abandoned counter, not the
+  bound, is what makes an exceeded bound visible. The supervisor's own stop
+  budget (031) must exceed the stream drain (026) plus this bound; the
+  build session checks the sum and records it.
+- **P-2 (synchronous denials).** Leave out, as drafted. Nothing measured
+  here needs a durable-before-answer denial once B-1 to B-3 hold, and it
+  would put a Raft write on the refusal path.
+- **P-3 (id shape).** Adopt the visible node segment,
+  `kernel:<nonce>:<node>:<counter>`. It is the only one of the three whose
+  uniqueness an auditor can check from the id and the deployment's node
+  list without recomputing a hash, and it keeps 015 D-8's reproducibility
+  (no clock, no randomness). Record it as a dated decision in this spec,
+  not an edit to 015's text; 015 D-8 stays as the history of the old shape.
+- **P-4 (the denial that is not persisted, accounted for).** B-4 lists four
+  ways a denial answered with an id can be absent from the chain. A fifth
+  consequence follows from the id shape and is not closed by B-6: a replica
+  whose denials were all lost (dropped, failed, abandoned, or killed) and
+  which restarts before any replica appends anything boots on the same head
+  with the same node id, so its counter restarts at zero and it mints the
+  ids the lost denials' callers already hold. After B-1 to B-3 this needs a
+  lost denial and an unmoved cluster-wide head. Proposed: accept it, state it
+  in B-4 as "an id held for a lost denial can be re-minted by the same
+  replica after a restart on an unmoved head", and have `serve` log the
+  booted nonce and node at startup so an auditor can see a re-mint. The
+  alternative that closes it is a per-boot sequence per node kept in the
+  store and read at boot (a store write at every boot, no randomness); this
+  proposal does not take it because the case is narrow and counted.
+- **P-5 (evidence the build must produce).** FR-004 in process and FR-005
+  across three processes, both failing at `c13cc70` and passing after, plus
+  FR-001 on a release build. The out-of-tree probes in the design note are
+  the starting point; they are not repository code and nothing here claims
+  them.
 
 ## Verification
 
