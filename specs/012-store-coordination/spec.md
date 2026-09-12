@@ -54,10 +54,18 @@ Four modules inside `crates/rahi-store` and their tests. It extends spec
 ## 3. Behavior
 
 - **B-1 (lease).** `lease(key: &str) -> Result<Lease>` acquires hiqlite's
-  distributed lock. `Lease { token: FenceToken, release: fn }` exposes the
-  Raft log id as the fencing token and an explicit `release().await`; the
-  handle's `Drop` is a backstop, not the mechanism. The TTL is documented
-  as ten seconds and not configurable.
+  distributed lock and, while holding it, mints the fencing token from the
+  SQL group: it bumps the key's row in `lease_fence` and reads the new
+  value back with `query_consistent` (D-1). `Lease { token: FenceToken,
+  release: fn }` exposes that token and an explicit `release().await`; the
+  handle's `Drop` is a backstop, not the mechanism. Tokens for one key are
+  strictly increasing and survive a restore; a token is comparable only
+  with tokens of the same key, so one lease key guards one resource set.
+  The TTL is documented as ten seconds and not configurable, and a lease
+  cannot be renewed: a holder that needs longer acquires again, and a
+  claim that must outlive the TTL is an application row written under a
+  lease (D-10). *(Amended 2026-09-12, D-10; the text before named the
+  Raft log id as the token.)*
 - **B-2 (fencing predicate).** Every lease-guarded write goes through
   `Store::fenced_txn(lease: &Lease, statements)`, which appends `AND fence
   <= :token` to each statement's `WHERE` via a `Statement::fenced(token)`
@@ -72,6 +80,11 @@ Four modules inside `crates/rahi-store` and their tests. It extends spec
   row commits with the resource. `Outbox::drain(store, batch_size)` reads
   staged rows with `query_consistent`, calls `notify` for each, and deletes
   them in one `txn`. A row is never notified before it is durable.
+  Delivery is at least once: a crash between the notify and the delete
+  publishes the row again on the next drain. The chassis never runs the
+  drain; an application that stages envelopes runs the loop. The `outbox`
+  and `lease_fence` tables are DDL the application places in its own
+  migration list (D-5). *(Amended 2026-09-12, D-10.)*
 - **B-5 (watermark).** `Watermark::next(txn: &mut TxnBuilder, table)`
   computes `max(revision) + 1` inside the transaction and stamps the row.
   `Watermark::since(store, table, after: Revision) -> Vec<Revision>`
@@ -79,8 +92,16 @@ Four modules inside `crates/rahi-store` and their tests. It extends spec
   revision and calls `since` on every tick whether or not a notify arrived.
 - **B-6 (cache is derived).** KV and counter helpers (`kv_put`, `kv_get`,
   `kv_del` with TTL; `counter_add`, `counter_get`) are provided for rate
-  limits and caches and are documented as non-durable; a test asserts a
-  restart clears them.
+  limits and caches and are documented as non-durable. Non-durable is a
+  rule for application code, not a property of hiqlite: hiqlite 0.14
+  persists the cache group's Raft log and replays it at startup, so a
+  value and a counter outlive a restart (D-6). A test asserts that
+  persistence, so an upgrade that changes it is caught, and asserts that a
+  value expires on its TTL and that a delete is a delete. Those two
+  properties, and the rule that no transaction that decides anything
+  writes to the group, are what make it unfit for durable state. *(Amended
+  2026-09-12, D-10; the text before asked for a test that a restart clears
+  the group.)*
 
 ## 4. Functional requirements
 
@@ -125,7 +146,8 @@ which uses `txn` plus a unique index and no primitive from here (013).
   one resource set. Alternative rejected: the cache group's Raft
   `last_log_index`, which is reachable but resets when the group is
   rebuilt, and would then hand out tokens below the ones already recorded
-  in `fence` columns, wedging every later write.
+  in `fence` columns, wedging every later write. Amended into B-1 on
+  2026-09-12 (D-10).
 - **D-2 (2026-09-06, build session).** `Lease::release` is `async` and
   consumes the handle, but it cannot acknowledge: hiqlite releases on
   `Lock::drop` by spawning a task and offers no confirmed release. A
@@ -176,6 +198,7 @@ which uses `txn` plus a unique index and no primitive from here (013).
   nothing in the group is written by the transaction that decided
   anything. The invariant "nothing durable lives in the cache group" stands
   as a rule for application code; it was never a guarantee from hiqlite.
+  Amended into B-6 on 2026-09-12 (D-10).
 - **D-7 (2026-09-06, build session).** `listen()` returns the named type
   `Listen`, which implements `futures_core::Stream<Item = Envelope>` and
   also offers `recv().await`, rather than an anonymous `impl Stream`: spec
@@ -205,6 +228,26 @@ which uses `txn` plus a unique index and no primitive from here (013).
   fifth module, `cache.rs`, rather than inside one of the four the
   Territory names; `tests/watermark.rs` and `tests/cache.rs` cover FR-004
   and B-6.
+- **D-10 (2026-09-12, corpus amendment; owner decision RH-06).** D-1 and
+  D-6 recorded that B-1 and B-6 contradicted the implementation and left
+  both pending a human amendment. The owner decided that the lease and
+  outbox text be amended to match real behavior, so B-1 now names the token
+  `lease_fence` mints (D-1), B-6 now states that hiqlite replays the cache
+  group and what the test asserts instead (D-6), and B-4 now states what the
+  outbox
+  already does: delivery at least once, a drain the chassis never runs,
+  and tables the application migrates (D-5). No code changed except a doc
+  comment in `tests/cache.rs` that quoted B-6's old text, and no
+  requirement moved away from what `cargo test -p rahi-store` already
+  proves. The same decision refused a renewable chassis lease API, which
+  aicortex 035 asked for (a requested duration and a renewal call): B-1's
+  ten-second, non-renewable lease stands, and a work claim that must
+  outlive it is an application row (`key`, `holder`, `fence`,
+  `expires_at`) created and renewed through `fenced_txn` under a
+  short-held lease, as `docs/design/02-operational-prerequisites.md`
+  section 6.5 recommends. Rejected alternative: a renew call on `Lease`,
+  which hiqlite 0.14's lock does not offer, and which would make the TTL
+  a chassis promise the lock cannot keep.
 
 ## Verification
 

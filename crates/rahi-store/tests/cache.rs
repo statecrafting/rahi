@@ -1,7 +1,8 @@
 //! spec 012 B-6: the cache group is derived state, and this file pins what
 //! "derived" actually costs with hiqlite 0.14.
 //!
-//! B-6 expects a restart to clear the cache. It does not: hiqlite persists
+//! B-6 as first written expected a restart to clear the cache, and was
+//! amended on 2026-09-12 (spec 012 D-10) because it does not: hiqlite persists
 //! the cache Raft log under `data_dir` and replays it at startup, so a KV
 //! value and a counter both outlive the process (spec 012 D-6). What makes
 //! the group unfit for durable state is everything else about it: entries
