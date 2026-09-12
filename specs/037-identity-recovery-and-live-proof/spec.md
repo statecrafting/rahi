@@ -89,7 +89,12 @@ test file.
 - **B-1 (the rauthy backup answers).** `rahi backup` obtains rauthy's
   snapshot through the mechanism a human selects in §7 and nothing else.
   No mechanism reads rauthy's directory (constitution VIII). A refusal is
-  still an error and still writes no archive (030 B-5).
+  still an error and still writes no archive (030 B-5). The selection
+  (D-1) is a dedicated backup admin that completes rauthy's MFA with a
+  software passkey custodied in the key set, built only after FR-005's
+  spike proves it against the pinned release; the chassis never sets
+  `ADMIN_FORCE_MFA=false`. If the spike fails, B-1 is not built and the
+  rauthy half is the rehearsed operator-assisted procedure of D-1.
 - **B-2 (the app backup exists before it is reported).** `Store::backup`
   triggers hiqlite's backup and then waits, polling the local listing
   within a bound (default 120 seconds), for a file newer than the ones it
@@ -101,6 +106,8 @@ test file.
   rauthy's health, and records the application in the marker. A later
   start sees the record and passes nothing. Every other start is exactly
   as today. The app never opens rauthy's store; it hands rauthy a file.
+  This spec builds and exercises the hand-off at N=1; restore
+  orchestration at N=3 is deferred (D-2).
 - **B-4 (loud skips where it matters).** When `RAHI_REQUIRE_RAUTHY=1` is
   set, every test gated on `RAHI_TEST_RAUTHY` or `RAHI_TEST_RAUTHY_URL`
   fails instead of skipping when its variables are absent. The dead test
@@ -135,6 +142,14 @@ test file.
   pinned release and in `live.yml`.
 - **FR-004.** With `RAHI_REQUIRE_RAUTHY=1` and no `RAHI_TEST_RAUTHY`, `cargo
   test -p hello-cell --locked` fails naming the variable.
+- **FR-005 (the spike, first).** Added 2026-09-12 (D-1). Before any B-1
+  code lands, a bounded experiment against the pinned rauthy with
+  `ADMIN_FORCE_MFA` on: a dedicated backup admin holds a software passkey,
+  a WebAuthn client in `rahi-ops` completes the assertion without a
+  browser, the resulting session is MFA-satisfied, `POST /auth/v1/backup`
+  succeeds, and the snapshot downloads. Its outcome, pass or fail, with the
+  rauthy version, is recorded as a dated decision in this spec, and it
+  decides which branch of D-1 the build takes.
 
 ## 5. Acceptance criteria
 
@@ -147,6 +162,12 @@ test file.
 - **AC-3.** `deploy/README.md` loses its restore gap paragraph and its D-3
   hold paragraph, or keeps whichever of them this spec did not close,
   with the reason.
+- **AC-4.** Added 2026-09-12 (D-1). No document in this repository claims
+  unattended recovery until B-6 passes with the mechanism B-1 built. If
+  FR-005 fails, `deploy/README.md` carries the operator-assisted backup and
+  restore procedure, states that unattended recovery is not supported, and
+  names the date and rauthy version of the rehearsal that proved the
+  procedure.
 
 ## 6. Out of scope
 
@@ -155,22 +176,42 @@ test file.
   (constitution XII).
 - Backup scheduling and retention (032).
 - A rauthy fork: rahi consumes released rauthy.
+- Restore orchestration at N=3 (D-2), and turning rauthy's admin MFA
+  enforcement off (D-1).
 
 ## 7. Resolved decisions
 
-None yet. Before approval a human decides B-1's mechanism:
+As drafted on 2026-09-11, this section asked a human to choose B-1's
+mechanism between a rauthy change upstream (an API key with backup access on
+`/auth/v1/backup*`, then waiting on a release that carries it) and a
+dedicated backup admin session for a user whose MFA requirement is off. The
+evidence below showed the second does not exist as worded in 0.36.2, and P-1
+named a third. The owner decided on 2026-09-12 (decisions RH-02 and RH-03 of
+the revision-3 register). The spec stays `draft` until a human flips it.
 
-- **A rauthy change upstream** accepting an API key with backup access on
-  `/auth/v1/backup*` (recommended: the key already exists, is scoped, and
-  keeps MFA on every human admin); the spec then waits on a rauthy
-  release that carries it, and pins that release.
-- **A dedicated backup admin session** that the verb establishes by
-  logging in as a rauthy user whose MFA requirement is off, with its
-  password in the key set. It needs no rauthy change and weakens the rule
-  that every rauthy admin has MFA.
+- **D-1 (2026-09-12, owner decision RH-02; B-1's mechanism).** A software
+  passkey feasibility spike first (FR-005), then the implementation of the
+  mechanism it proves: a dedicated backup admin whose passkey private key
+  is custodied in the key set, so `rahi backup` completes rauthy's MFA and
+  `ADMIN_FORCE_MFA` stays on. The owner called this a bounded engineering
+  experiment, not another product decision. Two routes are refused: waiting
+  for an upstream API-key route (asking upstream is allowed and is not a
+  dependency of this spec), and turning MFA off instance-wide. If
+  automation fails, the only thing kept is a rehearsed operator-assisted
+  backup and restore procedure, and every unattended recovery claim is
+  blocked (AC-4). N=1 engineering work on B-2 to B-6 continues whichever
+  branch the spike takes. No hosted pilot may claim unattended recovery
+  until B-6 passes with the built mechanism.
+- **D-2 (2026-09-12, owner decision RH-03; B-3 at N=3).** Restore
+  orchestration at N=3 is deferred; the first pilot makes no N=3 promise.
+  The candidate design is recorded and not adopted: one node restores
+  (hiqlite restores only on node 1), the others rejoin, then the whole is
+  exercised. It is reopened only when N=3 is requested and identity,
+  rollout, and backup can be exercised together. P-2 is therefore not
+  adopted; its text stays as the candidate's detail.
 
-Also for the human: whether `live.yml` becomes a required check or stays
-advisory beside `ci-gate`.
+Still open: whether `live.yml` becomes a required check or stays advisory
+beside `ci-gate`.
 
 ### Evidence and proposals (2026-09-12)
 
@@ -212,7 +253,9 @@ the hello-cell release binary from the image `docker/Dockerfile` builds at
   and rejoin (`hiqlite/src/backup.rs`, `restore_backup_start`), so at N=3 the
   hand-off is node 1's and was not exercised.
 
-Proposals, none adopted:
+Proposals, kept as written. P-1's passkey spike is D-1, with its
+upstream-first ordering and fallback date refused; P-2 is D-2's deferred
+candidate; P-3 is not decided:
 
 - **P-1 (B-1's mechanism).** Ask upstream for an API key access group that
   covers `/auth/v1/backup*` (the first option, still recommended), with a
