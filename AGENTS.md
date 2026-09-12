@@ -76,9 +76,12 @@ plain `spec-spine compile` or `index` here; `/prime` reports, it does not
 mutate.
 
 `spec-spine check` also prints the unwitnessed-claim count and how much of it
-`[lint] unwitnessed_allowed` covers. Today that is 97 of 97, declared
-deliberate in `spec-spine.toml` (spec 001 D-11); a number above the allowance
-is a new unhashed claim and worth naming.
+`[lint] unwitnessed_allowed` covers. Report both numbers as the check prints
+them; this file states no count, because the allowance grows with the specs
+that claim files and a number written here goes stale at the next one (spec
+001 D-11 declares the gap, D-12 removes the number). Equal numbers mean every
+unhashed claim is declared deliberate in `spec-spine.toml`; a count above the
+allowance is a new unhashed claim and worth naming.
 
 **CLI missing:** if `spec-spine --version` fails, run `/setup`. Do not fall
 back to ad-hoc parsing.
