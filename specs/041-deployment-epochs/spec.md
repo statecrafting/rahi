@@ -374,8 +374,26 @@ is re-run.
 
 ## 7. Resolved decisions
 
-None yet. Before approval a human decides, and the first item needs the
-other repositories:
+- **D-1 (2026-09-12, owner decision RH-07; the reference contract kept).**
+  The owner retained the reference this spec proposes to Statecraft below:
+  an epoch is referenced by the chain hash (the genesis record hash) plus
+  the epoch record hash, with the number informative only (B-7), and a
+  replica by that reference plus instance identity (B-9, 040 B-4). This is
+  rahi's position in the cross-repository agreement, not the agreement
+  itself; the type URIs and member names below remain open.
+- **D-2 (2026-09-12, owner decision RH-07; observation is not
+  permission).** B-10a is retained: nothing this spec records or reports
+  authorizes a deployment, and the chassis reads no permit.
+- **D-3 (2026-09-12, owner decision RH-07; bounded signals).** B-10 is
+  retained: no digest, reference, or instance id is a metric label.
+- **D-4 (2026-09-12, owner decision RH-07; sequencing).** Implementation
+  is deferred until the first hosted pilot's prerequisites are built. The
+  contracts in D-1 to D-3 can be aligned with Statecraft, spec-spine, and
+  the CLI now, without building the binding system. The spec stays `draft`
+  until a human flips it.
+
+Still open before approval, and the first item needs the other
+repositories:
 
 - the reference type URIs and the three member names, agreed with
   Statecraft (the deployment record and the composing envelope),
