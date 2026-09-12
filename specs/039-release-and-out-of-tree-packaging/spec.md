@@ -11,6 +11,7 @@ risk: medium
 wave: 3
 depends_on:
   - "010-workspace-and-core-types"
+  - "015-kernel-manifest-and-adjudication"
   - "030-operational-verbs"
   - "031-single-container-packaging"
   - "032-cluster-topology"
@@ -31,6 +32,10 @@ extends:
   - { spec: "034-hello-cell", unit: "apps/hello-cell/src/cell.rs", nature: additive }
   - { spec: "032-cluster-topology", unit: "deploy/README.md", nature: additive }
   - { spec: "034-hello-cell", unit: "apps/hello-cell/README.md", nature: additive }
+  - { spec: "015-kernel-manifest-and-adjudication", unit: "crates/rahi-kernel/src/manifest.rs", nature: additive }
+  - { spec: "015-kernel-manifest-and-adjudication", unit: "crates/rahi-kernel/tests/manifest.rs", nature: additive }
+  - { spec: "015-kernel-manifest-and-adjudication", unit: "crates/rahi-kernel/testdata/manifests/", nature: additive }
+  - { spec: "034-hello-cell", unit: "apps/hello-cell/manifest.toml", nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/01-consumer-contract.md" }, role: context }
   - { unit: { kind: file, path: "docs/design/00-lineage.md" }, role: context }
@@ -88,8 +93,12 @@ manifest (010), the image workflow and recipe (031), the deploy manifests
 ## 3. Behavior
 
 - **B-1 (one version).** `[workspace.package] version` is the version of
-  every chassis crate, inherited. Pre-1.0, a minor bump may change the
-  consumer contract and a patch bump may not. The consumer contract is the
+  every chassis crate, inherited. The chassis crates are the nine a
+  consumer can depend on: `rahi-types`, `rahi-store`, `rahi-ledger`,
+  `rahi-kernel`, `rahi-idp`, `rahi-edge`, `rahi-ops`, `rahi-cli` (which
+  carries `Cell` and `run`), and `rahi-harness`. Pre-1.0, a minor bump may
+  change the consumer contract and a patch bump may not. The consumer
+  contract is the
   `Cell` trait, the manifest schema, the environment surface, the exit
   codes, the archive format, the chain record format, and the chassis's
   HTTP surfaces (`/auth`, `/session`, `/.well-known`, `/operator`,
@@ -97,12 +106,17 @@ manifest (010), the image workflow and recipe (031), the deploy manifests
 - **B-2 (a release).** A release is an annotated tag `vX.Y.Z` on a `main`
   commit whose `make ci` passed. `CHANGELOG.md` names every change to the
   consumer contract under its version, and the release updates
-  `docs/design/01-consumer-contract.md` to the commit it tags.
+  `docs/design/01-consumer-contract.md` to the commit it tags. A release
+  publishes all nine chassis crates to the crates.io registry at the
+  tag's version, so a crate version, a tag, and the images of B-3 name one
+  release (D-1). Publication is a step a human takes at the release
+  checkpoint; nothing in this spec's build publishes.
 - **B-3 (the images a tag builds).** On a tag, `image.yml` publishes
   `ghcr.io/statecrafting/rahi:X.Y.Z` (the empty cell) and
   `ghcr.io/statecrafting/rahi-runtime:X.Y.Z` (B-4), public, both
   architectures. `deploy/k8s` names `ghcr.io/statecrafting/rahi` and a
-  version, never `latest`.
+  version, never `latest`, and a consumer pins an image by that version
+  and its digest.
 - **B-4 (the runtime image).** `docker/runtime.Dockerfile` is the runtime
   stage of `docker/Dockerfile` on its own: the pinned rauthy by digest, the
   non-root user, `/data`, the entrypoint, and no cell. A cell in another
@@ -117,16 +131,23 @@ manifest (010), the image workflow and recipe (031), the deploy manifests
   answers `200` in its image.
 - **B-6 (packageable crates).** The rauthy environment template lives in
   `crates/rahi-ops/`, and `cargo package --workspace --locked` passes in
-  `release.yml` on every pull request.
+  `release.yml` on every pull request, for all nine chassis crates, and
+  locally before a release.
 - **B-7 (the consumer stanza, proven).** `release.yml`, on a tag, builds a
   scratch cell outside the workspace from `rahi-* = { git = ..., tag =
   "vX.Y.Z" }`, runs `first-boot`, `migrate`, and `serve` with
   `RAHI_RAUTHY_MODE=none`, and asserts `/readyz`, one governed write, one
-  ledgered denial, and `ledger verify`.
+  ledgered denial, and `ledger verify`. The git-tag stanza is the proof
+  available before publication; once a release is published, the same job
+  proves the registry stanza (`rahi-* = "X.Y.Z"`), and a consumer's
+  acceptance that needs a published crate is not passed before then (D-1).
 - **B-8 (the manifest schema version).** `rahi_types::MANIFEST_SCHEMA_VERSION`
   is either read by `Manifest::parse` from the manifest it parses, so a
   manifest names the schema it was written for, or deleted; today it is
-  declared and read by nothing.
+  declared and read by nothing. D-2 selects the first: a manifest names
+  its schema version, `Manifest::parse` refuses a manifest that names none
+  or names a major other than `MANIFEST_SCHEMA_VERSION`'s, and unknown
+  sections stay refused at every level (015 B-1).
 
 ## 4. Functional requirements
 
@@ -140,6 +161,11 @@ manifest (010), the image workflow and recipe (031), the deploy manifests
   `200` in its image.
 - **FR-005.** `release.yml`'s consumer job passes on the tag that lands
   this spec.
+- **FR-006 (the manifest names its schema).** Added 2026-09-12 (D-2).
+  Kernel manifest tests refuse a manifest that names no schema version, one
+  that names another major, and one with an unknown section, each with a
+  named `Error::Validation`, and accept one that names the same major with
+  another minor. hello-cell's manifest names the version.
 
 ## 5. Acceptance criteria
 
@@ -149,6 +175,12 @@ manifest (010), the image workflow and recipe (031), the deploy manifests
   An operator check, since it needs the registry.
 - **AC-3.** Spec 034's AC-2 procedure passes end to end against the
   published hello-cell image: the page, a login through rauthy.
+- **AC-4.** Added 2026-09-12 (D-1). After a human publishes a release, all
+  nine chassis crates resolve from crates.io at the tag's version and
+  `release.yml` proves the registry stanza. An operator check at the
+  release checkpoint; until it passes, no document in this repository
+  calls a crate published, and no consumer's published-only acceptance is
+  marked passed.
 
 ## 6. Out of scope
 
@@ -156,19 +188,51 @@ manifest (010), the image workflow and recipe (031), the deploy manifests
 - A stamp, template, or upgrade verb (thesis §6).
 - Signing images or crates (a later supply-chain spec).
 - Publishing `hello-cell` (`publish = false` stays).
+- The act of publishing: a human publishes at the release checkpoint
+  (D-1); the build implements and tests packaging locally.
 
 ## 7. Resolved decisions
 
-None yet. Before approval a human decides:
+The owner decided the publication question and B-8 on 2026-09-12 (decisions
+RH-05 and RH-06 of the revision-3 register). The spec stays `draft` until a
+human flips it.
 
-- whether chassis crates go to crates.io at each tag (aicortex's 010 D-1
-  needs it) or consumers pin git tags only;
+- **D-1 (2026-09-12, owner decision RH-05; registry publication).** The
+  question was whether chassis crates go to crates.io at each tag, which
+  aicortex's 010 D-1 needs, or consumers pin git tags only. The owner chose
+  registry publication for all nine chassis crates, `rahi-cli` included
+  (aicortex 010 B-2 and hqgit 003 B-2 both omit it, and a cell cannot be
+  built without it), with release tags whose version matches the crates'
+  and pinned images. It fits the published-dependency expectation of
+  aicortex 010 and hqgit 003. This spec's build implements and tests
+  packaging locally (B-6, FR-001); publication itself follows the release
+  checkpoint and is a human's step (B-2, AC-4). Consumers may prepare their
+  code against the planned version, but none marks an acceptance that needs
+  a published crate as passed before a release exists. Publishing
+  `rahi-cli` needs `rahi-ops` to package, so B-6's template move is now on
+  this spec's critical path; the claim-list edit it needs still waits on
+  the approval listed below.
+- **D-2 (2026-09-12, owner decision RH-06; B-8).** The manifest schema
+  version is wired and validated, not deleted: a manifest names the schema
+  it was written for and `Manifest::parse` refuses a missing value or
+  another major (FR-006). Unknown sections stay refused. The capability
+  vocabulary's evolution rule is recorded where the vocabulary lives, spec
+  015 D-9. Noticed for the build session and not decided here: the parsed
+  model is what `Manifest::hash()` covers (015 D-1), so a new manifest
+  member moves the hash of every manifest that gains it, and a volume whose
+  chain was rooted before the change refuses to boot until spec 036 lands
+  or the volume is recreated. The build session records which, and names
+  the member and its TOML key.
+
+Still open before approval:
+
 - the runtime image (B-4) versus a Dockerfile each consumer copies;
 - moving the template under `crates/rahi-ops/` removes
   `docker/rauthy.env.template` from spec 031's `establishes` and from the
   `docker/*.template` hashed input, an edit to a complete spec's claim
   list of the kind spec 034 D-10 made, and a human approves it;
-- whether `latest` is ever published.
+- whether `latest` is ever published (D-1 requires pinned images, and
+  `deploy/k8s` never names `latest`, B-3).
 
 ## Verification
 
@@ -176,4 +240,5 @@ None yet. Before approval a human decides:
 cargo package --workspace --locked
 scripts/k8s-validate.sh
 cargo test -p rahi-cli --locked
+cargo test -p rahi-kernel --locked --test manifest
 ```
