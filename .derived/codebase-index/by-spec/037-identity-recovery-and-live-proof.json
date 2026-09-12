@@ -208,11 +208,24 @@
           "kind": "file",
           "path": "docs/design/01-consumer-contract.md"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/02-operational-prerequisites.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-operational-prerequisites.md"
+        }
       }
     ],
     "specId": "037-identity-recovery-and-live-proof",
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "7a68b3a96f11c134f5acb6915b1dc9a0308bda549a3f22132daa059ecb2f24ca"
+  "shardHash": "0552885598370203102034e1d2805e9e7ac0ae9d1023b03072f500161f248a47"
 }

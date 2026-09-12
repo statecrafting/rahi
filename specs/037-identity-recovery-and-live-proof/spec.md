@@ -30,6 +30,7 @@ extends:
   - { spec: "034-hello-cell", unit: "apps/hello-cell/README.md", nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/01-consumer-contract.md" }, role: context }
+  - { unit: { kind: file, path: "docs/design/02-operational-prerequisites.md" }, role: context }
 summary: >
   Recovery of a cell is two state systems, and only one of them recovers
   today. Against a real rauthy the backup verb fails outright, because
@@ -170,6 +171,70 @@ None yet. Before approval a human decides B-1's mechanism:
 
 Also for the human: whether `live.yml` becomes a required check or stays
 advisory beside `ci-gate`.
+
+### Evidence and proposals (2026-09-12)
+
+Recorded by the operational-prerequisites session against the pinned
+release: the rauthy binary byte-identical to `/app/rauthy` in
+`ghcr.io/sebadob/rauthy:0.36.2@sha256:f7d3c501...`, reporting `0.36.2`, and
+the hello-cell release binary from the image `docker/Dockerfile` builds at
+`c13cc70`. Method and output are in
+`docs/design/02-operational-prerequisites.md` section 4.
+
+- **The verb.** `rahi backup` against the running rauthy exits `1` with
+  `unauthorized: rauthy refused the admin token ... (401 Unauthorized)` and
+  writes no archive.
+- **An admin session under rauthy's defaults.** The bootstrap admin logs in
+  through the cell's origin; `POST /auth/v1/backup` with that session answers
+  `406` `MfaRequired`, "Rauthy admin access only allowed with MFA active".
+- **The second option as worded above does not exist in 0.36.2.** rauthy's
+  admin MFA rule is one instance-wide setting, `ADMIN_FORCE_MFA`
+  (`mfa.admin_force_mfa`, checked in `validate_admin_session`); there is no
+  per-user exemption. With `ADMIN_FORCE_MFA=false` the same session backs up
+  (`204`), lists `backup_node_1_<ts>.sqlite`, and downloads it (675,840
+  bytes). So the session route turns admin MFA enforcement off for every
+  rauthy admin of the cell, not for one backup principal.
+- **Upstream.** rauthy's `main` on 2026-09-12 still calls
+  `validate_admin_session()` in all four backup handlers; no release accepts
+  an API key there.
+- **Restore without a hand-off, as today.** A rahi archive carrying that
+  real snapshot (relayed to the unchanged verb by a stub on rauthy's port)
+  restores into a fresh volume, and the volume boots with the pinned rauthy.
+  The user is absent from rauthy, her login is refused, and the app's notes
+  answer `401`: the rows survive and nobody can reach them.
+- **The B-3 mechanism, by hand.** The same volume started once with
+  `HQL_BACKUP_RESTORE=file:<the placed snapshot>` in rauthy's environment
+  (injected by a test wrapper, since the supervisor clears the environment):
+  the user is back with her original `sub`, logs in with her original
+  password, reads her note, and the ledger head equals the head before the
+  backup. A second start without the variable keeps all of it. hiqlite
+  restores only on node 1; nodes 2 and 3 given the variable delete their data
+  and rejoin (`hiqlite/src/backup.rs`, `restore_backup_start`), so at N=3 the
+  hand-off is node 1's and was not exercised.
+
+Proposals, none adopted:
+
+- **P-1 (B-1's mechanism).** Ask upstream for an API key access group that
+  covers `/auth/v1/backup*` (the first option, still recommended), with a
+  date after which the pilot falls back. Name a third option beside the two
+  above: a dedicated backup admin holding a software passkey whose private
+  key is custodied in the key set, so the verb completes rauthy's MFA and
+  `ADMIN_FORCE_MFA` stays on. It is unverified and costs a WebAuthn client in
+  `rahi-ops`; spike it before choosing it. Do not choose the session route
+  with `ADMIN_FORCE_MFA=false` for a cell with human admins; if a pilot takes
+  it, the preflight should say that admin MFA is off.
+- **P-2 (B-3 at N=3).** State in B-3 that the supervisor passes the restore
+  source to every replica's first start after a restore, that node 1
+  applies it and the others rejoin empty, and that the marker records the
+  application per volume; exercise it with three processes as the 035 note
+  does before claiming N=3 recovery.
+- **P-3 (clients).** rauthy's `POST /auth/v1/oidc/authorize` refuses a
+  request with an empty `User-Agent` and reports it to the caller as
+  "Invalid user credentials" (its log says "Empty User-Agent not allowed").
+  The harness sets one; `rahi-ops` and `rahi-idp` set none, and their calls
+  (token exchange, admin API, backup) were not refused for it in these runs.
+  B-6's test and any native client flow (038) send one, and whether the
+  device endpoints apply the same check is unverified.
 
 ## Verification
 
