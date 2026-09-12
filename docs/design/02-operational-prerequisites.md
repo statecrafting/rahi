@@ -564,8 +564,9 @@ no three-replica claim before that.
 The rahi maintainer's rows above were decided on 2026-09-12, as decisions
 RH-01 to RH-08 of the revision-3 register. Each is recorded as a dated
 decision in the spec it governs, and that entry is the authority; this table
-only points there. No draft is approved by these decisions: every draft stays
-`status: draft` until a human flips it.
+only points there. No draft is approved by these decisions; approval is a
+separate human flip, which the maintainer made for 035 the same day. 036 to
+041 stay `status: draft`.
 
 | Decision | Resolution | Recorded in |
 |---|---|---|
@@ -591,10 +592,10 @@ it closes the two losses this note measured; its acceptance reuses sections
 mechanism, because every recovery claim of the pilot waits on it.
 
 Update, 2026-09-12, after section 8.1: both have happened. P-1, P-3, and P-4
-are adopted as 035 D-1 to D-3, and 037's mechanism is chosen (D-1). What
-stands between 035 and its build is the human flip to `approved` and the
-corpus reaching `main`. 037's FR-005 spike is the parallel increment, since
-its outcome decides which branch of 037 D-1 is built.
+are adopted as 035 D-1 to D-3, and 037's mechanism is chosen (D-1). The
+maintainer then approved 035 the same day, so what stands between 035 and
+its build is the corpus reaching `main`. 037's FR-005 spike is the parallel
+increment, since its outcome decides which branch of 037 D-1 is built.
 
 ## Appendix A: the probes
 

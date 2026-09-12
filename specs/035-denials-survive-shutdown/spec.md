@@ -1,7 +1,7 @@
 ---
 id: "035-denials-survive-shutdown"
 title: "Denials survive a graceful shutdown, and every lost denial is counted by its cause"
-status: draft
+status: approved
 kind: kernel
 domain: kernel
 created: "2026-09-11"
@@ -227,9 +227,10 @@ file in `rahi-cli`.
 ## 7. Resolved decisions
 
 The owner decided P-1, P-3, and P-4 on 2026-09-12 (decision RH-01 of the
-revision-3 register); D-1 to D-4 record them. The spec stays `draft` until a
-human flips it. P-2 was not part of that decision: synchronous denials stay
-out of scope (§6) exactly as drafted.
+revision-3 register); D-1 to D-4 record them. P-2 was not part of that
+decision: synchronous denials stay out of scope (§6) exactly as drafted. The
+owner then approved the spec on 2026-09-12, flipping it from `draft` to
+`approved` with `implementation: pending`, so it is a work order.
 
 - **D-1 (2026-09-12, owner decision RH-01; adopts P-1).** The drain bound
   is five seconds, `RAHI_DENIAL_DRAIN_TIMEOUT_SECS`. The owner named it
