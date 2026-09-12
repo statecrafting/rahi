@@ -1,0 +1,178 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '035-denials-survive-shutdown' file unit 'crates/rahi-cli/tests/shutdown.rs' does not exist",
+        "path": "crates/rahi-cli/tests/shutdown.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '035-denials-survive-shutdown' file unit 'crates/rahi-kernel/tests/replicas.rs' does not exist",
+        "path": "crates/rahi-kernel/tests/replicas.rs"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "015-kernel-manifest-and-adjudication",
+      "023-observability",
+      "030-operational-verbs"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/rahi-cli/src/serve.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/obs/metrics.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/obs/mod.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-kernel/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-kernel/src/observe.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/README.md",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/shutdown.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/tests/replicas.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/serve.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/obs/metrics.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/obs/metrics.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/obs/mod.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/obs/mod.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-kernel/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-kernel/src/observe.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/observe.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "deploy/README.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/README.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/01-consumer-contract.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-consumer-contract.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/02-operational-prerequisites.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-operational-prerequisites.md"
+        }
+      }
+    ],
+    "specId": "035-denials-survive-shutdown",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "1aa8d65ec1bd5456efb1f4caa1e061158fc968603a778a9ca9f73f216dfdb8ce"
+}

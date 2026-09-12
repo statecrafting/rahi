@@ -1,0 +1,141 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-11",
+    "dependsOn": [
+      "011-store-hiqlite",
+      "030-operational-verbs",
+      "031-single-container-packaging",
+      "033-dev-substrate-and-harness",
+      "034-hello-cell"
+    ],
+    "domain": "ops",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": ".github/workflows/live.yml"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/tests/rauthy_restore.rs"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "011-store-hiqlite",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/backup.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_api.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/restore.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/supervise.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "033-dev-substrate-and-harness",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-harness/src/boot.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "034-hello-cell",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/tests/e2e.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "021-idp-proxy-and-discovery",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/discovery.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "032-cluster-topology",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/README.md"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "034-hello-cell",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/README.md"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 3
+    },
+    "id": "037-identity-recovery-and-live-proof",
+    "implementation": "pending",
+    "kind": "feature",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-consumer-contract.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-operational-prerequisites.md"
+        }
+      }
+    ],
+    "risk": "high",
+    "sectionHeadings": [
+      "037: Identity recovery and the live proof",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Evidence and proposals (2026-09-12)",
+      "Verification"
+    ],
+    "specPath": "specs/037-identity-recovery-and-live-proof/spec.md",
+    "status": "draft",
+    "summary": "Recovery of a cell is two state systems, and only one of them recovers today. Against a real rauthy the backup verb fails outright, because rauthy's backup routes accept only an admin session and the verb presents the admin API key (030 D-3, observed against 0.36.2). The app half races hiqlite's background backup and can report no file for a backup that lands a moment later (observed on two of four runs). A restore places rauthy's snapshot and nothing hands it to rauthy, so a restored cell comes up with no users, and every sub in its rows is unreachable. CI never runs a real rauthy. This spec resolves D-3 by the mechanism a human chooses, waits for the app backup to exist, applies rauthy's snapshot exactly once on the next start, and adds a CI job that runs every rauthy-gated test, and an end-to-end test through recovery with identity, against the pinned rauthy release.\n",
+    "title": "Identity recovery and the live proof: a backup a real rauthy answers, a restore that brings the users back, and CI that runs against the pinned release"
+  },
+  "shardHash": "3391d1deb569be591e5184ab95f29033a62f4a40e00ee28d13c9ecabd302ca96",
+  "specVersion": "1.2.0"
+}

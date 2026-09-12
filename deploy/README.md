@@ -11,6 +11,14 @@ The first target is a Hetzner Kubernetes cluster with Hetzner object
 storage as the S3 endpoint. Kubernetes 1.28 or later: the pod ordinal
 reaches the container through the `apps.kubernetes.io/pod-index` label.
 
+No image is published yet. The manifests and the commands below name
+`ghcr.io/bartekus/rahi:latest`; `image.yml` pushes
+`ghcr.io/statecrafting/rahi:<tag>` and `:<version>` only when a `v*` tag
+is pushed, never `latest`, and no tag has been pushed. Until a release
+exists, build the image from `docker/Dockerfile`, push it where your
+cluster can pull it, and substitute its name and tag
+(`kustomize edit set image`).
+
 ## What is in the tree
 
 | File | What it declares |
@@ -123,6 +131,34 @@ backup verb's admin token is refused on the backup routes (they want an
 admin session). Until that is resolved the CronJob's run fails at the
 rauthy part with rauthy's error; the failure is the known hold, not a
 manifest defect.
+
+A second gap sits on the restore side. `rahi restore` places rauthy's
+snapshot under `/data/restore/rauthy/` and names it in the marker, and
+nothing hands it to rauthy on the next start: the supervisor starts rauthy
+from its rendered environment only. A restore therefore recovers the
+app's store, its decision chain, and the key set; rauthy comes up on its
+own directory as it finds it, which on a fresh volume is empty. Every
+principal id in the app's rows is rauthy's `sub`, so a cell restored
+without rauthy's state holds rows no user can reach until rauthy's
+database is restored by hand. `docs/design/01-consumer-contract.md` tracks
+both gaps.
+
+## Token lifetimes and revocation
+
+Spec 025 B-5 asks the deployment documentation to state the revocation
+bound. As built:
+
+- A browser session holds a cached assertion for fifteen minutes and then
+  renews through rauthy, re-reading the user's roles. A user disabled in
+  rauthy loses the session at the next renewal, so within fifteen minutes.
+- A bearer access token is validated locally against rauthy's key set,
+  never introspected, and accepted until its `exp` plus sixty seconds of
+  leeway. rahi sets no token lifetime, so the lifetime is rauthy's client
+  default: 1800 seconds in rauthy 0.36.2. The `jti` deny-list the resource
+  server consults exists with its writer, and nothing calls the writer yet
+  (neither logout nor a verb), so a bearer token cannot be revoked before
+  it expires.
+- `preflight` does not report the bound yet.
 
 ## What does not span replicas
 

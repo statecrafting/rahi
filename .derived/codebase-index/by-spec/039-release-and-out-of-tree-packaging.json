@@ -1,0 +1,353 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '039-release-and-out-of-tree-packaging' file unit 'docker/runtime.Dockerfile' does not exist",
+        "path": "docker/runtime.Dockerfile"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '039-release-and-out-of-tree-packaging' file unit '.github/workflows/release.yml' does not exist",
+        "path": ".github/workflows/release.yml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '039-release-and-out-of-tree-packaging' file unit 'crates/rahi-ops/rauthy.env.template' does not exist",
+        "path": "crates/rahi-ops/rauthy.env.template"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "010-workspace-and-core-types",
+      "015-kernel-manifest-and-adjudication",
+      "030-operational-verbs",
+      "031-single-container-packaging",
+      "032-cluster-topology",
+      "034-hello-cell"
+    ],
+    "implementingPaths": [
+      {
+        "path": ".github/workflows/image.yml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "apps/hello-cell/README.md",
+        "source": "spec-edge"
+      },
+      {
+        "path": "apps/hello-cell/manifest.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "apps/hello-cell/src/cell.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/serve.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-kernel/src/manifest.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-kernel/testdata/manifests/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-kernel/tests/manifest.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/rauthy_env.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/README.md",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/k8s/kustomization.yaml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/k8s/migrate-job.yaml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/k8s/statefulset.yaml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "docker/Dockerfile",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/release.yml"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/rauthy.env.template"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "docker/runtime.Dockerfile"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": ".github/workflows/image.yml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/image.yml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "apps/hello-cell/README.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/README.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "apps/hello-cell/manifest.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/manifest.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "apps/hello-cell/src/cell.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/src/cell.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/serve.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-kernel/src/manifest.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/manifest.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-kernel/testdata/manifests/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/testdata/manifests/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-kernel/tests/manifest.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/tests/manifest.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/rauthy_env.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_env.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "deploy/README.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/README.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "deploy/k8s/kustomization.yaml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/kustomization.yaml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "deploy/k8s/migrate-job.yaml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/migrate-job.yaml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "deploy/k8s/statefulset.yaml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/statefulset.yaml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docker/Dockerfile"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "docker/Dockerfile"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.toml",
+            "span": {
+              "endLine": 14,
+              "startLine": 8
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "anchor": "workspace.package",
+          "file": "Cargo.toml",
+          "kind": "section"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/00-lineage.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/00-lineage.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/01-consumer-contract.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-consumer-contract.md"
+        }
+      }
+    ],
+    "specId": "039-release-and-out-of-tree-packaging",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "63971ada63913b9d9c3481456f3b1b6cffdd5cee4714a4f47f4ad2e6b6f54a2a"
+}

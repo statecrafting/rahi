@@ -1,0 +1,231 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '037-identity-recovery-and-live-proof' file unit '.github/workflows/live.yml' does not exist",
+        "path": ".github/workflows/live.yml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '037-identity-recovery-and-live-proof' file unit 'crates/rahi-ops/tests/rauthy_restore.rs' does not exist",
+        "path": "crates/rahi-ops/tests/rauthy_restore.rs"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "011-store-hiqlite",
+      "030-operational-verbs",
+      "031-single-container-packaging",
+      "033-dev-substrate-and-harness",
+      "034-hello-cell"
+    ],
+    "implementingPaths": [
+      {
+        "path": "apps/hello-cell/README.md",
+        "source": "spec-edge"
+      },
+      {
+        "path": "apps/hello-cell/tests/e2e.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-harness/src/boot.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/tests/discovery.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/rauthy_api.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/restore.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/supervise.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/src/backup.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/README.md",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/live.yml"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/rauthy_restore.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "apps/hello-cell/README.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/README.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "apps/hello-cell/tests/e2e.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/tests/e2e.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-harness/src/boot.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-harness/src/boot.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/tests/discovery.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/discovery.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/rauthy_api.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_api.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/restore.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/restore.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/supervise.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/supervise.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-store/src/backup.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/backup.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "deploy/README.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/README.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/01-consumer-contract.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-consumer-contract.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/02-operational-prerequisites.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-operational-prerequisites.md"
+        }
+      }
+    ],
+    "specId": "037-identity-recovery-and-live-proof",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "dc5ded81e9db01ad3f4d145a6c08f67a1400ff00a183ec72d6422a6b2f81280f"
+}

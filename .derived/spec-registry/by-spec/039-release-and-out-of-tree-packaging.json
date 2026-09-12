@@ -1,0 +1,194 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-11",
+    "dependsOn": [
+      "010-workspace-and-core-types",
+      "015-kernel-manifest-and-adjudication",
+      "030-operational-verbs",
+      "031-single-container-packaging",
+      "032-cluster-topology",
+      "034-hello-cell"
+    ],
+    "domain": "ops",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "docker/runtime.Dockerfile"
+      },
+      {
+        "kind": "file",
+        "path": ".github/workflows/release.yml"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/rauthy.env.template"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "010-workspace-and-core-types",
+        "unit": {
+          "anchor": "workspace.package",
+          "file": "Cargo.toml",
+          "kind": "section"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/image.yml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "docker/Dockerfile"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_env.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "032-cluster-topology",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/kustomization.yaml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "032-cluster-topology",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/statefulset.yaml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "032-cluster-topology",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/migrate-job.yaml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "034-hello-cell",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/src/cell.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "032-cluster-topology",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/README.md"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "034-hello-cell",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/README.md"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "015-kernel-manifest-and-adjudication",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/manifest.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "015-kernel-manifest-and-adjudication",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/tests/manifest.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "015-kernel-manifest-and-adjudication",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/testdata/manifests/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "034-hello-cell",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/manifest.toml"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 3
+    },
+    "id": "039-release-and-out-of-tree-packaging",
+    "implementation": "pending",
+    "kind": "tooling",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-consumer-contract.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/00-lineage.md"
+        }
+      }
+    ],
+    "risk": "medium",
+    "sectionHeadings": [
+      "039: Releases and out-of-tree packaging",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/039-release-and-out-of-tree-packaging/spec.md",
+    "status": "draft",
+    "summary": "The thesis says consumers depend on published crates and pin a version (002 D5), and nothing is published: no tag, no release, no crate, no image. The one route that works is a git dependency pinned to a sha. cargo package fails on rahi-ops because it includes a template from outside the crate, which also blocks rahi-cli, the crate that carries Cell. The deploy manifests name ghcr.io/bartekus/rahi:latest, a namespace and a tag no workflow produces. The image recipe builds only a package of this workspace, and a cell's static directory named under CARGO_MANIFEST_DIR does not exist in the image (hello-cell's page answers 404 there). This spec defines the version and the release, publishes the images a tag builds under the names the manifests use, adds a runtime image an out-of-tree cell builds on, makes static assets exist in the image, makes the crates packageable, and proves the consumer stanza on every release.\n",
+    "title": "Releases and out-of-tree packaging: a tagged version a consumer pins, images that exist under the names the manifests use, and a runtime image a cell in another repository builds on"
+  },
+  "shardHash": "7c6a21c7f632b7798170c6211b4b444bd16fd6d1c1d07297827eb27c8ef18ab3",
+  "specVersion": "1.2.0"
+}
