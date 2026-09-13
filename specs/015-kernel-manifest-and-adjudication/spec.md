@@ -240,6 +240,29 @@ degradation (a later spec if a product needs them).
   nonce, which adds a dependency and makes ids unreproducible;
   `SystemTime::now()`, in a crate whose decisions are meant to be
   re-derivable.
+- **D-9 (2026-09-12, corpus amendment; owner decision RH-06; how the
+  manifest schema evolves).** Three rules, none of which changes what
+  `cargo test -p rahi-kernel` proves today. First, unknown sections and
+  keys stay refused at every level (B-1); a consumer that needs a view of
+  its own keeps it outside the manifest, and the chassis grows no
+  forward-compatible section. Second, a manifest names the schema version
+  it was written for and `Manifest::parse` validates it:
+  `rahi_types::MANIFEST_SCHEMA_VERSION` is declared today and read by
+  nothing, and spec 039 B-8 wires it, on an `extends` edge into
+  `manifest.rs`. Third, the capability kind vocabulary (B-1) stays closed.
+  A new kind is a rahi-owned, reviewed schema change: a spec that amends
+  B-1, raises the minor of `MANIFEST_SCHEMA_VERSION`, and carries
+  compatibility tests showing that every manifest valid under the previous
+  version still parses and hashes byte for byte as before. A breaking
+  change requires a new major schema: removing or renaming a kind,
+  changing what a kind admits, or anything else that refuses or rehashes a
+  manifest that was valid. An application never defines a kind of its own.
+  This is D-4's rule for gate checks ("adding a check is a spec
+  amendment") applied to kinds, for the same reason: the manifest hash
+  must be a function of the document and of this crate alone. Rejected
+  alternative: an open kind registry, which leaves the hash undefined until
+  registration and lets a consumer widen what the chassis's grants can
+  mean.
 
 ## Verification
 

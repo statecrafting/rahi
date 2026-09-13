@@ -118,6 +118,6 @@
     "summary": "The application store: hiqlite linked as a library, opened from the Config with its own data directory and ports (never rauthy's), exposing exactly the surface the interface contract decided: execute, txn as the write path for anything with an invariant, query on the local replica and query_consistent through the leader as two named calls, migrations as versioned DDL run by a verb and never at boot, and the leader-only encrypted backup surface. Carries enrahitu://032 §3.1, §3.3, §3.6, §3.8.\n",
     "title": "The store: hiqlite in-process with txn, two read calls, migrations, and backup"
   },
-  "shardHash": "ac73ebbcfe7b1c7d5c2e050cec345e91d50018ecefb06edca88cd78f325519d0",
+  "shardHash": "f7fa6f7ee068c2c37b3b71c723593daa01a167c22e15d71a9237e39e1d111eb7",
   "specVersion": "1.2.0"
 }

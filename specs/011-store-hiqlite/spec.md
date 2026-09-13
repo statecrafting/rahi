@@ -92,8 +92,10 @@ hiqlite.
   `backup_list_s3()` list snapshots. Restore is NOT on this surface: it is a
   boot-time concern of spec 030.
 - **B-6 (feature set).** hiqlite is built with `sqlite`, `cache`,
-  `dlock`, `listen_notify_local`, `backup`, and `s3`; never
-  `listen_notify` (remote listeners are a second egress path).
+  `counters`, `dlock`, `listen_notify_local`, `backup`, and `s3`; never
+  `listen_notify` (remote listeners are a second egress path). hiqlite is
+  the released crate from the registry, never a fork or a patch (D-10).
+  *(Amended 2026-09-12, D-11: `counters` arrived through spec 012 D-8.)*
 - **B-7 (rauthy's store is invisible).** No function in this crate accepts
   or derives a path under the rauthy data directory; the config type has no
   field for it.
@@ -184,6 +186,28 @@ Locks, notify, outbox, and the revision watermark (012); the decision chain
   Alternative rejected: a `[patch]` to a fork, which the constitution
   forbids. Reviewed and accepted on 2026-09-05; the exception stands until
   hiqlite moves, and no further review is pending.
+- **D-10 (2026-09-12, corpus amendment; owner decision RH-06; hiqlite
+  provenance).** The store keeps the actual upstream hiqlite dependency:
+  the released crate from crates.io (`hiqlite 0.14.0` in `Cargo.lock` at
+  `c13cc70`, a registry source with a checksum), with no `[patch]`, no git
+  source, and no vendored copy. The July proposal that the family maintain
+  a deliberate fork of hiqlite as its state engine, tracking upstream
+  (enrahitu://001 §4.7, the architecture rewritten on 2026-07-19), is
+  reversed for rahi, and this entry records the reversal. The engine
+  constraint that section recorded and rahi relies on, two Raft groups
+  whose SQL write and notify are never atomic, is carried by B-2; where
+  rahi measured the engine differently (the cache group survives a
+  restart, 012 D-6), rahi's measurement governs. D-9 rejected a `[patch]`
+  to a fork and attributed the rule to the constitution, which states no
+  rule about hiqlite; from this date the authority for "no fork" is this
+  decision. A change that needs hiqlite to behave differently goes
+  upstream or waits for a release that carries it, as D-9 already does for
+  `cryptr`.
+- **D-11 (2026-09-12, corpus amendment; owner decision RH-06).** B-6's
+  feature list now names `counters`, which spec 012 D-8 added additively
+  on 2026-09-06 and which the workspace has built with since, so the
+  list matches the dependency as declared. D-1's "exactly the B-6 set" is
+  true again. No code changed.
 
 ## Verification
 
