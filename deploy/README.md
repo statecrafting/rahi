@@ -160,6 +160,38 @@ bound. As built:
   it expires.
 - `preflight` does not report the bound yet.
 
+## Denials at a stop
+
+Spec 035 B-4 asks the deployment documentation to state what a decision id
+in a `403` promises. As built:
+
+- A denial answered with a decision id is in the chain unless one of four
+  things happened. Three are counted by name on `/metrics`, and each writes
+  one `ERROR rahi.decision` line to stderr naming the id and the cause:
+  - the denial queue was full: `kernel_decisions_dropped_total`;
+  - the append failed: `kernel_ledger_failures_total`;
+  - the stop's drain bound expired first:
+    `kernel_decisions_abandoned_total`, plus one `WARN rahi.decision` line
+    naming how many were abandoned.
+- The fourth cannot be counted. A process killed without a stop signal
+  (SIGKILL, an out-of-memory kill, power loss) loses whatever its queue
+  held, and nothing reports it.
+- The drain is bounded. It is not a guarantee against process death or
+  storage failure. On SIGTERM, `serve` lets in-flight requests finish, then
+  gives the queue `RAHI_DENIAL_DRAIN_TIMEOUT_SECS` (default 5) before it
+  shuts the store; what the store has not taken by then is abandoned and
+  counted. If the supervisor stops waiting for `serve` first (fifteen
+  seconds, spec 031 D-4, which open streams and slow connections can use
+  up), the records still owed are counted as abandoned as the process ends.
+- An id names one denial across replicas. It is
+  `kernel:<nonce>:<node>:<counter>`, where the node is the replica's
+  `RAHI_HIQ_NODE_ID` (the pod ordinal plus one). One residual remains (spec
+  035 D-3): a replica whose denials were all lost, and which restarts before
+  any replica appends, boots on the same head as the same node and can mint
+  again the ids its lost denials' callers hold. Every boot writes one
+  `INFO rahi.decision` line naming its nonce and node, so a re-mint shows as
+  two boot lines of one node on one nonce.
+
 ## What does not span replicas
 
 - **The cache group is per node.** Nothing durable lives in it.

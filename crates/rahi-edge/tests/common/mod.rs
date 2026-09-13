@@ -65,6 +65,7 @@ pub async fn boot(public_url: &str) -> Cell {
         KernelOptions {
             queue_capacity: 16,
             clock: Some(std::sync::Arc::new(|| 1_767_225_600)),
+            ..KernelOptions::default()
         },
     )
     .await

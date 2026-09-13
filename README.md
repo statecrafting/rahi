@@ -19,9 +19,8 @@ Encore and Turso and what remains is what this is.
 
 This repository is a specification corpus, the harness that builds it, and
 the code it specifies. The corpus holds 23 `status: approved` specs in three
-waves: twenty are `implementation: complete`, the two records, 000 and 002,
-are `n-a`, and 035, approved on 2026-09-12, is `implementation: pending`, a
-work order. Spec ordinals are the build order, and each spec is bounded to
+waves: twenty-one are `implementation: complete` and the two records, 000
+and 002, are `n-a`. Spec ordinals are the build order, and each spec is bounded to
 one driven session's territory. Six more, 036 to 041, are `status: draft`:
 proposals from the consumer contract below that schedule nothing until a
 human approves them. Nine crates and the reference app exist
@@ -35,10 +34,10 @@ the whole repository:
 
 | | State |
 |---|---|
-| Implemented | the twenty `complete` specs. Complete means the code landed and the spec's verification block passed; two operator procedures inside complete specs were recorded and never run: the N=3 rollout check (032 D-1) and the compose walkthrough (034 D-1). |
+| Implemented | the twenty-one `complete` specs. Complete means the code landed and the spec's verification block passed; two operator procedures inside complete specs were recorded and never run: the N=3 rollout check (032 D-1) and the compose walkthrough (034 D-1). |
 | Released or installable | nothing: no tag, release, crate, or image. A consumer pins a git commit (draft 039). |
 | Exercised against the pinned rauthy | by hand, never in CI, which runs without a rauthy. The end-to-end login, write, denial, and restore pass against rauthy 0.36.2. `rahi backup` against a real rauthy fails (030 D-3), and a restore brings back the rows and the chain but no users (draft 037). |
-| Supported topology | N=1. Three replicas have run only as three processes on one host, without rauthy, and there every replica mints the same decision ids (spec 035, approved, not built). N=3 on Kubernetes has never run. |
+| Supported topology | N=1. Three replicas have run only as three processes on one host, without rauthy, in spec 035's test, which CI runs: each replica mints its own decision ids and none of thirty concurrent denials is lost. N=3 on Kubernetes has never run. |
 
 [`docs/design/01-consumer-contract.md`](docs/design/01-consumer-contract.md)
 states what a consumer gets and what is proven, by which test, against which

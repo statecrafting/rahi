@@ -201,6 +201,7 @@ pub async fn boot() -> Cell {
         KernelOptions {
             queue_capacity: 16,
             clock: Some(Arc::new(|| T0)),
+            ..KernelOptions::default()
         },
     )
     .await

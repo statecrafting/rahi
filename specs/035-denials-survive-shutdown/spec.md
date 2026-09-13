@@ -23,6 +23,13 @@ extends:
   - { spec: "023-observability", unit: "crates/rahi-edge/src/obs/mod.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/serve.rs", nature: additive }
   - { spec: "032-cluster-topology", unit: "deploy/README.md", nature: additive }
+  - { spec: "015-kernel-manifest-and-adjudication", unit: "crates/rahi-kernel/tests/adjudicate.rs", nature: additive }
+  - { spec: "020-edge-server", unit: "crates/rahi-edge/tests/common/mod.rs", nature: additive }
+  - { spec: "022-session-and-principal", unit: "crates/rahi-idp/tests/oidc/", nature: additive }
+  - { spec: "013-ledger-decision-chain", unit: "crates/rahi-ledger/src/append.rs", nature: amending }
+  - { spec: "013-ledger-decision-chain", unit: "crates/rahi-ledger/Cargo.toml", nature: additive }
+  - { spec: "013-ledger-decision-chain", unit: "crates/rahi-ledger/tests/append.rs", nature: additive }
+  - { spec: "001-agentic-harness", unit: ".claude/rules/", nature: amending }
 references:
   - { unit: { kind: file, path: "docs/design/01-consumer-contract.md" }, role: context }
   - { unit: { kind: file, path: "docs/design/02-operational-prerequisites.md" }, role: context }
@@ -270,6 +277,100 @@ owner then approved the spec on 2026-09-12, flipping it from `draft` to
   segment is a zero-padded `u64` that widens past twelve digits rather than
   wrapping in any reachable run, so it is not a third bound; a reader who
   meant something else by "exhaustion" corrects this entry before approval.
+- **D-5 (2026-09-13, build session; reads the Territory's "`Kernel::flush`
+  reports what it abandoned").** `flush` stays the wait that abandons
+  nothing: its timeout error names how many decisions the appender still
+  owes, which is its report, and every owed decision stays with the
+  appender. `Kernel::drain(bound) -> Drained` is the stop: it waits the
+  bound, then takes every owed decision off the queue, counts each on
+  `kernel_decisions_abandoned`, reports each to the failure observers with
+  the cause, and returns their ids. The denial queue is shared state rather
+  than a channel, so a drain whose bound expired can name what the appender
+  never took; a decision that was mid-append when abandoned is counted even
+  if it lands afterwards, because a count that can overstate a loss is
+  better than one that can miss one. When a runtime ends the appender with
+  decisions still owed (a supervisor that stops waiting, a test runtime
+  torn down), a guard in the appender counts them as abandoned on its way
+  out. Rejected: a `flush` that abandons at its deadline, which would make
+  every caller that only meant to wait discard records.
+- **D-6 (2026-09-13, build session; reads B-2 and B-7's "line at target
+  `rahi.decision`").** The chassis installs no formatting subscriber, and
+  spec 023's ring merges `rahi.decision` events onto a request span only.
+  The appender and a stop run outside every request, which is why a lost
+  denial left no line at `c13cc70`. A line is therefore one line of process
+  output, `LEVEL rahi.decision: message`. The edge's failure observer writes
+  `ERROR rahi.decision: decision <id> was not written to the chain (<cause>):
+  <error>` to stderr beside its tracing event, for every cause and not only
+  `abandoned`, since each is a loss B-4 names. `serve` writes the `WARN` line
+  of B-2 to stderr and the `INFO` boot line of B-7 to stdout. Rejected:
+  `tracing-subscriber`'s formatting layer, which needs a workspace feature
+  change under spec 010 and would print one line per decision, allowed or
+  denied.
+- **D-7 (2026-09-13, build session; the sum D-1 asks for).** The stream
+  drain (026 B-7, default ten seconds) plus this bound (five) is fifteen
+  seconds, and the supervisor waits `SERVE_GRACE`, fifteen seconds (031
+  D-4). The check fails by equality: fifteen does not exceed fifteen. It is
+  worse in the worst case, since `serve` also gives open connections
+  `DRAIN_BUDGET` (ten seconds, after the stream drain), so a stop can take
+  twenty-five seconds before the store shuts. Part of the gap predates this
+  spec: 031 D-4's "the fifteen seconds the supervisor waits always suffice"
+  was written before 026 added a stream drain in front of the connection
+  budget. 031's text fixes fifteen seconds and this spec amends nothing in
+  it, so `SERVE_GRACE` is unchanged. A stop with no open streams and no slow
+  connections gives the denial drain its whole bound inside the fifteen;
+  when the supervisor stops waiting first, D-5's guard counts every owed
+  decision as abandoned as the runtime ends, so the loss is counted, not
+  silent, and `deploy/README.md` says so. Open for the owner: raising
+  `SERVE_GRACE` to cover twenty-five seconds, which also means raising the
+  StatefulSet's thirty-second `terminationGracePeriodSeconds`, since it must
+  cover `SERVE_GRACE` plus rauthy's ten.
+- **D-8 (2026-09-13, build session; reads B-6's `<node>`).** The node
+  segment is the hiqlite node id in plain decimal, unpadded:
+  `kernel:<nonce>:2:<counter>`. Node ids are small integers and ids are
+  compared as text, never sorted. `KernelOptions::node_id` zero means node
+  1 (`DEFAULT_NODE_ID`), the id a single node runs as, the way a zero
+  `queue_capacity` means the default; `serve` passes
+  `StoreConfig::node_id`, and `Kernel::nonce` and `Kernel::node_id` expose
+  what B-7's line names. A new field breaks struct literals, so three test
+  fixtures other specs own (015's `tests/adjudicate.rs`, 020's
+  `tests/common/mod.rs`, 022's `tests/oidc/`) gain `..KernelOptions::default()`,
+  and 015's test observer takes the new cause argument: `extends` edges on
+  those units, and nothing they assert changes.
+- **D-9 (2026-09-13, build session; the fixture cell).** The cell FR-001
+  and FR-005 boot is the test binary itself. `tests/shutdown.rs` holds a
+  `DenyCell` and a `fixture_cell` test that, started as a child with
+  `RAHI_TEST_FIXTURE_VERB` set, runs `rahi_cli::run_with::<DenyCell>` and
+  exits with the verb's code; in an ordinary run it returns at once. No
+  second binary ships in `rahi-cli` and no crate manifest changes. The
+  fixture declares no migrations, so `serve` starts on a fresh volume
+  without `migrate`, and FR-005 starts three `serve` processes at once
+  rather than design note 02 section 3's migrate-then-serve on each replica,
+  which would put the follower's exit 2 and a start-order race into a test
+  about ids. HTTP goes over std's `TcpStream`, so the test adds no
+  dependency. Rejected: a fixture `[[bin]]` in `rahi-cli`, which ships a
+  test cell with the product, and `rahi-harness` as a dev-dependency, which
+  needs a binary path and a manifest change.
+- **D-10 (2026-09-13, build session and owner decision; the second loss
+  FR-005 found).** FR-005 first failed. With ids distinct, three replicas
+  appending at once made the ledger lose three compare-and-swaps in a row,
+  and 4 and then 3 of 30 denials were lost, each counted as `failed` and
+  written as an `ERROR rahi.decision` line (B-3 doing what it says). The old
+  id shape had hidden this: a colliding id failed earlier, as a conflict.
+  Spec 013 B-3's three immediate attempts could not be satisfied beside
+  FR-005's zero, and the owner decided on 2026-09-13 that 013 B-3 be amended
+  in this build rather than FR-005 relaxed or held (013 D-9): a wait between
+  attempts, twelve attempts. With it the in-process three-appender test in
+  `rahi-ledger` passes where it failed three runs of three before, FR-005
+  passed three runs of three, and a one-off run at fifty denials per replica
+  passed. `extends` edges on 013's `append.rs`, `Cargo.toml`, and
+  `tests/append.rs`, and on 001's `.claude/rules/`, whose chassis-invariants
+  checklist quoted the old count.
+- **D-11 (2026-09-13, build session; FR-001 "on a release build").** The
+  test picks no profile: it runs under whichever profile cargo builds, and
+  the verification block builds the dev profile. P-5 asked for release-build
+  evidence, so this build also ran `cargo test --release -p rahi-cli --locked
+  --test shutdown`: all four tests passed, FR-001 and FR-005 among them, in
+  23.5 seconds.
 
 ### Proposals for the owner (2026-09-12)
 

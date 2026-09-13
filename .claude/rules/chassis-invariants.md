@@ -35,8 +35,9 @@ specs that own each rule are named so a violation can be traced.
 
 - Append is a compare-and-swap: head read, record build, and insert inside
   one `txn`, with the unique index on the parent hash making the insert the
-  CAS. A unique violation is a miss, retried three times, then a typed
-  integrity error. Never fork the chain.
+  CAS. A unique violation is a miss, retried after a bounded, id-seeded wait
+  up to twelve attempts (013 D-9), then a typed integrity error. Never fork
+  the chain.
 - Chain verification runs at boot and fails closed: an integrity error on
   the init path is process-fatal.
 - Sealed segments are immutable, hash-linked to their predecessor, and
