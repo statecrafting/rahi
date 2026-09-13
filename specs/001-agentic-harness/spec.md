@@ -505,6 +505,30 @@ of 000. Editing another spec's text to match a rename this spec made is the
 move the coherence guard exists to refuse, so it is reported rather than
 taken.
 
+D-12 (2026-09-12, corpus amendment; human decision RH-08; corrects the count
+D-11 put in `AGENTS.md`). D-11 wrote "97 of 97" into the New Sessions
+protocol as the unwitnessed-claim count a primed session should expect. Spec
+034 then widened `[lint] unwitnessed_allowed` to the reference app's sources,
+manifest, page, and README and deleted `apps/.gitkeep` (its D-10), which is
+the growth D-11 anticipated, and `AGENTS.md` kept saying 97: 034 does not own
+the file, and the coupling gate refuses an `AGENTS.md` edit that its owner,
+this spec, does not accompany. On 2026-09-12 `spec-spine check` at `c13cc70`
+printed `unwitnessed claims: 138 (138 allowed by [lint] unwitnessed_allowed)`,
+so every primed session reported a discrepancy that was only stale prose.
+
+The owner decided that the correction is routine coupled work, not a waiver,
+and that dated or generated evidence is preferred over another hardcoded
+count. `AGENTS.md` therefore states no number: it tells a session to report
+both numbers exactly as the check prints them, that equal numbers mean every
+unhashed claim is declared, and that a count above the allowance is a new
+unhashed claim. The check is the generated evidence, and this entry is the
+dated evidence: 138 of 138 on the day of the change. D-11's "97" stays as the
+record of its own day. A verification line keeps a count from returning to
+the protocol. Rejected alternatives: replacing 97 with 138, which goes stale
+at the next spec that claims a file outside `crates/`; a `Spec-Drift-Waiver:`
+line, which is a human instrument for a contradiction and this is a
+correction the owning spec can simply make.
+
 ## Verification
 
 ```verify:cli
@@ -524,6 +548,8 @@ sh -c 'test "$(ls -d .claude/skills/*/ | wc -l | tr -d " ")" = 10'
 sh -c 'for s in build code-review commit next prime setup shepherd ship spec verify; do test -f ".claude/skills/$s/SKILL.md" || exit 1; done'
 # B-7: the kit's one worked example of a path-scoped rule.
 test -f .claude/rules/derived-artifacts-are-compiler-output.md
+# D-12: the protocol states no unwitnessed-claim count; the check prints it.
+sh -c '! grep -A7 "unwitnessed-claim count" AGENTS.md | grep -qE "[0-9]+ of [0-9]+"'
 # FR-002: one verification protocol, one implementation of it.
 sh -c '! test -e scripts/verify-spec.sh'
 sh -c 'sed -n "/^verify:/,/^$/p" Makefile | grep -q "SPEC_SPINE) verify"'
