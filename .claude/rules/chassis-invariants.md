@@ -59,6 +59,8 @@ specs that own each rule are named so a violation can be traced.
 
 - The manifest is a declared ceiling: observed usage must be a subset of it
   or the build fails. Absence is never permission.
-- Every denial is a ledgered Decision. The request path never awaits the
-  ledger append; the denial path never swallows an integrity error.
+- Every denial is a ledgered Decision, or its loss is counted and logged by
+  cause: dropped, failed, or abandoned (spec 035 B-3). The request path never
+  awaits the ledger append; the denial path never swallows an integrity
+  error; a stop drains the queue before the store shuts (spec 035 B-1).
 - The gate's config hash is part of the anchored surface.
