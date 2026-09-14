@@ -95,9 +95,9 @@
     ],
     "specPath": "specs/013-ledger-decision-chain/spec.md",
     "status": "approved",
-    "summary": "The governance ledger: a linear chain of signed, hash-linked Decision records stored in the app's hiqlite, appended by a compare-and-swap that a unique index on the parent hash enforces inside one txn, retried three times on a miss and then a typed integrity error, and verified in full at every boot with an integrity failure being process-fatal. Records use the attest-ledger envelope and canonical-keysort-json bytes so an independent verifier can check the chain without this code. Carries enrahitu://024 and enrahitu://032 §3.7.\n",
+    "summary": "The governance ledger: a linear chain of signed, hash-linked Decision records stored in the app's hiqlite, appended by a compare-and-swap that a unique index on the parent hash enforces inside one txn, retried after a bounded wait on a miss and then a typed integrity error, and verified in full at every boot with an integrity failure being process-fatal. Records use the attest-ledger envelope and canonical-keysort-json bytes so an independent verifier can check the chain without this code. Carries enrahitu://024 and enrahitu://032 §3.7.\n",
     "title": "The decision chain: hash-linked records, CAS append, verification at boot"
   },
-  "shardHash": "caabc5ee0be615241f1c7fb07038123b1cf0963c813daa52022378cb0ffaebb4",
+  "shardHash": "1934c65ea0c8c1f2f43e460b23fac5fdbddf905e98186e17859f31adad13708a",
   "specVersion": "1.2.0"
 }

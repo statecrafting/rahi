@@ -9,8 +9,10 @@
 use std::future::{Future, IntoFuture as _};
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use axum::Router;
+use rahi_edge::obs::DECISION_TARGET;
 use rahi_edge::{
     AppState, Edge, Route, RouteClass, StreamHub, StreamIdentityResolver, StreamOptions,
 };
@@ -18,7 +20,7 @@ use rahi_idp::{
     AUTH_PREFIX, Discovery, IdpConfig, Jwks, Proxy, Resource, SessionKey, Sessions, proxy_router,
     resource_router, session_router, with_sessions,
 };
-use rahi_kernel::{Kernel, Manifest};
+use rahi_kernel::{Kernel, KernelOptions, Manifest};
 use rahi_ledger::{FsArchive, Hash, Ledger};
 use rahi_ops::KeySet;
 use rahi_store::Store;
@@ -53,6 +55,29 @@ pub const ENV_MAX_CONCURRENT_STREAMS: &str = "RAHI_MAX_CONCURRENT_STREAMS";
 /// Seconds a shutdown waits for open streams to close (spec 026 B-7); the
 /// default is ten.
 pub const ENV_STREAM_DRAIN_TIMEOUT: &str = "RAHI_STREAM_DRAIN_TIMEOUT_SECS";
+
+/// Seconds a stop gives the kernel's denial queue to drain before it shuts
+/// the store (spec 035 B-1); the default is [`DEFAULT_DENIAL_DRAIN_TIMEOUT`].
+pub const ENV_DENIAL_DRAIN_TIMEOUT: &str = "RAHI_DENIAL_DRAIN_TIMEOUT_SECS";
+
+/// The denial drain bound when the environment names none (spec 035 D-1).
+pub const DEFAULT_DENIAL_DRAIN_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Read [`ENV_DENIAL_DRAIN_TIMEOUT`].
+///
+/// # Errors
+///
+/// [`Error::Config`] when the value is not a number of seconds.
+pub fn denial_drain_timeout(env: &dyn EnvReader) -> Result<Duration> {
+    let Some(raw) = env.get(ENV_DENIAL_DRAIN_TIMEOUT) else {
+        return Ok(DEFAULT_DENIAL_DRAIN_TIMEOUT);
+    };
+    raw.parse::<u64>().map(Duration::from_secs).map_err(|_| {
+        Error::Config(format!(
+            "{ENV_DENIAL_DRAIN_TIMEOUT} {raw:?} is not a number of seconds"
+        ))
+    })
+}
 
 /// The stream options the environment describes (spec 026).
 ///
@@ -233,7 +258,35 @@ pub fn listen_addr(env: &dyn EnvReader) -> Result<SocketAddr> {
         .map_err(|_| Error::Config(format!("{ENV_LISTEN_ADDR} {raw:?} is not host:port")))
 }
 
+/// A composed cell: the router `serve` listens with, and the kernel whose
+/// denial queue a stop drains before the store goes away (spec 035 B-1).
+pub struct Composed {
+    /// The cell's router, identity layer included.
+    pub router: Router,
+    /// The kernel every route of the router adjudicates through.
+    pub kernel: Kernel,
+}
+
 /// Compose the cell's router over a booted cell (B-2, without the listener).
+///
+/// # Errors
+///
+/// As [`compose_parts`].
+pub async fn compose<C: Cell>(
+    booted: &Booted,
+    env: &dyn EnvReader,
+    streams: &StreamHub,
+) -> Result<Router> {
+    compose_parts::<C>(booted, env, streams)
+        .await
+        .map(|composed| composed.router)
+}
+
+/// [`compose`], keeping the kernel it booted.
+///
+/// The kernel names this replica's node in every decision id
+/// (spec 035 B-6), read from the store configuration the node was opened
+/// with.
 ///
 /// # Errors
 ///
@@ -241,25 +294,34 @@ pub fn listen_addr(env: &dyn EnvReader) -> Result<SocketAddr> {
 /// [`Error::Integrity`] when the chain does not verify; [`Error::Config`]
 /// when identity cannot be derived or a route is unclassified;
 /// [`Error::Upstream`] when rauthy is required and does not answer.
-pub async fn compose<C: Cell>(
+pub async fn compose_parts<C: Cell>(
     booted: &Booted,
     env: &dyn EnvReader,
     streams: &StreamHub,
-) -> Result<Router> {
+) -> Result<Composed> {
     rahi_ops::migrate::check_current(&booted.store, C::migrations()).await?;
     let ledger = booted.ledger().await?;
-    let kernel = Kernel::boot(
+    let kernel = Kernel::boot_with(
         booted.manifest.clone(),
         booted.store.handle(),
         ledger.clone(),
+        KernelOptions {
+            node_id: booted.store.config().node_id,
+            ..KernelOptions::default()
+        },
     )
     .await?;
     let obs = rahi_edge::ObsOptions::from_env(&booted.config, env)?
         .with_service_name(booted.manifest.app.name.as_str());
     rahi_edge::obs::init(obs)?;
 
-    let state = AppState::new(kernel, booted.store.handle(), ledger, booted.config.clone())
-        .with_extension(streams.clone());
+    let state = AppState::new(
+        kernel.clone(),
+        booted.store.handle(),
+        ledger,
+        booted.config.clone(),
+    )
+    .with_extension(streams.clone());
     let mut edge = Edge::builder(state.clone())
         .stream_identity(stream_identity())
         .mount("/", C::routes(state.clone()))
@@ -320,10 +382,38 @@ pub async fn compose<C: Cell>(
     // `Authenticated` and the operator gate read. Outside it every
     // authenticated route answers 401 (022 D-3), which is what an app with
     // a login would have met here before the first app existed (034 D-2).
-    Ok(match resolver {
+    let router = match resolver {
         Some(sessions) => with_sessions(sessions, router),
         None => router,
-    })
+    };
+    Ok(Composed { router, kernel })
+}
+
+/// B-7 of spec 035: the line naming the nonce and the node this boot's
+/// kernel mints decision ids under, so an auditor can pair any id with the
+/// boot that minted it and see two boots of one replica on one nonce.
+#[must_use]
+pub fn boot_line(kernel: &Kernel) -> String {
+    format!(
+        "INFO {DECISION_TARGET}: decision ids of this boot are kernel:{nonce}:{node}:<counter> \
+         (nonce {nonce}, node {node})",
+        nonce = kernel.nonce(),
+        node = kernel.node_id(),
+    )
+}
+
+/// B-1 and B-2 of spec 035: give the denial queue its bound, and say so in
+/// one warning line when the bound expired. Each abandoned id has already
+/// been counted and written as its own error line by the failure observer.
+async fn drain_denials(kernel: &Kernel, bound: Duration) {
+    let drained = kernel.drain(bound).await;
+    if !drained.is_complete() {
+        eprintln!(
+            "WARN {DECISION_TARGET}: the denial drain bound of {bound:?} expired with {} \
+             decision(s) abandoned",
+            drained.abandoned.len()
+        );
+    }
 }
 
 /// How long in-flight connections have to finish once serve is told to
@@ -345,7 +435,10 @@ pub async fn serve<C: Cell>(env: &dyn EnvReader) -> Result<()> {
 /// [`serve`] that stops when `stop` resolves, and only then: under the
 /// supervisor (spec 031 B-3) `stop` is the supervisor's hand, so that one
 /// SIGTERM has one listener and one ordered shutdown. The node is shut
-/// down on every exit, within [`DRAIN_BUDGET`] of the stop.
+/// down on every exit, within [`DRAIN_BUDGET`] of the stop plus the denial
+/// drain's bound: in-flight requests finish first, then the kernel's denial
+/// queue drains within [`ENV_DENIAL_DRAIN_TIMEOUT`], then the store is shut
+/// (spec 035 B-1).
 ///
 /// # Errors
 ///
@@ -356,17 +449,20 @@ pub async fn serve_until<C: Cell>(
 ) -> Result<()> {
     let addr = listen_addr(env)?;
     let streams = StreamHub::new(stream_options(env)?);
+    let denial_bound = denial_drain_timeout(env)?;
     let booted = Booted::open::<C>(env).await?;
-    let router = match compose::<C>(&booted, env, &streams).await {
-        Ok(router) => router,
+    let Composed { router, kernel } = match compose_parts::<C>(&booted, env, &streams).await {
+        Ok(composed) => composed,
         Err(err) => {
             booted.shutdown().await;
             return Err(err);
         }
     };
+    println!("{}", boot_line(&kernel));
     let listener = match tokio::net::TcpListener::bind(addr).await {
         Ok(listener) => listener,
         Err(err) => {
+            drain_denials(&kernel, denial_bound).await;
             booted.shutdown().await;
             return Err(Error::Io(format!("cannot listen on {addr}: {err}")));
         }
@@ -414,6 +510,9 @@ pub async fn serve_until<C: Cell>(
         }
     };
     drop(server);
+    // Spec 035 B-1: the requests are done; the records of their denials get
+    // their bound before the store they are written through goes away.
+    drain_denials(&kernel, denial_bound).await;
     booted.shutdown().await;
     served
 }

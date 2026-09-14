@@ -25,6 +25,8 @@ serde_json = { workspace = true }
 async-trait = { workspace = true }
 s3-simple = { workspace = true }
 url = { workspace = true }
+# The wait between compare-and-swap attempts (spec 013 B-3 as amended by D-9).
+tokio = { workspace = true, features = ["time"] }
 
 [dev-dependencies]
 tempfile = { workspace = true }

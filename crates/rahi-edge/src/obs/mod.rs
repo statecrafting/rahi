@@ -260,12 +260,90 @@ fn hook_kernel(metrics: Metrics) {
             reason = %decision.reason,
         );
     });
-    rahi_kernel::observe::on_failure(move |id, err| {
-        metrics.record_ledger_failure();
+    rahi_kernel::observe::on_failure(move |id, cause, err| {
+        metrics.record_loss(cause);
         tracing::error!(
             target: DECISION_TARGET,
             id = %id,
+            cause = cause.as_str(),
             ledger_failure = %err,
         );
+        // The event above reaches the ring only inside a request span, and
+        // the appender and a stop's drain run outside every request, so the
+        // loss is also one line on stderr (spec 035 B-2): a record that never
+        // reached the chain must leave a trace an operator can read without a
+        // collector standing by.
+        eprintln!("{}", loss_line(id, cause, err));
     });
+}
+
+/// The stderr line for a denied decision that did not reach the chain
+/// (spec 035 B-2): level, target, the id, the cause, and the error.
+#[must_use]
+pub fn loss_line(
+    id: &rahi_kernel::DecisionId,
+    cause: rahi_kernel::observe::Cause,
+    err: &Error,
+) -> String {
+    format!("ERROR {DECISION_TARGET}: decision {id} was not written to the chain ({cause}): {err}")
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used)]
+mod tests {
+    use axum::body::Body;
+    use axum::http::Request;
+    use rahi_kernel::DecisionId;
+    use rahi_kernel::observe::Cause;
+    use tower::ServiceExt as _;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn the_three_loss_families_render_on_the_metrics_route() {
+        init(ObsOptions {
+            ring_capacity: 16,
+            otlp_endpoint: None,
+            service_name: "obs-unit".to_owned(),
+        })
+        .expect("the observability context initialises");
+        let response = metrics_router()
+            .oneshot(
+                Request::get(METRICS_PATH)
+                    .body(Body::empty())
+                    .expect("a request"),
+            )
+            .await
+            .expect("the route answers");
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("a body");
+        let text = String::from_utf8(body.to_vec()).expect("the exposition is text");
+        for family in [
+            metrics::KERNEL_LEDGER_FAILURES,
+            metrics::KERNEL_DECISIONS_DROPPED,
+            metrics::KERNEL_DECISIONS_ABANDONED,
+        ] {
+            assert!(
+                text.lines()
+                    .any(|line| line.starts_with(&format!("{family} "))),
+                "{family} renders on {METRICS_PATH}:\n{text}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_loss_line_names_the_target_the_id_and_the_cause() {
+        let line = loss_line(
+            &DecisionId::new("kernel:0123456789abcdef:2:000000000007"),
+            Cause::Abandoned,
+            &Error::Upstream("the bound expired".to_owned()),
+        );
+        assert_eq!(
+            line,
+            "ERROR rahi.decision: decision kernel:0123456789abcdef:2:000000000007 was not \
+             written to the chain (abandoned): upstream: the bound expired"
+        );
+    }
 }

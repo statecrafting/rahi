@@ -68,13 +68,69 @@
           "kind": "file",
           "path": "deploy/README.md"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "015-kernel-manifest-and-adjudication",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/tests/adjudicate.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "020-edge-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/tests/common/mod.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "022-session-and-principal",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/oidc/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "013-ledger-decision-chain",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/src/append.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "013-ledger-decision-chain",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/Cargo.toml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "013-ledger-decision-chain",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/tests/append.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "001-agentic-harness",
+        "unit": {
+          "kind": "file",
+          "path": ".claude/rules/"
+        }
       }
     ],
     "extraFrontmatter": {
       "wave": 3
     },
     "id": "035-denials-survive-shutdown",
-    "implementation": "pending",
+    "implementation": "complete",
     "kind": "kernel",
     "references": [
       {
@@ -110,6 +166,6 @@
     "summary": "Constitution X says the kernel ledgers every denial. Spec 015 answers a denial before its record is durable and drains the records through a bounded queue, and serve never drains that queue on shutdown, so a graceful stop silently loses the denials still queued (reproduced: 50 denials answered 403 with decision ids, 33 and 40 of them in the chain after SIGTERM, nothing counted). A second loss is structural: a decision id is the chain head at boot plus a counter, so replicas of spec 032's StatefulSet that boot on the same head mint the same ids, and the second append of an id is refused as a conflict (reproduced in process: two kernels on one chain both answered with the same id and one record landed). This spec drains the queue within a bound when serve stops, counts what the bound abandons, separates a dropped record from a failed append on /metrics, and names the replica in every decision id, so the only uncounted loss left is a process that is killed.\n",
     "title": "Denials survive a graceful shutdown, and every lost denial is counted by its cause"
   },
-  "shardHash": "9a3fe828ea5e8d52c756eaae042489f7f2e669e89b033b89d08e4cb6d3f51272",
+  "shardHash": "9ab8bfb82d64a74bdb1cd680c7397e9bab4e6b8f882dbad26975acfb2f04d8c4",
   "specVersion": "1.2.0"
 }

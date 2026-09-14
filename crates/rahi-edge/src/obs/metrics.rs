@@ -15,6 +15,7 @@ use prometheus::{
     Histogram, HistogramOpts, HistogramVec, IntCounter, IntCounterVec, IntGauge, Opts, Registry,
     TextEncoder,
 };
+use rahi_kernel::observe::Cause;
 use rahi_types::{Error, Result};
 
 /// Requests served, by route pattern, method, and status class.
@@ -27,8 +28,14 @@ pub const STORE_OPS: &str = "store_ops_total";
 pub const STORE_DURATION: &str = "store_op_duration_seconds";
 /// Kernel decisions, by outcome.
 pub const KERNEL_DECISIONS: &str = "kernel_decisions_total";
-/// Appends of a decision that failed (spec 015 B-6).
+/// Appends of a decision that failed (spec 015 B-6); from spec 035 B-3,
+/// nothing else.
 pub const KERNEL_LEDGER_FAILURES: &str = "kernel_ledger_failures_total";
+/// Denied decisions the kernel's full queue refused (spec 035 B-3).
+pub const KERNEL_DECISIONS_DROPPED: &str = "kernel_decisions_dropped_total";
+/// Denied decisions still owed when a stop's drain bound expired
+/// (spec 035 B-2).
+pub const KERNEL_DECISIONS_ABANDONED: &str = "kernel_decisions_abandoned_total";
 /// Streams open right now (spec 026 B-9).
 pub const STREAMS_OPEN: &str = "rahi_streams_open";
 /// How long a stream stayed open (spec 026 B-9).
@@ -59,6 +66,8 @@ pub struct Metrics {
     store_duration: HistogramVec,
     kernel_decisions: IntCounterVec,
     kernel_ledger_failures: IntCounter,
+    kernel_decisions_dropped: IntCounter,
+    kernel_decisions_abandoned: IntCounter,
     streams_open: IntGauge,
     stream_duration: Histogram,
     stream_events: IntCounter,
@@ -109,6 +118,16 @@ impl Metrics {
             "Decisions the ledger could not be told about",
         ))
         .map_err(config)?;
+        let kernel_decisions_dropped = IntCounter::with_opts(Opts::new(
+            KERNEL_DECISIONS_DROPPED,
+            "Denied decisions the kernel's full queue refused",
+        ))
+        .map_err(config)?;
+        let kernel_decisions_abandoned = IntCounter::with_opts(Opts::new(
+            KERNEL_DECISIONS_ABANDONED,
+            "Denied decisions still owed when a stop's drain bound expired",
+        ))
+        .map_err(config)?;
 
         registry
             .register(Box::new(http_requests.clone()))
@@ -127,6 +146,12 @@ impl Metrics {
             .map_err(config)?;
         registry
             .register(Box::new(kernel_ledger_failures.clone()))
+            .map_err(config)?;
+        registry
+            .register(Box::new(kernel_decisions_dropped.clone()))
+            .map_err(config)?;
+        registry
+            .register(Box::new(kernel_decisions_abandoned.clone()))
             .map_err(config)?;
 
         // Spec 026 B-9: one gauge, one histogram, two counters per stream.
@@ -174,6 +199,8 @@ impl Metrics {
             store_duration,
             kernel_decisions,
             kernel_ledger_failures,
+            kernel_decisions_dropped,
+            kernel_decisions_abandoned,
             streams_open,
             stream_duration,
             stream_events,
@@ -227,6 +254,26 @@ impl Metrics {
     /// Count one decision the ledger could not be told about.
     pub fn record_ledger_failure(&self) {
         self.kernel_ledger_failures.inc();
+    }
+
+    /// Count one denied decision that did not reach the chain, on the family
+    /// its cause names (spec 035 B-3).
+    pub fn record_loss(&self, cause: Cause) {
+        match cause {
+            Cause::Dropped => self.kernel_decisions_dropped.inc(),
+            Cause::Failed => self.kernel_ledger_failures.inc(),
+            Cause::Abandoned => self.kernel_decisions_abandoned.inc(),
+        }
+    }
+
+    /// How many denied decisions were lost to `cause`, for a test or a probe.
+    #[must_use]
+    pub fn losses(&self, cause: Cause) -> u64 {
+        match cause {
+            Cause::Dropped => self.kernel_decisions_dropped.get(),
+            Cause::Failed => self.kernel_ledger_failures.get(),
+            Cause::Abandoned => self.kernel_decisions_abandoned.get(),
+        }
     }
 
     /// One more stream is open (spec 026 B-9).
@@ -337,12 +384,50 @@ mod tests {
             STORE_DURATION,
             KERNEL_DECISIONS,
             KERNEL_LEDGER_FAILURES,
+            KERNEL_DECISIONS_DROPPED,
+            KERNEL_DECISIONS_ABANDONED,
         ] {
             assert!(text.contains(family), "{family} is exposed:\n{text}");
         }
         assert!(text.contains("route=\"/api/notes\""), "{text}");
         assert!(text.contains("status_class=\"2xx\""), "{text}");
         assert!(text.contains("outcome=\"deny\""), "{text}");
+    }
+
+    #[test]
+    fn each_cause_counts_on_its_own_family_and_every_family_renders_at_zero() {
+        let metrics = Metrics::new().expect("the registry builds");
+        let text = metrics.render().expect("the exposition encodes");
+        for family in [
+            KERNEL_LEDGER_FAILURES,
+            KERNEL_DECISIONS_DROPPED,
+            KERNEL_DECISIONS_ABANDONED,
+        ] {
+            assert!(
+                text.lines().any(|line| line == format!("{family} 0")),
+                "{family} renders before any loss:\n{text}"
+            );
+        }
+
+        metrics.record_loss(Cause::Dropped);
+        metrics.record_loss(Cause::Abandoned);
+        metrics.record_loss(Cause::Abandoned);
+        assert_eq!(metrics.losses(Cause::Dropped), 1);
+        assert_eq!(metrics.losses(Cause::Failed), 0, "a drop is not a failure");
+        assert_eq!(metrics.losses(Cause::Abandoned), 2);
+        let text = metrics.render().expect("the exposition encodes");
+        assert!(
+            text.contains(&format!("{KERNEL_DECISIONS_DROPPED} 1")),
+            "{text}"
+        );
+        assert!(
+            text.contains(&format!("{KERNEL_LEDGER_FAILURES} 0")),
+            "{text}"
+        );
+        assert!(
+            text.contains(&format!("{KERNEL_DECISIONS_ABANDONED} 2")),
+            "{text}"
+        );
     }
 
     #[test]

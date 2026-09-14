@@ -132,8 +132,7 @@ async fn concurrent_appends_all_land_on_one_linear_chain() {
     let f = common::open().await;
     let ledger = open_ledger(f.handle()).await;
 
-    // Rounds of two, so a loser always has an attempt left: spec 013 B-3
-    // gives an append three tries, and two appenders can cost at most one.
+    // Rounds of two: every append of a round races the other for one head.
     let rounds = 5;
     for round in 0..rounds {
         let (a, b) = tokio::join!(
@@ -154,6 +153,48 @@ async fn concurrent_appends_all_land_on_one_linear_chain() {
     assert_eq!(
         records.len(),
         1 + rounds * 2,
+        "every append committed exactly once"
+    );
+    assert_eq!(
+        records.last().unwrap().hash().unwrap(),
+        ledger.head().await.unwrap(),
+        "one head: the chain did not fork"
+    );
+    ledger.verify().await.expect("the chain verifies");
+
+    f.store.shutdown().await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn three_appenders_each_with_a_backlog_all_land_on_one_linear_chain() {
+    // The shape spec 032 runs: three replicas, each appending its own queue
+    // one record at a time, all racing for one head. Three immediate tries
+    // lost records here; spec 013 B-3 as amended by D-9 waits between tries.
+    let f = common::open().await;
+    let ledger = open_ledger(f.handle()).await;
+
+    let per_appender = 10;
+    let appenders: Vec<_> = (0..3)
+        .map(|appender| {
+            let ledger = ledger.clone();
+            tokio::spawn(async move {
+                for n in 0..per_appender {
+                    ledger
+                        .append(decision(&format!("d-{appender}-{n}")))
+                        .await
+                        .unwrap_or_else(|e| panic!("appender {appender}, record {n}: {e}"));
+                }
+            })
+        })
+        .collect();
+    for appender in appenders {
+        appender.await.unwrap();
+    }
+
+    let records = ledger.records().await.unwrap();
+    assert_eq!(
+        records.len(),
+        1 + 3 * per_appender,
         "every append committed exactly once"
     );
     assert_eq!(

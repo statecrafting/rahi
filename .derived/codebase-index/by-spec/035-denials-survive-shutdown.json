@@ -1,19 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '035-denials-survive-shutdown' file unit 'crates/rahi-cli/tests/shutdown.rs' does not exist",
-        "path": "crates/rahi-cli/tests/shutdown.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '035-denials-survive-shutdown' file unit 'crates/rahi-kernel/tests/replicas.rs' does not exist",
-        "path": "crates/rahi-kernel/tests/replicas.rs"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "015-kernel-manifest-and-adjudication",
@@ -22,7 +7,15 @@
     ],
     "implementingPaths": [
       {
+        "path": ".claude/rules/",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-cli/src/serve.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/tests/shutdown.rs",
         "source": "spec-edge"
       },
       {
@@ -34,11 +27,39 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-edge/tests/common/mod.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/tests/oidc/",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-kernel/src/lib.rs",
         "source": "spec-edge"
       },
       {
         "path": "crates/rahi-kernel/src/observe.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-kernel/tests/adjudicate.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-kernel/tests/replicas.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ledger/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ledger/src/append.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ledger/tests/append.rs",
         "source": "spec-edge"
       },
       {
@@ -48,7 +69,11 @@
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-cli/tests/shutdown.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -57,12 +82,29 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-kernel/tests/replicas.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
           "kind": "file",
           "path": "crates/rahi-kernel/tests/replicas.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": ".claude/rules/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": ".claude/rules/"
         }
       },
       {
@@ -107,6 +149,32 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-edge/tests/common/mod.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/tests/common/mod.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/tests/oidc/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/oidc/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-kernel/src/lib.rs"
           }
         ],
@@ -128,6 +196,58 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-kernel/src/observe.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-kernel/tests/adjudicate.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/tests/adjudicate.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ledger/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ledger/src/append.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/src/append.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ledger/tests/append.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/tests/append.rs"
         }
       },
       {
@@ -174,5 +294,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "d84019d2647f6cdea55817f3455f0098ded8ee8e50993f1d10dd62619b7fb825"
+  "shardHash": "d46e29048c4e513d367c5fe1a95223f81c585443c1c576f6c1fe3b418467dfad"
 }

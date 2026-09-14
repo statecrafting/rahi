@@ -30,8 +30,8 @@ constrains:
 summary: >
   The governance ledger: a linear chain of signed, hash-linked Decision
   records stored in the app's hiqlite, appended by a compare-and-swap that a
-  unique index on the parent hash enforces inside one txn, retried three
-  times on a miss and then a typed integrity error, and verified in full at
+  unique index on the parent hash enforces inside one txn, retried after a
+  bounded wait on a miss and then a typed integrity error, and verified in full at
   every boot with an integrity failure being process-fatal. Records use the
   attest-ledger envelope and canonical-keysort-json bytes so an independent
   verifier can check the chain without this code. Carries enrahitu://024 and
@@ -69,10 +69,13 @@ spec 014's modules inside the same crate.
   distinct chains cannot collide.
 - **B-3 (append is CAS).** `Ledger::append(decision) -> Result<Hash>` runs
   head read (`query_consistent`), record build, and insert inside one
-  `txn`. A unique violation is a miss: reload the head, re-chain the same
-  payload, retry; three attempts, then `Error::Integrity`. Callers that
-  await the append get the error; the denial path (spec 015) logs it with
-  the decision id and never swallows it.
+  `txn`. A unique violation is a miss: wait, reload the head, re-chain the
+  same payload, retry; twelve attempts, each retry after a wait whose window
+  doubles from 5 ms to 250 ms and whose point in that window the decision id
+  picks, then `Error::Integrity`. Callers that await the append get the
+  error; the denial path (spec 015) logs it with the decision id and never
+  swallows it. *(Amended 2026-09-13, D-9; the text before gave three
+  attempts with no wait between them.)*
 - **B-4 (verify at boot).** `Ledger::open(store, signer) -> Result<Ledger>`
   creates the table and index, writes genesis if absent, then runs
   `verify_chain` (hash links, signatures, linearity) over the resident
@@ -213,6 +216,33 @@ and emits them); key generation (031).
   `txn`. It is a `txn` rather than an `execute` because that is the seam
   spec 014 extends, where the statements that seal the tail commit with the
   append that overflowed the window.
+- **D-9 (2026-09-13, corpus amendment in spec 035's build; owner
+  decision).** B-3's three immediate attempts assumed that losing three
+  times in a row is not ordinary. Spec 032 made it ordinary: three
+  replicas, each with its own appender, race for one head, and a loser that
+  retries at once meets the same rivals again. Spec 035's three-process test
+  (FR-005) lost 4 and then 3 of 30 denials, each one `Error::Integrity`
+  after three lost compare-and-swaps, once its node-segmented ids stopped
+  failing earlier as conflicts (035 D-10). The owner decided on 2026-09-13
+  that B-3 be amended rather than FR-005 relaxed or held: a lost
+  compare-and-swap now waits before it reloads the head, in a window that
+  doubles from `APPEND_BACKOFF_BASE` (5 ms) to `APPEND_BACKOFF_CAP`
+  (250 ms), at a point in the window's upper half picked by hashing the
+  decision id with the attempt number, so rivals wait different times and
+  one reaches the head first. `APPEND_ATTEMPTS` is twelve, so an append
+  spends at most about two seconds of waiting before it stops. No clock is
+  read into a record and no random source is used, so the same append waits
+  the same way every time. What the constraint on `append.rs` freezes is
+  unchanged: the append is the unique-parent compare-and-swap, one insert
+  per parent, and exhausting it is still `Error::Integrity`. The crate now
+  depends on `tokio` for the wait (its `time` feature only), a third-party
+  crate, so AC-2's workspace dependencies are unchanged.
+  `tests/append.rs` gains three appenders with a backlog each, which failed
+  three runs of three under the old rule and passes under this one.
+  Rejected: re-queuing an exhausted append in the kernel, which would log a
+  non-loss as an error and count it as a failed append (035 B-3); and a
+  lease around the append, which makes the append a lease-guarded write
+  that 012 requires to carry a fencing token the insert does not have.
 
 ## Verification
 

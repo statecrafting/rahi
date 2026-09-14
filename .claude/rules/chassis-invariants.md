@@ -35,8 +35,9 @@ specs that own each rule are named so a violation can be traced.
 
 - Append is a compare-and-swap: head read, record build, and insert inside
   one `txn`, with the unique index on the parent hash making the insert the
-  CAS. A unique violation is a miss, retried three times, then a typed
-  integrity error. Never fork the chain.
+  CAS. A unique violation is a miss, retried after a bounded, id-seeded wait
+  up to twelve attempts (013 D-9), then a typed integrity error. Never fork
+  the chain.
 - Chain verification runs at boot and fails closed: an integrity error on
   the init path is process-fatal.
 - Sealed segments are immutable, hash-linked to their predecessor, and
@@ -58,6 +59,8 @@ specs that own each rule are named so a violation can be traced.
 
 - The manifest is a declared ceiling: observed usage must be a subset of it
   or the build fails. Absence is never permission.
-- Every denial is a ledgered Decision. The request path never awaits the
-  ledger append; the denial path never swallows an integrity error.
+- Every denial is a ledgered Decision, or its loss is counted and logged by
+  cause: dropped, failed, or abandoned (spec 035 B-3). The request path never
+  awaits the ledger append; the denial path never swallows an integrity
+  error; a stop drains the queue before the store shuts (spec 035 B-1).
 - The gate's config hash is part of the anchored surface.

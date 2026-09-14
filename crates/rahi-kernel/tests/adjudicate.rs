@@ -222,6 +222,7 @@ async fn boot_rooted_at(manifest: Manifest, root: &Manifest, capacity: usize) ->
         KernelOptions {
             queue_capacity: capacity,
             clock: Some(std::sync::Arc::new(|| 1_767_225_600)),
+            ..KernelOptions::default()
         },
     )
     .await
@@ -248,7 +249,7 @@ fn observed() -> &'static Mutex<Vec<Decision>> {
                 .expect("not poisoned")
                 .push(decision.clone());
         });
-        observe::on_failure(|id, err| {
+        observe::on_failure(|id, _cause, err| {
             reported()
                 .lock()
                 .expect("not poisoned")
