@@ -1,7 +1,7 @@
 ---
 id: "039-release-and-out-of-tree-packaging"
 title: "Releases and out-of-tree packaging: a tagged version a consumer pins, images that exist under the names the manifests use, and a runtime image a cell in another repository builds on"
-status: draft
+status: approved
 kind: tooling
 domain: ops
 created: "2026-09-11"
@@ -194,8 +194,8 @@ manifest (010), the image workflow and recipe (031), the deploy manifests
 ## 7. Resolved decisions
 
 The owner decided the publication question and B-8 on 2026-09-12 (decisions
-RH-05 and RH-06 of the revision-3 register). The spec stays `draft` until a
-human flips it.
+RH-05 and RH-06 of the revision-3 register), and approved the spec on
+2026-09-16 (D-3), closing the three questions this section had left open.
 
 - **D-1 (2026-09-12, owner decision RH-05; registry publication).** The
   question was whether chassis crates go to crates.io at each tag, which
@@ -224,15 +224,26 @@ human flips it.
   or the volume is recreated. The build session records which, and names
   the member and its TOML key.
 
-Still open before approval:
-
-- the runtime image (B-4) versus a Dockerfile each consumer copies;
-- moving the template under `crates/rahi-ops/` removes
-  `docker/rauthy.env.template` from spec 031's `establishes` and from the
-  `docker/*.template` hashed input, an edit to a complete spec's claim
-  list of the kind spec 034 D-10 made, and a human approves it;
-- whether `latest` is ever published (D-1 requires pinned images, and
-  `deploy/k8s` never names `latest`, B-3).
+- **D-3 (2026-09-16, owner decision; approval).** The owner approved this
+  spec and answered the three questions this section left open, so nothing
+  in it waits on a further flip.
+  - **The runtime image stands (B-4).** A cell in another repository builds
+    on `ghcr.io/statecrafting/rahi-runtime:X.Y.Z` rather than copying a
+    Dockerfile into its own tree, so the pinned rauthy, the non-root user,
+    `/data`, and the entrypoint are patched in one place. Rejected: a
+    Dockerfile each consumer vendors, which drifts from the rauthy the
+    chassis pins.
+  - **The template moves (B-6).** `docker/rauthy.env.template` becomes
+    `crates/rahi-ops/rauthy.env.template`, which removes it from spec 031's
+    `establishes` and from the `docker/*.template` hashed input, the kind of
+    claim-list edit spec 034 D-10 made. It is on the critical path: without
+    it `cargo package` fails on `rahi-ops`, so neither it nor `rahi-cli`
+    can be published, and RH-05 cannot be met.
+  - **`latest` is never published.** A tag pushes `X.Y.Z` only, `deploy/k8s`
+    names a version, and FR-002 makes the validation script refuse a render
+    that names `:latest` or an image outside `ghcr.io/statecrafting/`.
+  - The first release is `v0.1.0`: the version every crate already declares,
+    and the one aicortex pins (`rahi-* = "=0.1.0"`, its 010 D-1).
 
 ## Verification
 

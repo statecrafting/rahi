@@ -346,8 +346,8 @@
       }
     ],
     "specId": "039-release-and-out-of-tree-packaging",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "3bedb08451ca4d132afe04621c9d6ebdb795ae4e7c20499bd628d9530cf177ea"
+  "shardHash": "24938feabd315bdedd9733a6417ae1d60c38d557d4786dc564b8559dce1edee1"
 }
