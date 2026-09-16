@@ -19,6 +19,7 @@ depends_on:
 establishes:
   - "docker/runtime.Dockerfile"
   - ".github/workflows/release.yml"
+  - ".github/publish-crate.sh"
   - "crates/rahi-ops/rauthy.env.template"
   - "CHANGELOG.md"
   - ".github/consumer-cell/"
@@ -350,6 +351,34 @@ RH-05 and RH-06 of the revision-3 register), and approved the spec on
   before the tag proves the git stanza: `/readyz` ready, `403` with
   `kernel:<nonce>:1:000000000000`, `200` and `wrote 1`, a clean stop, and
   `ledger verify` with two resident records.
+
+- **D-11 (2026-09-16, owner decision; supersedes the mechanism of B-2 and
+  D-8).** B-2's last sentence and D-8 made `cargo publish` a command a
+  human runs locally at the release checkpoint, and the first `v0.1.0` tag
+  was pushed under that reading. The owner reviewed the seven sibling
+  statecrafting Rust repositories and found the opposite already
+  established: `spec-spine`, `attest-ledger`, `action-gate`,
+  `canonical-keysort-json`, `tenant-emit`, `tenant-tail`, and
+  `trust-window` each publish from a tag-gated `publish-crates` job in
+  their `release.yml`, over `secrets.CARGO_REGISTRY_TOKEN`, idempotent on
+  an already-published version. This repository already carries that
+  secret. The owner chose the house mechanism, so rahi publishes the way
+  its siblings do rather than by a local command whose evidence lives only
+  on one machine. What does not change is whose act a release is: the
+  human still tags, and the tag still drives publication, exactly as B-3
+  already had it drive the images. B-2's and D-8's text is left as written
+  so the record shows what was asked as well as what was done; the
+  mechanism they name is superseded here and nowhere else. Two
+  consequences. `publish-crates` needs `package` and `consumer`, so a tag
+  that cannot package or compose publishes nothing, and publication is no
+  longer reversible by a human's choice not to run a command: a `v*` tag is
+  the irreversible act. And AC-4 becomes provable rather than recorded:
+  D-9 deferred it because `release.yml` proved only the git stanza, and
+  `consumer-registry` now builds the same cell from `= X.Y.Z` on crates.io
+  after `publish-crates` succeeds. The proof body both jobs run moved to
+  `.github/consumer-cell/prove.sh` so the two stanzas carry one evidence
+  path, and `.github/publish-crate.sh` holds the idempotent publish,
+  matching `attest-ledger`'s factoring.
 
 ## Verification
 

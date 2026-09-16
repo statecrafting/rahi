@@ -10,11 +10,12 @@ Every chassis crate carries one version, and a release is an annotated tag
 `vX.Y.Z` on a `main` commit whose `make ci` passed. Pre-1.0, a minor bump may
 change the consumer contract and a patch bump may not.
 
-## 0.1.0, unreleased
+## 0.1.0, 2026-09-16
 
-No tag exists yet, and nothing is published. The entries below are what the
-first release will carry; a consumer pinning a git commit today already has
-them.
+The first release: the seven responsibilities of spec 002, carried by nine
+crates at one version. A tag publishes the crates to crates.io and the
+images to ghcr.io (spec 039 D-11), so a consumer pins `= "0.1.0"` rather
+than a commit.
 
 ### The contract
 
