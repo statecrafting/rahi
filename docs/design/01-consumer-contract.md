@@ -12,6 +12,12 @@ against `c13cc70` (whose crate sources equal `444bcf8`) and the pinned
 rauthy release, answered the consumers' questions, and proposed the open
 decisions. Statements it supersedes are marked in place.
 
+Revised 2026-09-16 for the `v0.1.0` release (spec 039 B-2): section 2 now
+names the tag rather than a commit. Everything below section 2 was last
+checked against `444bcf8`, whose crate sources the tag carries forward
+through `39f778b`; where a statement has since changed, the release's
+entry in `CHANGELOG.md` is the one that governs.
+
 Every statement carries one of three tags.
 
 - **Verified**: checked against commit `444bcf8` (`main`) by reading the
@@ -58,42 +64,58 @@ nothing in the chassis distributes jobs to workers.
 
 ### 2.1 What is published
 
-**Verified** on 2026-09-11 (`gh repo view`, crates.io API, `git ls-remote`,
-`gh run view`, anonymous GHCR queries):
+**Verified** on 2026-09-16 (`git ls-remote`, `gh run view`, crates.io API),
+revising the 2026-09-11 reading that found nothing published:
 
 | Artifact | State |
 |---|---|
 | source | public at `github.com/statecrafting/rahi`, Apache-2.0, clonable without credentials |
-| crates on crates.io | none; the ten names are free |
-| git tags, GitHub releases | none |
-| container image | none; `image.yml` pushes `ghcr.io/statecrafting/rahi:<tag>` only on a `v*` tag, and no tag has been pushed |
-| deploy manifests | name `ghcr.io/bartekus/rahi:latest`, which does not exist and which no workflow produces |
+| crates on crates.io | the nine names are free and reserved for this release; the `v0.1.0` tag publishes them (spec 039 D-11) |
+| git tags, GitHub releases | `v0.1.0`, annotated and signed |
+| container image | `ghcr.io/statecrafting/rahi:0.1.0` and `ghcr.io/statecrafting/rahi-runtime:0.1.0`, both architectures, public |
+| deploy manifests | name `ghcr.io/statecrafting/rahi` and a version, never `latest` (spec 039 B-3) |
 | rauthy | the image pins `ghcr.io/sebadob/rauthy:0.36.2` by digest; a Cargo consumer gets no rauthy from rahi |
 
-A workspace version (`0.1.0` in every crate manifest) is a declaration, not
-a release. Pin a commit.
+The workspace version is no longer only a declaration: `0.1.0` is a tag and
+a pair of images that name one release. Pin the tag until the tag's
+`publish-crates` job is green; this note is revised to the registry stanza
+when it is, and not before (spec 039 AC-4).
 
 ### 2.2 The dependency stanza
 
-**Verified**: a scratch consumer outside this repository, with its own
-manifest and one migration, built from this stanza with rustc 1.96.0, then
-ran `first-boot`, `migrate`, and `serve`, answered `/readyz`, performed one
-governed write, was denied one ungranted operation with a decision id, and
-passed `ledger verify` with the denial as the chain's last record.
+**Verified**: a consumer cell outside this workspace, with its own manifest
+and one migration, built from this stanza, then ran `first-boot`,
+`migrate`, and `serve`, answered `/readyz`, performed one governed write,
+was denied one ungranted operation with a decision id, and passed
+`ledger verify` with the denial as the chain's last record. The `v0.1.0`
+tag runs that proof twice in `release.yml`: `consumer` against the git
+stanza and `consumer-registry` against the registry stanza below, both
+through `.github/consumer-cell/prove.sh` (spec 039 AC-4, D-11).
 
 ```toml
 [dependencies]
-rahi-cli    = { git = "https://github.com/statecrafting/rahi", rev = "444bcf8e10d79345afc114b59ec2baaa2c65d324" }
-rahi-edge   = { git = "https://github.com/statecrafting/rahi", rev = "444bcf8e10d79345afc114b59ec2baaa2c65d324" }
-rahi-idp    = { git = "https://github.com/statecrafting/rahi", rev = "444bcf8e10d79345afc114b59ec2baaa2c65d324" }
-rahi-kernel = { git = "https://github.com/statecrafting/rahi", rev = "444bcf8e10d79345afc114b59ec2baaa2c65d324" }
-rahi-store  = { git = "https://github.com/statecrafting/rahi", rev = "444bcf8e10d79345afc114b59ec2baaa2c65d324" }
-rahi-types  = { git = "https://github.com/statecrafting/rahi", rev = "444bcf8e10d79345afc114b59ec2baaa2c65d324" }
+rahi-cli    = { git = "https://github.com/statecrafting/rahi", tag = "v0.1.0" }
+rahi-edge   = { git = "https://github.com/statecrafting/rahi", tag = "v0.1.0" }
+rahi-idp    = { git = "https://github.com/statecrafting/rahi", tag = "v0.1.0" }
+rahi-kernel = { git = "https://github.com/statecrafting/rahi", tag = "v0.1.0" }
+rahi-store  = { git = "https://github.com/statecrafting/rahi", tag = "v0.1.0" }
+rahi-types  = { git = "https://github.com/statecrafting/rahi", tag = "v0.1.0" }
 axum = "0.8"
 
 [dev-dependencies]
-rahi-harness = { git = "https://github.com/statecrafting/rahi", rev = "444bcf8e10d79345afc114b59ec2baaa2c65d324" }
+rahi-harness = { git = "https://github.com/statecrafting/rahi", tag = "v0.1.0" }
 ```
+
+Once the tag's `publish-crates` job is green the registry stanza is the one
+to pin, and `consumer-registry` proves it on the same tag:
+
+```toml
+rahi-cli = "=0.1.0"
+```
+
+The `=` is deliberate. The nine crates move as one version (spec 039 B-1),
+and pre-1.0 a minor bump may change the consumer contract, so a caret range
+would let `cargo update` cross a contract change on its own.
 
 `rahi-cli` is the crate that exports `Cell` and `run`; a consumer that
 lists the other chassis crates and not this one cannot compose a cell.

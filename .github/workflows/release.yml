@@ -1,16 +1,23 @@
-# The release workflow (spec 039 B-2, B-6, B-7).
+# The release workflow (spec 039 B-2, B-6, B-7, AC-4).
 #
-# Two jobs. `package` proves every chassis crate can be published, on every
+# Four jobs. `package` proves every chassis crate can be published, on every
 # pull request, so packaging never breaks quietly between releases.
-# `consumer` proves the stanza a consumer actually writes: the cell in
-# `.github/consumer-cell/`, built outside this workspace against a git ref of
-# this repository, boots, writes through the kernel, is denied, and verifies
-# its chain.
+# `consumer` proves the stanza a consumer writes before a version exists:
+# the cell in `.github/consumer-cell/`, built outside this workspace against
+# a git ref of this repository, boots, writes through the kernel, is denied,
+# and verifies its chain.
 #
-# Nothing here publishes. A release is a human's step at the release
-# checkpoint (039 D-1): they tag, this workflow proves the tag, `image.yml`
-# publishes the images, and the human runs `cargo publish` for the nine
-# chassis crates in dependency order.
+# On a `v*` tag two more run. `publish-crates` publishes the nine chassis
+# crates to crates.io in dependency order, and `consumer-registry` then
+# proves the registry stanza (AC-4), which is the one aicortex pins. Both
+# run the same `prove.sh` over the same cell, so the two stanzas carry the
+# same evidence.
+#
+# The human's step at the release checkpoint is the tag (039 D-11, which
+# supersedes the mechanism of B-2's last sentence and D-8 on the owner's
+# decision of 2026-09-16): they tag, and the tag publishes the crates here
+# and the images in `image.yml`. `publish-crates` is idempotent, so
+# re-pushing a tag after a partial release is safe.
 
 name: release
 
@@ -106,51 +113,69 @@ jobs:
               -e "s|__KEY__|${key}|g" \
               -e "s|__REV__|${rev}|g" \
               /tmp/consumer/Cargo.toml.in > /tmp/consumer/Cargo.toml
-          rm /tmp/consumer/Cargo.toml.in
+          rm /tmp/consumer/Cargo.toml.in /tmp/consumer/Cargo.registry.toml.in
           cat /tmp/consumer/Cargo.toml
 
       - name: Build, boot, and govern it
         working-directory: /tmp/consumer
+        run: ./prove.sh
+
+  # Spec 039 D-11: the tag publishes. Nine crates, leaf first, each waiting
+  # on the index before the next resolves its version dependency. Gated on
+  # `package` and `consumer`, so nothing reaches crates.io until this tag
+  # has proven it packages and composes.
+  publish-crates:
+    name: publish to crates.io
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [package, consumer]
+    runs-on: ubuntu-latest
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: The token is present
         run: |
           set -euo pipefail
-          cargo build --release
-          bin=target/release/consumer-cell
-          export RAHI_PUBLIC_URL=http://127.0.0.1:18443
-          export RAHI_DATA_DIR=/tmp/consumer/data
-          export RAHI_LISTEN_ADDR=127.0.0.1:18443
-          export RAHI_HIQLITE_API_ADDR=127.0.0.1:18301
-          export RAHI_HIQLITE_RAFT_ADDR=127.0.0.1:18401
-          export RAHI_RAUTHY_MODE=none
-          mkdir -p "$RAHI_DATA_DIR"
-          "$bin" first-boot
-          "$bin" migrate
-          "$bin" serve &
-          serve=$!
-          ready=0
-          for _ in $(seq 1 120); do
-            if curl -fsS http://127.0.0.1:18443/readyz > /tmp/readyz 2>/dev/null; then ready=1; break; fi
-            sleep 1
+          [ -n "${CARGO_REGISTRY_TOKEN:-}" ] \
+            || { echo "CARGO_REGISTRY_TOKEN is not set on this repository" >&2; exit 1; }
+
+      # Dependency order (039 D-8): types, store, ledger, kernel, then idp
+      # and edge over the kernel, then ops over idp, then cli over both.
+      # rahi-harness depends on no chassis crate and goes last.
+      - name: Publish the nine chassis crates
+        run: |
+          set -euo pipefail
+          for crate in rahi-types rahi-store rahi-ledger rahi-kernel rahi-idp \
+                       rahi-edge rahi-ops rahi-cli rahi-harness; do
+            echo "::group::publish ${crate}"
+            .github/publish-crate.sh "${crate}"
+            echo "::endgroup::"
           done
-          [ "$ready" = "1" ] || { echo "the cell never answered /readyz" >&2; exit 1; }
-          grep -q '"status":"ready"' /tmp/readyz
+          echo "nine chassis crates published at ${GITHUB_REF_NAME#v}"
 
-          # One denial, answered with the id of the record the chain holds.
-          # This safe request also mints the CSRF cookie the next one echoes
-          # (spec 020 B-4); the probes sit outside that layer and mint none.
-          code="$(curl -s -c /tmp/jar -o /tmp/deny -w '%{http_code}' http://127.0.0.1:18443/api/deny)"
-          [ "$code" = "403" ] || { echo "the denial answered ${code}"; cat /tmp/deny; exit 1; }
-          grep -q '"decision":"kernel:' /tmp/deny
+  # Spec 039 AC-4: after publication the nine crates resolve from crates.io
+  # at the tag's version, and this workflow proves the registry stanza.
+  consumer-registry:
+    name: the consumer stanza, from crates.io
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: publish-crates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
 
-          # One governed write, admitted, with the double-submit pair a page
-          # sends: the cookie back, and its value in X-CSRF-Token.
-          token="$(awk '$6 == "csrf" { print $7 }' /tmp/jar)"
-          [ -n "$token" ] || { echo "no CSRF cookie was minted" >&2; cat /tmp/jar; exit 1; }
-          write="$(curl -s -o /tmp/write -w '%{http_code}' -b /tmp/jar \
-            -H "x-csrf-token: ${token}" -X POST http://127.0.0.1:18443/api/write)"
-          [ "$write" = "200" ] || { echo "the write answered ${write}"; cat /tmp/write; exit 1; }
-          grep -q "wrote 1" /tmp/write
+      - name: Assemble the cell outside the workspace
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          echo "the consumer pins = ${version} from crates.io"
+          mkdir -p /tmp/consumer-registry
+          cp -a .github/consumer-cell/. /tmp/consumer-registry/
+          sed -e "s|__VER__|${version}|g" \
+              /tmp/consumer-registry/Cargo.registry.toml.in > /tmp/consumer-registry/Cargo.toml
+          rm /tmp/consumer-registry/Cargo.toml.in /tmp/consumer-registry/Cargo.registry.toml.in
+          cat /tmp/consumer-registry/Cargo.toml
 
-          kill -TERM "$serve"
-          wait "$serve" || { echo "serve did not stop cleanly" >&2; exit 1; }
-          "$bin" ledger verify
-          echo "the consumer stanza builds, boots, writes, is denied, and verifies"
+      - name: Build, boot, and govern it
+        working-directory: /tmp/consumer-registry
+        run: ./prove.sh

@@ -108,9 +108,15 @@ extra_hashed_inputs = [
   "deploy/**/*.yaml",
   # The cell the release workflow builds outside this workspace (spec 039
   # B-7): a fixture of the release, versioned with the workflow that runs it.
-  ".github/consumer-cell/Cargo.toml.in",
+  # Both stanza templates, git and registry, and the proof both jobs run
+  # over the cell (039 D-11).
+  ".github/consumer-cell/*.toml.in",
   ".github/consumer-cell/manifest.toml",
   ".github/consumer-cell/src/*.rs",
+  ".github/consumer-cell/*.sh",
+  # The idempotent publish the release workflow calls per crate (039 D-11):
+  # a step of the release, hashed like the workflow that calls it.
+  ".github/*.sh",
 ]
 resolver_exclusions = ["target", "node_modules", ".derived", "dist", "build"]
 

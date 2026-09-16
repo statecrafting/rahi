@@ -14,6 +14,10 @@
         "source": "spec-edge"
       },
       {
+        "path": ".github/publish-crate.sh",
+        "source": "spec-edge"
+      },
+      {
         "path": ".github/workflows/image.yml",
         "source": "spec-edge"
       },
@@ -182,6 +186,19 @@
         "unit": {
           "kind": "file",
           "path": ".github/consumer-cell/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": ".github/publish-crate.sh"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": ".github/publish-crate.sh"
         }
       },
       {
@@ -727,5 +744,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "855e220b9bb208ad617f721601274be9059487fff9610798e85de94f302eb030"
+  "shardHash": "bae23663fd71b4b6e7b3ee5553a202b42f3152c4734ffbbf7093610a3555be7a"
 }

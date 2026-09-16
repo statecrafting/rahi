@@ -1,0 +1,22 @@
+# The consumer stanza a consumer writes once the release is on crates.io
+# (spec 039 AC-4, D-11). The release workflow substitutes __VER__ after
+# `publish-crates` succeeds, then builds this outside the chassis workspace.
+# This is the stanza aicortex pins; the git form in `Cargo.toml.in` is what
+# a consumer uses before a version is published.
+
+[package]
+name = "consumer-cell"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Standalone: this package is not a member of the chassis workspace.
+[workspace]
+
+[dependencies]
+rahi-cli = "=__VER__"
+rahi-edge = "=__VER__"
+rahi-kernel = "=__VER__"
+rahi-store = "=__VER__"
+rahi-types = "=__VER__"
+axum = "0.8"
