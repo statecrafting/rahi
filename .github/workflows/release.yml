@@ -87,14 +87,18 @@ jobs:
       # dependency on a tag. Once a release is published the same job proves
       # the registry stanza (D-1), which is the one aicortex pins.
       - name: Assemble the cell outside the workspace
+        env:
+          # Through the environment, never interpolated into the script: a
+          # dispatch input is a string somebody types.
+          REV: ${{ inputs.rev }}
         run: |
           set -euo pipefail
-          rev="${{ inputs.rev }}"
+          rev="${REV:-}"
           if [ -z "$rev" ]; then
             if [ "${GITHUB_REF_TYPE}" = "tag" ]; then rev="${GITHUB_REF_NAME}"; else rev="${GITHUB_SHA}"; fi
           fi
           key=rev
-          case "$rev" in v*) key=tag ;; esac
+          case "$rev" in v[0-9]*) key=tag ;; esac
           echo "the consumer pins ${key} = ${rev}"
           mkdir -p /tmp/consumer
           cp -a .github/consumer-cell/. /tmp/consumer/
@@ -130,14 +134,21 @@ jobs:
           [ "$ready" = "1" ] || { echo "the cell never answered /readyz" >&2; exit 1; }
           grep -q '"status":"ready"' /tmp/readyz
 
-          # One governed write, admitted.
-          curl -fsS -X POST http://127.0.0.1:18443/api/write | tee /tmp/write
-          grep -q "wrote 1" /tmp/write
-
           # One denial, answered with the id of the record the chain holds.
-          code="$(curl -s -o /tmp/deny -w '%{http_code}' http://127.0.0.1:18443/api/deny)"
+          # This safe request also mints the CSRF cookie the next one echoes
+          # (spec 020 B-4); the probes sit outside that layer and mint none.
+          code="$(curl -s -c /tmp/jar -o /tmp/deny -w '%{http_code}' http://127.0.0.1:18443/api/deny)"
           [ "$code" = "403" ] || { echo "the denial answered ${code}"; cat /tmp/deny; exit 1; }
           grep -q '"decision":"kernel:' /tmp/deny
+
+          # One governed write, admitted, with the double-submit pair a page
+          # sends: the cookie back, and its value in X-CSRF-Token.
+          token="$(awk '$6 == "csrf" { print $7 }' /tmp/jar)"
+          [ -n "$token" ] || { echo "no CSRF cookie was minted" >&2; cat /tmp/jar; exit 1; }
+          write="$(curl -s -o /tmp/write -w '%{http_code}' -b /tmp/jar \
+            -H "x-csrf-token: ${token}" -X POST http://127.0.0.1:18443/api/write)"
+          [ "$write" = "200" ] || { echo "the write answered ${write}"; cat /tmp/write; exit 1; }
+          grep -q "wrote 1" /tmp/write
 
           kill -TERM "$serve"
           wait "$serve" || { echo "serve did not stop cleanly" >&2; exit 1; }

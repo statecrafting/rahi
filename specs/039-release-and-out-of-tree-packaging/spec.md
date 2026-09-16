@@ -321,6 +321,36 @@ RH-05 and RH-06 of the revision-3 register), and approved the spec on
   refuses a tree where they disagree, and refuses a tag that does not name
   the version the crates carry.
 
+- **D-9 (2026-09-16, build session; what this build could not run).** AC-1
+  passed here: `make ci`, `cargo package --workspace --locked`, and
+  `scripts/k8s-validate.sh` all exit 0, and FR-001 through FR-004 and FR-006
+  have tests that run in CI. Three criteria need a release that does not
+  exist yet and are recorded rather than run, the way spec 032 D-1 records
+  its rollout check: AC-2 (a `v*` tag publishes both images and they pull
+  anonymously), AC-3 (spec 034's AC-2 procedure against the published
+  hello-cell image), and AC-4 (the nine crates resolve from crates.io and
+  `release.yml` proves the registry stanza). FR-005 is the same: the consumer
+  job runs on the tag. What this build could prove locally, it did: the
+  runtime image builds and carries rauthy, the entrypoint, the non-root user,
+  an empty `/usr/local/share/rahi/static`, and no cell; hello-cell's image
+  builds with `RAHI_STATIC_SRC` and `docker/smoke.sh` with `SMOKE_PAGE=1`
+  answers `200` for its page. Until a human tags and publishes, no document
+  in this repository calls a crate published (D-1).
+
+- **D-10 (2026-09-16, build session; what the consumer job had to learn).**
+  Run against a local build of the fixture before it was written into the
+  workflow, the cell answered `403` to its granted write. The refusal was
+  spec 020 B-4's double-submit check, not the kernel: an unsafe method needs
+  the CSRF cookie echoed in `X-CSRF-Token`, and `/readyz` mints no cookie
+  because the probes are mounted outside that layer (020 B-2). The job now
+  does what a page does: a safe request on a guarded route first, which is
+  also the denial assertion, then the write with the cookie and the header.
+  A consumer reading `docs/design/01-consumer-contract.md` meets the same
+  rule. Proven locally against path dependencies (the code of the fixture)
+  before the tag proves the git stanza: `/readyz` ready, `403` with
+  `kernel:<nonce>:1:000000000000`, `200` and `wrote 1`, a clean stop, and
+  `ledger verify` with two resident records.
+
 ## Verification
 
 ```verify:cli

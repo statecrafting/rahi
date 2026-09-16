@@ -190,10 +190,9 @@ jobs:
           done
           # shellcheck disable=SC2086
           docker buildx imagetools create \
-            -t "${IMAGE}:${tag}" \
             -t "${IMAGE}:${tag#v}" \
             $refs
-          docker buildx imagetools inspect "${IMAGE}:${tag}"
+          docker buildx imagetools inspect "${IMAGE}:${tag#v}"
 
           runtime_refs=""
           for d in /tmp/runtime-digests/*; do
@@ -201,7 +200,6 @@ jobs:
           done
           # shellcheck disable=SC2086
           docker buildx imagetools create \
-            -t "${RUNTIME_IMAGE}:${tag}" \
             -t "${RUNTIME_IMAGE}:${tag#v}" \
             $runtime_refs
-          docker buildx imagetools inspect "${RUNTIME_IMAGE}:${tag}"
+          docker buildx imagetools inspect "${RUNTIME_IMAGE}:${tag#v}"

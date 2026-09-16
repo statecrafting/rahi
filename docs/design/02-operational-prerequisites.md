@@ -667,6 +667,8 @@ futures = "0.3"
 # The probe cell's ceiling: `items` may be read and nothing else. Every
 # write the probe routes attempt is therefore a ledgered denial.
 
+schema_version = "1.0.0"
+
 [app]
 name = "probe-cell"
 org = "lab"

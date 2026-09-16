@@ -92,9 +92,10 @@ check_render() {
         fail "the render names $image; a deployment pins a version, never latest" ;;
     esac
     case "$image" in
-      */rahi | */rahi:* | */rahi-runtime | */rahi-runtime:*)
+      */rahi | */rahi:* | */rahi@* | */rahi-runtime | */rahi-runtime:* | */rahi-runtime@*)
         case "$image" in
           ghcr.io/statecrafting/rahi:*.*.* | ghcr.io/statecrafting/rahi-runtime:*.*.*) ;;
+          ghcr.io/statecrafting/rahi:*.*.*@sha256:* | ghcr.io/statecrafting/rahi-runtime:*.*.*@sha256:*) ;;
           *) fail "the render names $image; the cell's image is ghcr.io/statecrafting/rahi at a version" ;;
         esac ;;
       *:*) ;;
