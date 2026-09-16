@@ -271,6 +271,56 @@ RH-05 and RH-06 of the revision-3 register), and approved the spec on
   - The first release is `v0.1.0`: the version every crate already declares,
     and the one aicortex pins (`rahi-* = "=0.1.0"`, its 010 D-1).
 
+- **D-4 (2026-09-16, build session; the member D-2 asked this build to
+  name).** The manifest schema version is `Manifest::schema_version`, the TOML
+  key `schema_version` at the document root, above the first table. It is
+  `Option<String>` in the type so that a manifest naming none is refused by a
+  message about the schema rather than by serde's about a missing field;
+  `validate` refuses a missing value, a value that is not
+  `MAJOR.MINOR.PATCH`, and a major other than
+  `rahi_types::MANIFEST_SCHEMA_VERSION`'s, and reads a later minor of the
+  same major. The consequence D-2 noticed holds: the member is inside
+  `Manifest::hash` (015 D-1), so every manifest's hash moved, and a volume
+  whose chain was rooted before this change refuses to boot with
+  `Error::Integrity` until spec 036 lands or the volume is recreated. Nothing
+  is deployed from this repository and no image is published, so the volumes
+  that exist are development ones: `docker/.data` under the compose file and
+  whatever a contributor kept. Delete them. Rejected: leaving the member out
+  of the hash, which would let a cell change the schema it claims without the
+  chain noticing, and the chain's whole purpose is to notice.
+- **D-5 (2026-09-16, build session; reads B-4's "one runtime").** Docker has
+  no include, so `docker/runtime.Dockerfile` repeats `docker/Dockerfile`'s
+  runtime stage rather than either file building on the other, and
+  `image.yml` refuses a build whose two `ARG RAUTHY_IMAGE` lines differ. That
+  is what keeps them one runtime. Rejected: `docker/Dockerfile` building
+  `FROM ghcr.io/statecrafting/rahi-runtime`, which cannot build before that
+  image is published and would make a local `docker build` reach the
+  registry, against spec 031's acceptance.
+- **D-6 (2026-09-16, build session; reads B-5).** `RAHI_STATIC_DIR` wins over
+  the cell's `static_dir()`, and a directory either of them names that does
+  not exist is `Error::Config` at boot: `serve` checks it before the store is
+  opened, so the failure costs nothing and names the path. An image always
+  carries the directory (the recipe creates it), so a cell built without
+  `RAHI_STATIC_SRC` serves `404` for its page rather than refusing to start;
+  that is the empty cell's ordinary case and hello-cell's warning.
+- **D-7 (2026-09-16, build session; reads B-7).** The consumer cell is three
+  files in `.github/consumer-cell/`, not a heredoc inside the workflow: a
+  heredoc in a YAML block scalar cannot close at column zero, and a fixture
+  in the tree is reviewable, hashed, and diffable. `release.yml` copies it
+  and substitutes `__REPO__`, `__KEY__` (`rev` or `tag`), and `__REV__`. The
+  job runs on a tag and on `workflow_dispatch`, so the stanza can be proven
+  against a commit before anyone tags it; FR-005 is the run on the tag
+  itself.
+- **D-8 (2026-09-16, build session; what a release still needs from a
+  human).** This build publishes nothing and cannot: `cargo publish` and the
+  tag push are the human's steps at the release checkpoint (D-1), in
+  dependency order `rahi-types`, `rahi-store`, `rahi-ledger`, `rahi-kernel`,
+  `rahi-idp`, `rahi-edge`, `rahi-ops`, `rahi-cli`, `rahi-harness`. A version
+  bump edits two places, `[workspace.package] version` and the `version` of
+  each `rahi-*` entry in `[workspace.dependencies]`, so `release.yml`
+  refuses a tree where they disagree, and refuses a tag that does not name
+  the version the crates carry.
+
 ## Verification
 
 ```verify:cli

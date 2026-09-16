@@ -659,7 +659,9 @@ mod tests {
         assert_eq!(&fallback, cell_page(), "with nothing set, the cell's own");
 
         assert!(
-            static_dir::<EmptyCell>(&env(&[])).expect("no error").is_none(),
+            static_dir::<EmptyCell>(&env(&[]))
+                .expect("no error")
+                .is_none(),
             "a cell with no page and no environment names no directory"
         );
     }
@@ -668,14 +670,18 @@ mod tests {
     fn a_static_directory_that_does_not_exist_is_a_startup_error_naming_it() {
         let missing = std::env::temp_dir().join("rahi-no-such-page-dir");
         let _ = std::fs::remove_dir_all(&missing);
-        let err = static_dir::<EmptyCell>(&env(&[(
-            ENV_STATIC_DIR,
-            &missing.display().to_string(),
-        )]))
-        .expect_err("a named directory that is absent is refused");
+        let err =
+            static_dir::<EmptyCell>(&env(&[(ENV_STATIC_DIR, &missing.display().to_string())]))
+                .expect_err("a named directory that is absent is refused");
         assert_eq!(err.exit_code(), rahi_types::error::EXIT_INFRA);
         assert!(err.message().contains(ENV_STATIC_DIR), "{err}");
-        assert!(err.message().contains(&missing.display().to_string()), "{err}");
-        assert!(err.message().contains("404"), "it says what the slot would do: {err}");
+        assert!(
+            err.message().contains(&missing.display().to_string()),
+            "{err}"
+        );
+        assert!(
+            err.message().contains("404"),
+            "it says what the slot would do: {err}"
+        );
     }
 }

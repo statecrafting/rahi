@@ -238,7 +238,10 @@ fn a_manifest_that_names_no_schema_version_is_refused() {
     let err = Manifest::parse(NO_SCHEMA).expect_err("a manifest names its schema");
     assert_eq!(err.kind(), "validation");
     assert!(err.message().contains("names no schema_version"), "{err}");
-    assert!(err.message().contains("1.0.0"), "it names the one this build speaks: {err}");
+    assert!(
+        err.message().contains("1.0.0"),
+        "it names the one this build speaks: {err}"
+    );
 }
 
 #[test]
@@ -252,7 +255,10 @@ fn a_manifest_of_another_major_is_refused_and_a_later_minor_is_read() {
     assert_eq!(later.schema_version.as_deref(), Some("1.7.0"));
     assert_eq!(
         later.hash().expect("hashes"),
-        Manifest::parse(LATER_MINOR).expect("parses").hash().expect("hashes")
+        Manifest::parse(LATER_MINOR)
+            .expect("parses")
+            .hash()
+            .expect("hashes")
     );
 }
 
@@ -261,6 +267,9 @@ fn the_schema_version_is_part_of_what_the_chain_is_rooted_at() {
     // Spec 015 D-1 hashes the parsed model, so the version a manifest names
     // moves its hash: spec 039 D-4 is the consequence for an existing volume.
     let valid = valid().hash().expect("hashes");
-    let later = Manifest::parse(LATER_MINOR).expect("parses").hash().expect("hashes");
+    let later = Manifest::parse(LATER_MINOR)
+        .expect("parses")
+        .hash()
+        .expect("hashes");
     assert_ne!(valid, later, "the named schema version is inside the hash");
 }

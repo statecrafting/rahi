@@ -35,7 +35,7 @@ the whole repository:
 | | State |
 |---|---|
 | Implemented | the twenty-one `complete` specs. Complete means the code landed and the spec's verification block passed; two operator procedures inside complete specs were recorded and never run: the N=3 rollout check (032 D-1) and the compose walkthrough (034 D-1). |
-| Released or installable | nothing: no tag, release, crate, or image. A consumer pins a git commit (draft 039). |
+| Released or installable | nothing yet: no tag, release, crate, or image. Spec 039 built the packaging: every crate packages, a tag publishes the images, and `release.yml` proves the consumer stanza. Tagging and `cargo publish` are the maintainer's steps. Until then a consumer pins a git commit. |
 | Exercised against the pinned rauthy | by hand, never in CI, which runs without a rauthy. The end-to-end login, write, denial, and restore pass against rauthy 0.36.2. `rahi backup` against a real rauthy fails (030 D-3), and a restore brings back the rows and the chain but no users (draft 037). |
 | Supported topology | N=1. Three replicas have run only as three processes on one host, without rauthy, in spec 035's test, which CI runs: each replica mints its own decision ids and none of thirty concurrent denials is lost. N=3 on Kubernetes has never run. |
 

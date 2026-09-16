@@ -250,7 +250,10 @@ fn serve_with_a_static_directory_that_is_absent_is_exit_3_before_the_store_opens
         run.stderr
     );
     assert!(run.stderr.contains("404"), "{}", run.stderr);
-    assert!(!volume.path().join("hiqlite").exists(), "no node was opened");
+    assert!(
+        !volume.path().join("hiqlite").exists(),
+        "no node was opened"
+    );
 }
 
 #[test]
