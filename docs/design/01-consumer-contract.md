@@ -70,52 +70,54 @@ revising the 2026-09-11 reading that found nothing published:
 | Artifact | State |
 |---|---|
 | source | public at `github.com/statecrafting/rahi`, Apache-2.0, clonable without credentials |
-| crates on crates.io | the nine names are free and reserved for this release; the `v0.1.0` tag publishes them (spec 039 D-11) |
+| crates on crates.io | the nine chassis crates at `0.1.0`, published by the `v0.1.0` tag and proven by `consumer-registry` (spec 039 AC-4) |
 | git tags, GitHub releases | `v0.1.0`, annotated and signed |
-| container image | `ghcr.io/statecrafting/rahi:0.1.0` and `ghcr.io/statecrafting/rahi-runtime:0.1.0`, both architectures, public |
+| container image | `ghcr.io/statecrafting/rahi:0.1.0` and `ghcr.io/statecrafting/rahi-runtime:0.1.0` exist, both architectures, but the GHCR packages are **private**: an anonymous manifest fetch answers `403`, so AC-2 is not met until the owner makes them public (spec 039 D-12) |
 | deploy manifests | name `ghcr.io/statecrafting/rahi` and a version, never `latest` (spec 039 B-3) |
 | rauthy | the image pins `ghcr.io/sebadob/rauthy:0.36.2` by digest; a Cargo consumer gets no rauthy from rahi |
 
-The workspace version is no longer only a declaration: `0.1.0` is a tag and
-a pair of images that name one release. Pin the tag until the tag's
-`publish-crates` job is green; this note is revised to the registry stanza
-when it is, and not before (spec 039 AC-4).
+The workspace version is no longer only a declaration: `0.1.0` is a tag, a
+set of crates on crates.io, and a pair of images that name one release.
+Pin the version. The images are the one part still gated on an owner step,
+so a consumer building a cell from the crates is unblocked and a consumer
+pulling the runtime image is not.
 
 ### 2.2 The dependency stanza
 
-**Verified**: a consumer cell outside this workspace, with its own manifest
-and one migration, built from this stanza, then ran `first-boot`,
+**Verified** on 2026-09-16 by `consumer-registry` in the `v0.1.0` run: a
+consumer cell outside this workspace, with its own manifest and one
+migration, resolved this stanza from crates.io, then ran `first-boot`,
 `migrate`, and `serve`, answered `/readyz`, performed one governed write,
 was denied one ungranted operation with a decision id, and passed
-`ledger verify` with the denial as the chain's last record. The `v0.1.0`
-tag runs that proof twice in `release.yml`: `consumer` against the git
-stanza and `consumer-registry` against the registry stanza below, both
-through `.github/consumer-cell/prove.sh` (spec 039 AC-4, D-11).
+`ledger verify` with the denial as the chain's last record (`2 resident
+record(s)`). The tag runs that proof twice through the same
+`.github/consumer-cell/prove.sh`: `consumer` against the git stanza and
+`consumer-registry` against the registry stanza (spec 039 AC-4, D-11).
 
 ```toml
 [dependencies]
-rahi-cli    = { git = "https://github.com/statecrafting/rahi", tag = "v0.1.0" }
-rahi-edge   = { git = "https://github.com/statecrafting/rahi", tag = "v0.1.0" }
-rahi-idp    = { git = "https://github.com/statecrafting/rahi", tag = "v0.1.0" }
-rahi-kernel = { git = "https://github.com/statecrafting/rahi", tag = "v0.1.0" }
-rahi-store  = { git = "https://github.com/statecrafting/rahi", tag = "v0.1.0" }
-rahi-types  = { git = "https://github.com/statecrafting/rahi", tag = "v0.1.0" }
+rahi-cli    = "=0.1.0"
+rahi-edge   = "=0.1.0"
+rahi-idp    = "=0.1.0"
+rahi-kernel = "=0.1.0"
+rahi-store  = "=0.1.0"
+rahi-types  = "=0.1.0"
 axum = "0.8"
 
 [dev-dependencies]
-rahi-harness = { git = "https://github.com/statecrafting/rahi", tag = "v0.1.0" }
-```
-
-Once the tag's `publish-crates` job is green the registry stanza is the one
-to pin, and `consumer-registry` proves it on the same tag:
-
-```toml
-rahi-cli = "=0.1.0"
+rahi-harness = "=0.1.0"
 ```
 
 The `=` is deliberate. The nine crates move as one version (spec 039 B-1),
 and pre-1.0 a minor bump may change the consumer contract, so a caret range
 would let `cargo update` cross a contract change on its own.
+
+To track an unreleased change, the same stanza over git still works, and is
+what the `consumer` job proves on every tag:
+
+```toml
+rahi-cli = { git = "https://github.com/statecrafting/rahi", tag = "v0.1.0" }
+```
 
 `rahi-cli` is the crate that exports `Cell` and `run`; a consumer that
 lists the other chassis crates and not this one cannot compose a cell.

@@ -380,6 +380,29 @@ RH-05 and RH-06 of the revision-3 register), and approved the spec on
   path, and `.github/publish-crate.sh` holds the idempotent publish,
   matching `attest-ledger`'s factoring.
 
+- **D-12 (2026-09-16, build session; what the first release found).** The
+  `v0.1.0` run published all nine crates and `consumer-registry` proved the
+  registry stanza, so **AC-4 passes**: a cell built outside this workspace
+  from `= "0.1.0"` booted, was denied with a decision id, wrote, and
+  verified a two-record chain. D-9 had recorded AC-4 as unrunnable; it is
+  run now. Two things the release taught. First, crates.io rate-limits the
+  creation of new crate *names* much harder than new versions, so a first
+  release of nine at once meets a `429` that no later release will: six
+  names went through, then `rahi-ops`, `rahi-cli`, and `rahi-harness` each
+  needed their own window, costing three red runs that the idempotent skip
+  made safe to retry but could not avoid. `.github/publish-crate.sh` now
+  reads the moment the body names and waits for it, bounded to four
+  attempts and half an hour, so the job finishes on its own. Second,
+  **AC-2 does not pass**: `image.yml` built and pushed both images on the
+  tag, but the GHCR packages are created private, and an anonymous
+  manifest fetch answers `403` where the same fetch against
+  `ghcr.io/sebadob/rauthy:0.36.2` answers `200`. B-3's "public" is a
+  property of the package, not of the push, and nothing in a workflow can
+  set it: making a package public is an owner action in GitHub's package
+  settings. AC-2 and AC-3 (which pulls the hello-cell image) stay open
+  until the owner takes it, and no document here calls the images public
+  meanwhile.
+
 ## Verification
 
 ```verify:cli
