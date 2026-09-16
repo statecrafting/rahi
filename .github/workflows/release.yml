@@ -1,0 +1,156 @@
+# The release workflow (spec 039 B-2, B-6, B-7).
+#
+# Two jobs. `package` proves every chassis crate can be published, on every
+# pull request, so packaging never breaks quietly between releases.
+# `consumer` proves the stanza a consumer actually writes: the cell in
+# `.github/consumer-cell/`, built outside this workspace against a git ref of
+# this repository, boots, writes through the kernel, is denied, and verifies
+# its chain.
+#
+# Nothing here publishes. A release is a human's step at the release
+# checkpoint (039 D-1): they tag, this workflow proves the tag, `image.yml`
+# publishes the images, and the human runs `cargo publish` for the nine
+# chassis crates in dependency order.
+
+name: release
+
+on:
+  pull_request:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      rev:
+        description: "The commit or tag the consumer cell pins (defaults to this ref)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: cargo package (the nine chassis crates)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Spec 039 B-6 and FR-001: every chassis crate packages. `rahi-ops`
+      # used to fail here, because it included a template from outside its
+      # own directory, and that blocked `rahi-cli` with it.
+      - name: Package the workspace
+        run: cargo package --workspace --locked
+
+      - name: Every chassis crate is packaged at the workspace version
+        run: |
+          set -euo pipefail
+          version="$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)"
+          echo "workspace version ${version}"
+          for crate in rahi-types rahi-store rahi-ledger rahi-kernel rahi-idp \
+                       rahi-edge rahi-ops rahi-cli rahi-harness; do
+            test -f "target/package/${crate}-${version}.crate" \
+              || { echo "no package for ${crate} ${version}" >&2; exit 1; }
+          done
+          echo "nine chassis crates packaged at ${version}"
+
+      # Spec 039 B-1: the path dependencies carry the same version, because
+      # that is the version a published crate asks for.
+      - name: The workspace dependencies name the workspace version
+        run: |
+          set -euo pipefail
+          version="$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)"
+          bad="$(grep -E '^rahi-[a-z]+ = \{ path = ' Cargo.toml | grep -v "version = \"${version}\"" || true)"
+          if [ -n "$bad" ]; then
+            echo "these dependencies do not name ${version}:" >&2
+            echo "$bad" >&2
+            exit 1
+          fi
+
+      # Spec 039 B-2: a tag names the version the crates carry.
+      - name: The tag names the workspace version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          version="$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)"
+          tag="${GITHUB_REF_NAME#v}"
+          [ "$tag" = "$version" ] \
+            || { echo "tag ${GITHUB_REF_NAME} does not name version ${version}" >&2; exit 1; }
+
+  consumer:
+    name: the consumer stanza
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Spec 039 B-7: the stanza available before publication is a git
+      # dependency on a tag. Once a release is published the same job proves
+      # the registry stanza (D-1), which is the one aicortex pins.
+      - name: Assemble the cell outside the workspace
+        env:
+          # Through the environment, never interpolated into the script: a
+          # dispatch input is a string somebody types.
+          REV: ${{ inputs.rev }}
+        run: |
+          set -euo pipefail
+          rev="${REV:-}"
+          if [ -z "$rev" ]; then
+            if [ "${GITHUB_REF_TYPE}" = "tag" ]; then rev="${GITHUB_REF_NAME}"; else rev="${GITHUB_SHA}"; fi
+          fi
+          key=rev
+          case "$rev" in v[0-9]*) key=tag ;; esac
+          echo "the consumer pins ${key} = ${rev}"
+          mkdir -p /tmp/consumer
+          cp -a .github/consumer-cell/. /tmp/consumer/
+          sed -e "s|__REPO__|https://github.com/${GITHUB_REPOSITORY}|g" \
+              -e "s|__KEY__|${key}|g" \
+              -e "s|__REV__|${rev}|g" \
+              /tmp/consumer/Cargo.toml.in > /tmp/consumer/Cargo.toml
+          rm /tmp/consumer/Cargo.toml.in
+          cat /tmp/consumer/Cargo.toml
+
+      - name: Build, boot, and govern it
+        working-directory: /tmp/consumer
+        run: |
+          set -euo pipefail
+          cargo build --release
+          bin=target/release/consumer-cell
+          export RAHI_PUBLIC_URL=http://127.0.0.1:18443
+          export RAHI_DATA_DIR=/tmp/consumer/data
+          export RAHI_LISTEN_ADDR=127.0.0.1:18443
+          export RAHI_HIQLITE_API_ADDR=127.0.0.1:18301
+          export RAHI_HIQLITE_RAFT_ADDR=127.0.0.1:18401
+          export RAHI_RAUTHY_MODE=none
+          mkdir -p "$RAHI_DATA_DIR"
+          "$bin" first-boot
+          "$bin" migrate
+          "$bin" serve &
+          serve=$!
+          ready=0
+          for _ in $(seq 1 120); do
+            if curl -fsS http://127.0.0.1:18443/readyz > /tmp/readyz 2>/dev/null; then ready=1; break; fi
+            sleep 1
+          done
+          [ "$ready" = "1" ] || { echo "the cell never answered /readyz" >&2; exit 1; }
+          grep -q '"status":"ready"' /tmp/readyz
+
+          # One denial, answered with the id of the record the chain holds.
+          # This safe request also mints the CSRF cookie the next one echoes
+          # (spec 020 B-4); the probes sit outside that layer and mint none.
+          code="$(curl -s -c /tmp/jar -o /tmp/deny -w '%{http_code}' http://127.0.0.1:18443/api/deny)"
+          [ "$code" = "403" ] || { echo "the denial answered ${code}"; cat /tmp/deny; exit 1; }
+          grep -q '"decision":"kernel:' /tmp/deny
+
+          # One governed write, admitted, with the double-submit pair a page
+          # sends: the cookie back, and its value in X-CSRF-Token.
+          token="$(awk '$6 == "csrf" { print $7 }' /tmp/jar)"
+          [ -n "$token" ] || { echo "no CSRF cookie was minted" >&2; cat /tmp/jar; exit 1; }
+          write="$(curl -s -o /tmp/write -w '%{http_code}' -b /tmp/jar \
+            -H "x-csrf-token: ${token}" -X POST http://127.0.0.1:18443/api/write)"
+          [ "$write" = "200" ] || { echo "the write answered ${write}"; cat /tmp/write; exit 1; }
+          grep -q "wrote 1" /tmp/write
+
+          kill -TERM "$serve"
+          wait "$serve" || { echo "serve did not stop cleanly" >&2; exit 1; }
+          "$bin" ledger verify
+          echo "the consumer stanza builds, boots, writes, is denied, and verifies"

@@ -3,9 +3,8 @@
     "kind": "rust-lib",
     "name": "rahi-ops",
     "path": "crates/rahi-ops",
-    "specRef": "030-operational-verbs",
-    "version": "0.1.0"
+    "specRef": "030-operational-verbs"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "98213aa7924dac766f47600c58de5eac256887be60ea9bb9dbeefb3da1689725"
+  "shardHash": "b7f8c1181e3e2a14028bb6e22680dc0e0447ec08dd7bc71e48a5ea9a22a6f18c"
 }

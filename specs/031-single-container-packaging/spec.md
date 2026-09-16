@@ -20,7 +20,6 @@ establishes:
   - "crates/rahi-ops/tests/supervise.rs"
   - "docker/Dockerfile"
   - "docker/entrypoint.sh"
-  - "docker/rauthy.env.template"
   - "docker/smoke.sh"
   - ".github/workflows/image.yml"
 extends:
@@ -67,7 +66,7 @@ image job runs after the cargo gate).
   entrypoint before `supervise`): if `/data/keys` is empty, generate the
   ledger Ed25519 key, the session HMAC key, the backup age key, rauthy's
   `ENC_KEYS` and `ENC_KEY_ACTIVE`, and a rauthy admin token; write
-  `/data/rauthy/rauthy.env` from `docker/rauthy.env.template` with the
+  `/data/rauthy/rauthy.env` from `crates/rahi-ops/rauthy.env.template` with the
   public URL derivations (`PUB_URL`, `RP_ID`, `RP_ORIGIN`, `PROXY_MODE` or
   `COOKIE_MODE`, hiqlite ports `8100`/`8200`, loopback bind); print the
   admin credentials exactly once to stdout. If keys exist, verify their
@@ -153,7 +152,7 @@ for development (033).
   `first-boot` therefore writes an empty `config.toml` beside the rendered
   `rauthy.env`, and `supervise` runs `rauthy serve -c <that file>` with the
   rendered pairs as the child's whole environment (plus `PATH`, `HOME`,
-  `TZ`). The template is `docker/rauthy.env.template`, compiled into the
+  `TZ`). The template is `crates/rahi-ops/rauthy.env.template`, compiled into the
   binary with `include_str!` so the file in the tree and the file first
   boot writes cannot drift; placeholders are `${NAME}` and an unrendered one
   is a build defect. Three of rauthy's rules shape the values: `PUB_URL`
@@ -240,6 +239,16 @@ for development (033).
   SIGTERM), on this machine's architecture. FR-004, both architectures in
   CI, is asserted by `image.yml` on the first push to `main` that carries
   this spec; it is not something a build session can run before its merge.
+- **D-9 (2026-09-16, corpus amendment in spec 039's build; owner
+  decision).** The rauthy environment template moved from
+  `docker/rauthy.env.template` to `crates/rahi-ops/rauthy.env.template` and
+  left this spec's `establishes` list, which spec 039 B-6 needed and the
+  owner approved (039 D-3). `include_str!` reached outside the `rahi-ops`
+  package, so `cargo package` failed on it and neither `rahi-ops` nor
+  `rahi-cli` could be published. Nothing about B-2's rendering changed: the
+  same template, the same placeholders, the same destination
+  `/data/rauthy/rauthy.env`, compiled into the binary as before, and
+  `spec-spine.toml` hashes it at its new path. Spec 039 claims the file.
 
 ## Verification
 

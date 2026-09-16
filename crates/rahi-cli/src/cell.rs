@@ -62,6 +62,8 @@ impl EmptyCell {
     /// The smallest manifest `Manifest::parse` accepts.
     pub const MANIFEST: &'static str = r#"# The empty cell: the chassis, no app (spec 030).
 
+schema_version = "1.0.0"
+
 [app]
 name = "rahi"
 org = "statecrafting"

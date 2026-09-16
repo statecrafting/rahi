@@ -39,7 +39,7 @@ extends:
   - { spec: "031-single-container-packaging", unit: "crates/rahi-ops/src/rauthy_env.rs", nature: additive }
   - { spec: "031-single-container-packaging", unit: "crates/rahi-ops/src/supervise.rs", nature: additive }
   - { spec: "031-single-container-packaging", unit: "crates/rahi-ops/tests/first_boot.rs", nature: additive }
-  - { spec: "031-single-container-packaging", unit: "docker/rauthy.env.template", nature: additive }
+  - { spec: "039-release-and-out-of-tree-packaging", unit: "crates/rahi-ops/rauthy.env.template", nature: additive }
   - { spec: "001-agentic-harness", unit: "Makefile", nature: additive }
   - { spec: "001-agentic-harness", unit: ".github/workflows/govern.yml", nature: additive }
 summary: >

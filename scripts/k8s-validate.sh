@@ -80,6 +80,29 @@ check_render() {
     fail "a ReadWriteMany volume is in the render; Raft members never share a volume"
   fi
 
+  # Spec 039 B-3 and FR-002: no render names `latest`, which is never
+  # published (039 D-3), and the cell's own image comes from the repository
+  # a tag of this project publishes, with a version. Images of other tools
+  # (the CronJob's kubectl) are pinned but not ours to name.
+  grep -E '^ *image: ' "$out" | sed 's/^ *image: //' > "$tmp/images"
+  while read -r image; do
+    [ -n "$image" ] || continue
+    case "$image" in
+      *:latest | *:latest@*)
+        fail "the render names $image; a deployment pins a version, never latest" ;;
+    esac
+    case "$image" in
+      */rahi | */rahi:* | */rahi@* | */rahi-runtime | */rahi-runtime:* | */rahi-runtime@*)
+        case "$image" in
+          ghcr.io/statecrafting/rahi:*.*.* | ghcr.io/statecrafting/rahi-runtime:*.*.*) ;;
+          ghcr.io/statecrafting/rahi:*.*.*@sha256:* | ghcr.io/statecrafting/rahi-runtime:*.*.*@sha256:*) ;;
+          *) fail "the render names $image; the cell's image is ghcr.io/statecrafting/rahi at a version" ;;
+        esac ;;
+      *:*) ;;
+      *) fail "the render names $image with no version" ;;
+    esac
+  done < "$tmp/images"
+
   # One container per pod, in every pod spec (B-1).
   for n in $(containers_per_pod "$out"); do
     [ "$n" -eq 1 ] || fail "a pod spec declares $n containers; the supervisor is the one container"

@@ -31,7 +31,7 @@ spec:
         fsGroupChangePolicy: OnRootMismatch
       containers:
         - name: rahi
-          image: ghcr.io/bartekus/rahi
+          image: ghcr.io/statecrafting/rahi
           # The image's entrypoint (spec 031 B-3) runs first-boot, migrate,
           # then supervise. At N=1 a container start is the deployment and
           # the entrypoint is right as it is; deploy/n3 wraps the migrate

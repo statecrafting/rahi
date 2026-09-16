@@ -28,6 +28,8 @@ use tokio::task::JoinHandle;
 
 /// The fixture manifest every ledger here is rooted at.
 pub const MANIFEST: &str = r#"
+schema_version = "1.0.0"
+
 [app]
 name = "ops-fixture"
 org = "statecrafting"

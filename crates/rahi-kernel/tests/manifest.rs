@@ -14,6 +14,9 @@ const UNKNOWN_KIND: &str = include_str!("../testdata/manifests/unknown-kind.toml
 const UNDECLARED: &str = include_str!("../testdata/manifests/undeclared-capability.toml");
 const UPPERCASE_SECRET: &str = include_str!("../testdata/manifests/uppercase-secret.toml");
 const UNKNOWN_KEY: &str = include_str!("../testdata/manifests/unknown-key.toml");
+const NO_SCHEMA: &str = include_str!("../testdata/manifests/no-schema-version.toml");
+const FUTURE_SCHEMA: &str = include_str!("../testdata/manifests/future-schema.toml");
+const LATER_MINOR: &str = include_str!("../testdata/manifests/later-minor-schema.toml");
 
 fn valid() -> Manifest {
     Manifest::parse(VALID).expect("the fixture manifest parses")
@@ -228,4 +231,45 @@ fn a_crate_with_no_src_is_not_silently_clean() {
     let dir = tempfile::tempdir().expect("a temp dir");
     let err = verify_crate(&valid(), dir.path()).expect_err("there is nothing to walk");
     assert_eq!(err.kind(), "io");
+}
+
+#[test]
+fn a_manifest_that_names_no_schema_version_is_refused() {
+    let err = Manifest::parse(NO_SCHEMA).expect_err("a manifest names its schema");
+    assert_eq!(err.kind(), "validation");
+    assert!(err.message().contains("names no schema_version"), "{err}");
+    assert!(
+        err.message().contains("1.0.0"),
+        "it names the one this build speaks: {err}"
+    );
+}
+
+#[test]
+fn a_manifest_of_another_major_is_refused_and_a_later_minor_is_read() {
+    let err = Manifest::parse(FUTURE_SCHEMA).expect_err("another major is another schema");
+    assert_eq!(err.kind(), "validation");
+    assert!(err.message().contains("\"2.0.0\""), "{err}");
+    assert!(err.message().contains("different major"), "{err}");
+
+    let later = Manifest::parse(LATER_MINOR).expect("a later minor of this major reads");
+    assert_eq!(later.schema_version.as_deref(), Some("1.7.0"));
+    assert_eq!(
+        later.hash().expect("hashes"),
+        Manifest::parse(LATER_MINOR)
+            .expect("parses")
+            .hash()
+            .expect("hashes")
+    );
+}
+
+#[test]
+fn the_schema_version_is_part_of_what_the_chain_is_rooted_at() {
+    // Spec 015 D-1 hashes the parsed model, so the version a manifest names
+    // moves its hash: spec 039 D-4 is the consequence for an existing volume.
+    let valid = valid().hash().expect("hashes");
+    let later = Manifest::parse(LATER_MINOR)
+        .expect("parses")
+        .hash()
+        .expect("hashes");
+    assert_ne!(valid, later, "the named schema version is inside the hash");
 }

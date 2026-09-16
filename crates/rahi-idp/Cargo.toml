@@ -1,6 +1,6 @@
 [package]
 name = "rahi-idp"
-version = "0.1.0"
+version.workspace = true
 description = "rauthy behind a same-origin proxy: the raw /auth/* route, discovery, JWKS with rotation, and client bootstrap"
 edition.workspace = true
 rust-version.workspace = true

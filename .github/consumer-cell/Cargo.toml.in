@@ -1,0 +1,20 @@
+# The consumer stanza, as a consumer writes it (spec 039 B-7). The release
+# workflow substitutes __REPO__, __KEY__ (rev or tag), and __REV__, then
+# builds this outside the chassis workspace.
+
+[package]
+name = "consumer-cell"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Standalone: this package is not a member of the chassis workspace.
+[workspace]
+
+[dependencies]
+rahi-cli = { git = "__REPO__", __KEY__ = "__REV__" }
+rahi-edge = { git = "__REPO__", __KEY__ = "__REV__" }
+rahi-kernel = { git = "__REPO__", __KEY__ = "__REV__" }
+rahi-store = { git = "__REPO__", __KEY__ = "__REV__" }
+rahi-types = { git = "__REPO__", __KEY__ = "__REV__" }
+axum = "0.8"

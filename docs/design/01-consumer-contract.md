@@ -167,6 +167,8 @@ fn main() { rahi_cli::run(MyCell); }
 
 ```toml
 # manifest.toml
+schema_version = "1.0.0"
+
 [app]
 name = "my-cell"
 org = "example"

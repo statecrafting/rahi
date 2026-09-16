@@ -3,9 +3,8 @@
     "kind": "rust-bin",
     "name": "hello-cell",
     "path": "apps/hello-cell",
-    "specRef": "034-hello-cell",
-    "version": "0.1.0"
+    "specRef": "034-hello-cell"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "c6149a1036c02aa39f26366f4ed30097ce25193a08b50c5bc8c6c603de2103a3"
+  "shardHash": "21a21437b0efee242e2db5400f39d500ce02754fda205a1c85f56e1a7a358f94"
 }

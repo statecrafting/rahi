@@ -33,6 +33,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-ops/rauthy.env.template",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-ops/src/first_boot.rs",
         "source": "spec-edge"
       },
@@ -110,10 +114,6 @@
       },
       {
         "path": "deploy/n3/",
-        "source": "spec-edge"
-      },
-      {
-        "path": "docker/rauthy.env.template",
         "source": "spec-edge"
       },
       {
@@ -385,6 +385,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-ops/rauthy.env.template"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/rauthy.env.template"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-ops/src/first_boot.rs"
           }
         ],
@@ -485,24 +498,11 @@
           "kind": "file",
           "path": "crates/rahi-store/src/store.rs"
         }
-      },
-      {
-        "locations": [
-          {
-            "file": "docker/rauthy.env.template"
-          }
-        ],
-        "ownership": true,
-        "sourceField": "extends",
-        "unit": {
-          "kind": "file",
-          "path": "docker/rauthy.env.template"
-        }
       }
     ],
     "specId": "032-cluster-topology",
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "f8b96fc12c338706f0a141da076de204cb9875f581d34d6e0202f2694898a5fc"
+  "shardHash": "c7f04bfcd10469bcaad66b532c4aaf52d6ba53089d718756b982a578ba991157"
 }

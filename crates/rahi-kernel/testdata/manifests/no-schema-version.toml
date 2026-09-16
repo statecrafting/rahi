@@ -1,6 +1,7 @@
-# valid.toml with one grant removed (spec 015 FR-002): the hash must move.
+# The fixture ceiling with no schema_version of its own (spec 039 FR-006).
+# The [ledger] section still names the chain's schema; what is missing is
+# the document's own version, which B-8 requires.
 
-schema_version = "1.0.0"
 
 [app]
 name = "hello-cell"
@@ -90,6 +91,7 @@ resource = "*.example.com"
 [services.notes]
 capabilities = [
   "notes-read",
+  "notes-write",
   "notes-txn",
   "schema",
   "cache-get",

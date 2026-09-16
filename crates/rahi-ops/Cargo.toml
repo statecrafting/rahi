@@ -1,6 +1,6 @@
 [package]
 name = "rahi-ops"
-version = "0.1.0"
+version.workspace = true
 description = "The operational verbs of the rahi chassis: preflight, migrate, backup, restore, and ledger verify"
 edition.workspace = true
 rust-version.workspace = true

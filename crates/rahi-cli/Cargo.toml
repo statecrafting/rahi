@@ -1,6 +1,6 @@
 [package]
 name = "rahi-cli"
-version = "0.1.0"
+version.workspace = true
 description = "The binary composer of the rahi chassis: a Cell becomes serve plus every operational verb"
 edition.workspace = true
 rust-version.workspace = true

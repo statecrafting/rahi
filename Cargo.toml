@@ -6,6 +6,9 @@ members = ["crates/*", "apps/*"]
 resolver = "3"
 
 [workspace.package]
+# One version for every chassis crate, inherited (spec 039 B-1). A tag, the
+# crates it publishes, and the images it builds all name this number.
+version = "0.1.0"
 edition = "2024"
 rust-version = "1.96"
 license = "Apache-2.0"

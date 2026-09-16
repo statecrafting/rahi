@@ -1,6 +1,6 @@
 [package]
 name = "rahi-edge"
-version = "0.1.0"
+version.workspace = true
 description = "The edge of the rahi chassis: one axum router, a fixed middleware order, probes, a static slot, and one error mapping"
 edition.workspace = true
 rust-version.workspace = true

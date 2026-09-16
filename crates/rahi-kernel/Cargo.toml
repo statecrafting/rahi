@@ -1,6 +1,6 @@
 [package]
 name = "rahi-kernel"
-version = "0.1.0"
+version.workspace = true
 description = "The governance seam of the rahi chassis: a declared capability manifest, verified at build, enforced at runtime, with every denial ledgered"
 edition.workspace = true
 rust-version.workspace = true

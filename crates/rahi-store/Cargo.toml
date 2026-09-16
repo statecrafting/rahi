@@ -1,6 +1,6 @@
 [package]
 name = "rahi-store"
-version = "0.1.0"
+version.workspace = true
 description = "The application store of the rahi chassis: hiqlite in-process with txn, two read calls, migrations, and backup"
 edition.workspace = true
 rust-version.workspace = true

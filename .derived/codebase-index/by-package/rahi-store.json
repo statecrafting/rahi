@@ -3,9 +3,8 @@
     "kind": "rust-lib",
     "name": "rahi-store",
     "path": "crates/rahi-store",
-    "specRef": "011-store-hiqlite",
-    "version": "0.1.0"
+    "specRef": "011-store-hiqlite"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "c55b176b1a5fbddb24730f00a6a0dd943a7edc852d745c0861beb9dfd62b241e"
+  "shardHash": "a0e90165e5c58f27a71b8a935a9a2312b303ead954c826f63d6b45bc988cc07e"
 }

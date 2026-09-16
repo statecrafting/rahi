@@ -1,12 +1,12 @@
 ---
 id: "039-release-and-out-of-tree-packaging"
 title: "Releases and out-of-tree packaging: a tagged version a consumer pins, images that exist under the names the manifests use, and a runtime image a cell in another repository builds on"
-status: draft
+status: approved
 kind: tooling
 domain: ops
 created: "2026-09-11"
 authors: ["Bartek Kus"]
-implementation: pending
+implementation: complete
 risk: medium
 wave: 3
 depends_on:
@@ -20,6 +20,8 @@ establishes:
   - "docker/runtime.Dockerfile"
   - ".github/workflows/release.yml"
   - "crates/rahi-ops/rauthy.env.template"
+  - "CHANGELOG.md"
+  - ".github/consumer-cell/"
 extends:
   - { spec: "010-workspace-and-core-types", unit: { kind: section, file: "Cargo.toml", anchor: "workspace.package" }, nature: additive }
   - { spec: "031-single-container-packaging", unit: ".github/workflows/image.yml", nature: additive }
@@ -36,6 +38,30 @@ extends:
   - { spec: "015-kernel-manifest-and-adjudication", unit: "crates/rahi-kernel/tests/manifest.rs", nature: additive }
   - { spec: "015-kernel-manifest-and-adjudication", unit: "crates/rahi-kernel/testdata/manifests/", nature: additive }
   - { spec: "034-hello-cell", unit: "apps/hello-cell/manifest.toml", nature: additive }
+  # The manifest of every crate inherits the workspace version (B-1).
+  - { spec: "010-workspace-and-core-types", unit: "crates/rahi-types/Cargo.toml", nature: additive }
+  - { spec: "011-store-hiqlite", unit: "crates/rahi-store/Cargo.toml", nature: additive }
+  - { spec: "013-ledger-decision-chain", unit: "crates/rahi-ledger/Cargo.toml", nature: additive }
+  - { spec: "015-kernel-manifest-and-adjudication", unit: "crates/rahi-kernel/Cargo.toml", nature: additive }
+  - { spec: "020-edge-server", unit: "crates/rahi-edge/Cargo.toml", nature: additive }
+  - { spec: "021-idp-proxy-and-discovery", unit: "crates/rahi-idp/Cargo.toml", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-ops/Cargo.toml", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-cli/Cargo.toml", nature: additive }
+  - { spec: "033-dev-substrate-and-harness", unit: "crates/rahi-harness/Cargo.toml", nature: additive }
+  - { spec: "034-hello-cell", unit: "apps/hello-cell/Cargo.toml", nature: additive }
+  # Every manifest names the schema it was written for (B-8).
+  - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/cell.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-ops/tests/common/mod.rs", nature: additive }
+  - { spec: "020-edge-server", unit: "crates/rahi-edge/testdata/manifest.toml", nature: additive }
+  - { spec: "022-session-and-principal", unit: "crates/rahi-idp/testdata/oidc/", nature: additive }
+  - { spec: "035-denials-survive-shutdown", unit: "crates/rahi-cli/tests/shutdown.rs", nature: additive }
+  # The static directory, the page in the image, and the render's images.
+  - { spec: "030-operational-verbs", unit: "crates/rahi-cli/tests/cli.rs", nature: additive }
+  - { spec: "031-single-container-packaging", unit: "docker/smoke.sh", nature: additive }
+  - { spec: "032-cluster-topology", unit: "scripts/k8s-validate.sh", nature: additive }
+  - { spec: "032-cluster-topology", unit: "deploy/k8s/secret.example.yaml", nature: additive }
+  # The template's new home is hashed where it lives (B-6).
+  - { spec: "001-agentic-harness", unit: "spec-spine.toml", nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/01-consumer-contract.md" }, role: context }
   - { unit: { kind: file, path: "docs/design/00-lineage.md" }, role: context }
@@ -194,8 +220,8 @@ manifest (010), the image workflow and recipe (031), the deploy manifests
 ## 7. Resolved decisions
 
 The owner decided the publication question and B-8 on 2026-09-12 (decisions
-RH-05 and RH-06 of the revision-3 register). The spec stays `draft` until a
-human flips it.
+RH-05 and RH-06 of the revision-3 register), and approved the spec on
+2026-09-16 (D-3), closing the three questions this section had left open.
 
 - **D-1 (2026-09-12, owner decision RH-05; registry publication).** The
   question was whether chassis crates go to crates.io at each tag, which
@@ -224,15 +250,106 @@ human flips it.
   or the volume is recreated. The build session records which, and names
   the member and its TOML key.
 
-Still open before approval:
+- **D-3 (2026-09-16, owner decision; approval).** The owner approved this
+  spec and answered the three questions this section left open, so nothing
+  in it waits on a further flip.
+  - **The runtime image stands (B-4).** A cell in another repository builds
+    on `ghcr.io/statecrafting/rahi-runtime:X.Y.Z` rather than copying a
+    Dockerfile into its own tree, so the pinned rauthy, the non-root user,
+    `/data`, and the entrypoint are patched in one place. Rejected: a
+    Dockerfile each consumer vendors, which drifts from the rauthy the
+    chassis pins.
+  - **The template moves (B-6).** `docker/rauthy.env.template` becomes
+    `crates/rahi-ops/rauthy.env.template`, which removes it from spec 031's
+    `establishes` and from the `docker/*.template` hashed input, the kind of
+    claim-list edit spec 034 D-10 made. It is on the critical path: without
+    it `cargo package` fails on `rahi-ops`, so neither it nor `rahi-cli`
+    can be published, and RH-05 cannot be met.
+  - **`latest` is never published.** A tag pushes `X.Y.Z` only, `deploy/k8s`
+    names a version, and FR-002 makes the validation script refuse a render
+    that names `:latest` or an image outside `ghcr.io/statecrafting/`.
+  - The first release is `v0.1.0`: the version every crate already declares,
+    and the one aicortex pins (`rahi-* = "=0.1.0"`, its 010 D-1).
 
-- the runtime image (B-4) versus a Dockerfile each consumer copies;
-- moving the template under `crates/rahi-ops/` removes
-  `docker/rauthy.env.template` from spec 031's `establishes` and from the
-  `docker/*.template` hashed input, an edit to a complete spec's claim
-  list of the kind spec 034 D-10 made, and a human approves it;
-- whether `latest` is ever published (D-1 requires pinned images, and
-  `deploy/k8s` never names `latest`, B-3).
+- **D-4 (2026-09-16, build session; the member D-2 asked this build to
+  name).** The manifest schema version is `Manifest::schema_version`, the TOML
+  key `schema_version` at the document root, above the first table. It is
+  `Option<String>` in the type so that a manifest naming none is refused by a
+  message about the schema rather than by serde's about a missing field;
+  `validate` refuses a missing value, a value that is not
+  `MAJOR.MINOR.PATCH`, and a major other than
+  `rahi_types::MANIFEST_SCHEMA_VERSION`'s, and reads a later minor of the
+  same major. The consequence D-2 noticed holds: the member is inside
+  `Manifest::hash` (015 D-1), so every manifest's hash moved, and a volume
+  whose chain was rooted before this change refuses to boot with
+  `Error::Integrity` until spec 036 lands or the volume is recreated. Nothing
+  is deployed from this repository and no image is published, so the volumes
+  that exist are development ones: `docker/.data` under the compose file and
+  whatever a contributor kept. Delete them. Rejected: leaving the member out
+  of the hash, which would let a cell change the schema it claims without the
+  chain noticing, and the chain's whole purpose is to notice.
+- **D-5 (2026-09-16, build session; reads B-4's "one runtime").** Docker has
+  no include, so `docker/runtime.Dockerfile` repeats `docker/Dockerfile`'s
+  runtime stage rather than either file building on the other, and
+  `image.yml` refuses a build whose two `ARG RAUTHY_IMAGE` lines differ. That
+  is what keeps them one runtime. Rejected: `docker/Dockerfile` building
+  `FROM ghcr.io/statecrafting/rahi-runtime`, which cannot build before that
+  image is published and would make a local `docker build` reach the
+  registry, against spec 031's acceptance.
+- **D-6 (2026-09-16, build session; reads B-5).** `RAHI_STATIC_DIR` wins over
+  the cell's `static_dir()`, and a directory either of them names that does
+  not exist is `Error::Config` at boot: `serve` checks it before the store is
+  opened, so the failure costs nothing and names the path. An image always
+  carries the directory (the recipe creates it), so a cell built without
+  `RAHI_STATIC_SRC` serves `404` for its page rather than refusing to start;
+  that is the empty cell's ordinary case and hello-cell's warning.
+- **D-7 (2026-09-16, build session; reads B-7).** The consumer cell is three
+  files in `.github/consumer-cell/`, not a heredoc inside the workflow: a
+  heredoc in a YAML block scalar cannot close at column zero, and a fixture
+  in the tree is reviewable, hashed, and diffable. `release.yml` copies it
+  and substitutes `__REPO__`, `__KEY__` (`rev` or `tag`), and `__REV__`. The
+  job runs on a tag and on `workflow_dispatch`, so the stanza can be proven
+  against a commit before anyone tags it; FR-005 is the run on the tag
+  itself.
+- **D-8 (2026-09-16, build session; what a release still needs from a
+  human).** This build publishes nothing and cannot: `cargo publish` and the
+  tag push are the human's steps at the release checkpoint (D-1), in
+  dependency order `rahi-types`, `rahi-store`, `rahi-ledger`, `rahi-kernel`,
+  `rahi-idp`, `rahi-edge`, `rahi-ops`, `rahi-cli`, `rahi-harness`. A version
+  bump edits two places, `[workspace.package] version` and the `version` of
+  each `rahi-*` entry in `[workspace.dependencies]`, so `release.yml`
+  refuses a tree where they disagree, and refuses a tag that does not name
+  the version the crates carry.
+
+- **D-9 (2026-09-16, build session; what this build could not run).** AC-1
+  passed here: `make ci`, `cargo package --workspace --locked`, and
+  `scripts/k8s-validate.sh` all exit 0, and FR-001 through FR-004 and FR-006
+  have tests that run in CI. Three criteria need a release that does not
+  exist yet and are recorded rather than run, the way spec 032 D-1 records
+  its rollout check: AC-2 (a `v*` tag publishes both images and they pull
+  anonymously), AC-3 (spec 034's AC-2 procedure against the published
+  hello-cell image), and AC-4 (the nine crates resolve from crates.io and
+  `release.yml` proves the registry stanza). FR-005 is the same: the consumer
+  job runs on the tag. What this build could prove locally, it did: the
+  runtime image builds and carries rauthy, the entrypoint, the non-root user,
+  an empty `/usr/local/share/rahi/static`, and no cell; hello-cell's image
+  builds with `RAHI_STATIC_SRC` and `docker/smoke.sh` with `SMOKE_PAGE=1`
+  answers `200` for its page. Until a human tags and publishes, no document
+  in this repository calls a crate published (D-1).
+
+- **D-10 (2026-09-16, build session; what the consumer job had to learn).**
+  Run against a local build of the fixture before it was written into the
+  workflow, the cell answered `403` to its granted write. The refusal was
+  spec 020 B-4's double-submit check, not the kernel: an unsafe method needs
+  the CSRF cookie echoed in `X-CSRF-Token`, and `/readyz` mints no cookie
+  because the probes are mounted outside that layer (020 B-2). The job now
+  does what a page does: a safe request on a guarded route first, which is
+  also the denial assertion, then the write with the cookie and the header.
+  A consumer reading `docs/design/01-consumer-contract.md` meets the same
+  rule. Proven locally against path dependencies (the code of the fixture)
+  before the tag proves the git stanza: `/readyz` ready, `403` with
+  `kernel:<nonce>:1:000000000000`, `200` and `wrote 1`, a clean stop, and
+  `ledger verify` with two resident records.
 
 ## Verification
 
