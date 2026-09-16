@@ -5,6 +5,9 @@
 #
 #   docker/smoke.sh <image> [port]
 #
+# With SMOKE_PAGE=1 the page at / is asserted to answer 200 (spec 039
+# FR-004), which a cell with a static directory must do in its image.
+#
 # Exit 0 when every assertion holds; the container's log is printed on any
 # failure. Needs docker, curl, and jq.
 set -eu
@@ -49,6 +52,14 @@ discovery="$(curl -fsS "$public/auth/v1/.well-known/openid-configuration")" || f
 issuer="$(printf '%s' "$discovery" | jq -r '.issuer')"
 [ "$issuer" = "$public/auth/v1/" ] || fail "issuer is $issuer, expected $public/auth/v1/"
 curl -fsS "$public/healthz" >/dev/null || fail "/healthz did not answer"
+
+# Spec 039 FR-004: a cell with a page serves it from the image. Before B-5
+# the slot named a directory of the source tree, which the image never
+# carried, so every page answered 404.
+if [ "${SMOKE_PAGE:-0}" = "1" ]; then
+  page="$(curl -s -o /dev/null -w '%{http_code}' "$public/")"
+  [ "$page" = "200" ] || fail "the cell's page answered $page, expected 200"
+fi
 
 docker stop -t 30 "$name" >/dev/null
 code="$(docker inspect -f '{{.State.ExitCode}}' "$name")"

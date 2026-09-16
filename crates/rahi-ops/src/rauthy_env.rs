@@ -2,7 +2,8 @@
 //!
 //! rauthy 0.36 reads a TOML file and lets an environment variable override
 //! every key in it, so the app hands rauthy an empty file and a rendered
-//! environment. The template is `docker/rauthy.env.template`, compiled into
+//! environment. The template is `crates/rahi-ops/rauthy.env.template`,
+//! inside the crate so that it packages (spec 039 B-6), compiled into
 //! this crate so the file in the repository and the file first boot writes
 //! cannot drift; the rendering is a pure function of the public URL, the
 //! ports, and the secrets minted into the key set.
@@ -16,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use rahi_types::{Config, Error, Result};
 
 /// The template, as committed.
-pub const TEMPLATE: &str = include_str!("../../../docker/rauthy.env.template");
+pub const TEMPLATE: &str = include_str!("../rauthy.env.template");
 
 /// The rendered environment, relative to the data directory.
 pub const ENV_FILE: &str = "rauthy/rauthy.env";

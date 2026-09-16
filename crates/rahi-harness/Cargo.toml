@@ -1,6 +1,6 @@
 [package]
 name = "rahi-harness"
-version = "0.1.0"
+version.workspace = true
 description = "The test harness of the rahi chassis: boot a built cell binary under a throwaway volume, wait on /readyz, hand back a client with a cookie jar"
 edition.workspace = true
 rust-version.workspace = true

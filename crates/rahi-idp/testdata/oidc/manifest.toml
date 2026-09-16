@@ -6,6 +6,8 @@
 # this is the smallest document `Manifest::parse` accepts, plus the operator
 # role spec 024 will name.
 
+schema_version = "1.0.0"
+
 [app]
 name = "hello-cell"
 org = "statecrafting"

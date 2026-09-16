@@ -29,7 +29,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use action_gate_core::{Gate, sha256_hex};
 use rahi_ledger::Hash;
-use rahi_types::{Error, LEDGER_SCHEMA_VERSION};
+use rahi_types::{Error, LEDGER_SCHEMA_VERSION, MANIFEST_SCHEMA_VERSION};
 use serde::{Deserialize, Serialize};
 
 use crate::adjudicate::{GRANT_CHECK_ID, OPTIONAL_CHECKS, build_gate};
@@ -152,6 +152,13 @@ pub struct Contract {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Manifest {
+    /// The manifest schema this document was written for,
+    /// `MAJOR.MINOR.PATCH` (spec 039 B-8). Optional in the type so that a
+    /// manifest that names none is refused by
+    /// [`Manifest::validate`] with a message about the schema rather than by
+    /// serde with one about a missing field.
+    #[serde(default)]
+    pub schema_version: Option<String>,
     /// Identity.
     pub app: App,
     /// Everything addressable, by name.
@@ -200,11 +207,43 @@ impl Manifest {
     ///
     /// [`Error::Validation`], naming the offending id, service, or resource.
     pub fn validate(&self) -> Result<(), Error> {
+        self.validate_schema_version()?;
         self.validate_resources()?;
         self.validate_capabilities()?;
         self.validate_services()?;
         self.validate_gate()?;
         self.validate_policy()
+    }
+
+    /// The manifest names the schema it was written for, and this build
+    /// speaks its major (spec 039 B-8).
+    ///
+    /// A manifest outlives the binary that first read it: a document that
+    /// does not say which schema it follows leaves a reader guessing which
+    /// rules its silence means, and silence is what
+    /// `deny_unknown_fields` exists to refuse everywhere else.
+    fn validate_schema_version(&self) -> Result<(), Error> {
+        let Some(named) = &self.schema_version else {
+            return Err(Error::Validation(format!(
+                "the manifest names no schema_version; this build speaks \
+                 {MANIFEST_SCHEMA_VERSION}, so write schema_version = \
+                 \"{MANIFEST_SCHEMA_VERSION}\" at the top of the document"
+            )));
+        };
+        let major = major_of(named).ok_or_else(|| {
+            Error::Validation(format!(
+                "the manifest's schema_version {named:?} is not MAJOR.MINOR.PATCH"
+            ))
+        })?;
+        let ours = major_of(MANIFEST_SCHEMA_VERSION).unwrap_or_default();
+        if major == ours {
+            return Ok(());
+        }
+        Err(Error::Validation(format!(
+            "the manifest names schema_version {named:?} and this build speaks \
+             {MANIFEST_SCHEMA_VERSION}: a different major is a different schema, and \
+             nothing here can read it"
+        )))
     }
 
     /// Every declared resource, deduplicated per family.
@@ -425,4 +464,18 @@ impl Manifest {
         let gate = self.gate()?.config_hash();
         Hash::parse(sha256_hex(format!("{model}\n{gate}").as_bytes()))
     }
+}
+
+/// The MAJOR of a `MAJOR.MINOR.PATCH` version, if it is one.
+fn major_of(version: &str) -> Option<u64> {
+    let mut parts = version.split('.');
+    let (Some(major), Some(minor), Some(patch), None) =
+        (parts.next(), parts.next(), parts.next(), parts.next())
+    else {
+        return None;
+    };
+    if minor.parse::<u64>().is_err() || patch.parse::<u64>().is_err() {
+        return None;
+    }
+    major.parse().ok()
 }

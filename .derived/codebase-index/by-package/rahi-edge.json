@@ -3,9 +3,8 @@
     "kind": "rust-lib",
     "name": "rahi-edge",
     "path": "crates/rahi-edge",
-    "specRef": "020-edge-server",
-    "version": "0.1.0"
+    "specRef": "020-edge-server"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "1b45381a91e91e7154eeb7e851a0fcd77c8d585641bff6ff4c603b8f6626b69b"
+  "shardHash": "8e2d93eb0925d17b55a1f265c42e49f27eb26da15eba3663090d30b4120e496f"
 }

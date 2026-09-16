@@ -139,7 +139,8 @@ the volume bind-mounted at `docker/.data`.
 
    ```sh
    docker compose -f docker/compose.yml build \
-     --build-arg RAHI_PACKAGE=hello-cell --build-arg RAHI_BIN=hello-cell
+     --build-arg RAHI_PACKAGE=hello-cell --build-arg RAHI_BIN=hello-cell \
+     --build-arg RAHI_STATIC_SRC=apps/hello-cell/web
    docker compose -f docker/compose.yml up
    ```
 
@@ -148,7 +149,10 @@ the volume bind-mounted at `docker/.data`.
    `docker compose -f docker/compose.yml logs rahi`.
 
 3. Open `http://localhost:8080/`. The page is served from the static slot
-   and shows a login button and an empty list.
+   and shows a login button and an empty list. In an image the page lives at
+   `/usr/local/share/rahi/static`, which `RAHI_STATIC_SRC` copies it to and
+   `RAHI_STATIC_DIR` names (spec 039 B-5); without that build argument the
+   image carries an empty directory and `/` answers 404.
 
 4. Create a user in rauthy: open `http://localhost:8080/auth/v1/admin`
    with the admin credentials from step 2, add a user with a password,

@@ -11,13 +11,20 @@ The first target is a Hetzner Kubernetes cluster with Hetzner object
 storage as the S3 endpoint. Kubernetes 1.28 or later: the pod ordinal
 reaches the container through the `apps.kubernetes.io/pod-index` label.
 
-No image is published yet. The manifests and the commands below name
-`ghcr.io/bartekus/rahi:latest`; `image.yml` pushes
-`ghcr.io/statecrafting/rahi:<tag>` and `:<version>` only when a `v*` tag
-is pushed, never `latest`, and no tag has been pushed. Until a release
-exists, build the image from `docker/Dockerfile`, push it where your
-cluster can pull it, and substitute its name and tag
-(`kustomize edit set image`).
+No image is published yet. The manifests name
+`ghcr.io/statecrafting/rahi:0.1.0`, which is what `image.yml` pushes when
+the `v0.1.0` tag is pushed (spec 039 B-3): the version only, both
+architectures, and never `latest`. Until that tag exists, build the image
+from `docker/Dockerfile`, push it where your cluster can pull it, and
+substitute its name and tag (`kustomize edit set image`).
+
+A cell in another repository does not copy this recipe. It builds on
+`ghcr.io/statecrafting/rahi-runtime:<version>`, which carries the pinned
+rauthy, the non-root user, `/data`, and the entrypoint, and adds its own
+binary at `/usr/local/bin/rahi` and its page at
+`/usr/local/share/rahi/static` (spec 039 B-4). `scripts/k8s-validate.sh`
+refuses a render that names `:latest` or a cell image outside
+`ghcr.io/statecrafting/`.
 
 ## What is in the tree
 
@@ -52,7 +59,7 @@ and one rauthy admin. Mint the set once, anywhere the image runs:
 
 ```sh
 docker run --rm -e RAHI_PUBLIC_URL=https://cell.example.com \
-  ghcr.io/bartekus/rahi first-boot --export > rahi-keys.yaml
+  ghcr.io/statecrafting/rahi:0.1.0 first-boot --export > rahi-keys.yaml
 ```
 
 The document is a complete `Secret` named `rahi-keys` (the shape is in
@@ -97,7 +104,7 @@ For every rollout after the first, run the migrations before rolling the
 image, with the image that carries them:
 
 ```sh
-kustomize edit set image ghcr.io/bartekus/rahi=ghcr.io/bartekus/rahi:<new tag>
+kustomize edit set image ghcr.io/statecrafting/rahi=ghcr.io/statecrafting/rahi:<new version>
 kubectl -n rahi delete job rahi-migrate --ignore-not-found
 kubectl apply -k deploy/n3 --selector app.kubernetes.io/name=rahi-migrate
 kubectl -n rahi wait --for=condition=complete job/rahi-migrate --timeout=300s

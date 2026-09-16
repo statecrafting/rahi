@@ -1,0 +1,33 @@
+# The consumer cell's ceiling: `items` may be written and nothing else, so
+# one route is admitted and one is a ledgered denial (spec 039 B-7).
+
+schema_version = "1.0.0"
+
+[app]
+name = "consumer-cell"
+org = "statecrafting"
+
+[resources]
+tables = ["items"]
+
+[[capabilities]]
+id = "items-write"
+kind = "db.write"
+resource = "items"
+
+[services.items]
+capabilities = ["items-write"]
+
+[ledger]
+schema_version = "1.0.0"
+max_record_bytes = 65536
+
+[observability]
+metrics_path = "/metrics"
+otel = false
+
+[auth]
+operator_role = "consumer-operator"
+
+[contract]
+version = "1.0.0"

@@ -229,6 +229,31 @@ fn preflight_prints_the_engine_report_when_the_store_opens() {
 }
 
 #[test]
+fn serve_with_a_static_directory_that_is_absent_is_exit_3_before_the_store_opens() {
+    // Spec 039 B-5 and FR-003: the slot would answer 404 for every page, so
+    // the cell refuses to start and says which directory is missing. The
+    // store is never opened, which is why this is not the stale-schema exit.
+    let volume = Volume::new();
+    let missing = volume.path().join("no-such-web-dir");
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_rahi"));
+    cmd.arg("serve");
+    for (k, v) in &volume.env {
+        cmd.env(k, v);
+    }
+    cmd.env(rahi_cli::serve::ENV_STATIC_DIR, &missing);
+    let run = Run::of(cmd.output().unwrap());
+    assert_eq!(run.code, 3, "{}\n{}", run.stdout, run.stderr);
+    assert!(run.stderr.contains("error: config:"), "{}", run.stderr);
+    assert!(
+        run.stderr.contains(&missing.display().to_string()),
+        "the missing directory is named: {}",
+        run.stderr
+    );
+    assert!(run.stderr.contains("404"), "{}", run.stderr);
+    assert!(!volume.path().join("hiqlite").exists(), "no node was opened");
+}
+
+#[test]
 fn serve_behind_on_migrations_is_exit_2_and_names_the_command() {
     let volume = Volume::new();
     let run = volume.run(&["serve"]);

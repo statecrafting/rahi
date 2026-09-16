@@ -3,9 +3,8 @@
     "kind": "rust-lib",
     "name": "rahi-kernel",
     "path": "crates/rahi-kernel",
-    "specRef": "015-kernel-manifest-and-adjudication",
-    "version": "0.1.0"
+    "specRef": "015-kernel-manifest-and-adjudication"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "87c2ef3b15c9838033d0981dae21754433ac428ff2f86bbcf21bae8165d80bb9"
+  "shardHash": "f5cea4172b4f9612ff7519a9e8235bcdc0aa473ec0322a4534f923ab68303abd"
 }

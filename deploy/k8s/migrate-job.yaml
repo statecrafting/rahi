@@ -30,7 +30,7 @@ spec:
         fsGroup: 10001
       containers:
         - name: migrate
-          image: ghcr.io/bartekus/rahi
+          image: ghcr.io/statecrafting/rahi
           command: ["rahi", "migrate"]
           env:
             - name: RAHI_STORE_CLIENT

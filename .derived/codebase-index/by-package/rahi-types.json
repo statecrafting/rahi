@@ -3,9 +3,8 @@
     "kind": "rust-lib",
     "name": "rahi-types",
     "path": "crates/rahi-types",
-    "specRef": "010-workspace-and-core-types",
-    "version": "0.1.0"
+    "specRef": "010-workspace-and-core-types"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "f39a0783013abe05923a722c6db2a5f07f03e8f9dcab1ad09c55a253c6906447"
+  "shardHash": "005e0ba0a05b60d94c09ee9590dc4afb0f37850f0b9230fd54193cc963b6f60b"
 }

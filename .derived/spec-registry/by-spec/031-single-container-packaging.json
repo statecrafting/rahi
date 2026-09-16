@@ -43,10 +43,6 @@
       },
       {
         "kind": "file",
-        "path": "docker/rauthy.env.template"
-      },
-      {
-        "kind": "file",
         "path": "docker/smoke.sh"
       },
       {
@@ -145,6 +141,6 @@
     "summary": "One container plus one volume is a complete authenticated application. The image carries the app binary and the rauthy release binary. First boot generates every key (ledger, session, backup, rauthy ENC_KEYS, the admin token), writes rauthy's environment derived from one public URL, and bootstraps the OIDC client; a restart regenerates nothing. The app is the supervisor: it starts rauthy on loopback, waits for its health, starts serve, and when either exits the other is stopped and the container exits. The volume layout is /data/hiqlite, /data/rauthy, /data/keys, and /data/backups. Carries enrahitu://007.\n",
     "title": "Single-container packaging: one image, one volume, first boot, keys, die-together supervision"
   },
-  "shardHash": "7bec250c1f3ab466e3f2c52e5bf894d31cf126cb0029ddbe7cf06ef03807a6f0",
+  "shardHash": "e68f13dd4b163adc2e966b72db58dd3e223f25f60a4e429d61eae5c3b91e5d1a",
   "specVersion": "1.2.0"
 }

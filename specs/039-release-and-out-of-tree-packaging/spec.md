@@ -20,6 +20,8 @@ establishes:
   - "docker/runtime.Dockerfile"
   - ".github/workflows/release.yml"
   - "crates/rahi-ops/rauthy.env.template"
+  - "CHANGELOG.md"
+  - ".github/consumer-cell/"
 extends:
   - { spec: "010-workspace-and-core-types", unit: { kind: section, file: "Cargo.toml", anchor: "workspace.package" }, nature: additive }
   - { spec: "031-single-container-packaging", unit: ".github/workflows/image.yml", nature: additive }
@@ -36,6 +38,30 @@ extends:
   - { spec: "015-kernel-manifest-and-adjudication", unit: "crates/rahi-kernel/tests/manifest.rs", nature: additive }
   - { spec: "015-kernel-manifest-and-adjudication", unit: "crates/rahi-kernel/testdata/manifests/", nature: additive }
   - { spec: "034-hello-cell", unit: "apps/hello-cell/manifest.toml", nature: additive }
+  # The manifest of every crate inherits the workspace version (B-1).
+  - { spec: "010-workspace-and-core-types", unit: "crates/rahi-types/Cargo.toml", nature: additive }
+  - { spec: "011-store-hiqlite", unit: "crates/rahi-store/Cargo.toml", nature: additive }
+  - { spec: "013-ledger-decision-chain", unit: "crates/rahi-ledger/Cargo.toml", nature: additive }
+  - { spec: "015-kernel-manifest-and-adjudication", unit: "crates/rahi-kernel/Cargo.toml", nature: additive }
+  - { spec: "020-edge-server", unit: "crates/rahi-edge/Cargo.toml", nature: additive }
+  - { spec: "021-idp-proxy-and-discovery", unit: "crates/rahi-idp/Cargo.toml", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-ops/Cargo.toml", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-cli/Cargo.toml", nature: additive }
+  - { spec: "033-dev-substrate-and-harness", unit: "crates/rahi-harness/Cargo.toml", nature: additive }
+  - { spec: "034-hello-cell", unit: "apps/hello-cell/Cargo.toml", nature: additive }
+  # Every manifest names the schema it was written for (B-8).
+  - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/cell.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-ops/tests/common/mod.rs", nature: additive }
+  - { spec: "020-edge-server", unit: "crates/rahi-edge/testdata/manifest.toml", nature: additive }
+  - { spec: "022-session-and-principal", unit: "crates/rahi-idp/testdata/oidc/", nature: additive }
+  - { spec: "035-denials-survive-shutdown", unit: "crates/rahi-cli/tests/shutdown.rs", nature: additive }
+  # The static directory, the page in the image, and the render's images.
+  - { spec: "030-operational-verbs", unit: "crates/rahi-cli/tests/cli.rs", nature: additive }
+  - { spec: "031-single-container-packaging", unit: "docker/smoke.sh", nature: additive }
+  - { spec: "032-cluster-topology", unit: "scripts/k8s-validate.sh", nature: additive }
+  - { spec: "032-cluster-topology", unit: "deploy/k8s/secret.example.yaml", nature: additive }
+  # The template's new home is hashed where it lives (B-6).
+  - { spec: "001-agentic-harness", unit: "spec-spine.toml", nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/01-consumer-contract.md" }, role: context }
   - { unit: { kind: file, path: "docs/design/00-lineage.md" }, role: context }

@@ -56,6 +56,40 @@ pub const ENV_MAX_CONCURRENT_STREAMS: &str = "RAHI_MAX_CONCURRENT_STREAMS";
 /// default is ten.
 pub const ENV_STREAM_DRAIN_TIMEOUT: &str = "RAHI_STREAM_DRAIN_TIMEOUT_SECS";
 
+/// Where the static slot serves from, when the deployment names it
+/// (spec 039 B-5). It wins over the cell's own `static_dir()`, which names a
+/// path in the source tree that an image does not carry.
+pub const ENV_STATIC_DIR: &str = "RAHI_STATIC_DIR";
+
+/// The directory the static slot serves, or `None` when neither the
+/// environment nor the cell names one (spec 039 B-5).
+///
+/// A named directory that does not exist is a startup error rather than a
+/// slot that answers `404` for every page: the cell was deployed with a page
+/// it cannot serve, and the operator finds that out at boot instead of from
+/// the first visitor.
+///
+/// # Errors
+///
+/// [`Error::Config`] naming the directory and who named it.
+pub fn static_dir<C: Cell>(env: &dyn EnvReader) -> Result<Option<PathBuf>> {
+    let (dir, named_by) = match env.get(ENV_STATIC_DIR) {
+        Some(raw) if !raw.trim().is_empty() => (PathBuf::from(raw.trim()), ENV_STATIC_DIR),
+        _ => match C::static_dir() {
+            Some(dir) => (dir, "the cell's static_dir()"),
+            None => return Ok(None),
+        },
+    };
+    if !dir.is_dir() {
+        return Err(Error::Config(format!(
+            "{named_by} names the static directory {}, which does not exist; the static slot \
+             would answer 404 for every page it was deployed to serve",
+            dir.display()
+        )));
+    }
+    Ok(Some(dir))
+}
+
 /// Seconds a stop gives the kernel's denial queue to drain before it shuts
 /// the store (spec 035 B-1); the default is [`DEFAULT_DENIAL_DRAIN_TIMEOUT`].
 pub const ENV_DENIAL_DRAIN_TIMEOUT: &str = "RAHI_DENIAL_DRAIN_TIMEOUT_SECS";
@@ -329,7 +363,7 @@ pub async fn compose_parts<C: Cell>(
     for route in C::exposed() {
         edge = edge.expose(route);
     }
-    if let Some(dir) = C::static_dir() {
+    if let Some(dir) = static_dir::<C>(env)? {
         edge = edge.static_slot(dir);
     }
 
@@ -450,6 +484,10 @@ pub async fn serve_until<C: Cell>(
     let addr = listen_addr(env)?;
     let streams = StreamHub::new(stream_options(env)?);
     let denial_bound = denial_drain_timeout(env)?;
+    // Spec 039 B-5: a page the cell cannot serve is a boot failure, and it is
+    // one before the store is opened. `compose` resolves it again for its own
+    // callers; both calls are one `is_dir`.
+    static_dir::<C>(env)?;
     let booted = Booted::open::<C>(env).await?;
     let Composed { router, kernel } = match compose_parts::<C>(&booted, env, &streams).await {
         Ok(composed) => composed,
@@ -550,5 +588,94 @@ async fn shutdown_signal() {
     #[cfg(not(unix))]
     {
         let _ = ctrl_c.await;
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod tests {
+    use std::collections::BTreeMap;
+    use std::sync::OnceLock;
+
+    use axum::Router;
+    use rahi_edge::AppState;
+    use rahi_store::Migration;
+
+    use super::*;
+    use crate::cell::EmptyCell;
+
+    /// Where [`PagedCell`] says its page lives.
+    fn cell_page() -> &'static PathBuf {
+        static DIR: OnceLock<PathBuf> = OnceLock::new();
+        DIR.get_or_init(|| {
+            let dir = std::env::temp_dir().join("rahi-serve-cell-page");
+            std::fs::create_dir_all(&dir).expect("a directory for the cell's own page");
+            dir
+        })
+    }
+
+    /// A cell that names a page of its own, the way hello-cell does.
+    struct PagedCell;
+
+    impl Cell for PagedCell {
+        fn manifest() -> &'static str {
+            EmptyCell::MANIFEST
+        }
+
+        fn migrations() -> &'static [Migration] {
+            &[]
+        }
+
+        fn routes(_state: AppState) -> Router {
+            Router::new()
+        }
+
+        fn static_dir() -> Option<PathBuf> {
+            Some(cell_page().clone())
+        }
+    }
+
+    fn env(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
+        pairs
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect()
+    }
+
+    #[test]
+    fn the_environment_names_the_static_directory_over_the_cells_own() {
+        let deployed = tempfile::tempdir().expect("a temp dir");
+        let chosen = static_dir::<PagedCell>(&env(&[(
+            ENV_STATIC_DIR,
+            &deployed.path().display().to_string(),
+        )]))
+        .expect("the directory exists")
+        .expect("one is named");
+        assert_eq!(chosen, deployed.path(), "spec 039 B-5: the deployment wins");
+
+        let fallback = static_dir::<PagedCell>(&env(&[]))
+            .expect("the cell's own directory exists")
+            .expect("one is named");
+        assert_eq!(&fallback, cell_page(), "with nothing set, the cell's own");
+
+        assert!(
+            static_dir::<EmptyCell>(&env(&[])).expect("no error").is_none(),
+            "a cell with no page and no environment names no directory"
+        );
+    }
+
+    #[test]
+    fn a_static_directory_that_does_not_exist_is_a_startup_error_naming_it() {
+        let missing = std::env::temp_dir().join("rahi-no-such-page-dir");
+        let _ = std::fs::remove_dir_all(&missing);
+        let err = static_dir::<EmptyCell>(&env(&[(
+            ENV_STATIC_DIR,
+            &missing.display().to_string(),
+        )]))
+        .expect_err("a named directory that is absent is refused");
+        assert_eq!(err.exit_code(), rahi_types::error::EXIT_INFRA);
+        assert!(err.message().contains(ENV_STATIC_DIR), "{err}");
+        assert!(err.message().contains(&missing.display().to_string()), "{err}");
+        assert!(err.message().contains("404"), "it says what the slot would do: {err}");
     }
 }

@@ -101,10 +101,16 @@ extra_hashed_inputs = [
   # `docker/**/*`, so a stray `.DS_Store` under either directory cannot reach
   # a shard hash on one contributor's machine and not another's.
   "docker/Dockerfile",
+  "docker/*.Dockerfile",
   "docker/*.yml",
   "docker/*.sh",
-  "docker/*.template",
+  "crates/rahi-ops/*.template",
   "deploy/**/*.yaml",
+  # The cell the release workflow builds outside this workspace (spec 039
+  # B-7): a fixture of the release, versioned with the workflow that runs it.
+  ".github/consumer-cell/Cargo.toml.in",
+  ".github/consumer-cell/manifest.toml",
+  ".github/consumer-cell/src/*.rs",
 ]
 resolver_exclusions = ["target", "node_modules", ".derived", "dist", "build"]
 
@@ -124,9 +130,10 @@ governance = [
 ]
 deployment = [
   "docker/Dockerfile",
+  "docker/*.Dockerfile",
   "docker/*.yml",
   "docker/*.sh",
-  "docker/*.template",
+  "crates/rahi-ops/*.template",
   "deploy/**/*.yaml",
 ]
 
@@ -160,6 +167,10 @@ unwitnessed_allowed = [
   # In the coupling bypass floor already, so hashing it would restale every
   # shard for a doc edit the gate deliberately ignores.
   "deploy/README.md",
+  "CHANGELOG.md",
+  # A crate's fixture data, claimed as bare file units for the same reason
+  # as the crates' Rust sources, and defended by the same two checks.
+  "crates/*/testdata/**/*.toml",
 ]
 
 [branding]

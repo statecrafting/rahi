@@ -1,6 +1,6 @@
 [package]
 name = "rahi-types"
-version = "0.1.0"
+version.workspace = true
 description = "The plain-data substrate of the rahi chassis: Error, Principal, Revision, FenceToken, Config"
 edition.workspace = true
 rust-version.workspace = true

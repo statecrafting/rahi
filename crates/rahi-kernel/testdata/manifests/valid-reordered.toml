@@ -2,6 +2,8 @@
 # (spec 015 FR-002). Nothing here changes what the cell may do, so nothing
 # here may change the manifest hash.
 
+schema_version = "1.0.0"
+
 [contract]
 version   = "1.0.0"
 

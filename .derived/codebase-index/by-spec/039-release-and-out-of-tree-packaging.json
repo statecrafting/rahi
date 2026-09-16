@@ -1,24 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '039-release-and-out-of-tree-packaging' file unit 'docker/runtime.Dockerfile' does not exist",
-        "path": "docker/runtime.Dockerfile"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '039-release-and-out-of-tree-packaging' file unit '.github/workflows/release.yml' does not exist",
-        "path": ".github/workflows/release.yml"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '039-release-and-out-of-tree-packaging' file unit 'crates/rahi-ops/rauthy.env.template' does not exist",
-        "path": "crates/rahi-ops/rauthy.env.template"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "010-workspace-and-core-types",
@@ -30,11 +10,27 @@
     ],
     "implementingPaths": [
       {
+        "path": ".github/consumer-cell/",
+        "source": "spec-edge"
+      },
+      {
         "path": ".github/workflows/image.yml",
         "source": "spec-edge"
       },
       {
+        "path": ".github/workflows/release.yml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "CHANGELOG.md",
+        "source": "spec-edge"
+      },
+      {
         "path": "Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "apps/hello-cell/Cargo.toml",
         "source": "spec-edge"
       },
       {
@@ -50,7 +46,47 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-cli/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/cell.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-cli/src/serve.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/tests/cli.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/tests/shutdown.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/testdata/manifest.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-harness/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/testdata/oidc/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-kernel/Cargo.toml",
         "source": "spec-edge"
       },
       {
@@ -66,7 +102,31 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-ledger/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/rauthy.env.template",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-ops/src/rauthy_env.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/tests/common/mod.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-types/Cargo.toml",
         "source": "spec-edge"
       },
       {
@@ -82,17 +142,54 @@
         "source": "spec-edge"
       },
       {
+        "path": "deploy/k8s/secret.example.yaml",
+        "source": "spec-edge"
+      },
+      {
         "path": "deploy/k8s/statefulset.yaml",
         "source": "spec-edge"
       },
       {
         "path": "docker/Dockerfile",
         "source": "spec-edge"
+      },
+      {
+        "path": "docker/runtime.Dockerfile",
+        "source": "spec-edge"
+      },
+      {
+        "path": "docker/smoke.sh",
+        "source": "spec-edge"
+      },
+      {
+        "path": "scripts/k8s-validate.sh",
+        "source": "spec-edge"
+      },
+      {
+        "path": "spec-spine.toml",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": ".github/consumer-cell/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": ".github/consumer-cell/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": ".github/workflows/release.yml"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -101,7 +198,24 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "CHANGELOG.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "CHANGELOG.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/rauthy.env.template"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -110,7 +224,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "docker/runtime.Dockerfile"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -129,6 +247,19 @@
         "unit": {
           "kind": "file",
           "path": ".github/workflows/image.yml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "apps/hello-cell/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/Cargo.toml"
         }
       },
       {
@@ -173,6 +304,32 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-cli/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/cell.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/cell.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-cli/src/serve.rs"
           }
         ],
@@ -181,6 +338,110 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/tests/cli.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/cli.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/tests/shutdown.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/shutdown.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/testdata/manifest.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/testdata/manifest.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-harness/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-harness/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/testdata/oidc/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/testdata/oidc/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-kernel/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/Cargo.toml"
         }
       },
       {
@@ -225,6 +486,32 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-ledger/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-ops/src/rauthy_env.rs"
           }
         ],
@@ -233,6 +520,45 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-ops/src/rauthy_env.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/tests/common/mod.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/common/mod.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-store/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-types/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-types/Cargo.toml"
         }
       },
       {
@@ -277,6 +603,19 @@
       {
         "locations": [
           {
+            "file": "deploy/k8s/secret.example.yaml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/secret.example.yaml"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "deploy/k8s/statefulset.yaml"
           }
         ],
@@ -303,9 +642,48 @@
       {
         "locations": [
           {
+            "file": "docker/smoke.sh"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "docker/smoke.sh"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "scripts/k8s-validate.sh"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/k8s-validate.sh"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "spec-spine.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "spec-spine.toml"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "Cargo.toml",
             "span": {
-              "endLine": 14,
+              "endLine": 17,
               "startLine": 8
             }
           }
@@ -349,5 +727,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "3f155adef7d50734e26f56a08d69776d27523eccab94dd773cb0c2e9b3263cae"
+  "shardHash": "471e65c2d86e99df4d0dd611b69c4a6dd147376226677ea9b1c8dc44e6bc0f9c"
 }

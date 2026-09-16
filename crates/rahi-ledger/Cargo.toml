@@ -1,6 +1,6 @@
 [package]
 name = "rahi-ledger"
-version = "0.1.0"
+version.workspace = true
 description = "The decision chain of the rahi chassis: hash-linked signed records, a unique-parent CAS append, and full verification at boot"
 edition.workspace = true
 rust-version.workspace = true

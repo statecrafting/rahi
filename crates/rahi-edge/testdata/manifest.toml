@@ -5,6 +5,8 @@
 # `AppState`, not a ceiling to test against. Spec 015's fixtures are where the
 # capability vocabulary is exercised.
 
+schema_version = "1.0.0"
+
 [app]
 name = "edge-fixture"
 org = "statecrafting"

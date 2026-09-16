@@ -169,10 +169,10 @@
       },
       {
         "nature": "additive",
-        "spec": "031-single-container-packaging",
+        "spec": "039-release-and-out-of-tree-packaging",
         "unit": {
           "kind": "file",
-          "path": "docker/rauthy.env.template"
+          "path": "crates/rahi-ops/rauthy.env.template"
         }
       },
       {
@@ -216,6 +216,6 @@
     "summary": "What multiplies and what does not. At N=1 nothing changes. At N=3 every replica is identical: a StatefulSet pod running the supervisor, with its own volume, two Raft clusters per replica (rauthy's and the app's), peers discovered by stable pod DNS, one key set injected as a Secret and custodied once, the public origin on an Ingress that terminates TLS and keeps /metrics off it, a CronJob that runs backup --to s3:// against the leader, and a ServiceMonitor example. Rate limiting is per node and says so. A shared volume between Raft members is refused by the manifests themselves. Carries enrahitu://030.\n",
     "title": "Cluster topology: N=1 primary, N=3 StatefulSet on Kubernetes, one key set, S3 backups"
   },
-  "shardHash": "ce5b638970b907dc37bccea2e0ed9dab98e16e2beddfe1781ccc30806dd42acf",
+  "shardHash": "72fb28d3a0984e2907649318d0f16f619ec0c9a9064943e9f793160a08fdb76e",
   "specVersion": "1.2.0"
 }

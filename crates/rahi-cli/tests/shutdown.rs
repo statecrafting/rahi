@@ -64,6 +64,8 @@ const STOP_BUDGET: Duration = Duration::from_secs(60);
 const MANIFEST: &str = r#"# The deny cell: `items` may be read and nothing else, so the write its
 # route attempts is always a ledgered denial (spec 035 FR-001, FR-005).
 
+schema_version = "1.0.0"
+
 [app]
 name = "deny-cell"
 org = "rahi-tests"

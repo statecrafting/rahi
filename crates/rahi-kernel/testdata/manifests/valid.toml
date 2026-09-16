@@ -3,6 +3,8 @@
 # Every kind family appears at least once, so a change to the vocabulary that
 # forgets a family fails a test rather than a deployment.
 
+schema_version = "1.0.0"
+
 [app]
 name = "hello-cell"
 org = "statecrafting"

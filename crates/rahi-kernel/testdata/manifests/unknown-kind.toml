@@ -2,6 +2,8 @@
 # `db.drop` reads like a real permission, which is exactly why an open
 # vocabulary is dangerous: the kernel would have no way to enforce it.
 
+schema_version = "1.0.0"
+
 [app]
 name = "hello-cell"
 org = "statecrafting"

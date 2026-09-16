@@ -1,6 +1,8 @@
 # A service granted a capability the catalog does not declare
 # (spec 015 FR-001). A grant that names nothing is a grant nobody can audit.
 
+schema_version = "1.0.0"
+
 [app]
 name = "hello-cell"
 org = "statecrafting"

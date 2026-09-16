@@ -1,6 +1,8 @@
-# valid.toml with one grant removed (spec 015 FR-002): the hash must move.
+# The fixture ceiling written for the next major of the manifest schema
+# (spec 039 FR-006): a build that speaks 1.x must refuse it rather than
+# read it under rules it does not know.
 
-schema_version = "1.0.0"
+schema_version = "2.0.0"
 
 [app]
 name = "hello-cell"
@@ -90,6 +92,7 @@ resource = "*.example.com"
 [services.notes]
 capabilities = [
   "notes-read",
+  "notes-write",
   "notes-txn",
   "schema",
   "cache-get",

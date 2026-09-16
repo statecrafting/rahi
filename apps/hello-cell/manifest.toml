@@ -6,6 +6,8 @@
 # end-to-end test reads the decision id off the 403. That is the
 # demonstration, not an oversight.
 
+schema_version = "1.0.0"
+
 [app]
 name = "hello-cell"
 org = "statecrafting"

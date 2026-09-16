@@ -73,10 +73,6 @@
         "source": "spec-edge"
       },
       {
-        "path": "docker/rauthy.env.template",
-        "source": "spec-edge"
-      },
-      {
         "path": "docker/smoke.sh",
         "source": "spec-edge"
       }
@@ -202,19 +198,6 @@
       {
         "locations": [
           {
-            "file": "docker/rauthy.env.template"
-          }
-        ],
-        "ownership": true,
-        "sourceField": "establishes",
-        "unit": {
-          "kind": "file",
-          "path": "docker/rauthy.env.template"
-        }
-      },
-      {
-        "locations": [
-          {
             "file": "docker/smoke.sh"
           }
         ],
@@ -321,8 +304,8 @@
           {
             "file": "Cargo.toml",
             "span": {
-              "endLine": 106,
-              "startLine": 15
+              "endLine": 109,
+              "startLine": 18
             }
           }
         ],
@@ -339,5 +322,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "ef72248bd2676bcfb1013fd69b81620a718ebae87cf543a02d98ac8a6a6e7e03"
+  "shardHash": "189567c284a0c13030f4cb09445a3e3b25bfb662523fbfddbb91f71fed7e6893"
 }
