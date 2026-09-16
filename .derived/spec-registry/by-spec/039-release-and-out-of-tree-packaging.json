@@ -154,7 +154,7 @@
       "wave": 3
     },
     "id": "039-release-and-out-of-tree-packaging",
-    "implementation": "pending",
+    "implementation": "in-progress",
     "kind": "tooling",
     "references": [
       {
@@ -189,6 +189,6 @@
     "summary": "The thesis says consumers depend on published crates and pin a version (002 D5), and nothing is published: no tag, no release, no crate, no image. The one route that works is a git dependency pinned to a sha. cargo package fails on rahi-ops because it includes a template from outside the crate, which also blocks rahi-cli, the crate that carries Cell. The deploy manifests name ghcr.io/bartekus/rahi:latest, a namespace and a tag no workflow produces. The image recipe builds only a package of this workspace, and a cell's static directory named under CARGO_MANIFEST_DIR does not exist in the image (hello-cell's page answers 404 there). This spec defines the version and the release, publishes the images a tag builds under the names the manifests use, adds a runtime image an out-of-tree cell builds on, makes static assets exist in the image, makes the crates packageable, and proves the consumer stanza on every release.\n",
     "title": "Releases and out-of-tree packaging: a tagged version a consumer pins, images that exist under the names the manifests use, and a runtime image a cell in another repository builds on"
   },
-  "shardHash": "ff86c88ed37aa5497580296bedf9568bd7fc3d84dee0b822093f8aafcf7e19c4",
+  "shardHash": "b6fe1a3adedfb91004da08fc4e1f565a3e555d95597ef86532836a34d0bb18aa",
   "specVersion": "1.2.0"
 }
