@@ -37,6 +37,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-idp/testdata/tokens/",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-idp/tests/bearer.rs",
         "source": "spec-edge"
       },
@@ -256,6 +260,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-idp/testdata/tokens/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/testdata/tokens/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-idp/tests/bearer.rs"
           }
         ],
@@ -466,5 +483,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "e1f453270a62014a2b9702d3b5659204af15d82712ff97f8242cfe8158189e96"
+  "shardHash": "bd56eedc63dfbc78355d255c7bf5abe3a0bd0d2bc46a2ef5f96f39956c544a09"
 }

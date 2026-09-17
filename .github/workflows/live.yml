@@ -17,10 +17,8 @@
 # Advisory, and deliberately so (spec 037, decided 2026-09-17): it publishes
 # no status check that branch protection requires and sits outside the
 # ci-gate chain (spec 001 D-9), beside `image.yml`. It boots real rauthy
-# processes, and a slow runner is a flake rather than a defect. It also
-# carries one known failure (spec 037 D-7, below), so it cannot become
-# required until that is reconciled; when it does, add it to `ci.yml`'s
-# `needs` rather than to the branch rule.
+# processes with wall-clock readiness budgets. Any change to required-check
+# policy is the owner's decision; local proof does not change that policy.
 
 name: live
 
@@ -114,6 +112,8 @@ jobs:
           HQL_NODES=1 127.0.0.1:8100 127.0.0.1:8200
           HQL_LISTEN_ADDR_API=127.0.0.1
           HQL_LISTEN_ADDR_RAFT=127.0.0.1
+          HQL_SECRET_RAFT=RahiLiveRaftSecret0123456789abcdefghijklmnopqrstuvwxyz0123456789
+          HQL_SECRET_API=RahiLiveApiClusterSecret0123456789abcdefghijklmnopqrstuvwxyz0123456789
           ENC_KEYS=live/9/KslT9sVWd0aEnR9e0AVrd4aTue/etZIqCm4PsjsnU=
           ENC_KEY_ACTIVE=live
           ENABLE_DYN_CLIENT_REG=true
@@ -160,13 +160,9 @@ jobs:
       # budget assertion under full parallelism, and 27s with all six green
       # when it had the machine to itself.
       #
-      # KNOWN RED, and left red on purpose (spec 037 D-7): rauthy 0.36.1
-      # added `dynamic clients must not request a `resource``, and spec 025
-      # AC-2 asks for both a dynamically registered client and an RFC 8707
-      # audience. That test was verified against 0.36.0, the image pin moved
-      # to 0.36.2, and nothing ran it against the new pin until this workflow
-      # existed. Reconciling spec 025 with the pinned release is a human's;
-      # tolerating the failure here would be the green run that says nothing.
+      # The bearer flow uses the administrator-provisioned default audience
+      # supported by the pin, with real-token audience negative controls
+      # (spec 037 D-7 correction). Dynamic clients send no resource parameter.
       - name: The whole suite, with rauthy and no skips allowed
         env:
           RAHI_REQUIRE_RAUTHY: "1"
@@ -175,10 +171,7 @@ jobs:
           RAHI_TEST_RAUTHY_API_KEY: ${{ env.LIVE_API_KEY_NAME }}$${{ env.LIVE_API_KEY_SECRET }}
           RAHI_TEST_RAUTHY_USER: ${{ env.LIVE_ADMIN }}
           RAHI_TEST_RAUTHY_PASSWORD: ${{ env.LIVE_ADMIN_PASSWORD }}
-        # `--no-fail-fast`, because one known-red test must not hide every
-        # test binary after it: cargo stops at the first failing binary, and
-        # with the bearer failure below that would leave `rahi-ops` and
-        # `rahi-store` unrun and unreported.
+        # Keep every test binary's result visible when any one fails.
         run: cargo test --workspace --locked --no-fail-fast -- --test-threads=2
 
       - name: rauthy's log, on a failure

@@ -37,6 +37,7 @@ extends:
   - { spec: "033-dev-substrate-and-harness", unit: "crates/rahi-harness/src/boot.rs", nature: additive }
   - { spec: "033-dev-substrate-and-harness", unit: "crates/rahi-harness/tests/boot.rs", nature: additive }
   - { spec: "025-api-tokens-and-resource-server", unit: "crates/rahi-idp/tests/bearer.rs", nature: additive }
+  - { spec: "025-api-tokens-and-resource-server", unit: "crates/rahi-idp/testdata/tokens/", nature: additive }
   - { spec: "034-hello-cell", unit: "apps/hello-cell/tests/e2e.rs", nature: additive }
   - { spec: "021-idp-proxy-and-discovery", unit: "crates/rahi-idp/tests/discovery.rs", nature: additive }
   - { spec: "032-cluster-topology", unit: "deploy/README.md", nature: additive }
@@ -396,6 +397,53 @@ the revision-3 register). The spec stays `draft` until a human flips it.
   the workflow, and quietly tolerating it would be the green-that-says-
   nothing B-4 removed.
 
+  **Correction appended 2026-09-17 (administered default audience).** The
+  measurements above stand, but the inference that 025 AC-2 requires a
+  `resource` request parameter is incorrect. AC-2 requires dynamic
+  registration, authorization code with PKCE, a loopback redirect, scoped
+  admission and insufficient-scope refusal. B-3 and D-2 require the signed
+  audience to contain the cell origin. D-12 already administers the
+  registered client. None of those requires that request parameter.
+
+  Checked against tagged upstream `v0.36.2` before implementation:
+  [`Client::validate_resource_request`](https://github.com/sebadob/rauthy/blob/v0.36.2/src/data/src/entity/clients.rs#L967-L1008)
+  refuses a dynamic client's resource request;
+  [`update_client`](https://github.com/sebadob/rauthy/blob/v0.36.2/src/service/src/client.rs#L59-L70)
+  persists administrator-supplied `default_aud` without excluding dynamic
+  clients; and
+  [`TokenSet::build_access_token`](https://github.com/sebadob/rauthy/blob/v0.36.2/src/service/src/token_set.rs#L180-L194)
+  adds those audiences independently of a resource request. The live test
+  now sets `default_aud = [cell_origin]` in its existing admin update, reads
+  it back, and omits `resource` from authorization and code exchange.
+  Registration remains token-gated and dynamic, the client remains public,
+  signatures remain RS256, PKCE remains S256, the redirect remains exactly
+  `http://127.0.0.1:9876/callback`, and the scope grants are unchanged.
+
+  Measured locally against the pinned image digest from D-3, reporting
+  rauthy `0.36.2`: the administered client issues a token with the client id
+  and cell origin in `aud`; `/api/read` answers `200`; `/api/write` answers
+  `403` with `insufficient_scope` naming `api:write`. Two more real tokens
+  from the same client and user, with the same scope grant, prove the
+  negatives: clearing `default_aud` yields only the client id in `aud`, and
+  setting it to `https://other-resource.invalid` yields that wrong origin
+  beside the client id. Both pass signature, issuer and time validation and
+  fail specifically on audience; `/api/read` answers `401 invalid_token`.
+  The production validator is unchanged. The original cell-bound token
+  still answers `200` after these admin changes, as local JWT validation
+  promises. No approved B, FR or AC text changes, no static client or image
+  upgrade is needed, and this administered mechanism claims no universal
+  RFC 8707 or MCP interoperability.
+
+  The disposable fixture also exposed two setup defects: `live.yml`
+  omitted the pinned rauthy's mandatory `HQL_SECRET_RAFT` and
+  `HQL_SECRET_API`, so it exited at boot; it now supplies test-only values.
+  The bearer test resolved `localhost` to `::1` ahead of the fixture's IPv4
+  listener; its back-channel selection now prefers IPv4 when available.
+  The recipe gains an additive ownership edge on 025's token testdata.
+  The original D-7 is retained above as historical evidence. Local proof
+  resolves its mechanism inference; 037 AC-2 still requires the actual PR's
+  `live.yml` run, so implementation remains `in-progress`.
+
 - **D-8 (2026-09-17; a backup admin that cannot be provisioned does not
   stop the cell).** B-1 puts the provisioning in `supervise`'s readiness
   step, beside the client bootstrap, and the spec does not say what a
@@ -417,6 +465,14 @@ beside `ci-gate`, and not a required check. It cannot become required while
 D-7 stands.
 
 ## Status
+
+- **2026-09-17 (administered audience follow-up).** The D-7 correction
+  records a locally passing dynamic-client flow and real-token audience
+  negative controls against pinned rauthy 0.36.2. AC-2 and the PR half of
+  FR-003 remain pending until `live.yml` passes on the actual pull request.
+  The coordinator owns that check and lifecycle follow-up. N=1 and
+  origin-bound backup passkey limits remain unchanged; consumers require a
+  merged, released version of this work.
 
 - **2026-09-17.** B-1 to B-6 are built and measured (the evidence is in D-3,
   D-4 and D-7). AC-1, AC-3 and AC-4 hold; FR-001, FR-002, FR-003, FR-004 and
