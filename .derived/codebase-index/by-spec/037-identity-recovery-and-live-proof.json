@@ -11,6 +11,16 @@
         "code": "W-001",
         "message": "spec '037-identity-recovery-and-live-proof' file unit 'crates/rahi-ops/tests/rauthy_restore.rs' does not exist",
         "path": "crates/rahi-ops/tests/rauthy_restore.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '037-identity-recovery-and-live-proof' file unit 'crates/rahi-ops/src/rauthy_session.rs' does not exist",
+        "path": "crates/rahi-ops/src/rauthy_session.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '037-identity-recovery-and-live-proof' file unit 'crates/rahi-store/tests/backup_freshness.rs' does not exist",
+        "path": "crates/rahi-store/tests/backup_freshness.rs"
       }
     ]
   },
@@ -32,11 +42,23 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-cli/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-harness/src/boot.rs",
         "source": "spec-edge"
       },
       {
         "path": "crates/rahi-idp/tests/discovery.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/first_boot.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/lib.rs",
         "source": "spec-edge"
       },
       {
@@ -58,6 +80,10 @@
       {
         "path": "deploy/README.md",
         "source": "spec-edge"
+      },
+      {
+        "path": "deploy/k8s/secret.example.yaml",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
@@ -76,7 +102,25 @@
         "sourceField": "establishes",
         "unit": {
           "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_session.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
           "path": "crates/rahi-ops/tests/rauthy_restore.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/backup_freshness.rs"
         }
       },
       {
@@ -108,6 +152,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-cli/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-harness/src/boot.rs"
           }
         ],
@@ -129,6 +186,32 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-idp/tests/discovery.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/first_boot.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/first_boot.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/lib.rs"
         }
       },
       {
@@ -199,6 +282,19 @@
       {
         "locations": [
           {
+            "file": "deploy/k8s/secret.example.yaml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/secret.example.yaml"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "docs/design/01-consumer-contract.md"
           }
         ],
@@ -224,8 +320,8 @@
       }
     ],
     "specId": "037-identity-recovery-and-live-proof",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "e4130f82c832b998cca8fef8de8331386519d9faf7c5b521d93eb2562a035bf8"
+  "shardHash": "4486549d5437c708a9c36405b29a8e01e23da1cc365adfbfd99cfd21e5e9c1a4"
 }
