@@ -107,19 +107,34 @@ With `RAHI_TEST_RAUTHY` naming a rauthy binary the whole path runs: boot
 with rauthy, log in, create two notes, list, delete one, be denied
 `db.migrate` with a decision id, read the trace ring and the exposure
 table as an operator, verify the ledger and assert the denial is the last
-record, back up, restore into a fresh volume, boot again on the restored
-volume, and assert the remaining note and the same ledger head.
+record, and then recovery with identity (spec 037 B-6):
 
-Two parts of that path do not touch the real rauthy. The backup's rauthy
-part is answered by a stub on rauthy's address, because a live rauthy
-refuses the admin API key on its backup routes (spec 030 D-3); and the
-boot on the restored volume mounts no identity, because nothing yet hands
-the restored rauthy snapshot to rauthy. What the round trip proves is the
-app's store, its chain, and its keys.
+1. restart the same volume on the same ports, with rauthy, and read a note
+   through the session that was open before the restart: it renews against
+   the rauthy that came back, and the chain head is where it was;
+2. back up that running cell, against that real rauthy. Nothing is stubbed:
+   the verb attaches to the running node for the app's snapshot and logs in
+   as the dedicated passkey-only backup admin for rauthy's;
+3. restore into a fresh volume and boot it *with* identity on the same
+   ports, where the supervisor hands rauthy the snapshot the restore placed;
+4. assert alice's original `sub`, the note readable behind her session on
+   the restored cell, the marker's record of the hand-off, and the same
+   ledger head.
+
+Nothing in that path stubs rauthy any more, and no part of it mounts a cell
+without identity. A skip is a pass only when the runner did not ask for
+rauthy: with `RAHI_REQUIRE_RAUTHY=1`, which `.github/workflows/live.yml`
+sets, an absent `RAHI_TEST_RAUTHY` fails the test by name.
 
 ```sh
 RAHI_TEST_RAUTHY=/path/to/rauthy cargo test -p hello-cell --locked
 ```
+
+It boots rauthy three times and takes minutes rather than seconds: a rauthy
+needs the better part of a minute to come up, and `rahi supervise` gives it
+sixty seconds, so a loaded host can push a boot past the budget. That is
+load, not a regression. `live.yml` runs the same test against the rauthy
+release `docker/Dockerfile` pins.
 
 With `attest-ledger` on the PATH (or `RAHI_TEST_ATTEST_LEDGER` naming it)
 the exported chain is also verified by that independent CLI.

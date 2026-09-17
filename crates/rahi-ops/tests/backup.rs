@@ -55,16 +55,45 @@ async fn one_archive_holds_every_part() {
     let dirs = |d: &str| parts.iter().filter(|p| p.dir() == d).count();
     assert_eq!(dirs(APP_DIR), 1, "one app snapshot");
     assert_eq!(dirs(RAUTHY_DIR), 1, "one rauthy snapshot");
-    assert_eq!(dirs(KEYS_DIR), KeySet::REQUIRED.len(), "every key file");
+    // Every file in the key directory, named rather than counted: the
+    // required set, rauthy's own secrets, and the backup admin's passkey
+    // (spec 037 B-1). The passkey is not in `REQUIRED`, because a key set
+    // minted before that spec has none; it is in the archive, because a
+    // restored cell needs the private key whose registration the restored
+    // rauthy holds.
+    let mut key_parts: Vec<&str> = parts
+        .iter()
+        .filter(|p| p.dir() == KEYS_DIR)
+        .map(rahi_ops::archive::Part::name)
+        .collect();
+    key_parts.sort_unstable();
+    assert_eq!(
+        key_parts,
+        vec![
+            "backup.key",
+            "backup_passkey.json",
+            "hiqlite.json",
+            "ledger.key",
+            "rauthy.json",
+            "rauthy_admin_token",
+            "session.key",
+        ]
+    );
+    for required in KeySet::REQUIRED {
+        assert!(key_parts.contains(&required), "{required} is carried");
+    }
     let rauthy = parts.iter().find(|p| p.dir() == RAUTHY_DIR).unwrap();
     assert_eq!(rauthy.bytes, b"rauthy-snapshot-bytes");
-    assert_eq!(rauthy.name(), "backup_node_1_1.sqlite");
-    let (triggers, fetched) = {
+    let (triggers, fetched, taken) = {
         let log = stub.log.lock().unwrap();
-        (log.triggers, log.fetched.clone())
+        (log.triggers, log.fetched.clone(), log.taken.clone())
     };
     assert_eq!(triggers, 1, "rauthy was asked for exactly one snapshot");
-    assert_eq!(fetched, vec!["backup_node_1_1.sqlite".to_owned()]);
+    // The snapshot fetched is the one this trigger produced, named for the
+    // second it was issued at (spec 037 B-1).
+    let expected = format!("backup_node_1_{}.sqlite", taken[0]);
+    assert_eq!(rauthy.name(), expected);
+    assert_eq!(fetched, vec![expected]);
 
     store.shutdown().await.unwrap();
 }

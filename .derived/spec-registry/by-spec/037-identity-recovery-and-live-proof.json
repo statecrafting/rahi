@@ -28,6 +28,10 @@
       {
         "kind": "file",
         "path": "crates/rahi-store/tests/backup_freshness.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/tests/rauthy_backup_admin.rs"
       }
     ],
     "extends": [
@@ -37,6 +41,14 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-store/src/backup.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "011-store-hiqlite",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/Cargo.toml"
         }
       },
       {
@@ -73,6 +85,38 @@
       },
       {
         "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/cli.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/common/mod.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/backup.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/first_boot.rs"
+        }
+      },
+      {
+        "nature": "additive",
         "spec": "031-single-container-packaging",
         "unit": {
           "kind": "file",
@@ -93,6 +137,22 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-harness/src/boot.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "033-dev-substrate-and-harness",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-harness/tests/boot.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "025-api-tokens-and-resource-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/bearer.rs"
         }
       },
       {
@@ -176,6 +236,6 @@
     "summary": "Recovery of a cell is two state systems, and only one of them recovers today. Against a real rauthy the backup verb fails outright, because rauthy's backup routes accept only an admin session and the verb presents the admin API key (030 D-3, observed against 0.36.2). The app half races hiqlite's background backup and can report no file for a backup that lands a moment later (observed on two of four runs). A restore places rauthy's snapshot and nothing hands it to rauthy, so a restored cell comes up with no users, and every sub in its rows is unreachable. CI never runs a real rauthy. This spec resolves D-3 by the mechanism a human chooses, waits for the app backup to exist, applies rauthy's snapshot exactly once on the next start, and adds a CI job that runs every rauthy-gated test, and an end-to-end test through recovery with identity, against the pinned rauthy release.\n",
     "title": "Identity recovery and the live proof: a backup a real rauthy answers, a restore that brings the users back, and CI that runs against the pinned release"
   },
-  "shardHash": "d0c279d3c7f4e9b54a570733d94001a47c7debad08a4ea7d7cd7535afb5df712",
+  "shardHash": "33e78a8651a210dcb53bf74440351bbd207690f60df0cf2f625fbd17d85b08c6",
   "specVersion": "1.3.0"
 }

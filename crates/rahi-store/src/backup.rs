@@ -3,12 +3,58 @@
 //! `backup` issues hiqlite's `VACUUM main INTO` on the writer thread and,
 //! with an S3 target configured, encrypts and pushes the file. Restore is
 //! not here: it is a cluster reset and a boot-time concern of spec 030.
+//!
+//! # What a backup returns (spec 037 B-2)
+//!
+//! hiqlite's `Client::backup` returns before the file exists, and it
+//! *silently ignores* a request made within [`SUPPRESSION_WINDOW`] of the
+//! last one while acknowledging it as success (hiqlite 0.14,
+//! `state_machine/sqlite/writer.rs`). Reporting the newest file on disk
+//! after such a call reports somebody else's snapshot as this call's.
+//!
+//! What makes freshness decidable is the name: hiqlite writes
+//! `backup_node_<id>_<ts>.sqlite`, where `<ts>` is the epoch second at
+//! which the request was issued, and the writer applies the log in order,
+//! so the `VACUUM` behind a snapshot whose `<ts>` is at or after the
+//! second this process triggered in ran after that trigger, whoever issued
+//! it. Age on disk proves nothing of the kind and is not used.
+//!
+//! So [`StoreHandle::backup`] serialises rahi's own requests, waits out
+//! the remainder of the suppression window before it triggers, accepts
+//! only a snapshot at or after its own trigger second, triggers again when
+//! an outside request wins the window, and bounds the whole sequence by
+//! one deadline. It never reports a stale file as a success.
+
+use std::time::{Duration, Instant};
 
 use rahi_types::Error;
 use serde::{Deserialize, Serialize};
 
 use crate::error::map;
 use crate::store::StoreHandle;
+
+/// How long the whole of [`StoreHandle::backup`] may take: the wait for
+/// hiqlite's suppression window, the trigger, and the wait for the file
+/// (spec 037 B-2).
+pub const BACKUP_DEADLINE: Duration = Duration::from_secs(120);
+
+/// hiqlite ignores a backup request made within this long of the one
+/// before and acknowledges it anyway. Its timer is process-local, so the
+/// first request after a restart is never suppressed.
+pub const SUPPRESSION_WINDOW: Duration = Duration::from_secs(60);
+
+/// How long one trigger is given to produce its file before the sequence
+/// assumes the request was suppressed and tries again inside the deadline.
+pub const FILE_WAIT: Duration = Duration::from_secs(30);
+
+/// How often the local listing is re-read while waiting.
+pub const POLL_INTERVAL: Duration = Duration::from_millis(200);
+
+/// One process takes one backup at a time, so that two callers of this
+/// chassis never race each other into hiqlite's suppression window. It
+/// says nothing about a request from outside this process, which is what
+/// the trigger-second rule is for.
+static ONE_AT_A_TIME: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 /// The name of one backup file, `backup_node_<id>_<ts>.sqlite`.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -21,6 +67,29 @@ impl BackupId {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    /// The epoch second hiqlite named this snapshot for: the second the
+    /// request that produced it was issued at.
+    #[must_use]
+    pub fn taken_at(&self) -> Option<i64> {
+        snapshot_ts(&self.0)
+    }
+}
+
+/// The `<ts>` of `backup_node_<id>_<ts>.sqlite`.
+#[must_use]
+pub fn snapshot_ts(name: &str) -> Option<i64> {
+    name.strip_prefix("backup_node_")?
+        .strip_suffix(".sqlite")?
+        .rsplit_once('_')
+        .and_then(|(_, ts)| ts.parse().ok())
+}
+
+/// Seconds since the epoch.
+fn unix_now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX))
 }
 
 /// One snapshot as listed locally or in S3.
@@ -35,29 +104,121 @@ pub struct BackupListing {
 }
 
 impl StoreHandle {
-    /// Take a backup. Leader-only.
+    /// Take a backup and return the snapshot it produced. Leader-only.
+    ///
+    /// Bounded by [`BACKUP_DEADLINE`]; see the module documentation for
+    /// what makes the returned snapshot this call's and not an older one.
     ///
     /// # Errors
     ///
     /// [`Error::Stale`] on a follower: the caller retries against the
-    /// leader; [`Error::Upstream`] when hiqlite fails to write it.
+    /// leader; [`Error::Upstream`] when hiqlite fails to write it, or when
+    /// the deadline runs out before a snapshot of this call's own exists.
     pub async fn backup(&self) -> Result<BackupId, Error> {
+        self.backup_within(BACKUP_DEADLINE).await
+    }
+
+    /// [`StoreHandle::backup`] under a deadline of your own. A deadline
+    /// shorter than the remaining suppression window is a refusal, not a
+    /// stale file.
+    ///
+    /// # Errors
+    ///
+    /// As [`StoreHandle::backup`].
+    pub async fn backup_within(&self, deadline: Duration) -> Result<BackupId, Error> {
         if !self.is_leader().await {
             return Err(Error::Stale(
                 "backup is leader-only; this node is a follower".to_owned(),
             ));
         }
-        let before: Vec<BackupListing> = self.backup_list_local().await?;
-        self.client().backup().await.map_err(map)?;
-        let after = self.backup_list_local().await?;
-        after
+        // Two callers of this process never race each other into hiqlite's
+        // suppression window; the trigger-second rule below covers anyone
+        // else (spec 037 B-2).
+        let _serialised = ONE_AT_A_TIME.lock().await;
+        let started = Instant::now();
+        let expired = |waited: Duration| -> Error {
+            Error::Upstream(format!(
+                "no snapshot of this backup's own within the {} second deadline (waited {}): \
+                 hiqlite ignores a backup request within {} seconds of the one before, and \
+                 the window did not clear",
+                deadline.as_secs(),
+                waited.as_secs(),
+                SUPPRESSION_WINDOW.as_secs(),
+            ))
+        };
+        loop {
+            // hiqlite would ignore a trigger inside the window of the
+            // newest snapshot, and answer success anyway. Wait it out.
+            if let Some(wait) = self.suppressed_for().await? {
+                if started.elapsed() + wait > deadline {
+                    return Err(expired(started.elapsed()));
+                }
+                tokio::time::sleep(wait).await;
+            }
+            if started.elapsed() >= deadline {
+                return Err(expired(started.elapsed()));
+            }
+            let trigger = unix_now();
+            self.client().backup().await.map_err(map)?;
+            let wait_until = started + FILE_WAIT.min(deadline.saturating_sub(started.elapsed()));
+            loop {
+                if let Some(id) = self.snapshot_since(trigger).await? {
+                    return Ok(id);
+                }
+                if Instant::now() >= wait_until {
+                    // Either the trigger was suppressed by a request from
+                    // outside this process, or the writer is slow. Both are
+                    // answered the same way: go round, wait the window out
+                    // again, and trigger again inside the deadline.
+                    break;
+                }
+                tokio::time::sleep(POLL_INTERVAL).await;
+            }
+            if started.elapsed() >= deadline {
+                return Err(expired(started.elapsed()));
+            }
+        }
+    }
+
+    /// How long until hiqlite would stop ignoring a backup request, given
+    /// the newest snapshot already on disk. `None` when it would take one
+    /// now.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Io`] when the backup directory cannot be read.
+    pub async fn suppressed_for(&self) -> Result<Option<Duration>, Error> {
+        let newest = self
+            .backup_list_local()
+            .await?
+            .iter()
+            .filter_map(|l| l.id.taken_at())
+            .max();
+        let Some(newest) = newest else {
+            return Ok(None);
+        };
+        let age = unix_now().saturating_sub(newest);
+        let window = i64::try_from(SUPPRESSION_WINDOW.as_secs()).unwrap_or(60);
+        if (0..window).contains(&age) {
+            // One second past the window: hiqlite compares against a
+            // timestamp of its own taking, which may be a fraction later
+            // than the second its file name carries.
+            let remaining = u64::try_from(window - age).unwrap_or(0).saturating_add(1);
+            return Ok(Some(Duration::from_secs(remaining)));
+        }
+        Ok(None)
+    }
+
+    /// The snapshot this call's trigger produced: one whose name carries a
+    /// second at or after `trigger`. Nothing older is this call's.
+    async fn snapshot_since(&self, trigger: i64) -> Result<Option<BackupId>, Error> {
+        Ok(self
+            .backup_list_local()
+            .await?
             .into_iter()
-            .filter(|l| !before.iter().any(|b| b.id == l.id))
+            .filter(|l| l.id.taken_at().is_some_and(|ts| ts >= trigger))
             .map(|l| l.id)
-            .max()
-            .ok_or_else(|| {
-                Error::Upstream("backup completed but no new file was listed".to_owned())
-            })
+            .max())
     }
 
     /// The snapshots under the local backup directory.

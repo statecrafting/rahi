@@ -60,13 +60,27 @@ pub struct Exit {
     pub reason: Reason,
 }
 
+/// hiqlite's restore variable, which rauthy reads at its node's start.
+///
+/// The app's own node never sees it (spec 030 [`crate::RESTORE_ENV_VAR`]
+/// refuses to start while it is set): this is set on rauthy's child
+/// process alone, by the supervisor, for exactly one start, and the
+/// restore marker is what makes it exactly one (spec 037 B-3).
+pub const RAUTHY_RESTORE_ENV_VAR: &str = crate::RESTORE_ENV_VAR;
+
 /// The rauthy child's command: the binary, its rendered environment, its
 /// empty config, and its directory.
+///
+/// After a restore whose snapshot rauthy has not yet come up on, the
+/// command also carries [`RAUTHY_RESTORE_ENV_VAR`] pointing at the placed
+/// snapshot, which is how rauthy's own store is restored: the app hands
+/// rauthy a file and never opens rauthy's directory (constitution VIII,
+/// spec 037 B-3). Every other start passes nothing.
 ///
 /// # Errors
 ///
 /// [`Error::Io`] when the rendered environment cannot be read (run
-/// `first-boot`).
+/// `first-boot`), or when the restore marker cannot be read.
 pub fn rauthy_command(config: &Config, env: &dyn EnvReader) -> Result<Command> {
     let bin = env
         .get(ENV_RAUTHY_BIN)
@@ -93,7 +107,76 @@ pub fn rauthy_command(config: &Config, env: &dyn EnvReader) -> Result<Command> {
             command.env(inherited, value);
         }
     }
+    if let Some(snapshot) = crate::restore::pending_rauthy_snapshot(config)? {
+        command.env(
+            RAUTHY_RESTORE_ENV_VAR,
+            format!("file:{}", snapshot.display()),
+        );
+    }
     Ok(command)
+}
+
+/// The readiness step of a supervised start (spec 037 B-1, B-3): record a
+/// restored snapshot that rauthy has now come up on, and make sure rauthy
+/// holds the dedicated backup admin this key set's passkey belongs to.
+///
+/// Called after [`wait_healthy`] and before the client bootstrap. Each
+/// half is a no-op on every start but the one that needs it, and each
+/// returns what it did so the supervisor can say so.
+///
+/// # Errors
+///
+/// [`Error::Io`] when the restore marker cannot be written; whatever
+/// [`crate::rauthy_session::ensure_backup_admin`] returns.
+pub async fn ready_after_health(
+    config: &Config,
+    keys: &KeySet,
+    api: &RauthyApi,
+) -> Result<ReadySteps> {
+    let restored = crate::restore::record_rauthy_snapshot_applied(config).await?;
+    let provisioned = match keys.backup_passkey()? {
+        Some(passkey) => Some(
+            crate::rauthy_session::ensure_backup_admin(api.base(), api.token(), &passkey).await?,
+        ),
+        None => None,
+    };
+    Ok(ReadySteps {
+        rauthy_snapshot_applied: restored,
+        backup_admin: provisioned,
+    })
+}
+
+/// What [`ready_after_health`] did.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ReadySteps {
+    /// The restored rauthy snapshot this start applied, if any.
+    pub rauthy_snapshot_applied: Option<PathBuf>,
+    /// What became of the backup admin, or `None` when this key set holds
+    /// no passkey (one minted before spec 037).
+    pub backup_admin: Option<crate::rauthy_session::Provisioned>,
+}
+
+impl ReadySteps {
+    /// One line for the supervisor's own output, or nothing to say.
+    #[must_use]
+    pub fn render(&self) -> String {
+        let mut said = Vec::new();
+        if let Some(path) = &self.rauthy_snapshot_applied {
+            said.push(format!("rauthy restored from {}", path.display()));
+        }
+        match self.backup_admin {
+            Some(crate::rauthy_session::Provisioned::Created) => {
+                said.push("backup admin provisioned".to_owned());
+            }
+            Some(crate::rauthy_session::Provisioned::AlreadyPresent) => {}
+            None => said.push(format!(
+                "no {}: this key set predates spec 037, and `rahi backup` cannot take \
+                 rauthy's half until the deployment is given one",
+                crate::BACKUP_PASSKEY_FILE
+            )),
+        }
+        said.join("; ")
+    }
 }
 
 /// Poll rauthy's health until it answers or `budget` runs out.

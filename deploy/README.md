@@ -58,9 +58,17 @@ is how three pods share one ledger key, one session key, one backup key,
 and one rauthy admin. Mint the set once, anywhere the image runs:
 
 ```sh
-docker run --rm -e RAHI_PUBLIC_URL=https://cell.example.com \
+docker run --rm --entrypoint rahi -e RAHI_PUBLIC_URL=https://cell.example.com \
   ghcr.io/statecrafting/rahi:0.1.0 first-boot --export > rahi-keys.yaml
 ```
+
+`--entrypoint rahi` is load bearing. The image's entry point is
+`entrypoint.sh`, which takes no arguments and runs `first-boot`, `migrate`,
+`exec supervise`; without the override the arguments are discarded and the
+command starts a cell instead of rendering a Secret (spec 037 D-6).
+`RAHI_PUBLIC_URL` is load bearing too: the backup admin's passkey in the set
+is minted for that origin's WebAuthn relying party, and a Secret minted for
+one origin does not authenticate against another.
 
 The document is a complete `Secret` named `rahi-keys` (the shape is in
 `k8s/secret.example.yaml`). It holds every key of the deployment,
@@ -133,22 +141,55 @@ bucket's lifecycle rule, not the chassis's. A restore is spec 030's
 is single-shot: the archive's keys are the cell's keys, so `rahi-keys`
 must be the same set the archive carries.
 
-One known hold, inherited from spec 030 D-3: against a real rauthy the
-backup verb's admin token is refused on the backup routes (they want an
-admin session). Until that is resolved the CronJob's run fails at the
-rauthy part with rauthy's error; the failure is the known hold, not a
-manifest defect.
+Both halves of an archive are now taken through the systems that own them,
+and both gaps that stood here are closed (spec 037).
 
-A second gap sits on the restore side. `rahi restore` places rauthy's
-snapshot under `/data/restore/rauthy/` and names it in the marker, and
-nothing hands it to rauthy on the next start: the supervisor starts rauthy
-from its rendered environment only. A restore therefore recovers the
-app's store, its decision chain, and the key set; rauthy comes up on its
-own directory as it finds it, which on a fresh volume is empty. Every
-principal id in the app's rows is rauthy's `sub`, so a cell restored
-without rauthy's state holds rows no user can reach until rauthy's
-database is restored by hand. `docs/design/01-consumer-contract.md` tracks
-both gaps.
+**rauthy's half.** Its backup routes take an admin session with MFA
+satisfied and refuse an API key, and `ADMIN_FORCE_MFA` is one instance-wide
+setting this chassis never turns off. So the deployment carries a dedicated
+rauthy admin of its own whose only credential is a passkey: the private key
+is minted into the key set at first boot, `supervise` registers its public
+half with rauthy on the first start and converts the account to passkey
+only, and `rahi backup` completes rauthy's WebAuthn assertion from that
+custodied key. The account holds no password, so nothing behind the verb
+can expire. A key set minted before this existed holds no
+`backup_passkey.json`, and both `supervise` and `backup` say so by name.
+
+**The restore hand-off.** `rahi restore` still places rauthy's snapshot
+under `/data/restore/rauthy/` and names it in the marker. The next
+supervised start hands that file to rauthy's own hiqlite restore, waits for
+rauthy's health, and records the application in the marker; every later
+start passes nothing. The app never opens rauthy's directory. A restored
+cell therefore comes back with its users, and every `sub` in the app's rows
+resolves to the person it did before.
+
+**What a backup is, and is not.** Each snapshot is taken for the backup
+that asked for it. hiqlite ignores a backup request within sixty seconds of
+the one before and answers it as success anyway, so both halves wait that
+window out before triggering and accept only a snapshot stamped at or after
+their own trigger; a deadline that cannot outlast the window is an error,
+never a stale file reported as fresh. The default deadline is 120 seconds
+per store, which is why a backup taken soon after another can take a minute.
+
+The two stores are still two stores. Each half is fresh as of its own
+trigger, and nothing makes the pair a coordinated instant: the app's
+snapshot and rauthy's are taken seconds apart, and no claim of a common
+evidence head across them is supported by this mechanism.
+
+**What has been exercised, and where.** `apps/hello-cell/tests/e2e.rs` backs
+a live cell up against a real rauthy, restores into a fresh volume, boots it
+with identity on the same ports, and asserts the original `sub`, the note
+behind that principal's session, and the same ledger head; it also restarts
+a cell without a restore and asserts the session renews and the head is
+unchanged. `.github/workflows/live.yml` runs it against the rauthy release
+`docker/Dockerfile` pins, with `RAHI_REQUIRE_RAUTHY=1` so a missing rauthy
+fails the run rather than skipping it. That workflow is advisory today and
+is not a required check.
+
+All of it is N=1. Restore at N=3 is deferred (spec 037 D-2): hiqlite
+restores on node 1 and makes the other nodes delete their data and rejoin,
+and that path has not been exercised. Do not promise unattended recovery of
+a three-replica cell.
 
 ## Token lifetimes and revocation
 

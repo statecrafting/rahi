@@ -20,15 +20,23 @@ establishes:
   - "crates/rahi-ops/tests/rauthy_restore.rs"
   - "crates/rahi-ops/src/rauthy_session.rs"
   - "crates/rahi-store/tests/backup_freshness.rs"
+  - "crates/rahi-ops/tests/rauthy_backup_admin.rs"
 extends:
   - { spec: "011-store-hiqlite", unit: "crates/rahi-store/src/backup.rs", nature: additive }
+  - { spec: "011-store-hiqlite", unit: "crates/rahi-store/Cargo.toml", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/rauthy_api.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/restore.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/lib.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/lib.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-cli/tests/cli.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-ops/tests/common/mod.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-ops/tests/backup.rs", nature: additive }
+  - { spec: "031-single-container-packaging", unit: "crates/rahi-ops/tests/first_boot.rs", nature: additive }
   - { spec: "031-single-container-packaging", unit: "crates/rahi-ops/src/supervise.rs", nature: additive }
   - { spec: "031-single-container-packaging", unit: "crates/rahi-ops/src/first_boot.rs", nature: additive }
   - { spec: "033-dev-substrate-and-harness", unit: "crates/rahi-harness/src/boot.rs", nature: additive }
+  - { spec: "033-dev-substrate-and-harness", unit: "crates/rahi-harness/tests/boot.rs", nature: additive }
+  - { spec: "025-api-tokens-and-resource-server", unit: "crates/rahi-idp/tests/bearer.rs", nature: additive }
   - { spec: "034-hello-cell", unit: "apps/hello-cell/tests/e2e.rs", nature: additive }
   - { spec: "021-idp-proxy-and-discovery", unit: "crates/rahi-idp/tests/discovery.rs", nature: additive }
   - { spec: "032-cluster-topology", unit: "deploy/README.md", nature: additive }

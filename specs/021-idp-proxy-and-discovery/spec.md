@@ -292,6 +292,21 @@ IdP (an operator concern documented in 031).
   publishes and softens an exact-equality check on the one field that says
   which deployment a token came from.
 
+- **D-11 (2026-09-17, recorded by spec 037's build session under its B-4;
+  where FR-005 is proven).** This spec's FR-004 moved to spec 031 FR-005 in
+  D-8, and the assertion stayed written in `tests/discovery.rs` "where that
+  arrangement will find it". It never found it: the test checked that
+  `RAHI_TEST_RAUTHY` named an existing file, printed that booting rauthy
+  needs spec 031's container, and returned, so it could not fail. Spec 037
+  B-4 removed it and asks that its proof be named here. FR-005 is proven in
+  `apps/hello-cell/tests/e2e.rs`, which boots the pinned rauthy release
+  through the harness, logs a real user in, and reads discovery through this
+  crate's proxy, and in `.github/workflows/live.yml`, which runs that test
+  on every change to `crates/`, `apps/`, `docker/`, or `deploy/` with
+  `RAHI_REQUIRE_RAUTHY=1`, so an absent rauthy fails the run instead of
+  skipping it. Nothing this spec requires changes: the requirement moved in
+  D-8, and this entry records only where the evidence now lives.
+
 ## Verification
 
 ```verify:cli

@@ -1,29 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '037-identity-recovery-and-live-proof' file unit '.github/workflows/live.yml' does not exist",
-        "path": ".github/workflows/live.yml"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '037-identity-recovery-and-live-proof' file unit 'crates/rahi-ops/tests/rauthy_restore.rs' does not exist",
-        "path": "crates/rahi-ops/tests/rauthy_restore.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '037-identity-recovery-and-live-proof' file unit 'crates/rahi-ops/src/rauthy_session.rs' does not exist",
-        "path": "crates/rahi-ops/src/rauthy_session.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '037-identity-recovery-and-live-proof' file unit 'crates/rahi-store/tests/backup_freshness.rs' does not exist",
-        "path": "crates/rahi-store/tests/backup_freshness.rs"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "011-store-hiqlite",
@@ -33,6 +8,10 @@
       "034-hello-cell"
     ],
     "implementingPaths": [
+      {
+        "path": ".github/workflows/live.yml",
+        "source": "spec-edge"
+      },
       {
         "path": "apps/hello-cell/README.md",
         "source": "spec-edge"
@@ -46,7 +25,19 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-cli/tests/cli.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-harness/src/boot.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-harness/tests/boot.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/tests/bearer.rs",
         "source": "spec-edge"
       },
       {
@@ -66,6 +57,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-ops/src/rauthy_session.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-ops/src/restore.rs",
         "source": "spec-edge"
       },
@@ -74,7 +69,35 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-ops/tests/backup.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/tests/common/mod.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/tests/first_boot.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/tests/rauthy_backup_admin.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/tests/rauthy_restore.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-store/src/backup.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/tests/backup_freshness.rs",
         "source": "spec-edge"
       },
       {
@@ -88,7 +111,11 @@
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": ".github/workflows/live.yml"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -97,7 +124,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/rauthy_session.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -106,7 +137,24 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ops/tests/rauthy_backup_admin.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/rauthy_backup_admin.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/tests/rauthy_restore.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -115,7 +163,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-store/tests/backup_freshness.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -165,6 +217,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-cli/tests/cli.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/cli.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-harness/src/boot.rs"
           }
         ],
@@ -173,6 +238,32 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-harness/src/boot.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-harness/tests/boot.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-harness/tests/boot.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/tests/bearer.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/bearer.rs"
         }
       },
       {
@@ -256,6 +347,58 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-ops/tests/backup.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/backup.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/tests/common/mod.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/common/mod.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/tests/first_boot.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/first_boot.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-store/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-store/src/backup.rs"
           }
         ],
@@ -323,5 +466,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "4486549d5437c708a9c36405b29a8e01e23da1cc365adfbfd99cfd21e5e9c1a4"
+  "shardHash": "750d8c17ef3f0c2088ac20f7e0b22467f60a85fbe54feb8c943acec56079556b"
 }

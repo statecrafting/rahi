@@ -44,6 +44,7 @@ pub async fn run(env: &dyn EnvReader, app_name: &str) -> Result<Outcome> {
 
     if is_empty_dir(keys.dir()) {
         let credentials = keys::generate(&keys)?;
+        mint_backup_passkey(&config, &keys)?;
         let secrets = keys.rauthy_secrets()?;
         write_rauthy_files(&config, &secrets, app_name, ports, true)?;
         return Ok(Outcome::Generated(credentials));
@@ -53,6 +54,23 @@ pub async fn run(env: &dyn EnvReader, app_name: &str) -> Result<Outcome> {
     let secrets = keys.rauthy_secrets()?;
     let env_rendered = write_rauthy_files(&config, &secrets, app_name, ports, false)?;
     Ok(Outcome::Verified { env_rendered })
+}
+
+/// Mint the backup admin's passkey into a key set being created (spec 037
+/// B-1).
+///
+/// It is minted here rather than in [`keys::generate`] for one reason: a
+/// key set is created in two places, `run` above and [`export`] below, and
+/// only the second knows it is rendering a Secret that will be mounted
+/// read only, where nothing can ever be added later. Both call this.
+///
+/// # Errors
+///
+/// [`Error::Io`] when entropy is refused or the file cannot be written;
+/// [`Error::Config`] when the public URL names no relying party.
+pub fn mint_backup_passkey(config: &Config, keys: &KeySet) -> Result<()> {
+    let passkey = crate::rauthy_session::Passkey::generate(config)?;
+    keys.write(crate::BACKUP_PASSKEY_FILE, passkey.to_json()?.as_bytes())
 }
 
 /// The volume layout (B-1): the four directories, the key directory at
@@ -157,10 +175,12 @@ pub const EXPORT_SECRET_NAME: &str = "rahi-keys";
 ///
 /// # Errors
 ///
-/// [`Error::Io`] when entropy is refused or the temporary directory cannot
-/// be written.
-pub fn export() -> Result<String> {
+/// [`Error::Config`] when `RAHI_PUBLIC_URL` is absent, which the relying
+/// party of the backup admin's passkey is derived from; [`Error::Io`] when
+/// entropy is refused or the temporary directory cannot be written.
+pub fn export(env: &dyn EnvReader) -> Result<String> {
     use base64::Engine as _;
+    let config = Config::from_env(env)?;
     let dir = tempfile::tempdir().map_err(|err| {
         Error::Io(format!(
             "a private temporary directory cannot be made: {err}"
@@ -168,6 +188,9 @@ pub fn export() -> Result<String> {
     })?;
     let keys = KeySet::at(dir.path().join("keys"));
     keys::generate(&keys)?;
+    // The backup admin's passkey is part of the set, and a mounted Secret
+    // is never written to again (spec 037 B-1).
+    mint_backup_passkey(&config, &keys)?;
     let mut out = String::new();
     out.push_str(&format!(
         "# Rendered once by `rahi first-boot --export` (spec 032 B-2). Custody this\n\

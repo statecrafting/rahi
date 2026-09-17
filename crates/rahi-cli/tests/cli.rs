@@ -60,6 +60,23 @@ impl Volume {
         )
         .unwrap();
         keys.write(rahi_ops::ADMIN_TOKEN_FILE, b"token").unwrap();
+        // Spec 037 B-1: the key set carries the backup admin's passkey,
+        // because rauthy's backup routes take an admin session and the API
+        // key above is refused on them.
+        let passkey_config = rahi_types::Config::from_env(&std::collections::BTreeMap::from([(
+            "RAHI_PUBLIC_URL",
+            "http://localhost:8080",
+        )]))
+        .unwrap();
+        keys.write(
+            rahi_ops::BACKUP_PASSKEY_FILE,
+            rahi_ops::rauthy_session::Passkey::generate(&passkey_config)
+                .unwrap()
+                .to_json()
+                .unwrap()
+                .as_bytes(),
+        )
+        .unwrap();
         let env = vec![
             (
                 "RAHI_PUBLIC_URL".to_owned(),
@@ -386,15 +403,21 @@ fn backup_without_rauthy_is_exit_3_and_writes_nothing() {
     assert!(!volume.path().join("backups").exists());
 }
 
-/// A stub rauthy on its own runtime thread: the two backup routes and
-/// health, accepting the volume's admin token.
+/// A stub rauthy on its own runtime thread: health, the login ceremony the
+/// backup admin drives (spec 037 B-1), and the three backup routes.
+///
+/// It answers the ceremony without verifying the assertion: what is under
+/// test here is the verb, and the credential itself is verified against the
+/// pinned release by `rahi-ops`'s live test (037 FR-006). Its snapshots are
+/// named the way hiqlite names them, `backup_node_<id>_<ts>.sqlite`, because
+/// that name is what tells the verb which snapshot is its own.
 struct StubRauthy {
     addr: String,
     _runtime: tokio::runtime::Runtime,
 }
 
 fn stub_rauthy() -> StubRauthy {
-    use axum::routing::get;
+    use axum::routing::{get, post};
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
         .enable_all()
@@ -404,23 +427,72 @@ fn stub_rauthy() -> StubRauthy {
         .block_on(tokio::net::TcpListener::bind("127.0.0.1:0"))
         .unwrap();
     let addr = listener.local_addr().unwrap().to_string();
-    let taken = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    // Every accepted trigger records the second it arrived in, which is
+    // what the file name carries.
+    let taken: std::sync::Arc<std::sync::Mutex<Vec<i64>>> =
+        std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
     let list = taken.clone();
+    let code = "a".repeat(48);
+    let login_code = code.clone();
     let app = axum::Router::new()
         .route("/auth/v1/health", get(|| async { "ok" }))
         .route(
+            "/auth/v1/oidc/session",
+            post(|| async {
+                (
+                    [(axum::http::header::SET_COOKIE, "RauthySession=stub; Path=/")],
+                    serde_json::json!({"csrf_token": "stub-csrf"}).to_string(),
+                )
+            }),
+        )
+        // Difficulty zero: any counter solves it, so the verb's own solver
+        // returns at once and the stub stays a stub.
+        .route("/auth/v1/pow", post(|| async { "1:0:0:salt:hash:" }))
+        .route(
+            "/auth/v1/oidc/authorize",
+            post(move || {
+                let code = code.clone();
+                async move { serde_json::json!({"code": code, "exp": 60}).to_string() }
+            }),
+        )
+        .route(
+            "/auth/v1/users/webauthn_start",
+            post(move || {
+                let code = login_code.clone();
+                async move {
+                    serde_json::json!({
+                        "code": code,
+                        "rcr": {"publicKey": {"challenge": "c3R1Yg"}},
+                    })
+                    .to_string()
+                }
+            }),
+        )
+        .route("/auth/v1/users/webauthn_finish", post(|| async { "{}" }))
+        .route(
             "/auth/v1/backup",
             get(move || {
-                let n = list.load(std::sync::atomic::Ordering::SeqCst);
+                let taken = list.lock().unwrap().clone();
                 async move {
-                    let local: Vec<serde_json::Value> = (1..=n)
-                        .map(|i| serde_json::json!({"name": format!("rauthy_backup_{i}.sqlite"), "last_modified": i, "size": 6}))
+                    let local: Vec<serde_json::Value> = taken
+                        .iter()
+                        .map(|ts| {
+                            serde_json::json!({
+                                "name": format!("backup_node_1_{ts}.sqlite"),
+                                "last_modified": ts,
+                                "size": 6,
+                            })
+                        })
                         .collect();
                     serde_json::json!({"local": local, "s3": []}).to_string()
                 }
             })
             .post(move || {
-                taken.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs() as i64;
+                taken.lock().unwrap().push(now);
                 async { "" }
             }),
         )
@@ -457,13 +529,39 @@ fn backup_and_restore_round_trip_through_the_binary() {
         .find(|p| p.extension().is_some_and(|e| e == "age"))
         .expect("one archive landed");
 
-    // A --to directory outside the volume works the same way. hiqlite names
-    // its snapshot by the second, so two backups need a second between them.
-    std::thread::sleep(std::time::Duration::from_millis(1100));
+    // A --to directory outside the volume works the same way. This second
+    // backup falls inside hiqlite's sixty second suppression window, on
+    // both stores, so the verb waits it out and produces a snapshot of its
+    // own rather than sealing the one already on disk (spec 037 B-1, B-2).
+    // That wait is why this test takes a minute; shortening it would mean
+    // accepting a stale archive as a fresh one.
+    let second = std::time::Instant::now();
     let elsewhere = tempfile::tempdir().unwrap();
     let run = source.run(&["backup", "--to", elsewhere.path().to_str().unwrap()]);
     assert_eq!(run.code, 0, "{}", run.stderr);
     assert_eq!(std::fs::read_dir(elsewhere.path()).unwrap().count(), 1);
+    assert!(
+        second.elapsed() >= std::time::Duration::from_secs(30),
+        "the second backup waited the window out"
+    );
+    let snapshots: Vec<String> = std::fs::read_dir(
+        source
+            .path()
+            .join("hiqlite")
+            .join("state_machine")
+            .join("backups"),
+    )
+    .map(|entries| {
+        entries
+            .filter_map(|e| Some(e.ok()?.file_name().to_string_lossy().into_owned()))
+            .collect()
+    })
+    .unwrap_or_default();
+    assert_eq!(
+        snapshots.len(),
+        2,
+        "two backups, two app snapshots: {snapshots:?}"
+    );
 
     let fresh = Volume::new();
     std::fs::remove_dir_all(fresh.path().join("keys")).unwrap();

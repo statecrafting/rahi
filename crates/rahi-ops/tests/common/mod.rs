@@ -1,5 +1,6 @@
 //! One deployment in a temp directory: a key set, a single-voter node, and
-//! a stub rauthy that answers the two backup routes (spec 030 FR-001).
+//! a stub rauthy that answers the login ceremony the backup admin drives
+//! (spec 037 B-1) and the three backup routes (spec 030 FR-001).
 
 #![allow(
     dead_code,
@@ -17,7 +18,7 @@ use axum::Router;
 use axum::extract::{Path as AxumPath, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::IntoResponse;
-use axum::routing::get;
+use axum::routing::{get, post};
 use base64::Engine as _;
 use rahi_kernel::Manifest;
 use rahi_ledger::{Hash, Ledger};
@@ -96,6 +97,39 @@ pub fn write_keys(dir: &Path) -> KeySet {
     .unwrap();
     keys.write(rahi_ops::ADMIN_TOKEN_FILE, ADMIN_TOKEN.as_bytes())
         .unwrap();
+    // rauthy's own secrets, which first boot mints and the supervisor
+    // renders rauthy's environment from.
+    keys.write(
+        rahi_ops::RAUTHY_SECRETS_FILE,
+        serde_json::to_string(&rahi_ops::rauthy_env::RauthySecrets {
+            enc_key_id: "test".to_owned(),
+            enc_key: base64::engine::general_purpose::STANDARD.encode([9u8; 32]),
+            secret_raft: "rauthy-raft-secret-for-tests-000".to_owned(),
+            secret_api: "rauthy-api-secret-for-tests-0000".to_owned(),
+            admin_email: "admin@localhost".to_owned(),
+            admin_password: "admin-password-for-tests".to_owned(),
+            api_key_name: "rahi".to_owned(),
+            api_key_secret: "x".repeat(64),
+        })
+        .unwrap()
+        .as_bytes(),
+    )
+    .unwrap();
+    // Spec 037 B-1: the credential `rahi backup` presents to rauthy.
+    let passkey_config = Config::from_env(&BTreeMap::from([(
+        "RAHI_PUBLIC_URL",
+        "http://localhost:8080",
+    )]))
+    .unwrap();
+    keys.write(
+        rahi_ops::BACKUP_PASSKEY_FILE,
+        rahi_ops::rauthy_session::Passkey::generate(&passkey_config)
+            .unwrap()
+            .to_json()
+            .unwrap()
+            .as_bytes(),
+    )
+    .unwrap();
     keys
 }
 
@@ -137,6 +171,10 @@ pub async fn open_ledger(store: &Store, keys: &KeySet) -> Ledger {
 pub struct StubLog {
     pub triggers: usize,
     pub fetched: Vec<String>,
+    pub logins: usize,
+    /// The epoch second of each accepted trigger, which is what the
+    /// snapshot it produced is named for (spec 037 B-2).
+    pub taken: Vec<i64>,
 }
 
 #[derive(Clone)]
@@ -162,9 +200,28 @@ impl Drop for Stub {
 }
 
 impl Stub {
+    /// The client the verbs use: the admin token for health, and a backup
+    /// passkey for the backup routes (spec 037 B-1).
     pub fn api(&self) -> RauthyApi {
-        RauthyApi::new(format!("http://{}", self.addr), ADMIN_TOKEN).unwrap()
+        self.api_with(Some(test_passkey()))
     }
+
+    /// The same client with a credential of your choosing, or none.
+    pub fn api_with(&self, passkey: Option<rahi_ops::rauthy_session::Passkey>) -> RauthyApi {
+        RauthyApi::new(format!("http://{}", self.addr), ADMIN_TOKEN)
+            .unwrap()
+            .with_passkey(passkey)
+    }
+}
+
+/// A credential for the stub, which does not verify assertions.
+pub fn test_passkey() -> rahi_ops::rauthy_session::Passkey {
+    let config = Config::from_env(&BTreeMap::from([(
+        "RAHI_PUBLIC_URL",
+        "http://localhost:8080",
+    )]))
+    .unwrap();
+    rahi_ops::rauthy_session::Passkey::generate(&config).unwrap()
 }
 
 /// Serve a stub whose backup body is `body`; `refuse` makes it answer 401.
@@ -177,6 +234,12 @@ pub async fn stub(body: &[u8], refuse: bool) -> Stub {
     };
     let app = Router::new()
         .route("/auth/v1/health", get(|| async { StatusCode::OK }))
+        .route("/auth/v1/oidc/session", post(session))
+        // Difficulty zero: the verb's own solver returns at once.
+        .route("/auth/v1/pow", post(|| async { "1:0:0:salt:hash:" }))
+        .route("/auth/v1/oidc/authorize", post(authorize))
+        .route("/auth/v1/users/webauthn_start", post(webauthn_start))
+        .route("/auth/v1/users/webauthn_finish", post(webauthn_finish))
         .route("/auth/v1/backup", get(list).post(trigger))
         .route("/auth/v1/backup/local/{name}", get(fetch))
         .with_state(state);
@@ -188,19 +251,73 @@ pub async fn stub(body: &[u8], refuse: bool) -> Stub {
     Stub { addr, log, handle }
 }
 
+/// The stub's session cookie, which is what a backup route looks for. A
+/// refusing stub answers the ceremony and then refuses the routes, which is
+/// what a real rauthy does to a session that is not MFA-satisfied.
+const SESSION_COOKIE: &str = "RauthySession=stub";
+
 fn authorised(state: &StubState, headers: &HeaderMap) -> bool {
     !state.refuse
         && headers
-            .get("authorization")
+            .get("cookie")
             .and_then(|v| v.to_str().ok())
-            .is_some_and(|v| v == format!("API-Key {ADMIN_TOKEN}"))
+            .is_some_and(|v| v.contains(SESSION_COOKIE))
+}
+
+async fn session(State(state): State<StubState>) -> impl IntoResponse {
+    state.log.lock().unwrap().logins += 1;
+    (
+        StatusCode::CREATED,
+        [(
+            axum::http::header::SET_COOKIE,
+            format!("{SESSION_COOKIE}; Path=/"),
+        )],
+        serde_json::json!({ "csrf_token": "stub-csrf" }).to_string(),
+    )
+}
+
+async fn authorize() -> impl IntoResponse {
+    (
+        StatusCode::OK,
+        serde_json::json!({ "code": "a".repeat(48), "exp": 60 }).to_string(),
+    )
+}
+
+async fn webauthn_start() -> impl IntoResponse {
+    (
+        StatusCode::OK,
+        serde_json::json!({
+            "code": "a".repeat(48),
+            "rcr": { "publicKey": { "challenge": "c3R1Yg" } },
+        })
+        .to_string(),
+    )
+}
+
+async fn webauthn_finish() -> impl IntoResponse {
+    (StatusCode::ACCEPTED, "{}")
+}
+
+fn now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64
 }
 
 async fn trigger(State(state): State<StubState>, headers: HeaderMap) -> impl IntoResponse {
     if !authorised(&state, &headers) {
         return StatusCode::UNAUTHORIZED;
     }
-    state.log.lock().unwrap().triggers += 1;
+    let mut log = state.log.lock().unwrap();
+    log.triggers += 1;
+    // hiqlite names a snapshot for the second its request was issued at,
+    // and ignores a request inside the window of the last one; the stub
+    // does both, because that is what the verb's freshness rule reads.
+    let now = now();
+    if log.taken.last().is_none_or(|last| now - last >= 60) {
+        log.taken.push(now);
+    }
     StatusCode::OK
 }
 
@@ -208,12 +325,13 @@ async fn list(State(state): State<StubState>, headers: HeaderMap) -> impl IntoRe
     if !authorised(&state, &headers) {
         return (StatusCode::UNAUTHORIZED, String::new());
     }
-    let n = state.log.lock().unwrap().triggers;
-    let local: Vec<serde_json::Value> = (1..=n)
-        .map(|i| {
+    let taken = state.log.lock().unwrap().taken.clone();
+    let local: Vec<serde_json::Value> = taken
+        .iter()
+        .map(|ts| {
             serde_json::json!({
-                "name": format!("backup_node_1_{i}.sqlite"),
-                "last_modified": 1_700_000_000 + i as i64,
+                "name": format!("backup_node_1_{ts}.sqlite"),
+                "last_modified": ts,
                 "size": state.body.len(),
             })
         })

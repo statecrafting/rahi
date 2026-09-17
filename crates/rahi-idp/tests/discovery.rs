@@ -295,36 +295,17 @@ fn the_default_options_are_the_spec_defaults() {
 
 // -------------------------------------------------- spec 031 FR-005
 
-/// The live-rauthy run: with `RAHI_TEST_RAUTHY` naming a binary, boot it,
-/// bootstrap the client, and read discovery through the proxy. Without one,
-/// say so and pass: an absent operator prerequisite is not a failing chassis.
-///
-/// The requirement moved to spec 031 FR-005 (spec 021 D-8): booting rauthy
-/// needs the configuration file, the admin token, and the container that
-/// spec builds, none of which this crate owns. The assertion stays written
-/// here, where that arrangement will find it.
-#[tokio::test]
-async fn a_real_rauthy_issues_under_the_public_url() {
-    let Ok(binary) = std::env::var("RAHI_TEST_RAUTHY") else {
-        eprintln!(
-            "skipped: set RAHI_TEST_RAUTHY to a rauthy binary to run the integration \
-             check (spec 031 FR-005)"
-        );
-        return;
-    };
-    assert!(
-        std::path::Path::new(&binary).exists(),
-        "RAHI_TEST_RAUTHY names {binary}, which does not exist"
-    );
-    // The boot, the bootstrap, and the proxied discovery read are spec 031's
-    // container to arrange: it supplies rauthy's configuration file, its
-    // admin API key, and the key set. What this test owns is the assertion,
-    // and it is written where that arrangement will find it.
-    eprintln!(
-        "skipped: {binary} needs the container spec 031 builds (configuration, \
-         admin key, key set) before it can be booted from a test"
-    );
-}
+// The live-rauthy assertion that stood here never booted anything: it
+// checked that `RAHI_TEST_RAUTHY` named an existing file, printed that the
+// boot needs the container spec 031 builds, and returned. Spec 037 B-4
+// removed it, because a test that cannot fail is a green run that says
+// nothing. FR-005 is proven where the container is at hand: in
+// `apps/hello-cell/tests/e2e.rs`, which boots the pinned rauthy through the
+// harness, logs a real user in, and reads discovery through this crate's
+// proxy; `.github/workflows/live.yml` runs it on every change to the
+// crates, the app, the image, or the deployment, with
+// `RAHI_REQUIRE_RAUTHY=1` so an absent rauthy fails rather than skips. Spec
+// 021's D-11 records the same.
 
 /// The configuration a real run would use is the one the unit tests fix.
 #[test]

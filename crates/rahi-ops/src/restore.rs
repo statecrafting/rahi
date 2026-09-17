@@ -42,6 +42,15 @@ pub struct Marker {
     pub restored: u64,
     /// Where rauthy's snapshot was placed for rauthy's own restore.
     pub rauthy_snapshot: String,
+    /// When the supervisor handed that snapshot to rauthy and rauthy came
+    /// up healthy on it, seconds since the epoch (spec 037 B-3). `None` is
+    /// "not yet", which is what a restore writes and what every start
+    /// before the first healthy one reads. Absent in a marker written
+    /// before spec 037, which reads as `None` and is applied on the next
+    /// start: the restored rauthy of such a volume is empty, so applying
+    /// it is the repair.
+    #[serde(default)]
+    pub rauthy_snapshot_applied: Option<u64>,
     /// The archive manifest that was applied.
     pub manifest: ArchiveManifest,
 }
@@ -68,6 +77,67 @@ impl Marker {
             }),
         }
     }
+}
+
+/// rauthy's snapshot that is placed but not yet applied (spec 037 B-3).
+///
+/// `None` when there is no marker, when it names no snapshot, when the
+/// snapshot is gone, or when the marker records that rauthy already came up
+/// on it. The file's presence is not the signal: the marker is, so that a
+/// snapshot kept beside the volume for an operator to inspect is never
+/// applied twice.
+///
+/// # Errors
+///
+/// [`Error::Io`] or [`Error::Validation`] when the marker cannot be read.
+pub fn pending_rauthy_snapshot(config: &Config) -> Result<Option<PathBuf>> {
+    let Some(marker) = Marker::read(&crate::restore_marker(config))? else {
+        return Ok(None);
+    };
+    if marker.rauthy_snapshot_applied.is_some() || marker.rauthy_snapshot.is_empty() {
+        return Ok(None);
+    }
+    let path = PathBuf::from(&marker.rauthy_snapshot);
+    if !path.is_file() {
+        return Ok(None);
+    }
+    Ok(Some(path))
+}
+
+/// Record that rauthy came up healthy on the snapshot the marker names
+/// (spec 037 B-3), so that no later start hands it to rauthy again.
+///
+/// Written after rauthy is healthy and not before: a marker written first
+/// and a rauthy that then fails to start would leave a placed snapshot
+/// nothing ever applies, and a cell with rows no principal can reach. The
+/// cost of the other order is bounded and small: a process that dies
+/// between rauthy's health and this write applies the same snapshot once
+/// more on the next start, which is idempotent in content and loses only
+/// what rauthy wrote in that window.
+///
+/// # Errors
+///
+/// [`Error::Io`] when the marker cannot be read or written;
+/// [`Error::Validation`] when it does not parse.
+pub async fn record_rauthy_snapshot_applied(config: &Config) -> Result<Option<PathBuf>> {
+    let path = crate::restore_marker(config);
+    let Some(mut marker) = Marker::read(&path)? else {
+        return Ok(None);
+    };
+    if marker.rauthy_snapshot_applied.is_some() || marker.rauthy_snapshot.is_empty() {
+        return Ok(None);
+    }
+    let applied = PathBuf::from(&marker.rauthy_snapshot);
+    marker.rauthy_snapshot_applied = Some(crate::unix_now());
+    let bytes = serde_json::to_vec_pretty(&marker)
+        .map_err(|err| Error::Io(format!("the restore marker cannot be serialised: {err}")))?;
+    tokio::fs::write(&path, bytes).await.map_err(|err| {
+        Error::Io(format!(
+            "restore marker {} cannot be written: {err}",
+            path.display()
+        ))
+    })?;
+    Ok(Some(applied))
 }
 
 /// How a restore ended.
@@ -155,6 +225,7 @@ pub async fn run(config: &Config, archive_path: &Path, key: &KeySource) -> Resul
         sha256: archive::sha256_hex(&sealed),
         restored: crate::unix_now(),
         rauthy_snapshot: rauthy_snapshot.display().to_string(),
+        rauthy_snapshot_applied: None,
         manifest,
     };
     let bytes = serde_json::to_vec_pretty(&marker)

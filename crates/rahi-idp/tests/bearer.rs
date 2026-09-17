@@ -711,6 +711,13 @@ async fn the_proxy_subtree_carries_its_own_credentials_through() {
 /// fixture that proves the kernel refuses a payload carrying one. Nothing in
 /// the list creates, stores, hashes, or compares a credential of this app's.
 ///
+/// Spec 037 B-1 added a third thing this codebase presents, and it is worth
+/// saying why it is not a fourth kind of credential: the backup admin is a
+/// principal of *rauthy's*, and the key set holds an authenticator for it,
+/// the way a phone holds one. The account, its roles, and the registration
+/// that makes the key mean anything are rauthy's rows; nothing here issues a
+/// credential the app then honours, which is what B-1 forbids.
+///
 /// The allowlist is asserted to be exact, so an entry that stops offending
 /// has to be removed rather than left to rot into a permanent hole.
 #[test]
@@ -757,10 +764,6 @@ fn no_credential_is_minted_anywhere_in_this_workspace() {
             "the operator's S3 access key for an s3:// backup destination (spec 030 D-7)",
         ),
         (
-            "crates/rahi-ops/src/rauthy_api.rs",
-            "presents rauthy's admin key on the backup calls (spec 030 B-5)",
-        ),
-        (
             "crates/rahi-ops/src/keys.rs",
             "first boot provisions rauthy's own bootstrap API key (spec 031 B-2)",
         ),
@@ -775,6 +778,20 @@ fn no_credential_is_minted_anywhere_in_this_workspace() {
         (
             "crates/rahi-ops/tests/first_boot.rs",
             "asserts the provisioned key and rauthy's floor on its length",
+        ),
+        (
+            "crates/rahi-ops/src/rauthy_session.rs",
+            "presents rauthy's admin key to provision the backup admin, and holds \
+             the authenticator for a WebAuthn credential rauthy registers and owns \
+             (spec 037 B-1)",
+        ),
+        (
+            "crates/rahi-ops/tests/common/mod.rs",
+            "the stub rauthy the verb tests present that same admin key to",
+        ),
+        (
+            "crates/rahi-ops/tests/rauthy_backup_admin.rs",
+            "the live proof, which reads the operator's admin key out of the environment",
         ),
     ]);
 
@@ -901,6 +918,18 @@ fn between<'t>(text: &'t str, open: &str, close: &str) -> Option<&'t str> {
 
 // ------------------------------------------------------------- AC-2
 
+/// Spec 037 B-4: a skip is a pass only when the runner did not ask for
+/// rauthy. With `RAHI_REQUIRE_RAUTHY=1`, which `live.yml` sets, an absent
+/// variable fails the test by name instead of printing `skipped` into a
+/// green run.
+fn skip(message: &str) {
+    assert!(
+        std::env::var("RAHI_REQUIRE_RAUTHY").as_deref() != Ok("1"),
+        "RAHI_REQUIRE_RAUTHY=1 and skipped: {message}"
+    );
+    eprintln!("skipped: {message}");
+}
+
 /// The origin of an already running rauthy, which opts this run in (D-10).
 const LIVE_URL: &str = "RAHI_TEST_RAUTHY_URL";
 /// The registration token that rauthy's `token` mode requires (B-7).
@@ -941,10 +970,10 @@ const LIVE_REDIRECT: &str = "http://127.0.0.1:9876/callback";
 #[tokio::test]
 async fn a_real_rauthy_admits_a_registered_client_by_scope() {
     let Ok(origin) = std::env::var(LIVE_URL) else {
-        eprintln!(
-            "skipped: set {LIVE_URL} to the origin of a running rauthy (for example \
+        skip(&format!(
+            "set {LIVE_URL} to the origin of a running rauthy (for example \
              http://localhost:8080) to run AC-2; see testdata/tokens/README.md"
-        );
+        ));
         return;
     };
     let origin = origin.trim_end_matches('/').to_owned();

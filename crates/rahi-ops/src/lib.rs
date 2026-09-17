@@ -38,6 +38,7 @@ pub mod migrate;
 pub mod preflight;
 pub mod rauthy_api;
 pub mod rauthy_env;
+pub mod rauthy_session;
 pub mod restore;
 pub mod supervise;
 
@@ -69,6 +70,20 @@ pub const BACKUP_KEY_FILE: &str = "backup.key";
 /// rauthy's admin API key, the credential the bootstrap and backup calls
 /// carry (spec 021 B-5).
 pub const ADMIN_TOKEN_FILE: &str = "rauthy_admin_token";
+
+/// The backup admin's passkey (spec 037 B-1): a JSON
+/// `rauthy_session::Passkey` holding the relying party, the login name, the
+/// credential id, and the ES256 private key whose public half rauthy holds.
+///
+/// It is the credential `rahi backup` presents, because rauthy's backup
+/// routes take an admin session with MFA satisfied and nothing else. It is
+/// minted with the rest of the key set (`first-boot`, and
+/// `first-boot --export`), because a key set mounted read-only can never be
+/// written to later, and it is carried by every archive, so a restored cell
+/// holds the private key whose registration the restored rauthy holds. Not
+/// in [`KeySet::REQUIRED`]: a key set minted before spec 037 has none, and
+/// `supervise` says so rather than refusing to start.
+pub const BACKUP_PASSKEY_FILE: &str = "backup_passkey.json";
 
 /// rauthy's own secrets (spec 031 B-2): a JSON `rauthy_env::RauthySecrets`
 /// holding its encryption key, its hiqlite secrets, the bootstrap admin
@@ -299,6 +314,21 @@ impl KeySet {
     /// As [`KeySet::read_text`].
     pub fn admin_token(&self) -> Result<String> {
         self.read_text(ADMIN_TOKEN_FILE)
+    }
+
+    /// The backup admin's passkey from [`BACKUP_PASSKEY_FILE`], or `None`
+    /// when this key set was minted before spec 037 and holds none.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Io`] when the file exists but cannot be read;
+    /// [`Error::Config`] when it is not a passkey document.
+    pub fn backup_passkey(&self) -> Result<Option<rauthy_session::Passkey>> {
+        let path = self.path(BACKUP_PASSKEY_FILE);
+        if !path.exists() {
+            return Ok(None);
+        }
+        rauthy_session::Passkey::from_json(&self.read_text(BACKUP_PASSKEY_FILE)?).map(Some)
     }
 
     /// Every file in the set, name and bytes, sorted by name: what a backup

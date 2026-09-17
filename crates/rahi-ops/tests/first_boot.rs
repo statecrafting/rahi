@@ -68,6 +68,10 @@ async fn first_boot_mints_every_key_once_and_a_second_run_changes_nothing() {
         names,
         vec![
             "backup.key",
+            // spec 037 B-1: the backup admin's passkey is part of the set,
+            // minted here because a key set mounted read-only can never be
+            // added to later.
+            "backup_passkey.json",
             "hiqlite.json",
             "ledger.key",
             "rauthy.json",
@@ -81,6 +85,15 @@ async fn first_boot_mints_every_key_once_and_a_second_run_changes_nothing() {
     keys.ledger_signer().expect("the ledger seed parses");
     keys.store_secrets().expect("the store secrets parse");
     keys.backup_identity().expect("the backup identity parses");
+    let passkey = keys
+        .backup_passkey()
+        .expect("the backup passkey parses")
+        .expect("first boot minted one");
+    assert_eq!(passkey.rp_id(), "localhost", "rauthy's RP_ID for this cell");
+    assert_eq!(
+        passkey.email(),
+        rahi_ops::rauthy_session::BACKUP_ADMIN_EMAIL
+    );
     let rauthy = keys.rauthy_secrets().expect("rauthy's secrets parse");
     assert_eq!(keys.admin_token().unwrap(), rauthy.api_token());
     assert!(
