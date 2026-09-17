@@ -396,6 +396,21 @@ the revision-3 register). The spec stays `draft` until a human flips it.
   the workflow, and quietly tolerating it would be the green-that-says-
   nothing B-4 removed.
 
+- **D-8 (2026-09-17; a backup admin that cannot be provisioned does not
+  stop the cell).** B-1 puts the provisioning in `supervise`'s readiness
+  step, beside the client bootstrap, and the spec does not say what a
+  refusal there should do. The client bootstrap is fatal, because a cell
+  that cannot authenticate anyone is not a cell. The backup admin is not:
+  the cell serves without it, and a start that fails takes rauthy's own
+  admin interface down with it, which is the one place an operator could
+  repair the account that a refusal usually names (a credential rauthy
+  holds that this key set did not mint). So the refusal is reported on
+  every start, loudly and by name, and `rahi backup` refuses rauthy's half
+  when the day comes. Writing the restore marker stays fatal for the
+  opposite reason: a volume that silently re-restores is the crash loop
+  spec 030 exists to remove. Not covered: `preflight` does not check this
+  yet, so the only signals are the supervisor's line and the verb itself.
+
 Still open: whether `live.yml` becomes a required check or stays advisory
 beside `ci-gate`. Decided for now by the owner on 2026-09-17: advisory,
 beside `ci-gate`, and not a required check. It cannot become required while

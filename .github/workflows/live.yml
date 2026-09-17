@@ -175,7 +175,11 @@ jobs:
           RAHI_TEST_RAUTHY_API_KEY: ${{ env.LIVE_API_KEY_NAME }}$${{ env.LIVE_API_KEY_SECRET }}
           RAHI_TEST_RAUTHY_USER: ${{ env.LIVE_ADMIN }}
           RAHI_TEST_RAUTHY_PASSWORD: ${{ env.LIVE_ADMIN_PASSWORD }}
-        run: cargo test --workspace --locked -- --test-threads=2
+        # `--no-fail-fast`, because one known-red test must not hide every
+        # test binary after it: cargo stops at the first failing binary, and
+        # with the bearer failure below that would leave `rahi-ops` and
+        # `rahi-store` unrun and unreported.
+        run: cargo test --workspace --locked --no-fail-fast -- --test-threads=2
 
       - name: rauthy's log, on a failure
         if: failure()

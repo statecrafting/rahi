@@ -120,29 +120,44 @@ pub fn rauthy_command(config: &Config, env: &dyn EnvReader) -> Result<Command> {
 /// restored snapshot that rauthy has now come up on, and make sure rauthy
 /// holds the dedicated backup admin this key set's passkey belongs to.
 ///
-/// Called after [`wait_healthy`] and before the client bootstrap. Each
-/// half is a no-op on every start but the one that needs it, and each
-/// returns what it did so the supervisor can say so.
+/// Called after [`wait_healthy`] and before the client bootstrap. Each half
+/// is a no-op on every start but the one that needs it, and each returns
+/// what it did so the supervisor can say so.
+///
+/// The two halves fail differently on purpose. A restore marker that cannot
+/// be written is fatal: the next start would hand rauthy the same snapshot
+/// again, and a volume that silently re-restores is the crash loop spec
+/// 030 exists to remove. A backup admin that cannot be provisioned is
+/// **not** fatal, it is reported: the cell serves without it, and a cell
+/// that refuses to start takes rauthy's own admin interface down with it,
+/// which is the one place an operator could repair the account. `rahi
+/// backup` is where the consequence lands, and it names the credential it
+/// wanted.
 ///
 /// # Errors
 ///
-/// [`Error::Io`] when the restore marker cannot be written; whatever
-/// [`crate::rauthy_session::ensure_backup_admin`] returns.
+/// [`Error::Io`] when the restore marker cannot be written.
 pub async fn ready_after_health(
     config: &Config,
     keys: &KeySet,
     api: &RauthyApi,
 ) -> Result<ReadySteps> {
     let restored = crate::restore::record_rauthy_snapshot_applied(config).await?;
-    let provisioned = match keys.backup_passkey()? {
-        Some(passkey) => Some(
-            crate::rauthy_session::ensure_backup_admin(api.base(), api.token(), &passkey).await?,
-        ),
-        None => None,
+    let backup_admin = match keys.backup_passkey() {
+        Ok(Some(passkey)) => {
+            match crate::rauthy_session::ensure_backup_admin(api.base(), api.token(), &passkey)
+                .await
+            {
+                Ok(outcome) => Ok(Some(outcome)),
+                Err(err) => Err(err.to_string()),
+            }
+        }
+        Ok(None) => Ok(None),
+        Err(err) => Err(err.to_string()),
     };
     Ok(ReadySteps {
         rauthy_snapshot_applied: restored,
-        backup_admin: provisioned,
+        backup_admin,
     })
 }
 
@@ -151,12 +166,19 @@ pub async fn ready_after_health(
 pub struct ReadySteps {
     /// The restored rauthy snapshot this start applied, if any.
     pub rauthy_snapshot_applied: Option<PathBuf>,
-    /// What became of the backup admin, or `None` when this key set holds
-    /// no passkey (one minted before spec 037).
-    pub backup_admin: Option<crate::rauthy_session::Provisioned>,
+    /// What became of the backup admin: `Ok(None)` when this key set holds
+    /// no passkey (one minted before spec 037), `Err` when rauthy refused,
+    /// which is reported rather than fatal.
+    pub backup_admin: std::result::Result<Option<crate::rauthy_session::Provisioned>, String>,
 }
 
 impl ReadySteps {
+    /// Whether this start left the cell able to back rauthy up.
+    #[must_use]
+    pub fn can_back_rauthy_up(&self) -> bool {
+        matches!(self.backup_admin, Ok(Some(_)))
+    }
+
     /// One line for the supervisor's own output, or nothing to say.
     #[must_use]
     pub fn render(&self) -> String {
@@ -164,15 +186,19 @@ impl ReadySteps {
         if let Some(path) = &self.rauthy_snapshot_applied {
             said.push(format!("rauthy restored from {}", path.display()));
         }
-        match self.backup_admin {
-            Some(crate::rauthy_session::Provisioned::Created) => {
+        match &self.backup_admin {
+            Ok(Some(crate::rauthy_session::Provisioned::Created)) => {
                 said.push("backup admin provisioned".to_owned());
             }
-            Some(crate::rauthy_session::Provisioned::AlreadyPresent) => {}
-            None => said.push(format!(
+            Ok(Some(crate::rauthy_session::Provisioned::AlreadyPresent)) => {}
+            Ok(None) => said.push(format!(
                 "no {}: this key set predates spec 037, and `rahi backup` cannot take \
                  rauthy's half until the deployment is given one",
                 crate::BACKUP_PASSKEY_FILE
+            )),
+            Err(err) => said.push(format!(
+                "the backup admin is NOT usable and `rahi backup` will refuse rauthy's \
+                 half until it is: {err}"
             )),
         }
         said.join("; ")
