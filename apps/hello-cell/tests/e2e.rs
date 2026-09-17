@@ -19,10 +19,15 @@ fn binary() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_hello-cell"))
 }
 
-fn spec() -> (BootSpec, bool) {
-    match std::env::var("RAHI_TEST_RAUTHY") {
-        Ok(rauthy) => (BootSpec::new(binary()).with_rauthy(rauthy), true),
-        Err(_) => (BootSpec::new(binary()), false),
+/// The boot spec for this run, and the rauthy binary if there is one.
+///
+/// A missing rauthy is a skip, and a skip is a pass only when the runner did
+/// not ask for rauthy: `RAHI_REQUIRE_RAUTHY=1` makes it a failure
+/// (spec 037 B-4).
+fn spec() -> (BootSpec, Option<PathBuf>) {
+    match rahi_harness::boot::test_rauthy_binary() {
+        Some(rauthy) => (BootSpec::new(binary()).with_rauthy(&rauthy), Some(rauthy)),
+        None => (BootSpec::new(binary()), None),
     }
 }
 
@@ -54,7 +59,8 @@ fn head_of(verify_output: &str) -> String {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn the_cell_end_to_end() {
-    let (spec, with_rauthy) = spec();
+    let (spec, rauthy_bin) = spec();
+    let with_rauthy = rauthy_bin.is_some();
     let cell = Harness::boot(spec).expect("hello-cell boots");
     let client = cell.client();
 
@@ -94,10 +100,16 @@ async fn the_cell_end_to_end() {
         ops.status()
     );
 
+    let alice = User::new("alice@example.com", "Correct-Horse-Battery-Staple-2026");
     let mut decision: Option<String> = None;
+    let mut alice_sub: Option<String> = None;
     if with_rauthy {
-        let user = User::new("alice@example.com", "Correct-Horse-Battery-Staple-2026");
+        let user = alice.clone();
         cell.login_as(&client, &user).await.expect("alice logs in");
+        // Her `sub` as rauthy holds it, which is the only principal id the
+        // chassis knows (constitution VII) and what the restored cell must
+        // hand back unchanged (spec 037 B-6).
+        alice_sub = Some(rauthy_sub(&cell, &user.email).await);
 
         // Two notes, one txn each: the row, its revision, its outbox row.
         let first = client
@@ -258,33 +270,85 @@ async fn the_cell_end_to_end() {
         None => eprintln!("skipped (no attest-ledger): the independent chain verification"),
     }
 
-    if !with_rauthy {
+    let (Some(rauthy_bin), Some(alice_sub)) = (rauthy_bin, alice_sub) else {
         eprintln!("skipped (no RAHI_TEST_RAUTHY): backup and restore need rauthy's snapshot");
         return;
-    }
+    };
 
-    // Backup, then restore into a fresh volume. rauthy is stopped with the
-    // cell; its backup routes are answered by a stub on its address, since
-    // a live rauthy refuses the API key there (spec 030 D-3).
-    let stub = stub_rauthy_backup(cell.ports().rauthy);
+    // ---------------------------------------------------- spec 037 B-6
+    //
+    // Recovery, with identity, against the pinned rauthy release. Nothing
+    // here is stubbed: the backup is taken against the rauthy that answered
+    // alice's login, the restore lands on a fresh volume, and the restored
+    // cell is booted *with* identity on the same ports, where alice logs in
+    // as herself and reads what she wrote.
+    //
+    // This runs rauthy three times, and a rauthy takes the better part of a
+    // minute to come up: a restart of the same volume, and the restored
+    // volume. That is the cost of proving recovery rather than describing
+    // it. `.github/workflows/live.yml` is where it runs on every change.
+
+    // First, the restart without a restore: the same volume, the same
+    // ports, identity mounted. alice's existing session renews against the
+    // rauthy that came back, and the chain is where it was.
+    let again = Harness::boot(
+        BootSpec::new(binary())
+            .on_data_dir(&data_dir)
+            .with_ports(cell.ports())
+            .with_rauthy(&rauthy_bin),
+    )
+    .expect("the same volume boots again, with identity");
+    assert!(again.has_rauthy());
+    // The client from before the restart, cookie and all: the cell is on
+    // the same origin, so this is the session renewing, not a new login.
+    let renewed = client.get("/api/notes").await.unwrap();
+    assert_eq!(
+        renewed.status(),
+        StatusCode::OK,
+        "alice's session renews across a restart: {}",
+        renewed.text().await.unwrap()
+    );
+    let listed: Vec<serde_json::Value> = renewed.json().await.unwrap();
+    assert_eq!(listed.len(), 1, "her surviving note: {listed:?}");
+    assert_eq!(listed[0]["body"], "second");
+    assert_eq!(
+        rauthy_sub(&again, &alice.email).await,
+        alice_sub,
+        "the restart changed no principal id"
+    );
+
+    // The backup, against that real rauthy. The verb attaches to the
+    // running node for the app's half and logs in as the dedicated backup
+    // admin for rauthy's (spec 037 B-1); no route is stubbed.
     let archives = tempfile::tempdir().unwrap();
     let backed = verb(
-        &cell,
+        &again,
         &["backup", "--to", archives.path().to_str().unwrap()],
         &[],
     );
     assert!(backed.starts_with("backup: rahi-backup-"), "{backed}");
-    stub.shutdown_background();
+    eprintln!("e2e: {}", backed.trim());
+    again.stop().unwrap();
+
+    // The restart appended nothing: the head is the one measured before it.
+    let verified = verb(&again, &["ledger", "verify"], &[]);
+    assert_eq!(
+        head_of(&verified),
+        head,
+        "a restart without a restore leaves the chain where it was"
+    );
+
     let archive = std::fs::read_dir(archives.path())
         .unwrap()
         .map(|e| e.unwrap().path())
         .find(|p| p.extension().is_some_and(|e| e == "age"))
         .expect("one archive");
 
+    // Restore into a fresh volume.
     let fresh = tempfile::tempdir().unwrap();
     let key = data_dir.join("keys").join("backup.key");
-    let restored = verb(
-        &cell,
+    let restored_out = verb(
+        &again,
         &[
             "restore",
             archive.to_str().unwrap(),
@@ -293,41 +357,97 @@ async fn the_cell_end_to_end() {
         ],
         &[("RAHI_DATA_DIR", fresh.path().to_str().unwrap())],
     );
-    assert!(restored.starts_with("restore: applied"), "{restored}");
+    assert!(
+        restored_out.starts_with("restore: applied"),
+        "{restored_out}"
+    );
     eprintln!("e2e: restored into {}", fresh.path().display());
 
-    // The restored store holds the remaining note, read directly, on the
-    // addresses the volume was written under: hiqlite binds a node to the
-    // membership it stored, so another pair never elects (spec 034 D-5).
+    // The rows are there, read directly, on the addresses the volume was
+    // written under (spec 034 D-5).
     assert_eq!(
         count_notes(fresh.path(), cell.env()).await,
         1,
         "one note survived the round trip"
     );
 
-    // Boot again on the restored volume, on the same ports (D-5): first-boot
-    // finds the keys, migrate is current, serve verifies the same chain.
-    // rauthy's own restore is the operator's step (spec 030 B-6), so this
-    // boot mounts no identity.
-    let again = Harness::boot(
+    // And the cell comes up *with* identity: the supervisor hands rauthy the
+    // snapshot the restore placed, exactly once (spec 037 B-3).
+    let restored = Harness::boot(
         BootSpec::new(binary())
             .on_data_dir(fresh.path())
-            .with_ports(cell.ports()),
+            .with_ports(cell.ports())
+            .with_rauthy(&rauthy_bin),
     )
-    .expect("the restored cell boots");
-    assert!(!again.has_rauthy());
-    again
+    .expect("the restored cell boots with identity");
+    assert!(restored.has_rauthy());
+    restored
         .client()
         .expect_get("/readyz", StatusCode::OK)
         .await
         .unwrap();
-    again.stop().unwrap();
-    let verified = verb(&again, &["ledger", "verify"], &[]);
+
+    // alice is who she was. The harness's login creates a user that is
+    // absent, so the assertion that matters is her `sub`: an alice rauthy
+    // did not already hold would come back with a new one, and her note
+    // would be unreadable behind it.
+    assert_eq!(
+        rauthy_sub(&restored, &alice.email).await,
+        alice_sub,
+        "the restored rauthy holds alice with her original sub"
+    );
+    // Her login, not her creation. `Instance::login_as` would `ensure_user`
+    // first, which on a restored cell is both beside the point and refused:
+    // rauthy will not take a password it holds in its own history. She is
+    // already there, so the flow drives her login and nothing else.
+    let restored_client = restored.client();
+    rahi_harness::rauthy::login(&restored_client, restored.base_url(), &alice)
+        .await
+        .expect("alice logs in on the restored cell, as herself");
+    let listed: Vec<serde_json::Value> = restored_client
+        .get("/api/notes")
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(
+        listed.len(),
+        1,
+        "alice reads the note she wrote before the backup: {listed:?}"
+    );
+    assert_eq!(listed[0]["body"], "second");
+
+    // The marker records the hand-off, and a second start passes nothing.
+    let marker: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(fresh.path().join("restore.marker")).unwrap())
+            .unwrap();
+    assert!(
+        marker["rauthy_snapshot_applied"].as_u64().is_some(),
+        "the supervisor recorded the hand-off: {marker}"
+    );
+
+    restored.stop().unwrap();
+    let verified = verb(&restored, &["ledger", "verify"], &[]);
     assert_eq!(
         head_of(&verified),
         head,
         "the same ledger head after restore"
     );
+}
+
+/// The `sub` rauthy holds for `email`, read through the admin API on the
+/// instance's own loopback (spec 037 B-6).
+async fn rauthy_sub(instance: &Instance, email: &str) -> String {
+    rahi_harness::Rauthy::new(&instance.rauthy_loopback(), instance.admin_token())
+        .find_user(email)
+        .await
+        .expect("rauthy answers the admin API")
+        .unwrap_or_else(|| panic!("rauthy holds {email}"))
+        .get("id")
+        .and_then(|v| v.as_str())
+        .expect("the user carries an id")
+        .to_owned()
 }
 
 /// The independent verifier, if installed.
@@ -384,43 +504,4 @@ async fn count_notes(data_dir: &Path, cell_env: &[(String, String)]) -> i64 {
         .unwrap();
     store.shutdown().await.unwrap();
     rows.first().map_or(0, |c| c.n)
-}
-
-/// rauthy's backup routes, as `rahi backup` calls them, on `port`.
-fn stub_rauthy_backup(port: u16) -> tokio::runtime::Runtime {
-    use axum::routing::get;
-    let taken = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
-    let list = taken.clone();
-    let app = axum::Router::new()
-        .route("/auth/v1/health", get(|| async { "ok" }))
-        .route(
-            "/auth/v1/backup",
-            get(move || {
-                let n = list.load(std::sync::atomic::Ordering::SeqCst);
-                async move {
-                    let local: Vec<serde_json::Value> = (1..=n)
-                        .map(|i| serde_json::json!({"name": format!("rauthy_backup_{i}.sqlite"), "last_modified": i, "size": 6}))
-                        .collect();
-                    serde_json::json!({"local": local, "s3": []}).to_string()
-                }
-            })
-            .post(move || {
-                taken.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                async { "" }
-            }),
-        )
-        .route("/auth/v1/backup/local/{name}", get(|| async { "rauthy" }));
-    let listener = std::net::TcpListener::bind(("127.0.0.1", port))
-        .expect("rauthy's port is free once it stopped");
-    listener.set_nonblocking(true).unwrap();
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(2)
-        .enable_all()
-        .build()
-        .unwrap();
-    runtime.spawn(async move {
-        let listener = tokio::net::TcpListener::from_std(listener).unwrap();
-        axum::serve(listener, app).await.unwrap();
-    });
-    runtime
 }

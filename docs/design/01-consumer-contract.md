@@ -275,27 +275,29 @@ image and return that runtime path from `static_dir()`.
 
 ## 3. What is proven, and against which identity provider
 
-**Verified** (test inventory at `444bcf8`, and `.github/workflows/`). CI
-runs `cargo test --workspace --locked` with no rauthy: no workflow sets
-`RAHI_TEST_RAUTHY` or pulls a rauthy for the tests. Every
-rauthy-gated test prints `skipped` and passes. `docker/smoke.sh` boots the
-pinned rauthy inside the built image on pushes to `main`, outside the
-required checks, and covers readiness, discovery through the proxy, and a
-clean SIGTERM; it runs no verb and no login.
+**Updated 2026-09-17 (spec 037).** The ordinary cargo gate runs without
+rauthy. The separate `live.yml` workflow extracts the binary from the
+rauthy 0.36.2 image pinned by digest in `docker/Dockerfile`, provisions the
+live fixture, and runs the whole workspace with `RAHI_REQUIRE_RAUTHY=1`:
+a missing live fixture fails instead of skipping. Spec 037's Status records
+the passing run and revision. This workflow remains advisory by the
+owner's decision. `docker/smoke.sh` separately covers readiness, discovery
+through the proxy, and clean SIGTERM inside the built image.
 
 | Property | Proven in CI (no rauthy) | Proven against a real rauthy |
 |---|---|---|
 | browser login through the cell's origin | stub OIDC (`crates/rahi-idp/tests/session.rs`) | `apps/hello-cell/tests/e2e.rs`, `crates/rahi-harness/tests/boot.rs`, when `RAHI_TEST_RAUTHY` is set |
-| bearer resource server | stub key set (`crates/rahi-idp/tests/bearer.rs`) | `bearer.rs` live test, when `RAHI_TEST_RAUTHY_URL` and four more variables are set; driven by hand once (025 D-12) |
+| bearer resource server | stub key set (`crates/rahi-idp/tests/bearer.rs`) | `bearer.rs` live test: administered audience, scoped admission, insufficient-scope refusal, and real-token wrong/missing-audience controls |
 | governed write with its outbox row | the pieces separately (`rahi-store/tests/outbox.rs`, `rahi-kernel/tests/adjudicate.rs`) | whole, as an authenticated user, in the e2e only |
 | a ledgered denial | `rahi-kernel/tests/adjudicate.rs`, `rahi-edge/tests/stream.rs` | the e2e (`db.migrate` refused, the denial is the chain's last record) |
 | streaming | `rahi-edge/tests/stream.rs`, ten tests | not exercised with identity |
 | migration | `rahi-cli/tests/cli.rs`, `rahi-store/tests/migrate.rs` | the e2e |
-| backup | stub rauthy backup routes everywhere (`rahi-ops/tests/backup.rs`, `rahi-cli/tests/cli.rs`) | **never**: the e2e answers rauthy's backup routes with a stub too (D-3) |
-| restore | `rahi-ops/tests/restore.rs`, `rahi-cli/tests/cli.rs` | the app half only: the reboot after restore mounts no identity |
+| backup | stub rauthy backup routes in the verb tests (`rahi-ops/tests/backup.rs`, `rahi-cli/tests/cli.rs`) | against a real rauthy since 2026-09-17: `apps/hello-cell/tests/e2e.rs` and `rahi-ops/tests/rauthy_backup_admin.rs` (spec 037 B-1, B-6) |
+| restore | archive validation and actual supervised restore handoff (`rahi-ops/tests/{restore,rauthy_restore}.rs`, `rahi-cli/tests/cli.rs`) | the e2e restores identity, logs in with the original password and `sub`, reads the original note, and verifies the original ledger head |
 | restart with the chain verified | `rahi-ledger/tests/verify.rs`, `rahi-store/tests/cache.rs` (in process) | the e2e's reboot on the restored volume |
 
-**Verified** (spec 034 §8, and the maintainer's local rauthy checkout):
+**Historical evidence through 2026-09-12** (spec 034 §8, and the
+maintainer's local rauthy checkout):
 the "driven green against a native rauthy 0.36.0" run used a debug build
 of an unreleased rauthy branch (`feat/rfc9068-at-jwt`), not a release;
 rahi does not depend on that branch's `at+jwt` header. The same run
@@ -305,14 +307,13 @@ release, 0.36.2, has met the chassis in `docker/smoke.sh` and in the image
 run of 2.5, never in a login. *Superseded 2026-09-12:* by hand, in a Linux
 container, the pinned 0.36.2 binary drove hello-cell's end-to-end test and
 the harness's login test green, and a restore with identity was
-demonstrated; still not in CI (note 02 sections 1 and 4). `crates/rahi-idp/tests/discovery.rs` line
-307 is gated on `RAHI_TEST_RAUTHY` and never boots anything even when it
-is set.
+demonstrated, then still not in CI (note 02 sections 1 and 4). Spec 037
+supersedes that CI limitation and removes the empty rauthy-gated discovery
+test; the image smoke test carries that discovery proof (037 B-4).
 
-**Recommendation** (draft spec 037): a CI job that runs every
-rauthy-gated test against the pinned release, and an end-to-end test that
-also covers a bearer route, a stream, a restart without restore, and
-identity after restore.
+**Implemented by spec 037:** the live CI job, bearer proof, restart
+without restore, and recovery with identity. Streaming with real identity
+remains outside this proof; its coverage above is unchanged.
 
 ## 4. What the kernel enforces, and what it does not
 
@@ -448,34 +449,42 @@ stages envelopes also runs the drain loop (spec 012 §6).
   one key set for both.
 - `rahi backup` builds one archive of the app snapshot, rauthy's snapshot
   fetched over its HTTP API, and the keys, sealed to the backup key. A
-  missing part is an error. rauthy 0.36 accepts only an admin session on
-  its backup routes and the verb presents the admin API key, so **every
-  backup against a real rauthy fails today** (030 D-3). Choosing between a
-  rauthy change and a backup session is a human decision still open.
-  Observed in the hello-cell image with rauthy 0.36.2: `rahi backup`
-  inside the running container ends with `unauthorized: rauthy refused
-  the admin token at .../auth/v1/backup (401 Unauthorized)` and writes no
-  archive. *Added 2026-09-12:* an admin session is refused `406
-  MfaRequired` under rauthy's defaults, and the only way past it,
-  `ADMIN_FORCE_MFA=false`, is instance-wide (note 02 section 4).
-- The app half of the verb races. hiqlite 0.14 documents that
-  `Client::backup` returns before the file exists, and `Store::backup`
-  lists the backup directory once, immediately after, so it can report
-  `upstream: backup completed but no new file was listed` (exit 3) for a
-  backup that lands a moment later. Observed on two of four runs against
-  the same running container. The tests pass because nothing there is
-  large or busy.
+  missing part is an error. *Resolved 2026-09-17 (spec 037 B-1):* rauthy
+  accepts only an admin session with MFA satisfied on its backup routes, so
+  the deployment carries a dedicated rauthy admin of its own whose only
+  credential is a passkey custodied in the key set. `first-boot` mints the
+  private key, `supervise` registers its public half and converts the
+  account to passkey only (no password, so nothing behind the verb
+  expires), and `rahi backup` completes rauthy's WebAuthn assertion from
+  the custodied key with `ADMIN_FORCE_MFA` left on. Measured against the
+  pinned `0.36.2`: `POST /auth/v1/backup` answers `204` and the snapshot
+  downloads. A key set minted before this holds no `backup_passkey.json`,
+  and both verbs say so by name.
+- The app half of the verb no longer races, and "newer" is not file age.
+  *Resolved 2026-09-17 (spec 037 B-2):* hiqlite ignores a backup request
+  within sixty seconds of the one before **and acknowledges it as success**,
+  so reporting the newest file on disk reports somebody else's snapshot.
+  Both stores now serialise their own requests, wait the window out before
+  triggering, accept only a snapshot whose name carries a second at or after
+  their own trigger, and refuse under one deadline (120 seconds by default)
+  rather than sealing a stale file. A backup taken soon after another
+  therefore takes about a minute.
+- The two halves are each fresh as of their own trigger and are **not** a
+  coordinated instant. Nothing supports a claim of one evidence head across
+  the app store and rauthy.
 - `rahi restore` runs on a stopped volume, checks every part's hash,
   resets the app node, restores the keys, and places rauthy's snapshot
-  under `/data/restore/rauthy/`. **Nothing hands that snapshot to rauthy.**
-  030 D-2 said spec 031's supervisor would; 031 does not, and the
-  supervisor starts rauthy from its rendered environment only. The module
-  comment of `crates/rahi-ops/src/restore.rs` still says the supervisor
-  hands it over; the code does not. A restored
-  cell keeps its rows, its chain, and its keys, and its rauthy starts from
-  whatever `/data/rauthy` holds, which on a fresh volume is nothing.
-- Every principal id in app rows is rauthy's `sub` (constitution VII). A
-  restore without rauthy's state leaves every such row unreachable.
+  under `/data/restore/rauthy/`. *Resolved 2026-09-17 (spec 037 B-3):* the
+  next supervised start hands that file to rauthy's own hiqlite restore,
+  waits for rauthy's health, and records the application in the marker;
+  every later start passes nothing, and the app still never opens rauthy's
+  directory. A restored cell comes back with its users.
+- Every principal id in app rows is rauthy's `sub` (constitution VII), and a
+  restored cell hands back the same one: `apps/hello-cell/tests/e2e.rs`
+  asserts the original `sub`, the note readable behind that principal's
+  session on the restored cell, and the same ledger head, against the pinned
+  rauthy and with nothing stubbed. All of it is N=1; restore at N=3 is
+  deferred (spec 037 D-2).
 - Restore does not compare the archive's manifest hash or schema versions
   with the running binary; the next `serve` finds out (section 7).
 - Sealed chain segments live in the ledger archive, not in the backup
@@ -483,10 +492,12 @@ stages envelopes also runs the drain loop (spec 012 §6).
 - A restored volume must reopen on the ports it was written under
   (spec 034 D-5).
 
-**Recommendation** (draft spec 037): resolve D-3, make `Store::backup`
-wait for the file hiqlite writes in the background, hand the restored
-snapshot to rauthy once through the supervisor, and prove identity after
-restore against the pinned release.
+*Spec 037 implements the recovery recommendation. Its D-7 correction
+resolves the live bearer fixture failure on pinned rauthy 0.36.2: the
+dynamically registered client receives an administered `default_aud`,
+which the fixture reads back before PKCE without `resource` parameters.
+The production audience validator remains unchanged. Real signed tokens
+with missing or wrong cell audiences are refused.*
 
 ## 7. Manifest evolution
 
@@ -708,7 +719,7 @@ the evidence for each, plus the decisions owned by Statecraft and hqgit.
 
 | Decision | Options | Where |
 |---|---|---|
-| backup against a real rauthy | an upstream rauthy change accepting an API key with backup access on its backup routes, or a dedicated backup admin session the verb establishes | 030 D-3, draft 037 |
+| ~~backup against a real rauthy~~ | closed 2026-09-17: a dedicated passkey-only backup admin the verb logs in as | 037 B-1, D-3 |
 | manifest transitions | the shape in draft 036, or a new volume per ceiling change | draft 036 |
 | a store ahead of the binary | refuse by default, or accept as today | draft 036 |
 | release channel | git tags only, or tags plus crates.io | draft 039 |

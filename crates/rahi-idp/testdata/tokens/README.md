@@ -47,7 +47,8 @@ failure, not a skip.
 
 ### The rauthy this expects
 
-Verified against `ghcr.io/sebadob/rauthy:0.36.0` over plain `http` on port
+Verified against the rauthy `0.36.2` image pinned by digest in
+`docker/Dockerfile` (037 D-7 correction), over plain `http` on port
 8080. Four settings are load bearing:
 
 - `[server] scheme = 'http'`, `port_http = 8080`, `pub_url = 'localhost:8080'`,
@@ -73,11 +74,23 @@ Two calls before the flow, both with the admin API key:
    does not exist cannot be granted, and AC-2 needs one the token carries and
    one it does not.
 2. `PUT /auth/v1/clients/{id}` sets `access_token_alg` to `RS256` and
-   `allowed_resources` to this cell's origin. Both are refusals otherwise:
+   `default_aud` to `[cell_origin]`, then reads the client back and asserts
+   the audience, RS256, S256, exact loopback redirect and scope grant.
    rauthy signs with `EdDSA` by default and this chassis verifies only RS256
-   (B-3), and rauthy answers `invalid_target` to a `resource` parameter that
-   is not on the client's allow list, so without it no token can carry the
-   audience B-3 demands.
+   (B-3). In pinned 0.36.2 a dynamic client cannot request `resource`, even
+   with `allowed_resources` set. The administrator's `default_aud` is added
+   to its signed access tokens independently, so authorization and code
+   exchange omit `resource`. The production audience validator is unchanged.
+
+This proves the administered mechanism, not universal RFC 8707 or MCP
+interoperability. After admission and insufficient-scope refusal, the test
+administers the same dynamic client twice more: first with no default
+audience, then with `https://other-resource.invalid`. Each fresh PKCE login
+issues a real RS256 token with the same user, issuer and scopes. The first
+has only the client id in `aud`; the second has the client id and wrong
+origin. Both must fail specifically on audience after signature, issuer and
+time checks, and answer `401 invalid_token` on the read route. No JWT is
+edited or re-signed by the test.
 
 The login itself needs two things a browser would do invisibly: an anonymous
 session from `POST /auth/v1/oidc/session`, whose cookie and CSRF token the
@@ -89,9 +102,12 @@ rauthy also refuses a login with an empty `User-Agent`.
 ### Running it
 
 ```sh
-docker run -d --name rauthy -p 8080:8080 \
+# Use a disposable fixture with the configuration described above. The live
+# workflow supplies every setting, including HQL_SECRET_RAFT and HQL_SECRET_API.
+rauthy_image="$(sed -n 's/^ARG RAUTHY_IMAGE=//p' docker/Dockerfile)"
+docker run -d --name rauthy -p 127.0.0.1:8080:8080 \
   -v "$PWD/config.toml:/app/config.toml:ro" -v rauthy-data:/app/data \
-  ghcr.io/sebadob/rauthy:0.36.0
+  "$rauthy_image"
 
 RAHI_TEST_RAUTHY_URL=http://localhost:8080 \
 RAHI_TEST_RAUTHY_REG_TOKEN=<reg token> \

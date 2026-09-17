@@ -151,8 +151,7 @@ fn a_boot_the_binary_refuses_fails_inside_the_budget_with_its_stderr() {
 
 #[tokio::test]
 async fn with_a_rauthy_at_hand_a_user_logs_in_and_reads_a_protected_route() {
-    let Ok(rauthy) = std::env::var("RAHI_TEST_RAUTHY") else {
-        eprintln!("skipped: set RAHI_TEST_RAUTHY to a rauthy binary (spec 033 FR-002)");
+    let Some(rauthy) = rahi_harness::boot::test_rauthy_binary() else {
         return;
     };
     let instance =

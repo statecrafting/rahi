@@ -711,6 +711,13 @@ async fn the_proxy_subtree_carries_its_own_credentials_through() {
 /// fixture that proves the kernel refuses a payload carrying one. Nothing in
 /// the list creates, stores, hashes, or compares a credential of this app's.
 ///
+/// Spec 037 B-1 added a third thing this codebase presents, and it is worth
+/// saying why it is not a fourth kind of credential: the backup admin is a
+/// principal of *rauthy's*, and the key set holds an authenticator for it,
+/// the way a phone holds one. The account, its roles, and the registration
+/// that makes the key mean anything are rauthy's rows; nothing here issues a
+/// credential the app then honours, which is what B-1 forbids.
+///
 /// The allowlist is asserted to be exact, so an entry that stops offending
 /// has to be removed rather than left to rot into a permanent hole.
 #[test]
@@ -757,10 +764,6 @@ fn no_credential_is_minted_anywhere_in_this_workspace() {
             "the operator's S3 access key for an s3:// backup destination (spec 030 D-7)",
         ),
         (
-            "crates/rahi-ops/src/rauthy_api.rs",
-            "presents rauthy's admin key on the backup calls (spec 030 B-5)",
-        ),
-        (
             "crates/rahi-ops/src/keys.rs",
             "first boot provisions rauthy's own bootstrap API key (spec 031 B-2)",
         ),
@@ -775,6 +778,20 @@ fn no_credential_is_minted_anywhere_in_this_workspace() {
         (
             "crates/rahi-ops/tests/first_boot.rs",
             "asserts the provisioned key and rauthy's floor on its length",
+        ),
+        (
+            "crates/rahi-ops/src/rauthy_session.rs",
+            "presents rauthy's admin key to provision the backup admin, and holds \
+             the authenticator for a WebAuthn credential rauthy registers and owns \
+             (spec 037 B-1)",
+        ),
+        (
+            "crates/rahi-ops/tests/common/mod.rs",
+            "the stub rauthy the verb tests present that same admin key to",
+        ),
+        (
+            "crates/rahi-ops/tests/rauthy_backup_admin.rs",
+            "the live proof, which reads the operator's admin key out of the environment",
         ),
     ]);
 
@@ -901,6 +918,18 @@ fn between<'t>(text: &'t str, open: &str, close: &str) -> Option<&'t str> {
 
 // ------------------------------------------------------------- AC-2
 
+/// Spec 037 B-4: a skip is a pass only when the runner did not ask for
+/// rauthy. With `RAHI_REQUIRE_RAUTHY=1`, which `live.yml` sets, an absent
+/// variable fails the test by name instead of printing `skipped` into a
+/// green run.
+fn skip(message: &str) {
+    assert!(
+        std::env::var("RAHI_REQUIRE_RAUTHY").as_deref() != Ok("1"),
+        "RAHI_REQUIRE_RAUTHY=1 and skipped: {message}"
+    );
+    eprintln!("skipped: {message}");
+}
+
 /// The origin of an already running rauthy, which opts this run in (D-10).
 const LIVE_URL: &str = "RAHI_TEST_RAUTHY_URL";
 /// The registration token that rauthy's `token` mode requires (B-7).
@@ -933,7 +962,8 @@ const LIVE_REDIRECT: &str = "http://127.0.0.1:9876/callback";
 /// Nothing here is a fixture. The token is signed by rauthy's own key, the
 /// key set is fetched from rauthy over the network, the issuer is the one
 /// rauthy publishes, and the audience is this cell's origin because the
-/// client asked for it with RFC 8707's `resource`. Only the store and the
+/// administrator set `default_aud` on the dynamically registered client.
+/// No `resource` parameter is sent (037 D-7 correction). Only the store and the
 /// kernel are borrowed from the stub cell, because a decision has to be
 /// ledgered somewhere and that fixture already opens both.
 ///
@@ -941,10 +971,10 @@ const LIVE_REDIRECT: &str = "http://127.0.0.1:9876/callback";
 #[tokio::test]
 async fn a_real_rauthy_admits_a_registered_client_by_scope() {
     let Ok(origin) = std::env::var(LIVE_URL) else {
-        eprintln!(
-            "skipped: set {LIVE_URL} to the origin of a running rauthy (for example \
+        skip(&format!(
+            "set {LIVE_URL} to the origin of a running rauthy (for example \
              http://localhost:8080) to run AC-2; see testdata/tokens/README.md"
-        );
+        ));
         return;
     };
     let origin = origin.trim_end_matches('/').to_owned();
@@ -981,14 +1011,14 @@ async fn a_real_rauthy_admits_a_registered_client_by_scope() {
     live.create_scope(&api_key, LIVE_SCOPE_GRANTED).await;
     live.create_scope(&api_key, LIVE_SCOPE_WITHHELD).await;
     let client_id = live.register(&reg_token).await;
-    live.allow_resource(&api_key, &client_id, &origin, LIVE_SCOPE_GRANTED)
+    live.configure_client(&api_key, &client_id, &[&origin], LIVE_SCOPE_GRANTED)
         .await;
 
     let verifier = pkce_verifier();
     let code = live
-        .authorize(&client_id, &user, &password, &verifier, &origin)
+        .authorize(&client_id, &user, &password, &verifier)
         .await;
-    let token = live.exchange(&client_id, &code, &verifier, &origin).await;
+    let token = live.exchange(&client_id, &code, &verifier).await;
 
     // The cell: rauthy's real key set, this origin's resource, and the store
     // and kernel of the stub fixture, which the stub itself never serves.
@@ -1014,9 +1044,19 @@ async fn a_real_rauthy_admits_a_registered_client_by_scope() {
         Router::new().route("/write", get(|| async { "write" })),
     );
     let app = with_bearer(
-        RequireBearer::new(server, BearerRoutes::new().route(API_PREFIX)),
+        RequireBearer::new(server.clone(), BearerRoutes::new().route(API_PREFIX)),
         Router::new().nest(API_PREFIX, granted.merge(withheld)),
     );
+
+    let claims = live_claims(&token);
+    assert_eq!(claims["aud"], json!([client_id, origin]));
+    assert_eq!(claims["iss"], json!(idp.issuer));
+    assert_eq!(claims["azp"], json!(client_id));
+    assert_eq!(
+        claims["scope"],
+        json!(format!("openid {LIVE_SCOPE_GRANTED}"))
+    );
+    assert!(claims["sub"].as_str().is_some_and(|sub| !sub.is_empty()));
 
     let admitted = send(&app, with_token("/api/read", &token)).await;
     assert_eq!(
@@ -1047,6 +1087,73 @@ async fn a_real_rauthy_admits_a_registered_client_by_scope() {
         challenge.contains(LIVE_SCOPE_WITHHELD),
         "the refusal names the scope it wanted: {challenge}"
     );
+    eprintln!(
+        "live audience proof: default_aud read back; RS256 cell audience; read 200; write 403 insufficient_scope"
+    );
+
+    // Real tokens, freshly issued to the same dynamic client with identical
+    // grants and PKCE. Only the administered audience changes. No fixture
+    // re-signs or edits a JWT, and the production validator stays unchanged.
+    for (label, audiences) in [
+        ("missing cell audience", vec![]),
+        ("wrong audience", vec!["https://other-resource.invalid"]),
+    ] {
+        live.configure_client(&api_key, &client_id, &audiences, LIVE_SCOPE_GRANTED)
+            .await;
+        let verifier = pkce_verifier();
+        let code = live
+            .authorize(&client_id, &user, &password, &verifier)
+            .await;
+        let negative = live.exchange(&client_id, &code, &verifier).await;
+        let negative_claims = live_claims(&negative);
+        let expected_aud = if audiences.is_empty() {
+            json!(client_id)
+        } else {
+            json!([client_id, audiences[0]])
+        };
+        assert_eq!(negative_claims["aud"], expected_aud, "{label}");
+        for claim in ["iss", "sub", "azp", "scope"] {
+            assert_eq!(negative_claims[claim], claims[claim], "{label}: {claim}");
+        }
+        // validate checks RS256, issuer and time before audience. Naming the
+        // exact error proves these are valid signatures refused on audience.
+        let err = server.validate(&negative).await.expect_err(label);
+        assert!(
+            matches!(err, rahi_types::Error::Unauthorized(ref message)
+                if message == &format!("the token's audience does not include this resource {origin:?}")),
+            "{label}: {err}"
+        );
+        let refused = send(&app, with_token("/api/read", &negative)).await;
+        assert_eq!(refused.status, StatusCode::UNAUTHORIZED, "{label}");
+        let challenge = refused.headers[header::WWW_AUTHENTICATE]
+            .to_str()
+            .expect("the challenge is ascii");
+        assert!(
+            challenge.contains("error=\"invalid_token\""),
+            "{label}: {challenge}"
+        );
+        eprintln!(
+            "live audience proof: {label}; RS256 signature, issuer and time accepted; read 401 invalid_token"
+        );
+    }
+    // Administration affects new issuance, not the already signed token.
+    assert_eq!(
+        send(&app, with_token("/api/read", &token)).await.status,
+        StatusCode::OK
+    );
+}
+
+/// Inspect live claims without treating decoding as signature verification:
+/// the production ResourceServer independently validates each token below.
+fn live_claims(token: &str) -> Value {
+    let parts: Vec<_> = token.split('.').collect();
+    assert_eq!(parts.len(), 3, "rauthy issues a three-part JWT");
+    let decode = |part| {
+        serde_json::from_slice::<Value>(&URL_SAFE_NO_PAD.decode(part).expect("JWT base64url"))
+            .expect("JWT JSON")
+    };
+    assert_eq!(decode(parts[0])["alg"], json!("RS256"));
+    decode(parts[1])
 }
 
 /// The value of `name`, or a failure saying which variable is missing.
@@ -1070,7 +1177,9 @@ fn loopback_addr(origin: &str) -> String {
     authority
         .to_socket_addrs()
         .unwrap_or_else(|err| panic!("{LIVE_URL} names {authority}, which does not resolve: {err}"))
-        .next()
+        // The live fixture binds IPv4. localhost may resolve to ::1 first;
+        // retain IPv6 when it is the only address the operator supplied.
+        .min_by_key(|address| address.is_ipv6())
         .unwrap_or_else(|| panic!("{LIVE_URL} names {authority}, which resolves to nothing"))
         .to_string()
 }
@@ -1149,19 +1258,28 @@ impl Rauthy {
         );
         let body: Value = serde_json::from_str(&body)
             .unwrap_or_else(|err| panic!("the registration is json ({err}): {body}"));
-        body["client_id"]
+        let id = body["client_id"]
             .as_str()
-            .expect("a registered client has an id")
-            .to_owned()
+            .expect("a registered client has an id");
+        assert!(
+            id.starts_with("dyn$"),
+            "the client was dynamically registered"
+        );
+        id.to_owned()
     }
 
     /// Bind the client to this resource and grant it one scope.
     ///
-    /// Both halves are rauthy's to enforce: without `allowed_resources` it
-    /// refuses the `resource` parameter with `invalid_target`, so no token
-    /// could carry the audience B-3 demands, and the signing algorithm has to
-    /// be RS256 because that is the only one this chassis verifies (B-3).
-    async fn allow_resource(&self, api_key: &str, client_id: &str, resource: &str, scope: &str) {
+    /// The pinned rauthy refuses dynamic clients' `resource` requests, but
+    /// its admin API persists `default_aud` and adds it to signed tokens.
+    /// RS256 and the cell audience remain mandatory in the resource server.
+    async fn configure_client(
+        &self,
+        api_key: &str,
+        client_id: &str,
+        audiences: &[&str],
+        scope: &str,
+    ) {
         let answer = self
             .http
             .put(format!(
@@ -1186,7 +1304,7 @@ impl Rauthy {
                 "challenges": ["S256"],
                 "force_mfa": false,
                 "claims_at_root": false,
-                "allowed_resources": [resource],
+                "default_aud": audiences,
             }))
             .send()
             .await
@@ -1194,9 +1312,37 @@ impl Rauthy {
         let status = answer.status();
         assert!(
             status.is_success(),
-            "binding the client to {resource} answered {status}: {}",
+            "administering the client audience answered {status}: {}",
             answer.text().await.unwrap_or_default()
         );
+        let saved: Value = self
+            .http
+            .get(format!(
+                "{}/auth/v1/clients/{}",
+                self.origin,
+                urlencoding(client_id)
+            ))
+            .header(header::AUTHORIZATION, format!("API-Key {api_key}"))
+            .send()
+            .await
+            .expect("rauthy answers the client read")
+            .error_for_status()
+            .expect("the administered client can be read")
+            .json()
+            .await
+            .expect("the client is JSON");
+        let expected = if audiences.is_empty() {
+            Value::Null
+        } else {
+            json!(audiences)
+        };
+        assert_eq!(saved["default_aud"], expected, "the audience persisted");
+        assert_eq!(saved["id"], json!(client_id));
+        assert_eq!(saved["access_token_alg"], json!("RS256"));
+        assert_eq!(saved["challenges"], json!(["S256"]));
+        assert_eq!(saved["redirect_uris"], json!([LIVE_REDIRECT]));
+        assert_eq!(saved["default_scopes"], json!(["openid", scope]));
+        assert_eq!(saved["confidential"], json!(false));
     }
 
     /// An anonymous session, which rauthy's login endpoint requires.
@@ -1263,7 +1409,6 @@ impl Rauthy {
         user: &str,
         password: &str,
         verifier: &str,
-        resource: &str,
     ) -> String {
         let (cookie, csrf) = self.session().await;
         let answer = self
@@ -1280,7 +1425,6 @@ impl Rauthy {
                 "scopes": ["openid", LIVE_SCOPE_GRANTED],
                 "code_challenge": pkce_challenge(verifier),
                 "code_challenge_method": "S256",
-                "resource": resource,
             }))
             .send()
             .await
@@ -1296,17 +1440,12 @@ impl Rauthy {
             answer.text().await.unwrap_or_default()
         );
         let location = location.expect("a completed login redirects to the loopback");
+        assert_eq!(location.split('?').next(), Some(LIVE_REDIRECT));
         query_param(&location, "code").expect("the redirect carries the authorization code")
     }
 
-    /// Exchange the code for an access token bound to `resource` (RFC 8707).
-    async fn exchange(
-        &self,
-        client_id: &str,
-        code: &str,
-        verifier: &str,
-        resource: &str,
-    ) -> String {
+    /// Exchange the code; rauthy supplies the administered default audience.
+    async fn exchange(&self, client_id: &str, code: &str, verifier: &str) -> String {
         let answer = self
             .http
             .post(format!("{}/auth/v1/oidc/token", self.origin))
@@ -1316,7 +1455,6 @@ impl Rauthy {
                 ("client_id", client_id),
                 ("redirect_uri", LIVE_REDIRECT),
                 ("code_verifier", verifier),
-                ("resource", resource),
             ])
             .send()
             .await

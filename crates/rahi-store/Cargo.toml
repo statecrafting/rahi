@@ -17,11 +17,14 @@ futures-core = { workspace = true }
 hiqlite = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+# Spec 037 B-2: one process takes one backup at a time, and waiting out
+# hiqlite's suppression window is an await, not a blocked thread.
+tokio = { workspace = true, features = ["rt", "sync", "time"] }
 
 [dev-dependencies]
 serde_bytes = { workspace = true }
 tempfile = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time", "test-util"] }
 
 [lints]
 workspace = true

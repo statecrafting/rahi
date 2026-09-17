@@ -29,6 +29,60 @@ pub const STOP_GRACE: Duration = Duration::from_secs(5);
 /// The file under the data directory where `first-boot` printed once.
 pub const FIRST_BOOT_LOG: &str = "first-boot.log";
 
+/// Where a test finds the rauthy binary to boot (spec 033 FR-002).
+pub const ENV_TEST_RAUTHY: &str = "RAHI_TEST_RAUTHY";
+
+/// Set to `1` by a run that must have rauthy: an absent
+/// [`ENV_TEST_RAUTHY`] then fails the test instead of skipping it
+/// (spec 037 B-4). `.github/workflows/live.yml` sets it.
+pub const ENV_REQUIRE_RAUTHY: &str = "RAHI_REQUIRE_RAUTHY";
+
+/// Whether this run was told rauthy must be there.
+#[must_use]
+pub fn rauthy_required() -> bool {
+    std::env::var(ENV_REQUIRE_RAUTHY).as_deref() == Ok("1")
+}
+
+/// The rauthy binary for a test that needs one, or `None` after saying so.
+///
+/// A skip is a pass only when the runner did not ask for rauthy: with
+/// [`ENV_REQUIRE_RAUTHY`] set to `1` this panics naming the variable, so a
+/// live job cannot go green on tests that all skipped (spec 037 B-4).
+///
+/// # Panics
+///
+/// When [`ENV_REQUIRE_RAUTHY`] is `1` and [`ENV_TEST_RAUTHY`] is absent or
+/// names a file that does not exist.
+#[must_use]
+pub fn test_rauthy_binary() -> Option<PathBuf> {
+    match std::env::var(ENV_TEST_RAUTHY) {
+        Ok(path) => {
+            let path = PathBuf::from(path);
+            assert!(
+                path.exists() || !rauthy_required(),
+                "{ENV_REQUIRE_RAUTHY}=1 and {ENV_TEST_RAUTHY} names {}, which does not exist",
+                path.display()
+            );
+            if !path.exists() {
+                eprintln!(
+                    "skipped: {ENV_TEST_RAUTHY} names {}, which does not exist",
+                    path.display()
+                );
+                return None;
+            }
+            Some(path)
+        }
+        Err(_) => {
+            assert!(
+                !rauthy_required(),
+                "{ENV_REQUIRE_RAUTHY}=1 and {ENV_TEST_RAUTHY} is unset: this run must have rauthy"
+            );
+            eprintln!("skipped: set {ENV_TEST_RAUTHY} to a rauthy binary");
+            None
+        }
+    }
+}
+
 /// Whether the instance mounts an identity.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RauthyMode {

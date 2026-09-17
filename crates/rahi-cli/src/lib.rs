@@ -97,7 +97,7 @@ async fn dispatch<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<i32> {
     match verb {
         Verb::Supervise => supervise::<C>(env).await,
         Verb::FirstBoot { export: true } => {
-            print!("{}", rahi_ops::first_boot::export()?);
+            print!("{}", rahi_ops::first_boot::export(env)?);
             Ok(0)
         }
         Verb::FirstBoot { export: false } => first_boot::<C>(env).await.map(|()| 0),
@@ -134,14 +134,21 @@ async fn supervise<C: Cell>(env: &dyn EnvReader) -> Result<i32> {
     keys.check()?;
     let manifest = rahi_kernel::Manifest::parse(C::manifest())?;
     let app_name = manifest.app.name.as_str().to_owned();
-    let rauthy = sup::rauthy_command(&config, env)?;
+    let (rauthy, supplied) = sup::prepare_rauthy(&config, env)?;
     let api = rahi_ops::rauthy_api::RauthyApi::new(config.rauthy_base_url(), keys.admin_token()?)?;
     let ready = async {
         sup::wait_healthy(&api, sup::HEALTH_BUDGET).await?;
+        // Spec 037 B-3 and B-1, in that order: a restored rauthy has just
+        // come up on the snapshot this start handed it, and the backup
+        // admin the verb logs in as must exist before anything asks for a
+        // backup.
+        let steps = sup::ready_after_health(&config, &keys, &api, supplied.as_ref()).await?;
         sup::custody_client(&config, &keys, &app_name).await?;
+        let said = steps.render();
         println!(
-            "supervise: rauthy is healthy at {}, client {app_name} custodied",
-            api.base()
+            "supervise: rauthy is healthy at {}, client {app_name} custodied{}{said}",
+            api.base(),
+            if said.is_empty() { "" } else { "; " }
         );
         Ok(())
     };
@@ -261,10 +268,14 @@ async fn migrate<C: Cell>(booted: &Booted, with_backup: bool, env: &dyn EnvReade
 }
 
 async fn backup(booted: &Booted, to: &Destination, env: &dyn EnvReader) -> Result<()> {
+    // The API key cannot take rauthy's backup; the dedicated backup admin's
+    // passkey can (spec 037 B-1). A key set minted before spec 037 holds
+    // none, and the verb says so by name rather than failing on a 401.
     let rauthy = rahi_ops::rauthy_api::RauthyApi::new(
         booted.config.rauthy_base_url(),
         booted.keys.admin_token()?,
-    )?;
+    )?
+    .with_passkey(booted.keys.backup_passkey()?);
     let outcome = rahi_ops::backup::run(
         &booted.store,
         &rauthy,

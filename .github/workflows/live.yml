@@ -1,0 +1,183 @@
+# The live proof (spec 037 B-5): every rauthy-gated test, against the rauthy
+# release `docker/Dockerfile` pins, by the same digest.
+#
+# CI ran `cargo test --workspace --locked` with no rauthy, so every test gated
+# on RAHI_TEST_RAUTHY printed `skipped` and passed, and the only live identity
+# evidence in the repository was a hand-driven run. This workflow removes that:
+# it sets RAHI_REQUIRE_RAUTHY=1, which turns each of those skips into a
+# failure, so a green run here means the tests ran rather than that they were
+# absent.
+#
+# One job, because RAHI_REQUIRE_RAUTHY is one switch and the suite wants
+# rauthy in two shapes. The harness spawns a rauthy *binary* per instance on
+# its own ports (spec 033 B-2); spec 025's AC-2 and spec 037's FR-006 want a
+# *running* rauthy on a fixed origin with dynamic registration enabled. This
+# job supplies both and then requires everything, so no gated test can skip.
+#
+# Advisory, and deliberately so (spec 037, decided 2026-09-17): it publishes
+# no status check that branch protection requires and sits outside the
+# ci-gate chain (spec 001 D-9), beside `image.yml`. It boots real rauthy
+# processes with wall-clock readiness budgets. Any change to required-check
+# policy is the owner's decision; local proof does not change that policy.
+
+name: live
+
+on:
+  pull_request:
+    paths:
+      - "crates/**"
+      - "apps/**"
+      - "docker/**"
+      - "deploy/**"
+      - ".github/workflows/live.yml"
+  schedule:
+    # Nightly on main, so a rauthy release or a runner change that breaks the
+    # live path is found on a schedule rather than by the next pull request.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # The origin the running rauthy is published on, and the credentials a test
+  # provisions with. Nothing here is a secret: it is a throwaway rauthy that
+  # lives for the length of the job. rauthy refuses an API key secret under
+  # 64 characters.
+  LIVE_ORIGIN: http://localhost:8080
+  LIVE_REG_TOKEN: rahi-live-registration-token
+  LIVE_API_KEY_NAME: rahi
+  LIVE_API_KEY_SECRET: RahiLiveApiKeySecret0123456789abcdefghijklmnopqrstuvwxyz0123456789
+  LIVE_ADMIN: admin@localhost
+  LIVE_ADMIN_PASSWORD: RahiLiveAdminPassword123!
+
+jobs:
+  live:
+    name: the whole suite, against the pinned rauthy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # rustup installs the toolchain pinned in rust-toolchain.toml (spec 010).
+      - run: rustup show
+      - uses: Swatinem/rust-cache@v2
+
+      - id: pin
+        name: Read the rauthy pin out of docker/Dockerfile
+        run: |
+          set -euo pipefail
+          image="$(grep -m1 '^ARG RAUTHY_IMAGE=' docker/Dockerfile | cut -d= -f2-)"
+          case "$image" in
+            *@sha256:*) ;;
+            *) echo "docker/Dockerfile must pin rauthy by digest, found: $image" >&2; exit 1 ;;
+          esac
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "pinned rauthy: $image"
+
+      # The binary the image ships, taken out of the image itself: the same
+      # bytes the container runs, so the live suite and the shipped cell
+      # cannot disagree about which rauthy was proven.
+      - name: Extract the pinned rauthy binary
+        run: |
+          set -euo pipefail
+          image='${{ steps.pin.outputs.image }}'
+          docker pull "$image"
+          id="$(docker create "$image")"
+          mkdir -p "$RUNNER_TEMP/rauthy"
+          docker cp "$id:/app/rauthy" "$RUNNER_TEMP/rauthy/rauthy"
+          docker rm "$id" >/dev/null
+          chmod +x "$RUNNER_TEMP/rauthy/rauthy"
+          "$RUNNER_TEMP/rauthy/rauthy" --version
+          echo "RAHI_TEST_RAUTHY=$RUNNER_TEMP/rauthy/rauthy" >> "$GITHUB_ENV"
+
+      # The rauthy `crates/rahi-idp/testdata/tokens/README.md` describes: http
+      # on 8080, dynamic registration with a token, no registration rate
+      # limit, and a bootstrap admin and API key so a test can provision
+      # without a browser.
+      - name: Start the pinned rauthy on the live origin
+        env:
+          IMAGE: ${{ steps.pin.outputs.image }}
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/rauthy.env" <<ENV
+          PUB_URL=localhost:8080
+          LISTEN_SCHEME=http
+          LISTEN_ADDRESS=0.0.0.0
+          LISTEN_PORT_HTTP=8080
+          COOKIE_MODE=danger-insecure
+          RP_ID=localhost
+          RP_ORIGIN=${LIVE_ORIGIN}
+          RP_NAME=rahi-live
+          HQL_NODE_ID=1
+          HQL_NODES=1 127.0.0.1:8100 127.0.0.1:8200
+          HQL_LISTEN_ADDR_API=127.0.0.1
+          HQL_LISTEN_ADDR_RAFT=127.0.0.1
+          HQL_SECRET_RAFT=RahiLiveRaftSecret0123456789abcdefghijklmnopqrstuvwxyz0123456789
+          HQL_SECRET_API=RahiLiveApiClusterSecret0123456789abcdefghijklmnopqrstuvwxyz0123456789
+          ENC_KEYS=live/9/KslT9sVWd0aEnR9e0AVrd4aTue/etZIqCm4PsjsnU=
+          ENC_KEY_ACTIVE=live
+          ENABLE_DYN_CLIENT_REG=true
+          DYN_CLIENT_REG_TOKEN=${LIVE_REG_TOKEN}
+          DYN_CLIENT_RATE_LIMIT_SEC=0
+          BOOTSTRAP_ADMIN_EMAIL=${LIVE_ADMIN}
+          BOOTSTRAP_ADMIN_PASSWORD_PLAIN=${LIVE_ADMIN_PASSWORD}
+          BOOTSTRAP_API_KEY_SECRET=${LIVE_API_KEY_SECRET}
+          ENV
+          # No HQL_DATA_DIR: the image prepares /app/data with the ownership
+          # its own non-root user needs, and a volume mounted over /data is
+          # root-owned and unwritable, which rauthy reports as
+          # "WAL: IOError: Permission denied". Nothing here outlives the job.
+          #
+          # The API key document is rauthy's own bootstrap shape, base64 of
+          # the JSON it documents, with every group a test provisions in.
+          key='{"name":"'"$LIVE_API_KEY_NAME"'","exp":1924991999,"access":[{"group":"Blacklist","access_rights":["read","create","update","delete"]},{"group":"Clients","access_rights":["read","create","update","delete"]},{"group":"Users","access_rights":["read","create","update","delete"]},{"group":"Roles","access_rights":["read","create","update","delete"]},{"group":"Scopes","access_rights":["read","create","update","delete"]}]}'
+          echo "BOOTSTRAP_API_KEY=$(printf '%s' "$key" | base64 -w0)" >> "$RUNNER_TEMP/rauthy.env"
+          : > "$RUNNER_TEMP/config.toml"
+          docker run -d --name rauthy-live -p 8080:8080 \
+            --env-file "$RUNNER_TEMP/rauthy.env" \
+            -v "$RUNNER_TEMP/config.toml:/app/config.toml:ro" \
+            "$IMAGE"
+          for _ in $(seq 1 120); do
+            if [ "$(curl -s -o /dev/null -w '%{http_code}' "$LIVE_ORIGIN/auth/v1/health")" = "200" ]; then
+              echo "rauthy is healthy"; exit 0
+            fi
+            sleep 1
+          done
+          echo "rauthy did not become healthy" >&2
+          docker logs rauthy-live >&2
+          exit 1
+
+      # RAHI_REQUIRE_RAUTHY=1 is what makes this job mean something: a test
+      # that would have skipped now fails and names the variable it wanted
+      # (spec 037 B-4). Both shapes are supplied above, so nothing skips.
+      #
+      # `--test-threads=2` is not a weakened assertion, it is less
+      # contention. With rauthy present several tests boot whole cells, each
+      # waiting on budgets measured in wall-clock seconds (ninety for
+      # `/readyz`, sixty for rauthy's health), and a two-core runner running
+      # six of those at once turns a budget into a coin flip. Measured on
+      # 2026-09-17: `rahi-harness`'s boot suite took 117s and failed its
+      # budget assertion under full parallelism, and 27s with all six green
+      # when it had the machine to itself.
+      #
+      # The bearer flow uses the administrator-provisioned default audience
+      # supported by the pin, with real-token audience negative controls
+      # (spec 037 D-7 correction). Dynamic clients send no resource parameter.
+      - name: The whole suite, with rauthy and no skips allowed
+        env:
+          RAHI_REQUIRE_RAUTHY: "1"
+          RAHI_TEST_RAUTHY_URL: ${{ env.LIVE_ORIGIN }}
+          RAHI_TEST_RAUTHY_REG_TOKEN: ${{ env.LIVE_REG_TOKEN }}
+          RAHI_TEST_RAUTHY_API_KEY: ${{ env.LIVE_API_KEY_NAME }}$${{ env.LIVE_API_KEY_SECRET }}
+          RAHI_TEST_RAUTHY_USER: ${{ env.LIVE_ADMIN }}
+          RAHI_TEST_RAUTHY_PASSWORD: ${{ env.LIVE_ADMIN_PASSWORD }}
+        # Keep every test binary's result visible when any one fails.
+        run: cargo test --workspace --locked --no-fail-fast -- --test-threads=2
+
+      - name: rauthy's log, on a failure
+        if: failure()
+        run: docker logs rauthy-live
+
+      - name: Stop rauthy
+        if: always()
+        run: docker rm -f rauthy-live || true
