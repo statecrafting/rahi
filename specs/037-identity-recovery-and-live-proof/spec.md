@@ -6,7 +6,7 @@ kind: feature
 domain: ops
 created: "2026-09-11"
 authors: ["Bartek Kus"]
-implementation: in-progress
+implementation: complete
 risk: high
 wave: 3
 depends_on:
@@ -485,6 +485,23 @@ beside `ci-gate`, and not a required check. It cannot become required while
 D-7 stands.
 
 ## Status
+
+- **2026-09-17 (completion after live proof and review remediation).**
+  The full pinned-rauthy suite passes on PR 56 at
+  `658aee7e2a6fa2c9da1a51700961be71a4897f94`:
+  [live run 35281643211](https://github.com/statecrafting/rahi/actions/runs/35281643211).
+  Required CI and packaging pass on that same head. Local `make ci`
+  passes on Linux and macOS, and `spec-spine verify 037` passes all three
+  declared commands on Linux (each exits 0). The updated hello-cell e2e
+  also passes locally with `RAHI_REQUIRE_RAUTHY=1` and the binary extracted
+  from the pinned rauthy 0.36.2 image: backup, restart, identity recovery,
+  the original principal's note, and the original ledger head all hold.
+  D-9's deadline and restore-handoff regressions pass; review has no
+  remaining findings. AC-2 and FR-003's PR half now hold, superseding the
+  pending notes below and D-7's original failure. Implementation is
+  complete. The live workflow remains advisory under the existing owner
+  decision. Recovery is still N=1, backup passkeys remain origin-bound,
+  and these changes are newer than published v0.1.0.
 
 - **2026-09-17 (administered audience follow-up).** The D-7 correction
   records a locally passing dynamic-client flow and real-token audience

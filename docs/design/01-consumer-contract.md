@@ -275,27 +275,29 @@ image and return that runtime path from `static_dir()`.
 
 ## 3. What is proven, and against which identity provider
 
-**Verified** (test inventory at `444bcf8`, and `.github/workflows/`). CI
-runs `cargo test --workspace --locked` with no rauthy: no workflow sets
-`RAHI_TEST_RAUTHY` or pulls a rauthy for the tests. Every
-rauthy-gated test prints `skipped` and passes. `docker/smoke.sh` boots the
-pinned rauthy inside the built image on pushes to `main`, outside the
-required checks, and covers readiness, discovery through the proxy, and a
-clean SIGTERM; it runs no verb and no login.
+**Updated 2026-09-17 (spec 037).** The ordinary cargo gate runs without
+rauthy. The separate `live.yml` workflow extracts the binary from the
+rauthy 0.36.2 image pinned by digest in `docker/Dockerfile`, provisions the
+live fixture, and runs the whole workspace with `RAHI_REQUIRE_RAUTHY=1`:
+a missing live fixture fails instead of skipping. Spec 037's Status records
+the passing run and revision. This workflow remains advisory by the
+owner's decision. `docker/smoke.sh` separately covers readiness, discovery
+through the proxy, and clean SIGTERM inside the built image.
 
 | Property | Proven in CI (no rauthy) | Proven against a real rauthy |
 |---|---|---|
 | browser login through the cell's origin | stub OIDC (`crates/rahi-idp/tests/session.rs`) | `apps/hello-cell/tests/e2e.rs`, `crates/rahi-harness/tests/boot.rs`, when `RAHI_TEST_RAUTHY` is set |
-| bearer resource server | stub key set (`crates/rahi-idp/tests/bearer.rs`) | `bearer.rs` live test, when `RAHI_TEST_RAUTHY_URL` and four more variables are set; driven by hand once (025 D-12) |
+| bearer resource server | stub key set (`crates/rahi-idp/tests/bearer.rs`) | `bearer.rs` live test: administered audience, scoped admission, insufficient-scope refusal, and real-token wrong/missing-audience controls |
 | governed write with its outbox row | the pieces separately (`rahi-store/tests/outbox.rs`, `rahi-kernel/tests/adjudicate.rs`) | whole, as an authenticated user, in the e2e only |
 | a ledgered denial | `rahi-kernel/tests/adjudicate.rs`, `rahi-edge/tests/stream.rs` | the e2e (`db.migrate` refused, the denial is the chain's last record) |
 | streaming | `rahi-edge/tests/stream.rs`, ten tests | not exercised with identity |
 | migration | `rahi-cli/tests/cli.rs`, `rahi-store/tests/migrate.rs` | the e2e |
 | backup | stub rauthy backup routes in the verb tests (`rahi-ops/tests/backup.rs`, `rahi-cli/tests/cli.rs`) | against a real rauthy since 2026-09-17: `apps/hello-cell/tests/e2e.rs` and `rahi-ops/tests/rauthy_backup_admin.rs` (spec 037 B-1, B-6) |
-| restore | `rahi-ops/tests/restore.rs`, `rahi-cli/tests/cli.rs` | the app half only: the reboot after restore mounts no identity |
+| restore | archive validation and actual supervised restore handoff (`rahi-ops/tests/{restore,rauthy_restore}.rs`, `rahi-cli/tests/cli.rs`) | the e2e restores identity, logs in with the original password and `sub`, reads the original note, and verifies the original ledger head |
 | restart with the chain verified | `rahi-ledger/tests/verify.rs`, `rahi-store/tests/cache.rs` (in process) | the e2e's reboot on the restored volume |
 
-**Verified** (spec 034 §8, and the maintainer's local rauthy checkout):
+**Historical evidence through 2026-09-12** (spec 034 §8, and the
+maintainer's local rauthy checkout):
 the "driven green against a native rauthy 0.36.0" run used a debug build
 of an unreleased rauthy branch (`feat/rfc9068-at-jwt`), not a release;
 rahi does not depend on that branch's `at+jwt` header. The same run
@@ -305,14 +307,13 @@ release, 0.36.2, has met the chassis in `docker/smoke.sh` and in the image
 run of 2.5, never in a login. *Superseded 2026-09-12:* by hand, in a Linux
 container, the pinned 0.36.2 binary drove hello-cell's end-to-end test and
 the harness's login test green, and a restore with identity was
-demonstrated; still not in CI (note 02 sections 1 and 4). `crates/rahi-idp/tests/discovery.rs` line
-307 is gated on `RAHI_TEST_RAUTHY` and never boots anything even when it
-is set.
+demonstrated, then still not in CI (note 02 sections 1 and 4). Spec 037
+supersedes that CI limitation and removes the empty rauthy-gated discovery
+test; the image smoke test carries that discovery proof (037 B-4).
 
-**Recommendation** (draft spec 037): a CI job that runs every
-rauthy-gated test against the pinned release, and an end-to-end test that
-also covers a bearer route, a stream, a restart without restore, and
-identity after restore.
+**Implemented by spec 037:** the live CI job, bearer proof, restart
+without restore, and recovery with identity. Streaming with real identity
+remains outside this proof; its coverage above is unchanged.
 
 ## 4. What the kernel enforces, and what it does not
 
@@ -491,12 +492,12 @@ stages envelopes also runs the drain loop (spec 012 §6).
 - A restored volume must reopen on the ports it was written under
   (spec 034 D-5).
 
-*Was the recommendation of draft spec 037, and is now what spec 037 built;
-the four bullets above carry what was measured. One thing that spec found
-and did not fix: rauthy `0.36.1` forbids a dynamically registered client
-from requesting an RFC 8707 `resource`, which spec 025's live AC-2 needs, so
-that test is red against the pinned `0.36.2` (spec 037 D-7). Reconciling it
-is open.*
+*Spec 037 implements the recovery recommendation. Its D-7 correction
+resolves the live bearer fixture failure on pinned rauthy 0.36.2: the
+dynamically registered client receives an administered `default_aud`,
+which the fixture reads back before PKCE without `resource` parameters.
+The production audience validator remains unchanged. Real signed tokens
+with missing or wrong cell audiences are refused.*
 
 ## 7. Manifest evolution
 
