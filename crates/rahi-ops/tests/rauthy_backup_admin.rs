@@ -53,6 +53,44 @@ fn ts_of(name: &str) -> i64 {
     rahi_store::backup::snapshot_ts(name).unwrap_or_else(|| panic!("{name} carries no timestamp"))
 }
 
+/// Remove the dedicated backup admin, if rauthy holds one, so that this
+/// test starts where a fresh deployment starts.
+async fn delete_backup_admin(base: &str, api_key: &str) {
+    let http = reqwest::Client::builder()
+        .user_agent("rahi-ops-test")
+        .build()
+        .expect("the client builds");
+    let listing = http
+        .get(format!("{base}/auth/v1/users"))
+        .header("authorization", format!("API-Key {api_key}"))
+        .send()
+        .await
+        .expect("rauthy answers the user listing");
+    assert!(
+        listing.status().is_success() || listing.status().as_u16() == 206,
+        "the user listing answered {}",
+        listing.status()
+    );
+    let users: Vec<serde_json::Value> = listing.json().await.expect("the listing is json");
+    for user in users.iter().filter(|u| {
+        u.get("email").and_then(|v| v.as_str()) == Some(rauthy_session::BACKUP_ADMIN_EMAIL)
+    }) {
+        let id = user.get("id").and_then(|v| v.as_str()).expect("an id");
+        let gone = http
+            .delete(format!("{base}/auth/v1/users/{id}"))
+            .header("authorization", format!("API-Key {api_key}"))
+            .send()
+            .await
+            .expect("rauthy answers the delete");
+        assert!(
+            gone.status().is_success(),
+            "deleting {id}: {}",
+            gone.status()
+        );
+        eprintln!("037 FR-006: removed the backup admin left by an earlier run");
+    }
+}
+
 /// The whole of B-1 against the pinned release, in one test because one
 /// rauthy holds one backup admin and one registered credential: provision,
 /// log in with the custodied key alone, take two snapshots inside one
@@ -64,6 +102,14 @@ async fn the_backup_admin_takes_a_fresh_snapshot_twice_inside_the_window() {
         return;
     };
     let config = config(&base);
+
+    // A rauthy this test has run against before holds a backup admin whose
+    // registered credential belongs to that run's key set, and no call can
+    // give a passkey-only account a second credential without an MFA this
+    // process cannot satisfy. That is the real hazard of losing a key set
+    // while rauthy survives, and the verb says so; here it would only make
+    // the test unrepeatable, so the account goes first.
+    delete_backup_admin(&base, &api_key).await;
 
     // The key set mints the passkey; rauthy never sees the private half.
     let passkey = Passkey::generate(&config).expect("the passkey mints");

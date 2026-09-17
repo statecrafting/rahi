@@ -160,7 +160,12 @@ impl StoreHandle {
             }
             let trigger = unix_now();
             self.client().backup().await.map_err(map)?;
-            let wait_until = started + FILE_WAIT.min(deadline.saturating_sub(started.elapsed()));
+            // Measured from the trigger, not from the start: after waiting a
+            // suppression window out, `started` is already further back than
+            // FILE_WAIT, and a poll window that begins in the past would give
+            // the writer no time at all to produce the file.
+            let wait_until =
+                Instant::now() + FILE_WAIT.min(deadline.saturating_sub(started.elapsed()));
             loop {
                 if let Some(id) = self.snapshot_since(trigger).await? {
                     return Ok(id);

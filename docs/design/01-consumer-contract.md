@@ -291,7 +291,7 @@ clean SIGTERM; it runs no verb and no login.
 | a ledgered denial | `rahi-kernel/tests/adjudicate.rs`, `rahi-edge/tests/stream.rs` | the e2e (`db.migrate` refused, the denial is the chain's last record) |
 | streaming | `rahi-edge/tests/stream.rs`, ten tests | not exercised with identity |
 | migration | `rahi-cli/tests/cli.rs`, `rahi-store/tests/migrate.rs` | the e2e |
-| backup | stub rauthy backup routes everywhere (`rahi-ops/tests/backup.rs`, `rahi-cli/tests/cli.rs`) | **never**: the e2e answers rauthy's backup routes with a stub too (D-3) |
+| backup | stub rauthy backup routes in the verb tests (`rahi-ops/tests/backup.rs`, `rahi-cli/tests/cli.rs`) | against a real rauthy since 2026-09-17: `apps/hello-cell/tests/e2e.rs` and `rahi-ops/tests/rauthy_backup_admin.rs` (spec 037 B-1, B-6) |
 | restore | `rahi-ops/tests/restore.rs`, `rahi-cli/tests/cli.rs` | the app half only: the reboot after restore mounts no identity |
 | restart with the chain verified | `rahi-ledger/tests/verify.rs`, `rahi-store/tests/cache.rs` (in process) | the e2e's reboot on the restored volume |
 
@@ -448,34 +448,42 @@ stages envelopes also runs the drain loop (spec 012 §6).
   one key set for both.
 - `rahi backup` builds one archive of the app snapshot, rauthy's snapshot
   fetched over its HTTP API, and the keys, sealed to the backup key. A
-  missing part is an error. rauthy 0.36 accepts only an admin session on
-  its backup routes and the verb presents the admin API key, so **every
-  backup against a real rauthy fails today** (030 D-3). Choosing between a
-  rauthy change and a backup session is a human decision still open.
-  Observed in the hello-cell image with rauthy 0.36.2: `rahi backup`
-  inside the running container ends with `unauthorized: rauthy refused
-  the admin token at .../auth/v1/backup (401 Unauthorized)` and writes no
-  archive. *Added 2026-09-12:* an admin session is refused `406
-  MfaRequired` under rauthy's defaults, and the only way past it,
-  `ADMIN_FORCE_MFA=false`, is instance-wide (note 02 section 4).
-- The app half of the verb races. hiqlite 0.14 documents that
-  `Client::backup` returns before the file exists, and `Store::backup`
-  lists the backup directory once, immediately after, so it can report
-  `upstream: backup completed but no new file was listed` (exit 3) for a
-  backup that lands a moment later. Observed on two of four runs against
-  the same running container. The tests pass because nothing there is
-  large or busy.
+  missing part is an error. *Resolved 2026-09-17 (spec 037 B-1):* rauthy
+  accepts only an admin session with MFA satisfied on its backup routes, so
+  the deployment carries a dedicated rauthy admin of its own whose only
+  credential is a passkey custodied in the key set. `first-boot` mints the
+  private key, `supervise` registers its public half and converts the
+  account to passkey only (no password, so nothing behind the verb
+  expires), and `rahi backup` completes rauthy's WebAuthn assertion from
+  the custodied key with `ADMIN_FORCE_MFA` left on. Measured against the
+  pinned `0.36.2`: `POST /auth/v1/backup` answers `204` and the snapshot
+  downloads. A key set minted before this holds no `backup_passkey.json`,
+  and both verbs say so by name.
+- The app half of the verb no longer races, and "newer" is not file age.
+  *Resolved 2026-09-17 (spec 037 B-2):* hiqlite ignores a backup request
+  within sixty seconds of the one before **and acknowledges it as success**,
+  so reporting the newest file on disk reports somebody else's snapshot.
+  Both stores now serialise their own requests, wait the window out before
+  triggering, accept only a snapshot whose name carries a second at or after
+  their own trigger, and refuse under one deadline (120 seconds by default)
+  rather than sealing a stale file. A backup taken soon after another
+  therefore takes about a minute.
+- The two halves are each fresh as of their own trigger and are **not** a
+  coordinated instant. Nothing supports a claim of one evidence head across
+  the app store and rauthy.
 - `rahi restore` runs on a stopped volume, checks every part's hash,
   resets the app node, restores the keys, and places rauthy's snapshot
-  under `/data/restore/rauthy/`. **Nothing hands that snapshot to rauthy.**
-  030 D-2 said spec 031's supervisor would; 031 does not, and the
-  supervisor starts rauthy from its rendered environment only. The module
-  comment of `crates/rahi-ops/src/restore.rs` still says the supervisor
-  hands it over; the code does not. A restored
-  cell keeps its rows, its chain, and its keys, and its rauthy starts from
-  whatever `/data/rauthy` holds, which on a fresh volume is nothing.
-- Every principal id in app rows is rauthy's `sub` (constitution VII). A
-  restore without rauthy's state leaves every such row unreachable.
+  under `/data/restore/rauthy/`. *Resolved 2026-09-17 (spec 037 B-3):* the
+  next supervised start hands that file to rauthy's own hiqlite restore,
+  waits for rauthy's health, and records the application in the marker;
+  every later start passes nothing, and the app still never opens rauthy's
+  directory. A restored cell comes back with its users.
+- Every principal id in app rows is rauthy's `sub` (constitution VII), and a
+  restored cell hands back the same one: `apps/hello-cell/tests/e2e.rs`
+  asserts the original `sub`, the note readable behind that principal's
+  session on the restored cell, and the same ledger head, against the pinned
+  rauthy and with nothing stubbed. All of it is N=1; restore at N=3 is
+  deferred (spec 037 D-2).
 - Restore does not compare the archive's manifest hash or schema versions
   with the running binary; the next `serve` finds out (section 7).
 - Sealed chain segments live in the ledger archive, not in the backup
@@ -483,10 +491,12 @@ stages envelopes also runs the drain loop (spec 012 §6).
 - A restored volume must reopen on the ports it was written under
   (spec 034 D-5).
 
-**Recommendation** (draft spec 037): resolve D-3, make `Store::backup`
-wait for the file hiqlite writes in the background, hand the restored
-snapshot to rauthy once through the supervisor, and prove identity after
-restore against the pinned release.
+*Was the recommendation of draft spec 037, and is now what spec 037 built;
+the four bullets above carry what was measured. One thing that spec found
+and did not fix: rauthy `0.36.1` forbids a dynamically registered client
+from requesting an RFC 8707 `resource`, which spec 025's live AC-2 needs, so
+that test is red against the pinned `0.36.2` (spec 037 D-7). Reconciling it
+is open.*
 
 ## 7. Manifest evolution
 
@@ -708,7 +718,7 @@ the evidence for each, plus the decisions owned by Statecraft and hqgit.
 
 | Decision | Options | Where |
 |---|---|---|
-| backup against a real rauthy | an upstream rauthy change accepting an API key with backup access on its backup routes, or a dedicated backup admin session the verb establishes | 030 D-3, draft 037 |
+| ~~backup against a real rauthy~~ | closed 2026-09-17: a dedicated passkey-only backup admin the verb logs in as | 037 B-1, D-3 |
 | manifest transitions | the shape in draft 036, or a new volume per ceiling change | draft 036 |
 | a store ahead of the binary | refuse by default, or accept as today | draft 036 |
 | release channel | git tags only, or tags plus crates.io | draft 039 |

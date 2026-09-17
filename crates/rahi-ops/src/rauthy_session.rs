@@ -703,7 +703,14 @@ impl AdminSession {
             return Err(refusal(
                 status,
                 &body,
-                "rauthy refused the backup admin's passkey assertion",
+                &format!(
+                    "rauthy refused the backup admin's passkey assertion. If this key set \
+                     was replaced while rauthy's store survived, rauthy holds a credential \
+                     this set did not mint and cannot be given another one without an MFA \
+                     this process cannot satisfy: restore the key set that belongs to it, \
+                     or delete {} in rauthy's admin UI and start the cell again",
+                    passkey.email()
+                ),
             ));
         }
         Ok(())

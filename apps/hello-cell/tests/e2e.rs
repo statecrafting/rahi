@@ -396,11 +396,14 @@ async fn the_cell_end_to_end() {
         alice_sub,
         "the restored rauthy holds alice with her original sub"
     );
+    // Her login, not her creation. `Instance::login_as` would `ensure_user`
+    // first, which on a restored cell is both beside the point and refused:
+    // rauthy will not take a password it holds in its own history. She is
+    // already there, so the flow drives her login and nothing else.
     let restored_client = restored.client();
-    restored
-        .login_as(&restored_client, &alice)
+    rahi_harness::rauthy::login(&restored_client, restored.base_url(), &alice)
         .await
-        .expect("alice logs in on the restored cell");
+        .expect("alice logs in on the restored cell, as herself");
     let listed: Vec<serde_json::Value> = restored_client
         .get("/api/notes")
         .await

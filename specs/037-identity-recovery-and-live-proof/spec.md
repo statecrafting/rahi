@@ -358,9 +358,59 @@ the revision-3 register). The spec stays `draft` until a human flips it.
   lifetime depend on what an operator typed, which is what spec 031 B-3
   removed.
 
+- **D-7 (2026-09-17; AC-2 is blocked, by what B-5 was built to find).**
+  B-5's job runs spec 025's live bearer test against the pinned image, and
+  that test fails against rauthy `0.36.2`. It is not this spec's to fix, and
+  it is exactly the class of thing a live job exists to surface: spec 025's
+  AC-2 was verified against rauthy `0.36.0`, the image pin later moved to
+  `0.36.2`, and nothing ran that test against the new pin until now.
+
+  Measured on 2026-09-17 against the pinned digest, in the environment
+  `live.yml` builds:
+
+  ```
+  POST /auth/v1/clients_dyn                     201  client_id "dyn$QQ40DpQb6RfLQ0E4"
+  PUT  /auth/v1/clients/{id} allowed_resources  200
+  GET  /auth/v1/clients/{id}                    200  allowed_resources = ["http://localhost:8080"]
+  POST /auth/v1/oidc/authorize (with resource)  401  Unauthorized "Invalid user credentials"
+     rauthy's log: InvalidTarget "dynamic clients must not request a `resource`"
+  ```
+
+  rauthy accepts the allow list on a dynamic client and then refuses every
+  authorization that uses it: `Client::validate_resource_request` returns
+  `InvalidTarget` for any client whose id starts with `dyn$` before it
+  consults `allowed_resources`, and `is_dynamic()` is that prefix, which no
+  admin call can change. The check arrived in the commit tagged `v0.36.1`.
+  Spec 025 AC-2 asks for a client registered through dynamic registration
+  *and* an audience bound with RFC 8707 `resource`; on this release those
+  two cannot both hold, so no mechanism of this spec's makes both specs'
+  text true and the reconciliation is a human's
+  (`.claude/rules/adversarial-prompt-refusal.md`).
+
+  This spec's AC-2 therefore does not hold and is not claimed. Everything
+  else of B-1 to B-6 is built and measured; the live job's workspace half is
+  green against the pinned release and its bearer half is red for the reason
+  above. The spec stays `in-progress` until a human resolves spec 025
+  against the pinned rauthy. `live.yml` keeps the job B-5 asks for rather
+  than hiding it: an advisory red that names a real defect is the point of
+  the workflow, and quietly tolerating it would be the green-that-says-
+  nothing B-4 removed.
+
 Still open: whether `live.yml` becomes a required check or stays advisory
 beside `ci-gate`. Decided for now by the owner on 2026-09-17: advisory,
-beside `ci-gate`, and not a required check.
+beside `ci-gate`, and not a required check. It cannot become required while
+D-7 stands.
+
+## Status
+
+- **2026-09-17.** B-1 to B-6 are built and measured (the evidence is in D-3,
+  D-4 and D-7). AC-1, AC-3 and AC-4 hold; FR-001, FR-002, FR-003, FR-004 and
+  FR-006 hold, the last two measured against the pinned rauthy `0.36.2`.
+  **AC-2 does not hold**: `live.yml`'s bearer job runs spec 025's live test,
+  which the pinned rauthy refuses for a reason inside spec 025's territory
+  (D-7). Implementation stays `in-progress` until that is reconciled by a
+  human. Nothing in this repository claims unattended recovery beyond what
+  B-6 proves at N=1.
 
 ### Evidence and proposals (2026-09-12)
 

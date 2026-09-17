@@ -219,7 +219,12 @@ impl RauthyApi {
             }
             let trigger = i64::try_from(crate::unix_now()).unwrap_or(i64::MAX);
             self.trigger(&mut session).await?;
-            let wait_until = started + FILE_WAIT.min(deadline.saturating_sub(started.elapsed()));
+            // Measured from the trigger, not from the start: after waiting a
+            // suppression window out, `started` is already further back than
+            // FILE_WAIT, and a poll window that begins in the past would give
+            // the writer no time at all to produce the file.
+            let wait_until =
+                Instant::now() + FILE_WAIT.min(deadline.saturating_sub(started.elapsed()));
             let mut taken = None;
             loop {
                 if let Some(name) = self.snapshot_since(&mut session, trigger).await? {
