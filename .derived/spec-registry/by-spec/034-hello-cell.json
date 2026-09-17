@@ -139,5 +139,5 @@
     "title": "hello-cell: the reference app that composes every crate and proves the chassis end to end"
   },
   "shardHash": "5b6c13d65cf33cf74c14af3d6486f11e3bb746e2527babcf3b895d922700b5d3",
-  "specVersion": "1.2.0"
+  "specVersion": "1.3.0"
 }

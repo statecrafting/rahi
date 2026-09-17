@@ -88,6 +88,12 @@ extra_hashed_inputs = [
   "Makefile",
   "scripts/*.sh",
   ".githooks/*.sh",
+  # The commit-boundary hook carries no extension, so `.githooks/*.sh` above
+  # does not reach it. A governance surface outside every content hash is the
+  # gap D-11 corrected for the rest of the harness; it is named here rather
+  # than by widening the glob to `.githooks/*`, which would fold in whatever a
+  # contributor leaves in that directory.
+  ".githooks/pre-commit",
   ".gitattributes",
   "CODEOWNERS",
   # The toolchain and supply-chain pins (spec 010). Dependabot's cargo

@@ -33,7 +33,27 @@ python3 - "$tmp" <<'PY'
 import json, sys
 
 with open(sys.argv[1], encoding="utf-8") as fh:
-    specs = json.load(fh)
+    doc = json.load(fh)
+
+# spec-spine 0.20.0 (its spec 093) made every read document an object carrying
+# `schemaVersion` alongside its payload; before it, `registry list --json` was
+# the bare array. Accept both, so this script answers correctly whichever
+# binary is on PATH, and refuse a third shape loudly instead of iterating a
+# dict's keys and reporting the TypeError as a DAG violation.
+if isinstance(doc, dict):
+    specs = doc.get("items")
+    if specs is None:
+        print("spec-dag: registry list --json has no `items` member "
+              f"(schemaVersion {doc.get('schemaVersion', 'absent')}); "
+              "this script does not know this shape", file=sys.stderr)
+        sys.exit(3)
+elif isinstance(doc, list):
+    specs = doc
+else:
+    print(f"spec-dag: registry list --json returned {type(doc).__name__}, "
+          "expected an object or an array", file=sys.stderr)
+    sys.exit(3)
+
 deps = {s["id"]: list(s.get("dependsOn") or []) for s in specs}
 ordinal = {sid: int(sid[:3]) for sid in deps}
 violations = []

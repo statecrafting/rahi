@@ -37,6 +37,7 @@ make coverage   # spec-spine index coverage
 make attest     # spec-spine attest --with-coupling -> .derived/attestation/
 make verify SPEC=<id>         # one spec's declared acceptance (what the verify stage runs after merge)
 scripts/spec-dag.sh           # depends_on is acyclic and only points to lower-numbered specs
+./.githooks/enable-hooks.sh   # once per clone: the commit-boundary gate
 
 # One crate, one test:
 cargo test -p rahi-store --locked --test txn
@@ -96,6 +97,12 @@ the chassis never depends on an app.
 - Hooks in `.claude/settings.json` recompile after spec edits, check
   staleness after hashed-input edits, block `gh pr create` on a red
   coupling gate, and block `git push` to `main`.
+- `.githooks/pre-commit` is the commit boundary: it refuses a stale shard
+  tree, regenerated shards left out of the commit, and a change that drifts
+  from its owning spec, judging the index and working tree rather than a
+  pushed revision. It refuses and never repairs. Enable it once per clone
+  with `./.githooks/enable-hooks.sh`; bypass one commit with
+  `git commit --no-verify`.
 - The coherence guard: never edit an owning spec to make the gate pass on
   code that contradicts it. Surface the contradiction.
 

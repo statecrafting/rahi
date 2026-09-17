@@ -18,6 +18,10 @@ checked against `444bcf8`, whose crate sources the tag carries forward
 through `39f778b`; where a statement has since changed, the release's
 entry in `CHANGELOG.md` is the one that governs.
 
+Revised 2026-09-17 with a status reconciliation in section 12, taken during
+the spec-spine 0.20.0 upgrade. It adds a dated reading and supersedes no
+statement above: sections 2.1 and 2.2 are re-measured there, not rewritten.
+
 Every statement carries one of three tags.
 
 - **Verified**: checked against commit `444bcf8` (`main`) by reading the
@@ -831,3 +835,39 @@ as the original bytes, the verifying public key, the segment references,
 and, with draft 041 B-13, a coverage file that states what the export
 does not contain: allows, lost denials, and archived segments. The
 bundle's envelope is the consumer's.
+
+## 12. Status reconciliation, 2026-09-17
+
+**Verified** on 2026-09-17, during the spec-spine 0.20.0 governance upgrade.
+This section reports state; it approves no draft and amends no spec. The
+dated readings above are left as the record of their own days.
+
+### 12.1 The corpus
+
+| Item | State on `main` at `7c86771` |
+|---|---|
+| Specs | 29 total: 24 `approved`, 5 `draft` |
+| Implemented since note 02 | 035 (`#46`) and 039 (`#47`, `#48`, `#49`), both `approved` and `implementation: complete` |
+| Drafts remaining | 036, 037, 038, 040, 041, all `status: draft` and `implementation: pending` |
+| Schedulable | `registry plan` calls 036, 037, 038 and 040 dependency-ready and 041 blocked on 036 and 040. Ready is not approved: `/next` subtracts every draft, so the approved-ready set is empty and no spec is buildable until a human flips one |
+| Governance | `spec-spine 0.20.0 check`: registry fresh, index fresh, 142 unwitnessed claims, 142 allowed |
+
+Note 02 section 0 recorded the drafts as living on unpushed local branches.
+That is superseded by fact rather than by decision: 035 to 041 are on `main`
+since `#45`, and 035 and 039 have since been built.
+
+### 12.2 Spec 039's acceptance, re-measured
+
+| Criterion | State |
+|---|---|
+| **AC-1** `make ci`, `cargo package --workspace --locked`, `scripts/k8s-validate.sh` | passes locally |
+| **AC-2** a `v*` tag publishes both images and they pull anonymously | **not met.** Both images exist and both architectures were pushed, but the GHCR packages are private. Re-measured 2026-09-17 by anonymous registry token: `ghcr.io/statecrafting/rahi:0.1.0` and `ghcr.io/statecrafting/rahi-runtime:0.1.0` each answer `403`, against a `200` control on `ghcr.io/sebadob/rauthy:0.36.2` taken the same minute with the same method |
+| **AC-3** spec 034's AC-2 procedure end to end against the published image | **not met, and blocked by AC-2.** The procedure cannot begin while an anonymous pull is refused, so this is unproven rather than failing |
+| **AC-4** the nine crates resolve from crates.io at the tag's version, and `release.yml` proves the registry stanza | **met.** Re-measured 2026-09-17: all nine answer `0.1.0` from the crates.io API, and the `consumer-registry` job proved the stanza in the `v0.1.0` run |
+
+AC-2 rests on one action no workflow can take: a package's visibility is a
+GitHub package setting, not a property of the push, and GHCR creates a
+package private. Until an owner makes both packages public, a consumer
+building a cell from the crates is unblocked and a consumer pulling an image
+is not. AC-4's passing does not carry AC-2 or AC-3, and spec 039 is not
+release-ready on implementation status or on a local `make ci` alone.

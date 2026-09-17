@@ -63,7 +63,7 @@ Code needs beyond it), `Makefile` (the CI composite), `spec-spine.toml`,
 constitution itself is in the bypass floor and is amended only by a spec
 that `amends` it), the whole `.claude/` harness, the two CI workflows and the
 dependabot config, `CODEOWNERS`, `.gitattributes`, the `.githooks/` merge
-driver, and `scripts/spec-dag.sh`. The build session for any later spec is
+driver and commit-boundary hook, and `scripts/spec-dag.sh`. The build session for any later spec is
 granted authority to append a dated D-n note to this spec when it must
 adjust a hook or a Makefile target to make its own territory buildable; it
 may not change the protocol's substance without an amendment.
@@ -116,6 +116,18 @@ may not change the protocol's substance without an amendment.
   driver is opt-in per clone and the CI staleness gate stays the source of
   truth. `CODEOWNERS` names a reviewer for the corpus, the standards, the
   harness, and everything that runs with a token.
+- **B-10 (the commit boundary).** `.githooks/pre-commit` refuses, and never
+  repairs, three things at the one boundary no tool route bypasses: a stale
+  committed shard tree, regenerated shards left out of the commit, and a
+  change that drifts from its owning spec. Its coupling read passes
+  `--include-uncommitted`, so it judges the index and working tree, which is
+  the change a commit would record; CI's read stays over two committed
+  revisions and its verdict does not depend on a runner's working tree.
+  `.githooks/enable-hooks.sh` sets `core.hooksPath` in a clone, so the hook
+  is opt-in per clone exactly as the merge driver is, and `git commit
+  --no-verify` bypasses one commit. A commit-time run has no PR body, so a
+  change needing a `Spec-Drift-Waiver:` is refused here and waived at the
+  PR, where the gate judges the pushed commits.
 - **B-4 (hooks).** `.claude/settings.json` wires: `SessionStart` (report
   registry and index freshness through `spec-spine check`), `PostToolUse` on
   `Edit|Write` (recompile after a spec edit; freshness check after any
@@ -183,6 +195,9 @@ may not change the protocol's substance without an amendment.
   asserts a repository setting rather than a property of the checkout, so it is
   verified with `gh api repos/statecrafting/rahi/branches/main/protection`, not
   in the block below.
+- **AC-5.** `.githooks/pre-commit` and `.githooks/enable-hooks.sh` are
+  executable, the hook's coupling read passes `--include-uncommitted`, and
+  no workflow passes that flag.
 
 ## 6. Out of scope
 
@@ -529,6 +544,105 @@ at the next spec that claims a file outside `crates/`; a `Spec-Drift-Waiver:`
 line, which is a human instrument for a contradiction and this is a
 correction the owning spec can simply make.
 
+D-13 (2026-09-17, corpus amendment; spec-spine 0.20.0 adoption). The pin
+moves from 0.18.0 to 0.20.0 in every site that states it as the pin
+(`Makefile`, which CI reads, plus the prose in `AGENTS.md`, `README.md` and
+the architect agent). Three sites keep `0.18.0` on purpose and are not
+bumped: `AGENTS.md`'s freshness paragraph names it as the floor at which the
+`check` verb first existed, which is a fact about the verb and not about the
+pin; D-11 above records its own day; and
+`docs/design/02-operational-prerequisites.md` is a dated measurement from
+2026-09-12. Both release notes were read, 0.19.0's and 0.20.0's, because a
+0.18.0 adopter crosses both.
+
+**The versioned read document broke the one consumer that parses one.**
+spec-spine's spec 093 made every read document an object carrying
+`schemaVersion` beside its payload, so `registry list --json` went from a
+bare array to `{ "items": [...] }`. `scripts/spec-dag.sh` did
+`json.load(...)` and iterated the result, which under the new shape iterates
+a dict's keys and raises `TypeError: string indices must be integers` at
+exit 1, the code FR-001 reserves for a DAG violation. A tool reporting a
+schema change as a dependency cycle is the failure mode typed reads exist to
+prevent, so the parser now accepts both shapes, and refuses a third at exit
+3 with the `schemaVersion` it was handed. FR-001's text is unchanged: it
+still reads that command, and which shape the command answers in was never
+its claim. Every other `--json` site in this repository (`registry plan`,
+`registry show`, `registry status-report`, the verdict envelopes) is read by
+an agent, not decoded by a program, and all four keep every member they had.
+
+**The commit boundary arrives, and B-10 is new substance.** spec-spine spec
+090 observed that every hook the kit ships is bound to a Claude Code tool
+name, so it fires only when a session took that route; a commit is one
+command whatever wrote the bytes. `.githooks/pre-commit` is the kit's, with
+this repository's claim header, and it refuses rather than repairs for the
+reason `make gate` does: a hook that regenerates and stages collapses "was
+never stale" into "was stale until the hook fixed it", and telling those
+apart is the whole content of `check`. It gains one section the kit's does
+not have: the coupling read, passing `--include-uncommitted` (spec-spine
+spec 102), which is the flag's only sanctioned use. Spec 102 3.4 requires
+CI's unflagged verdict not to depend on a runner's working tree, so
+`govern.yml` is untouched and still diffs the event's two frozen SHAs; a
+verification line below keeps the flag out of every workflow. The hook is
+opt-in per clone through `.githooks/enable-hooks.sh`, the same shape B-9
+already uses for the merge driver, so a clone that has not run it is
+governed exactly as before. `.githooks/pre-commit` carries no extension, so
+`[index] extra_hashed_inputs` names it directly rather than widening
+`.githooks/*.sh` to `.githooks/*`, which would fold whatever a contributor
+leaves in that directory into every shard hash.
+
+**The session hooks stop guessing, and the shepherd classifies.** The fixes
+for spec-spine specs 090, 099 and 104 live in `settings.json`, which
+adopters copy, so the version pin does not deliver them: the `Stop` hook
+read `check` through `>/dev/null` and printed one staleness remedy on every
+non-zero exit, three of which are not staleness and none of which
+regenerating clears. The four hook bodies are taken from the kit whole.
+`permissions` is not: this repository's list carries `cargo`, `rustup` and
+`git checkout`, which the kit's does not, and the kit's carries three `npx`
+entries for an install route this repository does not use. `Stop` still only
+reports, which is D-6's property and is preserved by the kit's own text.
+`.claude/skills/shepherd/SKILL.md` takes spec 082's severity classification,
+which keeps a CRITICAL finding from consuming a remediation round; the other
+nine skills needed no copy and all ten are again byte-identical to the kit,
+as B-5 requires.
+
+**Three opt-ins are declined, and the reason is the same one each time.**
+`check --fail-on-unresolved` stays off: D-11's reasoning is unchanged, and
+on a corpus specified before it is built every unit of every pending spec is
+unresolved by design. spec-spine spec 101 makes that refusal exit 1 rather
+than 2, which changes nothing while the flag is off, but it does change what
+a reader must be told, so `AGENTS.md` now says an unresolved claim is a
+validation failure that regenerating never clears. `[coverage]
+governed_scope` (spec 097) stays empty, which is its default and the state
+in which it moves no verdict: declaring a scope here would be a governance
+change made to accompany a version bump, not a decision anyone took.
+`[lint] unwitnessed_allowed` keeps every entry: spec 094's new `W-003` found
+no near miss in this tree (`lint --fail-on-warn` reports zero warnings), so
+nothing was suppressed to reach green, and nothing was removed either.
+
+**What was measured, not assumed.** spec-spine spec 103 resolves an `amends`
+chain at `verify`, so an amended acceptance is the one that runs. No spec in
+this corpus declares an `amends` edge, so no effective plan could have
+moved, and that was checked rather than assumed: `spec-spine verify <id>
+--plan` over all 29 specs matched each spec's own declared `verify:cli`
+block line for line, with 27 declaring one and 000 and 002 declaring none.
+No historical acceptance was rewritten to match current code. spec 092 now
+judges mode-only and binary changes at the coupling gate; this change makes
+two files executable, both of them new, so there is no mode-only path in it.
+
+**Two untracked trees are reported, not adopted.** `.agents/skills/` (ten
+`SKILL.md` files) and `.codex/` (four agent `.toml` files and a
+`hooks.json`) have sat untracked in this clone since 2026-09-11. They are
+copies of the `.claude/` tree with a case-insensitive `claude` to `Codex`
+substitution, the defect spec-spine spec 100 measured in its own repository:
+nine of the ten skills and three of the four agent files reference a
+`.Codex/rules/` directory that exists on no filesystem. The kit does not
+ship either tree, and spec 100 delivers parity inside spec-spine alone,
+naming no adopter action. They are therefore left exactly as found, tracked
+by nothing and claimed by nothing. Deleting them is not this session's call,
+and tracking them would claim text no author wrote. Whether rahi wants
+generated non-Claude trees at all is recorded as an open decision for the
+owner, not settled here.
+
 ## Verification
 
 ```verify:cli
@@ -573,4 +687,19 @@ grep -q 'merge=spec-spine-derived-regen' .gitattributes
 test -x .githooks/merge-derived-index.sh
 test -x .githooks/enable-merge-driver.sh
 test -f CODEOWNERS
+# B-10 / AC-5: the commit boundary is executable and opt-in per clone.
+test -x .githooks/pre-commit
+test -x .githooks/enable-hooks.sh
+# B-10: it judges the change being committed, and it refuses rather than
+# repairs, so neither writing verb may appear in it.
+grep -q -- '--include-uncommitted' .githooks/pre-commit
+sh -c '! grep -qE "[\"] (compile|index)" .githooks/pre-commit'
+sh -c '! grep -qE "git (-C [^ ]+ )?add" .githooks/pre-commit'
+# B-10 / D-13: the flag is local-only. CI's coupling verdict must not depend
+# on the state of a runner's working tree (spec-spine spec 102 3.4).
+sh -c '! grep -rq -- "--include-uncommitted" .github/workflows/'
+# D-13: the pin is 0.20.0 wherever the pin is stated.
+sh -c 'test "$(sed -n "s/^SPEC_SPINE_VERSION ?= //p" Makefile)" = 0.20.0'
+# D-13: spec-dag reads the versioned read document (spec-spine spec 093).
+grep -q 'schemaVersion' scripts/spec-dag.sh
 ```

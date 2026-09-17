@@ -127,5 +127,5 @@
     "title": "The verbs and the binary composer: preflight, migrate, backup, restore, ledger verify"
   },
   "shardHash": "c8096ae6f3176ef58924a4b3e812ffa3dd7012ed831898ba3d3eb52a071c07e0",
-  "specVersion": "1.2.0"
+  "specVersion": "1.3.0"
 }
