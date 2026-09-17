@@ -176,5 +176,5 @@
     "title": "Deployment epochs: the chain records each deployment it serves under, appended at the deploy step, linked to external build and deployment records it never rewrites"
   },
   "shardHash": "c9c965fe215753a103605b9635eeecceb350147b5abd2c4a07961654d388c930",
-  "specVersion": "1.2.0"
+  "specVersion": "1.3.0"
 }

@@ -119,5 +119,5 @@
     "title": "The store: hiqlite in-process with txn, two read calls, migrations, and backup"
   },
   "shardHash": "f7fa6f7ee068c2c37b3b71c723593daa01a167c22e15d71a9237e39e1d111eb7",
-  "specVersion": "1.2.0"
+  "specVersion": "1.3.0"
 }

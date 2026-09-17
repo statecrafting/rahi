@@ -167,5 +167,5 @@
     "title": "Native clients and bearer revocation: the CSRF exemption wired, a public client for a CLI declared in the manifest, token lifetimes set, and a token that can be revoked"
   },
   "shardHash": "d81f1d72bc724807803a796dd6741f2dba4f40075bcaf7571b3947e974cc0df4",
-  "specVersion": "1.2.0"
+  "specVersion": "1.3.0"
 }

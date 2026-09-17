@@ -95,5 +95,5 @@
     "title": "Streaming responses: server-sent events as the one mechanism, declared per route, bounded and cancellable"
   },
   "shardHash": "ce9b6672b576cba74e3570abdfcc4292ce4fc3ced928197857077ba82e0bd67b",
-  "specVersion": "1.2.0"
+  "specVersion": "1.3.0"
 }

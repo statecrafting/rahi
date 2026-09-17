@@ -15,7 +15,7 @@ design, every ordinary spec is `approved` and `implementation: pending`, and
 spec ordinals are the build order. Code arrives one spec per session under
 `crates/`, `apps/`, `docker/`, and `deploy/`.
 
-Governance is `spec-spine` **0.18.0** on your `PATH` (CI pins the same
+Governance is `spec-spine` **0.20.0** on your `PATH` (CI pins the same
 version, read out of the `Makefile`). All governed reads of `.derived/` go
 through its CLI.
 
@@ -69,8 +69,12 @@ is stale: report which tree moved and that the fix is `make refresh` plus a
 commit of the regenerated shards, and say the lifecycle counts are the
 committed (stale) ones. Exit `1` means the corpus fails validation: surface
 the violations, report counts as unverified, and make fixing them the first
-task. Exit `3` means the read was not performed at all, most often a binary
-older than 0.18.0 that predates the verb; report the version it does answer
+task. Since spec-spine 0.20.0 (its specs 098 and 101) an **unresolved claim**
+is part of that exit `1`, not of exit `2`: a spec claims a unit that does not
+resolve, and re-running `index` never clears it, so report it as a corpus
+violation and never as a shard to regenerate. Exit `2` is staleness and
+nothing else. Exit `3` means the read was not performed at all, most often a
+binary older than 0.18.0 that predates the verb; report the version it does answer
 and send the reader to `/setup`, never call it staleness. Never substitute a
 plain `spec-spine compile` or `index` here; `/prime` reports, it does not
 mutate.

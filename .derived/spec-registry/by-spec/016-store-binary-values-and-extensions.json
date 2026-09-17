@@ -97,5 +97,5 @@
     "title": "Binary values and the extension policy: BLOBs are first class, loadable extensions are refused"
   },
   "shardHash": "2cddde2b2e9e5bd796e08fc1bbf8a5aade5449f44960e0a4be7671f8e6c470be",
-  "specVersion": "1.2.0"
+  "specVersion": "1.3.0"
 }

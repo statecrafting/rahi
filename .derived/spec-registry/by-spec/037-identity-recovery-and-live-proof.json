@@ -137,5 +137,5 @@
     "title": "Identity recovery and the live proof: a backup a real rauthy answers, a restore that brings the users back, and CI that runs against the pinned release"
   },
   "shardHash": "3391d1deb569be591e5184ab95f29033a62f4a40e00ee28d13c9ecabd302ca96",
-  "specVersion": "1.2.0"
+  "specVersion": "1.3.0"
 }

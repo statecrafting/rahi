@@ -190,5 +190,5 @@
     "title": "Runtime identity: a replica states which bits it runs, which ceiling it enforces, and which instance it is, with every value's basis named, on bounded surfaces"
   },
   "shardHash": "26b2d3906e01812dc5b6b8417bbeee068f5a4db3a4ae6a91e4ec3514d94bd126",
-  "specVersion": "1.2.0"
+  "specVersion": "1.3.0"
 }

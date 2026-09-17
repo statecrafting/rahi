@@ -362,5 +362,5 @@
     "title": "Releases and out-of-tree packaging: a tagged version a consumer pins, images that exist under the names the manifests use, and a runtime image a cell in another repository builds on"
   },
   "shardHash": "b524dd00134d0af1514f99ae06f81f4e06a71e758243f16f92e9f3ccb11a0f57",
-  "specVersion": "1.2.0"
+  "specVersion": "1.3.0"
 }
