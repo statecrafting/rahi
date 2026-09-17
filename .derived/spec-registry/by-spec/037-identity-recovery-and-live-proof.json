@@ -31,6 +31,10 @@
       },
       {
         "kind": "file",
+        "path": "crates/rahi-store/tests/backup_deadline.rs"
+      },
+      {
+        "kind": "file",
         "path": "crates/rahi-ops/tests/rauthy_backup_admin.rs"
       }
     ],
@@ -245,6 +249,6 @@
     "summary": "Recovery of a cell is two state systems, and only one of them recovers today. Against a real rauthy the backup verb fails outright, because rauthy's backup routes accept only an admin session and the verb presents the admin API key (030 D-3, observed against 0.36.2). The app half races hiqlite's background backup and can report no file for a backup that lands a moment later (observed on two of four runs). A restore places rauthy's snapshot and nothing hands it to rauthy, so a restored cell comes up with no users, and every sub in its rows is unreachable. CI never runs a real rauthy. This spec resolves D-3 by the mechanism a human chooses, waits for the app backup to exist, applies rauthy's snapshot exactly once on the next start, and adds a CI job that runs every rauthy-gated test, and an end-to-end test through recovery with identity, against the pinned rauthy release.\n",
     "title": "Identity recovery and the live proof: a backup a real rauthy answers, a restore that brings the users back, and CI that runs against the pinned release"
   },
-  "shardHash": "414a4e7996cd63cef89ec1d784c20372d18be2bd6767f9dbedbd5a7e144b193c",
+  "shardHash": "f90f3d501b1c14744f6fbb807097c2231f726004b11956ccdda95d83bb5c35e4",
   "specVersion": "1.3.0"
 }

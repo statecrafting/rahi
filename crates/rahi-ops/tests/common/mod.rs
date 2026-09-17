@@ -226,6 +226,18 @@ pub fn test_passkey() -> rahi_ops::rauthy_session::Passkey {
 
 /// Serve a stub whose backup body is `body`; `refuse` makes it answer 401.
 pub async fn stub(body: &[u8], refuse: bool) -> Stub {
+    delayed_stub(body, refuse, "", "", 0, std::time::Duration::ZERO).await
+}
+
+/// Delay a selected HTTP call, including response-body delivery, without changing its answer.
+pub async fn delayed_stub(
+    body: &[u8],
+    refuse: bool,
+    method: &str,
+    path: &str,
+    occurrence: usize,
+    delay: std::time::Duration,
+) -> Stub {
     let log = Arc::new(Mutex::new(StubLog::default()));
     let state = StubState {
         log: log.clone(),
@@ -243,6 +255,24 @@ pub async fn stub(body: &[u8], refuse: bool) -> Stub {
         .route("/auth/v1/backup", get(list).post(trigger))
         .route("/auth/v1/backup/local/{name}", get(fetch))
         .with_state(state);
+    let method = method.to_owned();
+    let path = path.to_owned();
+    let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let app = app.layer(axum::middleware::from_fn(
+        move |request: axum::extract::Request, next: axum::middleware::Next| {
+            let selected = request.method().as_str() == method
+                && (request.uri().path() == path
+                    || (path.ends_with("/local/") && request.uri().path().starts_with(&path)))
+                && calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == occurrence;
+            async move {
+                let response = next.run(request).await;
+                if selected {
+                    tokio::time::sleep(delay).await;
+                }
+                response
+            }
+        },
+    ));
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     let handle = tokio::spawn(async move {
@@ -352,4 +382,30 @@ async fn fetch(
     }
     state.log.lock().unwrap().fetched.push(name);
     (StatusCode::OK, state.body.as_ref().clone())
+}
+
+/// Run potentially stuck integration work in a disposable test process.
+/// Parent waits only to the explicit bound, then kills and reaps the child.
+pub fn disposable_process(test: &str, seconds: u64) -> bool {
+    if std::env::var("RAHI_DISPOSABLE_TEST").as_deref() == Ok(test) {
+        return true;
+    }
+    let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", test, "--nocapture"])
+        .env("RAHI_DISPOSABLE_TEST", test)
+        .spawn()
+        .unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(seconds);
+    loop {
+        if let Some(status) = child.try_wait().unwrap() {
+            assert!(status.success(), "{test}: {status}");
+            return false;
+        }
+        if std::time::Instant::now() >= deadline {
+            child.kill().unwrap();
+            child.wait().unwrap();
+            panic!("{test} exceeded {seconds}s; child killed and reaped");
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
 }

@@ -195,3 +195,151 @@ fn utc_stamp_is_the_expected_calendar() {
     assert_eq!(rahi_ops::utc_stamp(1_767_225_600), "20260101T000000Z");
     assert_eq!(rahi_ops::utc_stamp(951_782_400), "20000229T000000Z");
 }
+
+#[tokio::test]
+async fn an_existing_future_rauthy_snapshot_is_not_fresh() {
+    if !common::disposable_process("an_existing_future_rauthy_snapshot_is_not_fresh", 10) {
+        return;
+    }
+    let stub = common::stub(b"old snapshot", false).await;
+    stub.log
+        .lock()
+        .unwrap()
+        .taken
+        .push(i64::try_from(rahi_ops::unix_now()).unwrap() + 3600);
+    let result = stub
+        .api()
+        .backup_within(std::time::Duration::from_secs(1))
+        .await;
+    assert!(matches!(result, Err(Error::Upstream(_))), "{result:?}");
+    let log = stub.log.lock().unwrap();
+    assert_eq!(
+        log.triggers, 0,
+        "wait for the future timestamp before triggering"
+    );
+    assert!(
+        log.fetched.is_empty(),
+        "never download a pre-existing snapshot"
+    );
+}
+
+/// Every HTTP phase spends the same budget, including login and the final
+/// successful download. The server deliberately finishes after the caller.
+#[tokio::test]
+async fn slow_backup_calls_and_late_success_obey_one_deadline() {
+    if !common::disposable_process("slow_backup_calls_and_late_success_obey_one_deadline", 20) {
+        return;
+    }
+    use std::time::{Duration, Instant};
+    for (method, path, occurrence) in [
+        ("POST", "/auth/v1/oidc/session", 0),
+        ("GET", "/auth/v1/backup", 0),
+        ("POST", "/auth/v1/backup", 0),
+        ("GET", "/auth/v1/backup", 1),
+        ("GET", "/auth/v1/backup", 2),
+        ("GET", "/auth/v1/backup", 2),
+    ] {
+        let stub = common::delayed_stub(
+            b"fresh snapshot",
+            false,
+            method,
+            path,
+            occurrence,
+            Duration::from_millis(400),
+        )
+        .await;
+        let started = Instant::now();
+        let result = stub.api().backup_within(Duration::from_millis(150)).await;
+        assert!(
+            matches!(&result, Err(rahi_types::Error::Upstream(text)) if text.contains("deadline") && text.contains("150 ms")),
+            "{method} {path} #{occurrence}: {result:?}"
+        );
+        assert!(
+            started.elapsed() < Duration::from_millis(350),
+            "{method} {path}: {:?}",
+            started.elapsed()
+        );
+        // Let the server and retained worker finish. A late listing must not
+        // advance to a download, and a late login must not trigger a backup.
+        tokio::time::sleep(Duration::from_millis(450)).await;
+        assert!(stub.log.lock().unwrap().fetched.is_empty());
+        if path == "/auth/v1/oidc/session" {
+            assert_eq!(stub.log.lock().unwrap().triggers, 0);
+        }
+    }
+    // The download name is chosen by the real trigger, so delay by prefix.
+    let stub = common::delayed_stub(
+        b"fresh snapshot",
+        false,
+        "GET",
+        "/auth/v1/backup/local/",
+        0,
+        Duration::from_millis(400),
+    )
+    .await;
+    let started = Instant::now();
+    let result = stub.api().backup_within(Duration::from_millis(150)).await;
+    assert!(
+        matches!(&result, Err(rahi_types::Error::Upstream(text)) if text.contains("deadline")),
+        "{result:?}"
+    );
+    assert!(started.elapsed() < Duration::from_millis(350));
+    tokio::time::sleep(Duration::from_millis(450)).await;
+    assert_eq!(
+        stub.log.lock().unwrap().fetched.len(),
+        1,
+        "the late successful download really ran"
+    );
+}
+
+#[tokio::test]
+async fn queued_backup_expires_without_logging_in_or_triggering() {
+    if !common::disposable_process("queued_backup_expires_without_logging_in_or_triggering", 10) {
+        return;
+    }
+    use std::time::{Duration, Instant};
+    let stub = common::delayed_stub(
+        b"fresh snapshot",
+        false,
+        "POST",
+        "/auth/v1/backup",
+        0,
+        Duration::from_millis(600),
+    )
+    .await;
+    let first_api = stub.api();
+    let first =
+        tokio::spawn(async move { first_api.backup_within(Duration::from_millis(250)).await });
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while stub.log.lock().unwrap().triggers == 0 {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .unwrap();
+    let started = Instant::now();
+    let queued = stub.api().backup_within(Duration::from_millis(50)).await;
+    assert!(matches!(queued, Err(rahi_types::Error::Upstream(_))));
+    assert!(started.elapsed() < Duration::from_millis(200));
+    assert!(matches!(
+        first.await.unwrap(),
+        Err(rahi_types::Error::Upstream(_))
+    ));
+    // First caller has returned, but its trigger is still in flight. The
+    // next caller also expires at the gate rather than racing that trigger.
+    let queued = stub.api().backup_within(Duration::from_millis(50)).await;
+    assert!(matches!(queued, Err(rahi_types::Error::Upstream(_))));
+    assert_eq!(stub.log.lock().unwrap().logins, 1);
+    assert_eq!(stub.log.lock().unwrap().triggers, 1);
+    tokio::time::sleep(Duration::from_millis(650)).await;
+    assert!(stub.log.lock().unwrap().fetched.is_empty());
+    // Once the old request settles, the gate is usable again.
+    let other = common::stub(b"next snapshot", false).await;
+    assert!(
+        other
+            .api()
+            .backup_within(Duration::from_secs(2))
+            .await
+            .is_ok()
+    );
+}

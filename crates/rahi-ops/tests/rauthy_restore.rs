@@ -44,17 +44,12 @@ async fn backed_up(dir: &Path) -> (PathBuf, KeySet) {
 }
 
 /// A rauthy that records the environment it was started with and then
-/// answers health on `addr` until it is killed.
-fn recording_rauthy(record: &Path, addr: std::net::SocketAddr) -> PathBuf {
+/// answers health on its configured port until it is killed.
+fn recording_rauthy(record: &Path) -> PathBuf {
     let script = format!(
-        "#!/bin/sh\n\
-         env > \"{record}.$$\"\n\
-         cat \"{record}.$$\" > \"{record}\"\n\
-         while true; do\n\
-         printf 'HTTP/1.1 200 OK\\r\\nContent-Length: 2\\r\\n\\r\\nok' | nc -l {port} >/dev/null 2>&1 || sleep 0.2\n\
-         done\n",
+        "#!/bin/sh\nenv > '{record}'\nexport RAHI_RECORDING_STUB=1\nexec '{exe}' --exact recording_stub_process --nocapture\n",
         record = record.display(),
-        port = addr.port(),
+        exe = std::env::current_exe().unwrap().display(),
     );
     let path = record.with_extension("sh");
     std::fs::write(&path, script).unwrap();
@@ -87,6 +82,9 @@ fn child_env(config: &Config, env: &BTreeMap<&str, &str>) -> BTreeMap<String, St
 /// second, and the marker is what decides.
 #[tokio::test]
 async fn the_restored_snapshot_is_handed_to_rauthy_once() {
+    if !common::disposable_process("the_restored_snapshot_is_handed_to_rauthy_once", 40) {
+        return;
+    }
     let source = tempfile::tempdir().unwrap();
     let (archive, source_keys) = backed_up(source.path()).await;
 
@@ -121,44 +119,32 @@ async fn the_restored_snapshot_is_handed_to_rauthy_once() {
     let snapshot = PathBuf::from(&marker.rauthy_snapshot);
     assert!(snapshot.is_file());
 
-    // First start: the supervisor points rauthy's own hiqlite at the file.
-    let env = BTreeMap::from([("RAHI_RAUTHY_BIN", "/bin/true")]);
-    let first = child_env(&config, &env);
-    assert_eq!(
-        first.get(RAUTHY_RESTORE_ENV_VAR).map(String::as_str),
-        Some(format!("file:{}", snapshot.display()).as_str()),
-        "the first start after a restore hands rauthy the snapshot"
-    );
-    assert!(
-        first.contains_key("HQL_DATA_DIR"),
-        "and the rendered environment is still all there"
-    );
-
-    // rauthy came up healthy on it, so the supervisor records that.
-    let applied = restore::record_rauthy_snapshot_applied(&config)
-        .await
-        .unwrap()
-        .expect("the first healthy start records the application");
-    assert_eq!(applied, snapshot);
-    let marker = Marker::read(&restore_marker(&config)).unwrap().unwrap();
-    assert!(marker.rauthy_snapshot_applied.is_some());
-
-    // Second start: nothing is passed, and the file is still there for an
-    // operator to inspect.
-    let second = child_env(&config, &env);
-    assert!(
-        !second.contains_key(RAUTHY_RESTORE_ENV_VAR),
-        "a later start passes nothing: {second:?}"
-    );
-    assert!(snapshot.is_file(), "the snapshot is kept, not consumed");
-
-    // And recording it again is a no-op, whatever calls it.
-    assert_eq!(
-        restore::record_rauthy_snapshot_applied(&config)
-            .await
-            .unwrap(),
-        None
-    );
+    // Execute the recording stub through both supervisor starts. Read only
+    // what the actual child recorded, never Command's planned environment.
+    std::fs::remove_file(KeySet::of(&config).path(rahi_ops::BACKUP_PASSKEY_FILE)).unwrap();
+    let record = fresh.path().join("child.env");
+    let bin = recording_rauthy(&record);
+    let env = BTreeMap::from([("RAHI_RAUTHY_BIN", bin.to_str().unwrap())]);
+    for first in [true, false] {
+        run_supervisor(&config, &env).await;
+        let actual = std::fs::read_to_string(&record).unwrap();
+        let restore_line = format!("{RAUTHY_RESTORE_ENV_VAR}=file:{}", snapshot.display());
+        assert_eq!(
+            actual.lines().any(|line| line == restore_line),
+            first,
+            "{actual}"
+        );
+        assert!(actual.lines().any(|line| line.starts_with("HQL_DATA_DIR=")));
+        assert!(
+            Marker::read(&restore_marker(&config))
+                .unwrap()
+                .unwrap()
+                .rauthy_snapshot_applied
+                .is_some()
+        );
+        assert!(snapshot.is_file());
+        std::fs::remove_file(&record).unwrap();
+    }
 }
 
 /// A volume that was never restored passes nothing, which is every ordinary
@@ -215,20 +201,172 @@ fn a_marker_from_before_this_spec_reads_as_not_yet_applied() {
     assert!(marker.rauthy_snapshot_applied.is_none());
 }
 
-/// The recording rauthy is kept for `live.yml` and for a hand run; nothing
-/// in this file needs a process, and the unused-code warning would be a
-/// lie about why.
+/// Executed only as the disposable rauthy child, with a hard lifetime even
+/// if the supervisor fails to terminate it. No shell descendants or nc.
 #[test]
-fn the_recording_rauthy_script_is_written_executable() {
-    let dir = tempfile::tempdir().unwrap();
-    let path = recording_rauthy(&dir.path().join("env"), common::free_addr());
-    assert!(path.is_file());
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt as _;
-        assert_eq!(
-            std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
-            0o755
-        );
+fn recording_stub_process() {
+    if std::env::var("RAHI_RECORDING_STUB").as_deref() != Ok("1") {
+        return;
     }
+    use std::io::{Read, Write};
+    use std::time::{Duration, Instant};
+    let port = std::env::var("LISTEN_PORT_HTTP").unwrap();
+    let listener = std::net::TcpListener::bind(format!("127.0.0.1:{port}")).unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let stop = Instant::now() + Duration::from_secs(10);
+    while Instant::now() < stop {
+        if let Ok((mut stream, _)) = listener.accept() {
+            stream
+                .set_read_timeout(Some(Duration::from_millis(100)))
+                .unwrap();
+            stream
+                .set_write_timeout(Some(Duration::from_millis(100)))
+                .unwrap();
+            let _ = stream.read(&mut [0; 2048]);
+            let _ = stream
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok");
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
+async fn run_supervisor(config: &Config, env: &BTreeMap<&str, &str>) {
+    use std::time::Duration;
+    let (command, supplied) = supervise::prepare_rauthy(config, env).unwrap();
+    let api = rahi_ops::rauthy_api::RauthyApi::new(config.rauthy_base_url(), "test").unwrap();
+    let keys = KeySet::of(config);
+    let ready = async {
+        supervise::wait_healthy(&api, Duration::from_secs(3)).await?;
+        supervise::ready_after_health(config, &keys, &api, supplied.as_ref()).await?;
+        Ok(())
+    };
+    let result = tokio::time::timeout(
+        Duration::from_secs(6),
+        supervise::supervise_with(
+            command,
+            ready,
+            |_| async { Ok(()) },
+            std::future::pending(),
+            supervise::Graces {
+                term: Duration::from_millis(200),
+                serve: Duration::from_millis(200),
+                shutdown_term: Duration::from_millis(200),
+            },
+        ),
+    )
+    .await
+    .expect("supervisor is bounded");
+    assert_eq!(result.reason, supervise::Reason::ServeEnded);
+    assert_eq!(result.code, 0);
+}
+
+#[tokio::test]
+async fn missing_pending_source_fails_closed_and_can_be_retried() {
+    if !common::disposable_process("missing_pending_source_fails_closed_and_can_be_retried", 40) {
+        return;
+    }
+    let source = tempfile::tempdir().unwrap();
+    let (archive, keys) = backed_up(source.path()).await;
+    let fresh = tempfile::tempdir().unwrap();
+    let config = common::config(fresh.path(), common::free_addr());
+    rahi_ops::first_boot::layout(&config).unwrap();
+    restore::run(
+        &config,
+        &archive,
+        &KeySource::File(keys.path(rahi_ops::BACKUP_KEY_FILE)),
+    )
+    .await
+    .unwrap();
+    let secrets = KeySet::of(&config).rauthy_secrets().unwrap();
+    let rendered = rahi_ops::rauthy_env::render(
+        &config,
+        &secrets,
+        "ops-fixture",
+        rahi_ops::rauthy_env::HqlPorts::from_env(&BTreeMap::<&str, &str>::new()).unwrap(),
+    )
+    .unwrap();
+    std::fs::write(rahi_ops::rauthy_env::env_path(&config), rendered).unwrap();
+    std::fs::remove_file(KeySet::of(&config).path(rahi_ops::BACKUP_PASSKEY_FILE)).unwrap();
+    let marker = Marker::read(&restore_marker(&config)).unwrap().unwrap();
+    let snapshot = PathBuf::from(&marker.rauthy_snapshot);
+    let saved = snapshot.with_extension("saved");
+    std::fs::rename(&snapshot, &saved).unwrap();
+    let record = fresh.path().join("retry.env");
+    let bin = recording_rauthy(&record);
+    let env = BTreeMap::from([("RAHI_RAUTHY_BIN", bin.to_str().unwrap())]);
+    assert!(matches!(
+        supervise::prepare_rauthy(&config, &env),
+        Err(rahi_types::Error::Io(_))
+    ));
+    assert!(!record.exists(), "missing source must fail before spawning");
+    // Ordinary health cannot certify a pending marker it did not supply.
+    let api = rahi_ops::rauthy_api::RauthyApi::new(config.rauthy_base_url(), "test").unwrap();
+    supervise::ready_after_health(&config, &KeySet::of(&config), &api, None)
+        .await
+        .unwrap();
+    assert_eq!(
+        Marker::read(&restore_marker(&config)).unwrap().unwrap(),
+        marker
+    );
+    std::fs::create_dir(&snapshot).unwrap();
+    assert!(matches!(
+        supervise::prepare_rauthy(&config, &env),
+        Err(rahi_types::Error::Validation(_))
+    ));
+    std::fs::remove_dir(&snapshot).unwrap();
+    std::fs::rename(&saved, &snapshot).unwrap();
+    // A failed actual child start leaves the source retryable.
+    let failing = fresh.path().join("failing-rauthy");
+    std::fs::write(&failing, "#!/bin/sh\nexit 9\n").unwrap();
+    use std::os::unix::fs::PermissionsExt as _;
+    std::fs::set_permissions(&failing, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let failure_env = BTreeMap::from([("RAHI_RAUTHY_BIN", failing.to_str().unwrap())]);
+    let (failed, _) = supervise::prepare_rauthy(&config, &failure_env).unwrap();
+    let exit = supervise::supervise(
+        failed,
+        std::future::pending(),
+        |_| async { Ok(()) },
+        std::future::pending(),
+    )
+    .await;
+    assert_eq!(exit.reason, supervise::Reason::RauthyExited);
+    assert_eq!(exit.code, 9);
+    assert_eq!(
+        Marker::read(&restore_marker(&config)).unwrap().unwrap(),
+        marker
+    );
+    // Preparing one source cannot mark a replacement marker as applied.
+    let (_, supplied) = supervise::prepare_rauthy(&config, &env).unwrap();
+    let mut changed = marker.clone();
+    changed.rauthy_snapshot = saved.display().to_string();
+    std::fs::write(
+        restore_marker(&config),
+        serde_json::to_vec(&changed).unwrap(),
+    )
+    .unwrap();
+    assert!(matches!(
+        supervise::ready_after_health(&config, &KeySet::of(&config), &api, supplied.as_ref()).await,
+        Err(rahi_types::Error::Conflict(_))
+    ));
+    assert_eq!(
+        Marker::read(&restore_marker(&config)).unwrap().unwrap(),
+        changed
+    );
+    std::fs::write(
+        restore_marker(&config),
+        serde_json::to_vec(&marker).unwrap(),
+    )
+    .unwrap();
+    run_supervisor(&config, &env).await;
+    assert!(std::fs::read_to_string(record).unwrap().contains(&format!(
+        "{RAUTHY_RESTORE_ENV_VAR}=file:{}",
+        snapshot.display()
+    )));
+    assert!(
+        Marker::read(&restore_marker(&config))
+            .unwrap()
+            .unwrap()
+            .rauthy_snapshot_applied
+            .is_some()
+    );
 }

@@ -82,6 +82,18 @@ pub const RAUTHY_RESTORE_ENV_VAR: &str = crate::RESTORE_ENV_VAR;
 /// [`Error::Io`] when the rendered environment cannot be read (run
 /// `first-boot`), or when the restore marker cannot be read.
 pub fn rauthy_command(config: &Config, env: &dyn EnvReader) -> Result<Command> {
+    prepare_rauthy(config, env).map(|(command, _)| command)
+}
+
+/// Prepare a child together with the restore source its readiness must certify.
+///
+/// # Errors
+/// As [`rauthy_command`], including a missing pending restore source.
+pub fn prepare_rauthy(
+    config: &Config,
+    env: &dyn EnvReader,
+) -> Result<(Command, Option<crate::restore::PendingRauthySnapshot>)> {
+    let snapshot = crate::restore::pending_rauthy_snapshot(config)?;
     let bin = env
         .get(ENV_RAUTHY_BIN)
         .map_or_else(|| PathBuf::from(DEFAULT_RAUTHY_BIN), PathBuf::from);
@@ -107,13 +119,13 @@ pub fn rauthy_command(config: &Config, env: &dyn EnvReader) -> Result<Command> {
             command.env(inherited, value);
         }
     }
-    if let Some(snapshot) = crate::restore::pending_rauthy_snapshot(config)? {
+    if let Some(snapshot) = &snapshot {
         command.env(
             RAUTHY_RESTORE_ENV_VAR,
-            format!("file:{}", snapshot.display()),
+            format!("file:{}", snapshot.path().display()),
         );
     }
-    Ok(command)
+    Ok((command, snapshot))
 }
 
 /// The readiness step of a supervised start (spec 037 B-1, B-3): record a
@@ -141,8 +153,9 @@ pub async fn ready_after_health(
     config: &Config,
     keys: &KeySet,
     api: &RauthyApi,
+    supplied: Option<&crate::restore::PendingRauthySnapshot>,
 ) -> Result<ReadySteps> {
-    let restored = crate::restore::record_rauthy_snapshot_applied(config).await?;
+    let restored = crate::restore::record_rauthy_snapshot_applied(config, supplied).await?;
     let backup_admin = match keys.backup_passkey() {
         Ok(Some(passkey)) => {
             match crate::rauthy_session::ensure_backup_admin(api.base(), api.token(), &passkey)

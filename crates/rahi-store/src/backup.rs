@@ -25,7 +25,11 @@
 //! an outside request wins the window, and bounds the whole sequence by
 //! one deadline. It never reports a stale file as a success.
 
-use std::time::{Duration, Instant};
+use std::collections::BTreeSet;
+use std::future::Future;
+use std::time::Duration;
+
+use tokio::time::Instant;
 
 use rahi_types::Error;
 use serde::{Deserialize, Serialize};
@@ -55,6 +59,122 @@ pub const POLL_INTERVAL: Duration = Duration::from_millis(200);
 /// says nothing about a request from outside this process, which is what
 /// the trigger-second rule is for.
 static ONE_AT_A_TIME: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+/// One absolute deadline shared by all phases of a store's backup.
+///
+/// A caller timing out does not cancel an accepted Raft or HTTP request.
+/// [`Self::serialised`] keeps the local gate until its worker finishes the
+/// current request; [`Self::observe`] refuses its late result before another
+/// phase can run. Queued callers spend their own budget waiting for that gate.
+#[derive(Clone, Copy)]
+pub struct BackupDeadline {
+    end: Instant,
+    budget: Duration,
+}
+
+impl BackupDeadline {
+    /// Start the budget at entry to the backup API.
+    #[must_use]
+    pub fn new(budget: Duration) -> Self {
+        Self {
+            end: Instant::now() + budget,
+            budget,
+        }
+    }
+
+    fn expired(self) -> Error {
+        Error::Upstream(format!(
+            "backup exceeded its {} second deadline ({} ms); hiqlite ignores a backup request \
+             within {} seconds of the one before; an accepted request may still finish",
+            self.budget.as_secs(),
+            self.budget.as_millis(),
+            SUPPRESSION_WINDOW.as_secs(),
+        ))
+    }
+
+    /// Refuse to start another phase or report a result after expiry.
+    ///
+    /// # Errors
+    /// [`Error::Upstream`] naming the bound when it has expired.
+    pub fn check(self) -> Result<(), Error> {
+        if Instant::now() >= self.end {
+            Err(self.expired())
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Await cancellation-safe work under the remaining budget, rejecting
+    /// even a non-yielding future's late success or late error.
+    ///
+    /// # Errors
+    /// The operation's error, or [`Error::Upstream`] on expiry.
+    pub async fn wait<T>(self, work: impl Future<Output = Result<T, Error>>) -> Result<T, Error> {
+        self.check()?;
+        let result = tokio::time::timeout_at(self.end, work).await;
+        self.check()?;
+        result.map_err(|_| self.expired())?
+    }
+
+    /// Let an underlying request settle without dropping its receiver, then
+    /// reject a late answer. Use inside [`Self::serialised`]'s worker only.
+    ///
+    /// # Errors
+    /// The operation's error, or [`Error::Upstream`] on expiry.
+    pub async fn observe<T>(
+        self,
+        work: impl Future<Output = Result<T, Error>>,
+    ) -> Result<T, Error> {
+        self.check()?;
+        let result = work.await;
+        self.check()?;
+        result
+    }
+
+    /// Run one local backup at a time. The caller is bounded even when the
+    /// underlying request cannot be cancelled. A cancelled caller leaves
+    /// the worker holding the gate until that request settles. No later
+    /// phase starts after expiry; remote/background work may still finish.
+    ///
+    /// # Errors
+    /// The operation's error, or [`Error::Upstream`] on expiry or worker failure.
+    pub async fn serialised<T, F>(
+        self,
+        gate: &'static tokio::sync::Mutex<()>,
+        work: F,
+    ) -> Result<T, Error>
+    where
+        T: Send + 'static,
+        F: Future<Output = Result<T, Error>> + Send + 'static,
+    {
+        let guard = self.wait(async { Ok(gate.lock().await) }).await?;
+        let worker = tokio::spawn(async move {
+            let _guard = guard;
+            self.observe(work).await
+        });
+        self.wait(async {
+            worker
+                .await
+                .map_err(|err| Error::Upstream(format!("backup worker failed: {err}")))?
+        })
+        .await
+    }
+
+    /// Wait out suppression only if the remaining budget can contain it.
+    ///
+    /// # Errors
+    /// [`Error::Upstream`] if the window cannot clear before the deadline.
+    pub async fn sleep(self, duration: Duration) -> Result<(), Error> {
+        if duration >= self.end.saturating_duration_since(Instant::now()) {
+            return Err(self.expired());
+        }
+        self.wait(async {
+            tokio::time::sleep(duration).await;
+            Ok(())
+        })
+        .await
+    }
+}
 
 /// The name of one backup file, `backup_node_<id>_<ts>.sqlite`.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -126,48 +246,48 @@ impl StoreHandle {
     ///
     /// As [`StoreHandle::backup`].
     pub async fn backup_within(&self, deadline: Duration) -> Result<BackupId, Error> {
-        if !self.is_leader().await {
+        let deadline = BackupDeadline::new(deadline);
+        let store = self.clone();
+        deadline
+            .serialised(&ONE_AT_A_TIME, async move {
+                store.backup_before(deadline).await
+            })
+            .await
+    }
+
+    async fn backup_before(&self, deadline: BackupDeadline) -> Result<BackupId, Error> {
+        if !deadline
+            .observe(async { Ok(self.is_leader().await) })
+            .await?
+        {
             return Err(Error::Stale(
                 "backup is leader-only; this node is a follower".to_owned(),
             ));
         }
-        // Two callers of this process never race each other into hiqlite's
-        // suppression window; the trigger-second rule below covers anyone
-        // else (spec 037 B-2).
-        let _serialised = ONE_AT_A_TIME.lock().await;
-        let started = Instant::now();
-        let expired = |waited: Duration| -> Error {
-            Error::Upstream(format!(
-                "no snapshot of this backup's own within the {} second deadline (waited {}): \
-                 hiqlite ignores a backup request within {} seconds of the one before, and \
-                 the window did not clear",
-                deadline.as_secs(),
-                waited.as_secs(),
-                SUPPRESSION_WINDOW.as_secs(),
-            ))
-        };
+        let existing: BTreeSet<_> = deadline
+            .observe(self.backup_list_local())
+            .await?
+            .into_iter()
+            .map(|listing| listing.id)
+            .collect();
         loop {
             // hiqlite would ignore a trigger inside the window of the
             // newest snapshot, and answer success anyway. Wait it out.
-            if let Some(wait) = self.suppressed_for().await? {
-                if started.elapsed() + wait > deadline {
-                    return Err(expired(started.elapsed()));
-                }
-                tokio::time::sleep(wait).await;
+            if let Some(wait) = deadline.observe(self.suppressed_for()).await? {
+                deadline.sleep(wait).await?;
             }
-            if started.elapsed() >= deadline {
-                return Err(expired(started.elapsed()));
-            }
+            deadline.check()?;
             let trigger = unix_now();
-            self.client().backup().await.map_err(map)?;
-            // Measured from the trigger, not from the start: after waiting a
-            // suppression window out, `started` is already further back than
-            // FILE_WAIT, and a poll window that begins in the past would give
-            // the writer no time at all to produce the file.
-            let wait_until =
-                Instant::now() + FILE_WAIT.min(deadline.saturating_sub(started.elapsed()));
+            deadline
+                .observe(async { self.client().backup().await.map_err(map) })
+                .await?;
+            // Each trigger gets its own poll interval inside the original deadline.
+            let wait_until = (Instant::now() + FILE_WAIT).min(deadline.end);
             loop {
-                if let Some(id) = self.snapshot_since(trigger).await? {
+                if let Some(id) = deadline
+                    .observe(self.snapshot_since(trigger, &existing))
+                    .await?
+                {
                     return Ok(id);
                 }
                 if Instant::now() >= wait_until {
@@ -177,11 +297,14 @@ impl StoreHandle {
                     // again, and trigger again inside the deadline.
                     break;
                 }
-                tokio::time::sleep(POLL_INTERVAL).await;
+                deadline
+                    .wait(async {
+                        tokio::time::sleep(POLL_INTERVAL).await;
+                        Ok(())
+                    })
+                    .await?;
             }
-            if started.elapsed() >= deadline {
-                return Err(expired(started.elapsed()));
-            }
+            deadline.check()?;
         }
     }
 
@@ -204,24 +327,33 @@ impl StoreHandle {
         };
         let age = unix_now().saturating_sub(newest);
         let window = i64::try_from(SUPPRESSION_WINDOW.as_secs()).unwrap_or(60);
-        if (0..window).contains(&age) {
+        if age < window {
             // One second past the window: hiqlite compares against a
             // timestamp of its own taking, which may be a fraction later
             // than the second its file name carries.
-            let remaining = u64::try_from(window - age).unwrap_or(0).saturating_add(1);
+            let remaining = u64::try_from(window.saturating_sub(age))
+                .unwrap_or(u64::MAX)
+                .saturating_add(1);
             return Ok(Some(Duration::from_secs(remaining)));
         }
         Ok(None)
     }
 
     /// The snapshot this call's trigger produced: one whose name carries a
-    /// second at or after `trigger`. Nothing older is this call's.
-    async fn snapshot_since(&self, trigger: i64) -> Result<Option<BackupId>, Error> {
+    /// second at or after `trigger`, excluding every file present before
+    /// this backup. A clock rollback cannot make an existing file fresh.
+    async fn snapshot_since(
+        &self,
+        trigger: i64,
+        existing: &BTreeSet<BackupId>,
+    ) -> Result<Option<BackupId>, Error> {
         Ok(self
             .backup_list_local()
             .await?
             .into_iter()
-            .filter(|l| l.id.taken_at().is_some_and(|ts| ts >= trigger))
+            .filter(|l| {
+                !existing.contains(&l.id) && l.id.taken_at().is_some_and(|ts| ts >= trigger)
+            })
             .map(|l| l.id)
             .max())
     }
@@ -233,7 +365,12 @@ impl StoreHandle {
     /// [`Error::Io`] when the directory cannot be read.
     pub async fn backup_list_local(&self) -> Result<Vec<BackupListing>, Error> {
         let mut list: Vec<BackupListing> = match self.attached_backup_dir() {
-            Some(Some(dir)) => list_backup_dir(dir)?,
+            Some(Some(dir)) => {
+                let dir = dir.to_path_buf();
+                tokio::task::spawn_blocking(move || list_backup_dir(&dir))
+                    .await
+                    .map_err(|err| Error::Io(format!("backup listing worker failed: {err}")))??
+            }
             Some(None) => {
                 return Err(Error::Config(
                     "a client of the cluster has no local backup directory; run backup inside the leader replica".to_owned(),
@@ -323,4 +460,59 @@ fn list_backup_dir(dir: &std::path::Path) -> Result<Vec<BackupListing>, Error> {
         });
     }
     Ok(list)
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod deadline_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn late_non_yielding_success_is_not_reported_as_a_snapshot() {
+        let deadline = BackupDeadline::new(Duration::from_millis(10));
+        let result = deadline
+            .wait(async {
+                std::thread::sleep(Duration::from_millis(30));
+                Ok("late listing or download")
+            })
+            .await;
+        assert!(matches!(result, Err(Error::Upstream(_))));
+    }
+
+    #[tokio::test]
+    async fn cancellation_keeps_the_gate_until_underlying_work_settles() {
+        static GATE: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+        let (started, running) = tokio::sync::oneshot::channel();
+        let (finish, finished) = tokio::sync::oneshot::channel();
+        let deadline = BackupDeadline::new(Duration::from_secs(1));
+        let caller = tokio::spawn(deadline.serialised(&GATE, async move {
+            let _ = started.send(());
+            deadline
+                .observe(async {
+                    let _ = finished.await;
+                    Ok(())
+                })
+                .await
+        }));
+        running.await.unwrap();
+        caller.abort();
+        let _ = caller.await;
+        assert!(
+            GATE.try_lock().is_err(),
+            "cancellation cannot cancel the underlying work"
+        );
+        let queued = BackupDeadline::new(Duration::from_millis(20));
+        let result = queued
+            .serialised(&GATE, async {
+                panic!("queued work must not run");
+                #[allow(unreachable_code)]
+                Ok(())
+            })
+            .await;
+        assert!(matches!(result, Err(Error::Upstream(_))));
+        finish.send(()).unwrap();
+        let _settled = tokio::time::timeout(Duration::from_secs(1), GATE.lock())
+            .await
+            .unwrap();
+    }
 }

@@ -26,9 +26,12 @@
 //! second is accepted, and the whole sequence is bounded by one deadline
 //! (spec 037 B-1, B-2).
 
-use std::time::{Duration, Instant};
+use std::collections::BTreeSet;
+use std::time::Duration;
 
-use rahi_store::backup::{SUPPRESSION_WINDOW, snapshot_ts};
+use tokio::time::Instant;
+
+use rahi_store::backup::{BackupDeadline, SUPPRESSION_WINDOW, snapshot_ts};
 use rahi_types::{Error, Result};
 
 use crate::rauthy_session::{AdminSession, Passkey};
@@ -60,6 +63,8 @@ pub const FILE_WAIT: Duration = Duration::from_secs(30);
 /// How often rauthy's listing is re-read while waiting.
 pub const POLL_INTERVAL: Duration = Duration::from_millis(250);
 
+static ONE_AT_A_TIME: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 /// One rauthy backup, as rauthy lists it.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize)]
 pub struct Listing {
@@ -81,11 +86,12 @@ struct Listings {
 
 /// rauthy on loopback, with the admin token and, for the backup routes,
 /// the backup admin's passkey.
+#[derive(Clone)]
 pub struct RauthyApi {
     base: String,
     token: String,
     client: reqwest::Client,
-    passkey: Option<Passkey>,
+    passkey: Option<std::sync::Arc<Passkey>>,
 }
 
 impl std::fmt::Debug for RauthyApi {
@@ -119,7 +125,7 @@ impl RauthyApi {
     /// rauthy's backup routes accept (spec 037 B-1).
     #[must_use]
     pub fn with_passkey(mut self, passkey: Option<Passkey>) -> Self {
-        self.passkey = passkey;
+        self.passkey = passkey.map(std::sync::Arc::new);
         self
     }
 
@@ -185,6 +191,17 @@ impl RauthyApi {
     ///
     /// As [`RauthyApi::backup`].
     pub async fn backup_within(&self, deadline: Duration) -> Result<(String, Vec<u8>)> {
+        let deadline = BackupDeadline::new(deadline);
+        let api = self.clone();
+        deadline
+            .serialised(
+                &ONE_AT_A_TIME,
+                async move { api.backup_before(deadline).await },
+            )
+            .await
+    }
+
+    async fn backup_before(&self, deadline: BackupDeadline) -> Result<(String, Vec<u8>)> {
         let Some(passkey) = self.passkey.as_ref() else {
             return Err(Error::Config(format!(
                 "this key set holds no {}, so nothing can complete rauthy's admin MFA and \
@@ -194,40 +211,30 @@ impl RauthyApi {
             )));
         };
         let mut session = AdminSession::new(&self.base)?;
-        session.login(passkey).await?;
+        deadline.wait(session.login(passkey)).await?;
 
-        let started = Instant::now();
-        let expired = |waited: Duration| -> Error {
-            Error::Upstream(format!(
-                "rauthy produced no snapshot of this backup's own within the {} second \
-                 deadline (waited {}): rauthy's store is hiqlite, which ignores a backup \
-                 request within {} seconds of the one before while answering it as success",
-                deadline.as_secs(),
-                waited.as_secs(),
-                SUPPRESSION_WINDOW.as_secs(),
-            ))
-        };
+        let existing: BTreeSet<_> = deadline
+            .observe(self.list(&mut session))
+            .await?
+            .into_iter()
+            .map(|listing| listing.name)
+            .collect();
+
         let name = loop {
-            if let Some(wait) = self.suppressed_for(&mut session).await? {
-                if started.elapsed() + wait > deadline {
-                    return Err(expired(started.elapsed()));
-                }
-                tokio::time::sleep(wait).await;
+            if let Some(wait) = deadline.observe(self.suppressed_for(&mut session)).await? {
+                deadline.sleep(wait).await?;
             }
-            if started.elapsed() >= deadline {
-                return Err(expired(started.elapsed()));
-            }
+            deadline.check()?;
             let trigger = i64::try_from(crate::unix_now()).unwrap_or(i64::MAX);
-            self.trigger(&mut session).await?;
-            // Measured from the trigger, not from the start: after waiting a
-            // suppression window out, `started` is already further back than
-            // FILE_WAIT, and a poll window that begins in the past would give
-            // the writer no time at all to produce the file.
-            let wait_until =
-                Instant::now() + FILE_WAIT.min(deadline.saturating_sub(started.elapsed()));
+            deadline.observe(self.trigger(&mut session)).await?;
+            // Each trigger gets its own poll interval inside the original deadline.
+            let wait_until = Instant::now() + FILE_WAIT;
             let mut taken = None;
             loop {
-                if let Some(name) = self.snapshot_since(&mut session, trigger).await? {
+                if let Some(name) = deadline
+                    .observe(self.snapshot_since(&mut session, trigger, &existing))
+                    .await?
+                {
                     taken = Some(name);
                     break;
                 }
@@ -237,16 +244,19 @@ impl RauthyApi {
                     // the window out and triggering again inside the deadline.
                     break;
                 }
-                tokio::time::sleep(POLL_INTERVAL).await;
+                deadline
+                    .wait(async {
+                        tokio::time::sleep(POLL_INTERVAL).await;
+                        Ok(())
+                    })
+                    .await?;
             }
             if let Some(name) = taken {
                 break name;
             }
-            if started.elapsed() >= deadline {
-                return Err(expired(started.elapsed()));
-            }
+            deadline.check()?;
         };
-        let bytes = self.fetch(&mut session, &name).await?;
+        let bytes = deadline.observe(self.fetch(&mut session, &name)).await?;
         Ok((name, bytes))
     }
 
@@ -266,8 +276,10 @@ impl RauthyApi {
             .unwrap_or(i64::MAX)
             .saturating_sub(newest);
         let window = i64::try_from(SUPPRESSION_WINDOW.as_secs()).unwrap_or(60);
-        if (0..window).contains(&age) {
-            let remaining = u64::try_from(window - age).unwrap_or(0).saturating_add(1);
+        if age < window {
+            let remaining = u64::try_from(window.saturating_sub(age))
+                .unwrap_or(u64::MAX)
+                .saturating_add(1);
             return Ok(Some(Duration::from_secs(remaining)));
         }
         Ok(None)
@@ -279,12 +291,15 @@ impl RauthyApi {
         &self,
         session: &mut AdminSession,
         trigger: i64,
+        existing: &BTreeSet<String>,
     ) -> Result<Option<String>> {
         Ok(self
             .list(session)
             .await?
             .into_iter()
-            .filter(|l| snapshot_ts(&l.name).is_some_and(|ts| ts >= trigger))
+            .filter(|l| {
+                !existing.contains(&l.name) && snapshot_ts(&l.name).is_some_and(|ts| ts >= trigger)
+            })
             .map(|l| l.name)
             .max())
     }

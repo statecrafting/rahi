@@ -20,6 +20,7 @@ establishes:
   - "crates/rahi-ops/tests/rauthy_restore.rs"
   - "crates/rahi-ops/src/rauthy_session.rs"
   - "crates/rahi-store/tests/backup_freshness.rs"
+  - "crates/rahi-store/tests/backup_deadline.rs"
   - "crates/rahi-ops/tests/rauthy_backup_admin.rs"
 extends:
   - { spec: "011-store-hiqlite", unit: "crates/rahi-store/src/backup.rs", nature: additive }
@@ -458,6 +459,25 @@ the revision-3 register). The spec stays `draft` until a human flips it.
   opposite reason: a volume that silently re-restores is the crash loop
   spec 030 exists to remove. Not covered: `preflight` does not check this
   yet, so the only signals are the supervisor's line and the verb itself.
+
+- **D-9 (2026-09-17; recovery review before merge).** The backup deadline
+  starts at API entry and covers serialization, login, listing, triggering,
+  polling and download. An accepted request can outlive its caller's
+  deadline, so a retained worker holds the serialization gate until that
+  request settles and refuses its late result. Cancelling a caller is not
+  evidence that hiqlite or rauthy cancelled an accepted request. Paused-clock
+  regressions cover queueing, cancellation and late results; HTTP stubs
+  exercise delayed phases. A snapshot present in the initial listing is
+  excluded from the result even if the wall clock moves backwards; a future
+  timestamp waits out suppression or fails within the same deadline.
+
+  A pending restore source that is missing or not a readable regular file
+  now refuses startup. Preparing the rauthy child captures the exact marker;
+  only health following that handoff may record application, and a changed
+  marker is a conflict. Ordinary health cannot certify an unsupplied
+  restore. Marker replacement uses a temporary file and rename. FR-001's
+  test executes the recording child through two supervised starts and reads
+  its actual environment, with failures and retry tested separately.
 
 Still open: whether `live.yml` becomes a required check or stays advisory
 beside `ci-gate`. Decided for now by the owner on 2026-09-17: advisory,

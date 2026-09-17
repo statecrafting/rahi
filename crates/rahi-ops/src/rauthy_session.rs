@@ -454,6 +454,28 @@ pub fn solve_pow(challenge: &str) -> Result<String> {
     ))
 }
 
+// Authentication is cancellable under the backup deadline, including CPU
+// work. Yield between small batches instead of blocking the runtime timer.
+async fn solve_pow_cooperatively(challenge: &str) -> Result<String> {
+    let difficulty: u32 = challenge
+        .split(':')
+        .nth(1)
+        .and_then(|s| s.parse().ok())
+        .ok_or_else(|| Error::Upstream("rauthy's proof of work states no difficulty".to_owned()))?;
+    for counter in 0u64.. {
+        if counter % 1024 == 0 {
+            tokio::task::yield_now().await;
+        }
+        let attempt = format!("{challenge}{counter}");
+        if leading_zero_bits(digest(&SHA256, attempt.as_bytes()).as_ref()) >= difficulty {
+            return Ok(attempt);
+        }
+    }
+    Err(Error::Upstream(
+        "rauthy's proof of work exhausted the counter space".to_owned(),
+    ))
+}
+
 fn leading_zero_bits(bytes: &[u8]) -> u32 {
     let mut bits = 0;
     for byte in bytes {
@@ -621,7 +643,7 @@ impl AdminSession {
                 clip(&challenge)
             )));
         }
-        let pow = solve_pow(challenge.trim())?;
+        let pow = solve_pow_cooperatively(challenge.trim()).await?;
 
         // A passkey-only account logs in with no password field at all;
         // rauthy answers with the code the assertion is bound to.

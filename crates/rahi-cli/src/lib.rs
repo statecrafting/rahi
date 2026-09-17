@@ -134,7 +134,7 @@ async fn supervise<C: Cell>(env: &dyn EnvReader) -> Result<i32> {
     keys.check()?;
     let manifest = rahi_kernel::Manifest::parse(C::manifest())?;
     let app_name = manifest.app.name.as_str().to_owned();
-    let rauthy = sup::rauthy_command(&config, env)?;
+    let (rauthy, supplied) = sup::prepare_rauthy(&config, env)?;
     let api = rahi_ops::rauthy_api::RauthyApi::new(config.rauthy_base_url(), keys.admin_token()?)?;
     let ready = async {
         sup::wait_healthy(&api, sup::HEALTH_BUDGET).await?;
@@ -142,7 +142,7 @@ async fn supervise<C: Cell>(env: &dyn EnvReader) -> Result<i32> {
         // come up on the snapshot this start handed it, and the backup
         // admin the verb logs in as must exist before anything asks for a
         // backup.
-        let steps = sup::ready_after_health(&config, &keys, &api).await?;
+        let steps = sup::ready_after_health(&config, &keys, &api, supplied.as_ref()).await?;
         sup::custody_client(&config, &keys, &app_name).await?;
         let said = steps.render();
         println!(

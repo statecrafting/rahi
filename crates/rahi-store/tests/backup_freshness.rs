@@ -148,3 +148,89 @@ fn a_snapshot_name_carries_the_second_its_request_was_issued_at() {
     assert_eq!(snapshot_ts("backup_node_1_1789666246.sqlite.partial"), None);
     assert_eq!(snapshot_ts("hiqlite.db"), None);
 }
+
+/// An existing snapshot ahead of the clock must never become this call's
+/// answer, even though its timestamp is greater than the next trigger.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_existing_future_snapshot_is_not_fresh() {
+    let f = common::open().await;
+    let store = f.store.handle();
+    let future = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+        + 3600;
+    let dir = f.store.config().backup_dir();
+    std::fs::create_dir_all(&dir).unwrap();
+    let name = format!("backup_node_1_{future}.sqlite");
+    std::fs::write(dir.join(&name), b"pre-existing snapshot").unwrap();
+    assert!(store.suppressed_for().await.unwrap().unwrap() > SUPPRESSION_WINDOW);
+    let result = store.backup_within(Duration::from_millis(50)).await;
+    assert!(matches!(result, Err(Error::Upstream(_))), "{result:?}");
+    assert_eq!(
+        std::fs::read(dir.join(name)).unwrap(),
+        b"pre-existing snapshot"
+    );
+    f.store.shutdown().await.unwrap();
+}
+
+/// Occupy the real hiqlite writer, then queue backup behind it. Both the
+/// first caller and a contending caller must expire before the SQL finishes.
+/// The parent owns the volume and bounds the disposable process even if a
+/// regression leaves a hiqlite request or shutdown stuck forever.
+#[test]
+fn slow_hiqlite_and_queued_callers_are_bounded() {
+    const CASE: &str = "slow_hiqlite_and_queued_callers_are_bounded";
+    if let Ok(dir) = std::env::var("RAHI_SLOW_BACKUP_DIR") {
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let store = rahi_store::Store::open(&common::config(std::path::Path::new(&dir))).await.unwrap();
+            store.execute("CREATE TABLE slow (n INTEGER)", vec![]).await.unwrap();
+            let writer = store.handle();
+            let slow = tokio::spawn(async move {
+                writer.execute("WITH RECURSIVE count(n) AS (VALUES(0) UNION ALL SELECT n+1 FROM count WHERE n<30000000) INSERT INTO slow SELECT sum(n) FROM count", vec![]).await
+            });
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            assert!(!slow.is_finished(), "the real writer must still be occupied");
+            for _ in 0..2 {
+                let started = Instant::now();
+                let result = store.backup_within(Duration::from_millis(80)).await;
+                assert!(matches!(&result, Err(Error::Upstream(text)) if text.contains("80 ms") && text.contains("deadline")), "{result:?}");
+                assert!(started.elapsed() < Duration::from_millis(500), "caller exceeded its deadline: {:?}", started.elapsed());
+                assert!(!slow.is_finished(), "timeout preceded the underlying work finishing");
+            }
+            slow.await.unwrap().unwrap();
+            // The in-flight backup can finish after its caller timed out.
+            // Let it settle, then prove the store and worker remain usable.
+            tokio::time::timeout(Duration::from_secs(3), async {
+                while store.backup_list_local().await.unwrap().is_empty() { tokio::time::sleep(Duration::from_millis(20)).await; }
+            }).await.unwrap();
+            store.execute("INSERT INTO slow VALUES (7)", vec![]).await.unwrap();
+            store.shutdown().await.unwrap();
+        });
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", CASE, "--nocapture"])
+        .env("RAHI_SLOW_BACKUP_DIR", dir.path())
+        .spawn()
+        .unwrap();
+    let until = Instant::now() + Duration::from_secs(30);
+    loop {
+        if let Some(status) = child.try_wait().unwrap() {
+            assert!(status.success(), "{status}");
+            break;
+        }
+        if Instant::now() >= until {
+            child.kill().unwrap();
+            child.wait().unwrap();
+            panic!("slow hiqlite case exceeded 30s; killed and reaped");
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}

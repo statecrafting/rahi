@@ -79,65 +79,101 @@ impl Marker {
     }
 }
 
-/// rauthy's snapshot that is placed but not yet applied (spec 037 B-3).
+/// The restore marker captured when preparing this child's restore source.
+/// Only a child prepared with this source can certify its application.
+#[derive(Clone, Debug)]
+pub struct PendingRauthySnapshot {
+    marker: Marker,
+}
+
+impl PendingRauthySnapshot {
+    /// The exact source supplied to the child.
+    #[must_use]
+    pub fn path(&self) -> &Path {
+        Path::new(&self.marker.rauthy_snapshot)
+    }
+}
+
+/// Capture the pending source for this start (spec 037 B-3).
 ///
-/// `None` when there is no marker, when it names no snapshot, when the
-/// snapshot is gone, or when the marker records that rauthy already came up
-/// on it. The file's presence is not the signal: the marker is, so that a
-/// snapshot kept beside the volume for an operator to inspect is never
-/// applied twice.
+/// `None` means no marker, no named snapshot, or an already applied snapshot.
+/// A named pending source that is missing, unreadable, or not a file fails
+/// closed before the child starts. Keeping an applied snapshot is optional.
 ///
 /// # Errors
-///
-/// [`Error::Io`] or [`Error::Validation`] when the marker cannot be read.
-pub fn pending_rauthy_snapshot(config: &Config) -> Result<Option<PathBuf>> {
+/// [`Error::Io`] for an inaccessible source; [`Error::Validation`] for a
+/// malformed marker or a source that is not a regular file.
+pub fn pending_rauthy_snapshot(config: &Config) -> Result<Option<PendingRauthySnapshot>> {
     let Some(marker) = Marker::read(&crate::restore_marker(config))? else {
         return Ok(None);
     };
     if marker.rauthy_snapshot_applied.is_some() || marker.rauthy_snapshot.is_empty() {
         return Ok(None);
     }
-    let path = PathBuf::from(&marker.rauthy_snapshot);
-    if !path.is_file() {
-        return Ok(None);
-    }
-    Ok(Some(path))
-}
-
-/// Record that rauthy came up healthy on the snapshot the marker names
-/// (spec 037 B-3), so that no later start hands it to rauthy again.
-///
-/// Written after rauthy is healthy and not before: a marker written first
-/// and a rauthy that then fails to start would leave a placed snapshot
-/// nothing ever applies, and a cell with rows no principal can reach. The
-/// cost of the other order is bounded and small: a process that dies
-/// between rauthy's health and this write applies the same snapshot once
-/// more on the next start, which is idempotent in content and loses only
-/// what rauthy wrote in that window.
-///
-/// # Errors
-///
-/// [`Error::Io`] when the marker cannot be read or written;
-/// [`Error::Validation`] when it does not parse.
-pub async fn record_rauthy_snapshot_applied(config: &Config) -> Result<Option<PathBuf>> {
-    let path = crate::restore_marker(config);
-    let Some(mut marker) = Marker::read(&path)? else {
-        return Ok(None);
-    };
-    if marker.rauthy_snapshot_applied.is_some() || marker.rauthy_snapshot.is_empty() {
-        return Ok(None);
-    }
-    let applied = PathBuf::from(&marker.rauthy_snapshot);
-    marker.rauthy_snapshot_applied = Some(crate::unix_now());
-    let bytes = serde_json::to_vec_pretty(&marker)
-        .map_err(|err| Error::Io(format!("the restore marker cannot be serialised: {err}")))?;
-    tokio::fs::write(&path, bytes).await.map_err(|err| {
+    let path = Path::new(&marker.rauthy_snapshot);
+    let metadata = std::fs::metadata(path).map_err(|err| {
         Error::Io(format!(
-            "restore marker {} cannot be written: {err}",
+            "pending rauthy snapshot {} cannot be inspected: {err}",
             path.display()
         ))
     })?;
-    Ok(Some(applied))
+    if !metadata.is_file() {
+        return Err(Error::Validation(format!(
+            "pending rauthy snapshot {} is not a file",
+            path.display()
+        )));
+    }
+    // Check readability without consuming or opening rauthy's own store.
+    std::fs::File::open(path).map_err(|err| {
+        Error::Io(format!(
+            "pending rauthy snapshot {} cannot be opened: {err}",
+            path.display()
+        ))
+    })?;
+    Ok(Some(PendingRauthySnapshot { marker }))
+}
+
+/// Record health only for the pending source supplied to this child.
+///
+/// Normal health has no restore token and cannot advance a marker. If the
+/// marker changed while the child started, fail rather than certify another
+/// source. A failed child never calls this and leaves the restore retryable.
+///
+/// # Errors
+/// [`Error::Io`] when the marker cannot be read or written;
+/// [`Error::Validation`] when malformed; [`Error::Conflict`] if it changed.
+pub async fn record_rauthy_snapshot_applied(
+    config: &Config,
+    supplied: Option<&PendingRauthySnapshot>,
+) -> Result<Option<PathBuf>> {
+    let Some(supplied) = supplied else {
+        return Ok(None);
+    };
+    let path = crate::restore_marker(config);
+    let current = Marker::read(&path)?;
+    if current.as_ref() != Some(&supplied.marker) {
+        return Err(Error::Conflict(
+            "restore marker changed after preparing rauthy's source".to_owned(),
+        ));
+    }
+    let mut marker = supplied.marker.clone();
+    marker.rauthy_snapshot_applied = Some(crate::unix_now());
+    let bytes = serde_json::to_vec_pretty(&marker)
+        .map_err(|err| Error::Io(format!("the restore marker cannot be serialised: {err}")))?;
+    let temporary = path.with_extension("marker.pending");
+    tokio::fs::write(&temporary, bytes).await.map_err(|err| {
+        Error::Io(format!(
+            "restore marker {} cannot be written: {err}",
+            temporary.display()
+        ))
+    })?;
+    tokio::fs::rename(&temporary, &path).await.map_err(|err| {
+        Error::Io(format!(
+            "restore marker {} cannot be replaced: {err}",
+            path.display()
+        ))
+    })?;
+    Ok(Some(supplied.path().to_path_buf()))
 }
 
 /// How a restore ended.
