@@ -152,13 +152,17 @@ Section 8 states both.
     `INDEX kernel_decision_identity_segment (segment_hash)`, which every
     coverage repair and every per-segment count reads.
   - `kernel_decision_collisions (id TEXT, record_hash TEXT, segment_hash TEXT
-    NULL, identity_digest TEXT NOT NULL, PRIMARY KEY (id, record_hash))`
-    (B-12).
+    NULL, identity_digest TEXT NOT NULL, PRIMARY KEY (id, record_hash))`,
+    with `INDEX kernel_decision_collisions_segment (segment_hash)`, which the
+    coverage recomputation reads beside the identity index (B-12).
   - `kernel_decision_coverage (segment_hash TEXT PRIMARY KEY, stamped INTEGER
-    NOT NULL)`: how many identity rows carry that segment's hash, written
-    only inside the transaction that wrote those rows, so it cannot drift
-    from them (B-7). It is a cache of a count, never of a fact: every value
-    in it is recomputable from the identity table, and FR-018 asserts that.
+    NOT NULL)`: how many of that segment's records are **accounted for**,
+    which is the number of identity rows carrying its hash plus the number of
+    collision rows carrying its hash (B-7). It is never incremented: it is
+    written only by being recomputed from those two tables inside the
+    transaction that wrote them, so it cannot drift from them. It is a cache
+    of a count, never of a fact: every value in it is recomputable from the
+    two tables, and FR-018 asserts that.
 
   Hashes are stored as the lowercase hex text `Hash::as_str` yields, the
   encoding `kernel_decisions.hash` and `kernel_segments.segment_hash` already
@@ -188,27 +192,98 @@ Section 8 states both.
   already in the chain: return the stored `record_hash`, whether the record
   is resident or sealed. A row with a different digest is `Error::Conflict`
   naming the stored hash, as spec 013's contract already promises for a
-  reused id. No row means either the insert failed for the reason spec 013
-  B-3 handles, which the head question decides, or that coverage is
+  reused id. Classification reads that id's collision rows in the same
+  query, and an id carrying any collision row is `Error::Conflict` naming
+  every copy whatever the surviving identity row's digest says (B-12): on a
+  twice-spent id, a digest that matches one copy proves nothing about which
+  copy a retry meant. No row of either kind means either the insert failed
+  for the reason spec 013 B-3 handles, which the head question decides, or that coverage is
   incomplete, which B-11 decides first. `Ledger::append` keeps its signature
   and becomes lifetime idempotent on a covered chain.
-- **B-5 (sealing stamps, never deletes).** The transaction that inserts a
-  segment header and deletes the archived rows (spec 014 B-2) additionally
-  writes `segment_hash` onto those records' identity rows, as an upsert
-  computed from the record bodies the seal already holds: `INSERT INTO
-  kernel_decision_identity (...) VALUES (...) ON CONFLICT(id) DO UPDATE SET
-  segment_hash = excluded.segment_hash`. An upsert rather than an update,
-  because a record appended by a binary that does not stamp has no row to
-  update, and a seal that failed on it would make the first post-upgrade
-  seal a hard stop; the upsert instead closes that record's coverage from
-  the body it is archiving, and counts how many rows it had to create that
-  way, which is B-13's detector for a writer that does not stamp. The same
-  transaction writes `kernel_decision_coverage` for the new segment with the
-  count it stamped, asserts that it touched exactly `count` identity rows,
-  and is `Error::Integrity` otherwise, as it already asserts the deletion
-  count. No path in this crate deletes an identity row: an id is spent for
-  the life of the chain, and the table is the only place that remembers it
-  once the record is archived.
+- **B-5 (sealing stamps, never deletes, and never redirects).** The
+  transaction that inserts a segment header and deletes the archived rows
+  (spec 014 B-2) additionally accounts for every record it archives. It
+  cannot decide anything by reading first: `StoreHandle::txn` takes a batch
+  of statements and offers no read between them, so each record's accounting
+  is two self-arbitrating statements, in the same spirit as B-3's insert.
+
+  The first is a **conditional** upsert, which may create a row but may
+  never redirect one:
+
+  ```sql
+  INSERT INTO kernel_decision_identity (id, identity_digest, record_hash,
+                                        segment_hash)
+  VALUES (?id, ?digest, ?record_hash, ?segment_hash)
+  ON CONFLICT(id) DO UPDATE SET segment_hash = excluded.segment_hash
+    WHERE kernel_decision_identity.record_hash = excluded.record_hash
+      AND kernel_decision_identity.segment_hash IS NULL
+  ```
+
+  An insert rather than a plain update, because a record appended by a
+  binary that does not stamp has no row to update, and a seal that failed on
+  it would make the first post-upgrade seal a hard stop; the insert instead
+  closes that record's coverage from the body it is archiving, and the
+  number of rows it had to create that way is B-13's detector for a writer
+  that does not stamp. The `WHERE` is what makes the upsert safe on a chain
+  that already spent an id twice. An existing row whose `record_hash` names
+  a *different* record is B-12's collision, and stamping it would point that
+  identity row at a segment which does not contain the record it names:
+  `lookup` would then answer `Sealed { record_hash, segment_hash }` with a
+  pair no body satisfies, `recover` would fetch the wrong segment and report
+  `Integrity` on a healthy archive, and the segment that does hold the named
+  record would silently lose a row from its count. The `WHERE` makes that
+  statement a no-op instead. An already-stamped row is left alone for the
+  same reason, which also makes a repeated seal idempotent.
+
+  The second statement accounts for whatever the first one declined, and
+  writes nothing when the first one accounted for the record:
+
+  ```sql
+  INSERT INTO kernel_decision_collisions (id, record_hash, segment_hash,
+                                          identity_digest)
+  SELECT ?id, ?record_hash, ?segment_hash, ?digest
+  WHERE NOT EXISTS (SELECT 1 FROM kernel_decision_identity
+                    WHERE id = ?id AND record_hash = ?record_hash
+                      AND segment_hash = ?segment_hash)
+  ON CONFLICT(id, record_hash) DO NOTHING
+  ```
+
+  Statements run in order inside one transaction, so this one sees the
+  first one's effect: a record the upsert inserted or stamped is already
+  accounted for and no collision row is written; a record it declined gets
+  one. Every archived record therefore ends accounted for exactly once,
+  in one table or the other, which is the invariant B-7 counts and AC-12
+  asserts.
+
+  The transaction's last statement recomputes the segment's counter from
+  those two tables rather than incrementing anything:
+
+  ```sql
+  INSERT INTO kernel_decision_coverage (segment_hash, stamped)
+  VALUES (?segment_hash,
+          (SELECT COUNT(*) FROM kernel_decision_identity
+            WHERE segment_hash = ?segment_hash)
+        + (SELECT COUNT(*) FROM kernel_decision_collisions
+            WHERE segment_hash = ?segment_hash))
+  ON CONFLICT(segment_hash) DO UPDATE SET stamped = excluded.stamped
+  ```
+
+  so the counter cannot drift from the rows it counts, however the
+  statements above resolved, and seal and reindex (B-8) reach the same
+  number for the same rows because they run the same statement. The seal
+  then asserts the written `stamped` equals the header's `count` and is
+  `Error::Integrity` naming the segment otherwise, in the same form as the
+  existing deletion-count assertion: that assertion is a **post-commit
+  detection**, not a rollback, because `txn` commits the batch before any
+  result is inspected. What the error reports is that the segment is not
+  fully accounted for, which is exactly the uncovered state B-7 reports and
+  B-8 repairs, so the detection hands the operator a repairable condition
+  rather than a half-written one. This spec claims no rollback it cannot
+  perform.
+
+  No path in this crate deletes an identity row or a collision row: an id is
+  spent for the life of the chain, and those two tables are the only place
+  that remembers it once the record is archived.
 - **B-6 (lookup and recovery).** `Ledger::lookup(id) -> Presence` with
   `Presence::Resident { record_hash }`, `Sealed { record_hash, segment_hash
   }`, `Absent`, `Unproven { segment_hash: Option<Hash> }`, and `Ambiguous {
@@ -223,17 +298,29 @@ Section 8 states both.
   proven absence is how a duplicate gets written, and it is what the
   consumer's third reproduction records the current chassis doing.
 - **B-7 (coverage is proven from resident state, and is cheap to prove).**
-  Coverage is complete when every resident record has an identity row and,
-  for every row of `kernel_segments`, `kernel_decision_coverage` holds a
-  `stamped` equal to that header's `count`. Both halves are answerable
+  Coverage is an accounting over **records**, not over ids, because an id can
+  name more than one record on a chain written before this spec. A record is
+  *accounted for* when the resident state holds exactly one row naming it: an
+  identity row whose `id` and `record_hash` are its own, or a collision row
+  under that same `(id, record_hash)` key (B-12). Coverage is complete when
+  every resident record is accounted for and, for every row of
+  `kernel_segments`, `kernel_decision_coverage` holds a `stamped` equal to
+  that header's `count`, where `stamped` is the recomputed number of identity
+  *and* collision rows carrying that segment's hash (B-1, B-5). Counting
+  records rather than ids is what lets a segment holding a twice-spent id
+  still reach its header's `count`, which is what B-12 relies on when it lets
+  an ambiguous chain serve: the surviving copy is an identity row, every
+  further copy is a collision row, and all of them are counted. The two rules
+  are one rule, and AC-12 asserts it directly. Both halves are answerable
   without the archive and without scanning the identity table: the resident
   half is bounded by the hot window (spec 014 B-1, default 10,000 rows) and
   the sealed half is one row per segment. A segment with no counter row, or
   a counter below its header's `count`, is uncovered: it was sealed by a
   binary that does not stamp, or a reindex over it has not finished.
   - `Ledger::coverage() -> Coverage` reports the uncovered segment hashes,
-    the count of resident records with no identity row, the identity row
-    count, and the collision count, and reads through the leader
+    the count of resident records that are not accounted for (no identity row
+    and no collision row naming them), the identity row count, and the
+    collision count, and reads through the leader
     (`query_consistent`, spec 011 B-3) because it is the input to a refusal.
   - It is evaluated at `open`, by `Ledger::recheck_coverage()`, and by
     `rahi ledger verify` and `rahi preflight`. It is **not** evaluated per
@@ -247,13 +334,21 @@ Section 8 states both.
   cannot).** `Ledger::reindex(&dyn Archive) -> ReindexReport` walks the
   uncovered segments from the newest backwards. For each one it fetches the
   body, verifies it at full depth, and only then writes, in one transaction
-  per segment: the missing identity rows stamped with that segment's hash,
-  any collision rows B-12 requires, and that segment's
-  `kernel_decision_coverage` row recomputed from the identity rows the same
-  transaction can see. Each identity write is an insert that does nothing on
-  conflict, so reindex is idempotent, is resumable after an interruption,
-  converges under two reindexers on the same segment, and never overwrites a
-  row another transaction wrote.
+  per segment: the accounting for every record in the body, by exactly
+  the three statements B-5 uses and in the same order, so seal and reindex
+  are one accounting rather than two that must be kept agreeing. The
+  conditional upsert stamps a row that names the same record and was not yet
+  stamped, inserts one where none exists, and declines to redirect one that
+  names a different record; the collision statement catches whatever the
+  upsert declined; and the counter for that segment is recomputed from both
+  tables. Reindex is therefore idempotent, is resumable after an
+  interruption, converges under two reindexers on the same segment, and
+  never overwrites, redirects, or deletes a row another transaction wrote.
+  The unstamped-row case is why reindex needs the upsert rather than a plain
+  insert-or-ignore: a record backfilled while resident (FR-008) and then
+  sealed by a replica that does not stamp leaves a row that exists but
+  carries no segment, and an insert-or-ignore would skip it and leave that
+  segment permanently one short of its `count`.
 
   What it does with damaged or contradictory history is the point of this
   behavior, and in every case it is to fail visibly and continue rather than
@@ -309,7 +404,11 @@ Section 8 states both.
   table is one row per segment, about 100 bytes, which at spec 014's default
   `segment_size` of 1,000 is 0.1 bytes per decision and rounds away.
 
-  *Per cluster, and everywhere the store is copied.*
+  *Per cluster, and everywhere the store is copied.* The figures below are
+  estimates derived from the per-row arithmetic above, not measurements of an
+  implementation that does not exist yet. AC-9 is what turns them into a
+  measurement, and is written so that the spec can only be wrong about this
+  cost in a way the suite catches.
 
   | decisions | identity state, one replica | at spec 032's N=3 |
   |---|---|---|
@@ -419,15 +518,22 @@ Section 8 states both.
   into confidence. Refusing the unknown and admitting the verified is what
   keeps a recovery working through an incident that a full refusal would
   strand. The backstop is a second line, not the first: on a cluster upgraded
-  the way B-13 requires it is never reached.
+  the way B-13 requires it is never reached. It is reached only on a handle
+  that opened successfully and then observed degradation, which is the
+  scenario FR-010 tests it through. A repair handle is not that path: it
+  refuses every append unconditionally (B-15), so the backstop's admitting
+  branch does not exist on one, and no test may establish this behavior
+  there.
 - **B-12 (an id already spent twice is reported, never resolved).** Reindex
   and backfill can meet an id that history already spent more than once,
   which is the defect on a chain written before this spec. The two cases are
   both recorded and neither is decided. When a body or a resident record
-  names an id that already has an identity row, the walk compares: an equal
-  `identity_digest` and an equal `record_hash` is the idempotent repeat and
-  writes nothing; anything else is a collision, and every copy beyond the
-  first is written to `kernel_decision_collisions`. No archived body is read
+  names an id that already has an identity row, B-5's two statements
+  compare for it: an equal `record_hash` is the same record met twice and
+  writes no collision row, though the upsert still stamps that row if it was
+  unstamped; anything else is a collision, and every copy beyond the first is
+  written to `kernel_decision_collisions` under the segment it was found
+  in. No archived body is read
   for anything but comparison, no archived byte is written, and no identity
   row is overwritten, so immutable history is preserved exactly as spec 014
   B-5 requires. The identity row that happens to stand is the one the walk
@@ -441,8 +547,12 @@ Section 8 states both.
   repair succeeded on a chain that contradicts itself (B-8).
 
   Coverage and ambiguity are two different questions and this spec keeps them
-  apart. A collision does not make a segment uncovered: the ids in it are
-  accounted for, which is what coverage asks. It also cannot be repaired by
+  apart. A collision does not make a segment uncovered, and B-7's accounting
+  is what makes that true rather than a wish: coverage counts records, every
+  copy beyond the first is a collision row carrying its segment's hash, and
+  the counter recomputed by B-5's last statement counts identity and
+  collision rows together, so a segment holding a twice-spent id reaches its
+  header's `count` exactly. Ambiguity also cannot be repaired by
   any amount of reindexing, because the duplicate is history. So an
   ambiguous chain reaches complete coverage, `serve` starts on it, and the
   containment is per id: every colliding id refuses its own appends and
@@ -481,9 +591,34 @@ Section 8 states both.
   printed by `ledger verify` and `preflight`, and each is logged at `warn`
   naming the id. An old replica that survives the stop therefore shows up as
   a falling coverage number rather than as a silent duplicate. Third, a chain
-  the new binary cannot vouch for does not serve (B-10) and an id it cannot
-  prove free is not appended (B-11), so a mixed cluster degrades to a visible
-  refusal rather than to a wrong answer.
+  the new binary cannot vouch for *at open* does not serve (B-10), and an id
+  it cannot prove free is not appended once this node's verdict has moved
+  (B-11).
+
+  *What that detection does not establish.* It is after the fact and
+  eventual, never preventive, and this spec states the limit rather than
+  rounding it up to a guarantee. B-11's verdict is a cache that only this
+  node's own observations move, and both observations are late ones: a seal
+  that had to create a row, and a resident record met without a row. Neither
+  is synchronous with an old replica's append. So in the window between an
+  old binary's unstamped append and this node's next observation of it, the
+  cached verdict still says complete, an append of that same id finds no
+  identity row, and the insert succeeds: a second record under one id, which
+  is the defect this spec exists to close. A cached `complete` therefore
+  means "this node has seen no evidence of incompleteness", never "the chain
+  is proven complete now". The stronger reading holds only where coverage is
+  computed through the leader: at `open`, at `recheck_coverage`, and in
+  `ledger verify` and `preflight` (B-7).
+
+  What the detection does buy is that such a duplicate is discovered rather
+  than silent: it becomes a B-12 collision that `reindex` records, that
+  `lookup` answers `Ambiguous` for, that `append` refuses from then on, and
+  that `ledger verify` prints and exits non-zero on. That is a strictly
+  smaller claim than "a refusal rather than a wrong answer", and it is the
+  one the mechanism supports. A mixed-version cluster is out of scope
+  (section 6) and no guarantee is offered across one; what is offered is
+  that the cost of violating the procedure is a detectable, bounded,
+  repairable ambiguity rather than an undetected one.
 
   *What can enforce the next one.* Spec 036 B-8 makes `serve` refuse a store
   that is ahead of the binary across a non-additive migration, and B-10
@@ -601,23 +736,42 @@ Section 8 states both.
   succeed on it and print the uncovered count. After `reindex`, all of them
   start or pass. A chain with no sealed segments and no identity rows
   backfills and opens without an archive.
-- **FR-010 (the append backstop, B-11).** On an uncovered chain reached
-  through `open_for_repair` and then handed an append seam, an append of an
-  id with no identity row is `Error::Conflict` naming the reindex command
-  and writes no record; an append of an id whose row's digest matches
-  returns the stored hash; an append of an id whose row's digest differs is
-  `Error::Conflict`. The refusal names the uncovered segments. A seal that
-  has to create an identity row rather than update one moves the cached
-  verdict to incomplete without any leader read, and only `recheck_coverage`
-  moves it back.
+- **FR-010 (the append backstop, B-11).** The backstop is exercised on a
+  normal appending handle, because that is the only handle that can reach
+  it: a repair handle refuses every append unconditionally (B-15, FR-019),
+  so the admitting branch does not exist there and no successful retry can
+  be observed through one. The supported scenario is the degradation B-11
+  exists for. Open a covered chain normally, so `open`'s gate passes and the
+  cached verdict is complete; write an unstamped record behind this binary's
+  back as FR-020 does; then drive one of the two observations that move the
+  verdict to incomplete (a seal that has to create an identity row, or a
+  resident record met without a row), asserting that no leader read was
+  issued to move it. On that same running handle: an append of an id with no
+  identity row is `Error::Conflict` naming the evidence that moved the
+  verdict and the reindex command, and writes no record; an append of an id
+  whose row's digest matches returns the stored hash; an append of an id
+  whose row's digest differs is `Error::Conflict`. Only `recheck_coverage`
+  moves the verdict back, and `serve` never calls it. The same three
+  outcomes are asserted on a chain whose verdict went incomplete from an
+  uncovered segment, where the refusal names the uncovered segments
+  instead.
 - **FR-011 (transaction-level enforcement, B-3 and B-5).** A test asserts
   that the append transaction carries both statements and that neither lands
   alone: an injected failure of the identity insert leaves no
   `kernel_decisions` row, and an injected failure of the record insert
-  leaves no identity row. A test asserts the seal transaction upserts
-  exactly `count` identity rows, including for records that had none, writes
-  the matching `kernel_decision_coverage` row in the same transaction, and
-  that a count mismatch is `Error::Integrity`. A test runs a backfill and an
+  leaves no identity row. A test asserts the seal transaction accounts for
+  exactly `count` records, including for records that had no row, writes the
+  recomputed `kernel_decision_coverage` row in the same transaction, and that
+  a `stamped` below the header's `count` is `Error::Integrity` naming the
+  segment. A test asserts the seal never redirects: with an identity row
+  already naming a *different* record under the same id, the seal leaves that
+  row's `segment_hash` and `record_hash` untouched, writes the archived copy
+  to `kernel_decision_collisions` under this segment's hash, and the segment
+  still reaches its header's `count`; `lookup` of that id then answers
+  `Ambiguous`, and `recover` of the copy the identity row names still fetches
+  the segment that actually contains it. A test asserts the unstamped-row
+  case of B-8: a record backfilled while resident and then archived leaves a
+  stamped row, not a skipped one. A test runs a backfill and an
   append concurrently and asserts one identity row per id and no error from
   either.
 - **FR-012 (reindex meets a reused id, B-12).** A fixture archive holding
@@ -633,7 +787,12 @@ Section 8 states both.
   `record_hash`) produces the same outcome, a body that repeats an id within
   itself produces the same outcome, and a genuine idempotent repeat (same
   digest and same record hash, reached twice by an interrupted reindex)
-  produces no collision row.
+  produces no collision row. Coverage over that fixture is **complete**, and
+  the test asserts why: `kernel_decision_coverage` holds, for each segment, a
+  `stamped` equal to its header's `count`, counting the collision row as the
+  copy it is. A chain can be fully accounted for and ambiguous at the same
+  time, and that is precisely what lets `serve` start on it while every
+  colliding id refuses its own appends.
 - **FR-013 (`append_once` under a lost acknowledgement, B-14).** A first
   `append_once` whose return value is discarded, followed by a second
   `append_once` of the identical decision, yields the same `hash`,
@@ -653,9 +812,14 @@ Section 8 states both.
   consume it live in `crates/rahi-ledger/tests/identity.rs` and
   `crates/rahi-cli/tests/cli.rs`, both of which the Verification block runs,
   so AC-3 is exercised by the declared commands and not by an operator's
-  word. They skip with a message only when the fixture directory is absent,
-  never when crates.io is unreachable: the fixture is committed, and the
-  script is only how it was made.
+  word. They never skip. An absent fixture directory is a **failure** naming the
+  directory and `write.sh`, because the fixture is committed and its absence
+  is a broken checkout rather than a missing optional tool; a skip there
+  would let AC-3, the whole migration proof, pass on a tree that proves
+  nothing. crates.io being unreachable is likewise no reason to skip: the
+  fixture is committed and the script is only how it was made. The one skip
+  this spec permits anywhere is FR-007's, for an external binary the
+  repository does not vendor.
 - **FR-015 (reindex over a damaged archive, B-8).** Over a three-segment
   fixture in which one body is removed, one is corrupted, and one is
   readable and valid, `reindex` covers the valid segment, leaves the other
@@ -687,9 +851,10 @@ Section 8 states both.
 - **FR-018 (coverage is cheap and never a per-append read, B-7).** A test
   counts the leader reads issued across N appends on a covered chain and
   asserts the count does not grow with N. A test asserts every
-  `kernel_decision_coverage` value equals the count of identity rows
-  carrying that segment hash, after a seal, after a reindex, and after an
-  interrupted reindex.
+  `kernel_decision_coverage` value equals the number of identity rows plus
+  collision rows carrying that segment hash, after a seal, after a reindex,
+  after an interrupted reindex, and over a segment holding a twice-spent
+  id.
 - **FR-019 (the repair open, B-15).** `append` and `append_once` on a handle
   from `open_for_repair` are `Error::Conflict` naming the gate, on a covered
   chain as well as an uncovered one, and no argument or environment variable
@@ -734,7 +899,10 @@ Section 8 states both.
   process-local lock or a pre-read.
 - **AC-6.** Ambiguity is reported and never resolved: FR-012 passes, and the
   archived bodies of its fixture are byte-identical before and after
-  `reindex`, asserted by digest.
+  `reindex`, asserted by digest. FR-012's coverage assertion is part of this
+  criterion: the ambiguous chain is fully accounted for, which is what lets
+  `serve` start on it, and no seal or reindex over it redirects an identity
+  row to a record or a segment other than the one it names (FR-011).
 - **AC-7.** `append_once`'s contract is documented as B-14 states it, FR-013
   and FR-021 pass, and neither the crate documentation nor the consumer
   contract claims exactly-once delivery or any form of authorship.
@@ -747,10 +915,26 @@ Section 8 states both.
   per-decision figure is checked against the implementation by a test that
   writes a known number of identity rows to a temporary store, measures the
   resulting database growth, and fails if it exceeds B-9's figure by more
-  than a stated factor. The spec is wrong about cost only in a way the suite
-  catches.
+  than a stated factor. B-9's table is an estimate until this test runs; this
+  test is the measurement, and it is what makes the spec wrong about cost
+  only in a way the suite catches.
 - **AC-10.** Coverage stays cheap: FR-018 passes, and the boot path issues
   no scan whose cost grows with the number of archived decisions.
+- **AC-12 (the accounting is consistent, B-5, B-7 and B-12).** Across the
+  fixtures this spec builds, including FR-012's twice-spent id, FR-015's
+  damaged archive and FR-016's interrupted reindex, a test asserts the
+  accounting invariant directly rather than inferring it from the verbs:
+  every resident record and every record in every readable archived body is
+  named by exactly one row across `kernel_decision_identity` and
+  `kernel_decision_collisions`; no record is named by both; every identity
+  row's `segment_hash`, when set, names a segment whose body contains the
+  record that row's `record_hash` names; every `kernel_decision_coverage`
+  value equals the identity rows plus collision rows counted for its
+  segment; and a segment reports covered if and only if that value equals
+  its header's `count`. A segment whose body is unreadable is excluded from
+  the archived half and reported uncovered, never assumed accounted for.
+  This is the criterion that makes B-7's counting rule and B-12's
+  serve-while-ambiguous rule one rule rather than two that contradict.
 - **AC-11.** The three consumer reproductions named in section 1 are
   transcribed as FR-001, FR-002 and FR-004 with their assertions inverted,
   each test naming the reproduction it descends from in a comment, so a
@@ -856,8 +1040,20 @@ spec, and none is a waiver.
   `Ledger::open` and B-5 changes what a segment header carries; this spec
   changes both files too, and adds the coverage gate to the same `open`. The
   overlap is on shared files, not a dependency: 042 `depends_on` 013, 014 and
-  030, all `complete`, so it is buildable without 036, and both 036 and 042
-  are in the current ready set with 038 and 040.
+  030, all `complete`, so it is buildable without 036.
+
+  The approval state matters more than the ready set here, and it has moved
+  since this question was first written. The ready set is 036, 038, 040 and
+  042; of those **036 and 038 are `approved` and `implementation: pending`**,
+  while 040 and 042 are still `draft`. So the owner is not choosing among
+  four peers: two specs are already cleared to build and this one is not
+  cleared at all, which means any ordering that puts 042 first also asks for
+  042 to be approved first. Against 038 there is nothing to sequence: the
+  corpus declares no territory overlap between 038 and 042 (038's overlaps
+  are with 036 and 040, on `crates/rahi-cli/src/serve.rs`), and 038 touches
+  the edge and identity surfaces rather than the ledger, so the two can run
+  in either order without either session inheriting the other's
+  reconciliation. The sequencing question is 036 alone.
 
   This draft recommends **036 first, then 042**, for three reasons rather
   than for tidiness. `Ledger::open` gains two refusals that must compose into
