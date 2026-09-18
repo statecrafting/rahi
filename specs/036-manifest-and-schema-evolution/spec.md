@@ -1,7 +1,7 @@
 ---
 id: "036-manifest-and-schema-evolution"
 title: "Manifest and schema evolution: a ledgered manifest transition, a checked migration history, and a restore that refuses what it cannot serve"
-status: draft
+status: approved
 kind: kernel
 domain: kernel
 created: "2026-09-11"
@@ -245,20 +245,51 @@ Without this spec, every step above that changes the manifest ends in
 
 ## 7. Resolved decisions
 
-None yet. Before approval a human decides:
+The owner decided all five open questions on 2026-09-17 and flipped this
+spec to `approved`. Each entry names the question as it stood, so the
+record shows what was asked as well as what was answered.
 
-- whether adoption is a flag of `migrate` (proposed, which keeps spec 030
-  AC-2's exact verb list) or a verb of its own (which amends 030 B-1 and
-  AC-2);
-- whether the transition carries the whole canonical model or only its
-  hash (proposed: the model when it fits);
-- whether B-8's additive marking is right, or whether a store ahead of
-  the binary is refused always, or accepted always as today;
-- whether an old replica that restarts during an N=3 rollout may boot on
-  the *previous* manifest for a bounded window instead of refusing (B-10);
-- the genesis-parent change in B-4, which moves the anchor from the booted
-  manifest to the stored genesis record plus the ledger key's signatures,
-  and is a change to spec 013's verification a human approves explicitly.
+- **D-1 (2026-09-17, owner decision; adoption is a flag).** Adoption is
+  `rahi migrate --adopt-manifest`, the flag B-3 proposes, and not a verb of
+  its own. This keeps spec 030 AC-2's exact verb list true and amends
+  neither 030 B-1 nor AC-2. Alternative rejected: a separate verb, which
+  buys a clearer name at the cost of amending a `complete` spec's
+  acceptance criterion.
+- **D-2 (2026-09-17, owner decision; the transition carries the model).**
+  The transition record retains the canonical manifest content when it fits
+  `ledger.max_record_bytes`, as B-2 proposes. Oversized content does not
+  bypass that limit: before implementation this spec states the bounded
+  reference or failure path it takes instead, and the build implements the
+  stated one rather than deciding it at the keyboard. Alternative rejected:
+  the hash alone always, which makes a transition cheap to append and
+  useless to audit without the deploy's artefacts.
+- **D-3 (2026-09-17, owner decision; additive marking stands).** B-8's
+  declaration is right: an older binary serves a store ahead of it only
+  across migrations explicitly recorded additive, and refuses otherwise.
+  Incompatible rollbacks are refused; migrations stay forward-only.
+  Alternatives rejected: refusing a store ahead of the binary always, which
+  makes every rollout a hard cutover, and accepting one always, which is
+  today's behavior and the reason an incompatible rollback can serve a
+  schema it cannot read.
+- **D-4 (2026-09-17, owner decision; an old replica refuses after
+  adoption).** B-10 stands as written. A replica that restarts on the old
+  image after the transition refuses to boot. An old replica already
+  running may finish the rollout under the manifest its decisions record.
+  Alternative rejected: a bounded window in which a restarting old replica
+  boots on the previous manifest, which would let a ceiling the chain no
+  longer names adjudicate live requests for the length of the window.
+- **D-5 (2026-09-17, owner decision, explicit; the verification anchor
+  moves).** B-4 is approved explicitly, as the spec reserved it. `Ledger::
+  open` verifies the chain from its stored genesis record, reading the
+  genesis parent from the chain rather than from the booted manifest, with
+  the cell's ledger key's signatures as the anchor (013 B-5). `Kernel::
+  boot` then checks the booted manifest against the chain's current
+  manifest as a separate step, and a mismatch is `Error::Stale`, not
+  `Error::Integrity`. This is the material change this spec asked a human
+  to approve, and it is approved. What does **not** change: a broken link,
+  a bad signature, or a fork remains `Error::Integrity` and remains fatal
+  at boot (constitution XI). Verification is being re-anchored, never
+  relaxed.
 
 ## Verification
 
