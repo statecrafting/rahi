@@ -168,7 +168,14 @@ the property that a cell with no reachable object storage can still boot; and
 the guarantee it offers is exactly-once *append*, never exactly-once
 *delivery*, so a consumer's own side effects still need the consumer's own
 idempotency record and cannot be driven from the chassis's return value.
-Nothing here is an approval, a schedule, or a commitment to build it.
+Two further properties of the revised draft are worth a consumer's planning
+attention, and are equally undecided: it would add one permanent resident
+row per decision, about 400 bytes per decision on every replica, which sizes
+the design for cells in the 10^5 to 10^7 lifetime-decision range rather than
+for a decision per request; and a chain whose archive has permanently lost a
+segment body could not be proven covered, which under the draft as written
+means it could not serve. Nothing here is an approval, a schedule, or a
+commitment to build it.
 
 Publication still requires the annotated tag on tested main, all nine
 crates, the tag and registry consumer jobs, both architecture images,

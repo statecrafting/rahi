@@ -59,11 +59,23 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-ledger/src/segment.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ledger/src/verify.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-ledger/testdata/chains/",
         "source": "spec-edge"
       },
       {
         "path": "crates/rahi-ledger/tests/append.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ledger/tests/common/",
         "source": "spec-edge"
       },
       {
@@ -197,6 +209,32 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-ledger/src/segment.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/src/segment.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ledger/src/verify.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/src/verify.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-ledger/testdata/chains/"
           }
         ],
@@ -218,6 +256,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-ledger/tests/append.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ledger/tests/common/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/tests/common/"
         }
       },
       {
@@ -260,5 +311,5 @@
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "84d4e9fc4f36d8cfecf32a517024ed0d9215aa24d1cc5a2d485404d504e5854d"
+  "shardHash": "5acd35fe233a2643c006e95983607e4c9e8b503c69dcb4ac841bca46def9a973"
 }
