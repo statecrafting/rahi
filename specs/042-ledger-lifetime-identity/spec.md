@@ -1054,8 +1054,8 @@ further.
      `PRAGMA auto_vacuum` is `0` so a later drop frees pages to the freelist
      rather than reclaiming them mid-measurement.
   2. Record `used_before = (page_count - freelist_count) * page_size`.
-  3. `DROP TABLE` the five tables above, which drops their indexes with them,
-     then checkpoint again and record `used_after` the same way.
+  3. `DROP TABLE` the three tables above, which drops their five indexes with
+     them, then checkpoint again and record `used_after` the same way.
   4. The identity cost is `used_before - used_after`, and the measured
      per-decision figure is that difference divided by 100,000.
 
