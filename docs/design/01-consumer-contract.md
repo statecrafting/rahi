@@ -154,6 +154,22 @@ design, including unavailable-history handling. Neither limitation is fixed
 by 037 or 0.2.0, and aicortex must not adopt it as such. Section 5.1's journal
 recommendation does not establish these missing guarantees.
 
+The second of those limitations now has a proposed design, spec 042, and a
+proposal is not a capability. **042 is `draft` and `implementation: pending`:
+no code implements it, no release contains it, and nothing in 0.1.0 or 0.2.0
+behaves as it describes.** A consumer must keep treating lifetime ID
+uniqueness across sealed history as absent. Three properties of the proposal
+matter to a consumer planning around it, and all three are subject to owner
+decisions the draft itself lists as outstanding: adopting it would be a
+stop-the-world upgrade rather than a rolling one, because a chain sealed
+before it carries none of the state it needs; a cell whose sealed history has
+not been reindexed would refuse to start, which suspends for that one window
+the property that a cell with no reachable object storage can still boot; and
+the guarantee it offers is exactly-once *append*, never exactly-once
+*delivery*, so a consumer's own side effects still need the consumer's own
+idempotency record and cannot be driven from the chassis's return value.
+Nothing here is an approval, a schedule, or a commitment to build it.
+
 Publication still requires the annotated tag on tested main, all nine
 crates, the tag and registry consumer jobs, both architecture images,
 anonymous pulls, and the published-image walkthrough. The earlier merged
@@ -502,7 +518,8 @@ and to every cell, so it waits for a release line (spec 039).
 predate 035 and were corrected in 0.1.0: shutdown drains within a bound,
 loss counters distinguish causes, and IDs include the replica node.
 This does not provide lifetime ID uniqueness across sealed history.
-The independent archived-retry limitation in section 2.0 remains in 0.2.0.
+The independent archived-retry limitation in section 2.0 remains in 0.2.0,
+and the draft 042 design for it is unimplemented in every released version.
 The following dated findings preserve the evidence that motivated 035.
 
 **Verified** (`crates/rahi-kernel/src/lib.rs`, `adjudicate.rs`,

@@ -59,6 +59,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-ledger/testdata/chains/",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-ledger/tests/append.rs",
         "source": "spec-edge"
       },
@@ -193,6 +197,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-ledger/testdata/chains/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/testdata/chains/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-ledger/tests/append.rs"
           }
         ],
@@ -243,5 +260,5 @@
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "a9e8a25fc682e55c4f0665b97fb9020755404282bd4875d027ccac999aa7b374"
+  "shardHash": "84d4e9fc4f36d8cfecf32a517024ed0d9215aa24d1cc5a2d485404d504e5854d"
 }
