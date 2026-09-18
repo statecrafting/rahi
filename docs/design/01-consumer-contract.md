@@ -154,20 +154,20 @@ design, including unavailable-history handling. Neither limitation is fixed
 by 037 or 0.2.0, and aicortex must not adopt it as such. Section 5.1's journal
 recommendation does not establish these missing guarantees.
 
-The second of those limitations now has a proposed design, spec 042, and a
-proposal is not a capability. **042 is `draft` and `implementation: pending`:
-no code implements it, no release contains it, and nothing in 0.1.0 or 0.2.0
-behaves as it describes.** A consumer must keep treating lifetime ID
-uniqueness across sealed history as absent.
+The second of those limitations now has an approved design, spec 042, and an
+approved specification is not a capability. **042 is `status: approved` and
+`implementation: pending`: no code implements it, no release contains it, and
+nothing in 0.1.0 or 0.2.0 behaves as it describes.** A consumer must keep
+treating lifetime ID uniqueness across sealed history as absent.
 
-The owner's decisions on the draft were taken on 2026-09-18 and are recorded
-in the spec as D-1 to D-6. They settle the questions this paragraph
-previously listed as outstanding, and a consumer planning around the proposal
-should plan against the decided shape rather than the open one. Approval is
-still a separate act the owner has not taken, so the sentence above stands
-unchanged: nothing here is an approval, a schedule, or a commitment to build.
+The owner's decisions were taken on 2026-09-18 and are recorded in the spec as
+D-1 to D-7; the approval flip was taken in the same governed change. Approval
+fixes the design and its acceptance criteria. It is not a schedule and not a
+release: the spec is built when a build session takes it, in the order D-5
+sets (036, then 042, then 038), and a consumer's plan changes only when a
+release says so.
 
-Five properties of the decided draft matter to a consumer:
+Five properties of the approved design matter to a consumer:
 
 - Adopting it would be a **stop-the-world upgrade**, not a rolling one,
   because a chain sealed before it carries none of the state it needs. The
@@ -189,7 +189,9 @@ Five properties of the decided draft matter to a consumer:
 - It would add one **permanent resident row per decision**, estimated at
   about 400 bytes per decision on every replica and carried in every
   snapshot, backup, restore and cluster join. That figure is an estimate
-  until the spec's own measurement test runs. No supported lifetime-decision
+  until the spec's own measurement test runs; what the spec's acceptance
+  binds is a ceiling of 800 bytes per decision, twice the estimate, so a
+  consumer sizing conservatively should size against 800 rather than 400. No supported lifetime-decision
   ceiling is declared: 10^5 to 10^7 is the range the arithmetic was aimed at,
   not a capacity the chassis has verified, and nothing states what a cell
   does at or past any figure. A consumer sizing a cell must count **every**
@@ -552,7 +554,8 @@ predate 035 and were corrected in 0.1.0: shutdown drains within a bound,
 loss counters distinguish causes, and IDs include the replica node.
 This does not provide lifetime ID uniqueness across sealed history.
 The independent archived-retry limitation in section 2.0 remains in 0.2.0,
-and the draft 042 design for it is unimplemented in every released version.
+and the approved 042 design for it is unimplemented in every released
+version.
 The following dated findings preserve the evidence that motivated 035.
 
 **Verified** (`crates/rahi-kernel/src/lib.rs`, `adjudicate.rs`,

@@ -170,14 +170,14 @@
       "6. Out of scope",
       "7. Resolved decisions",
       "8. Owner decisions, answered",
-      "What remains before approval",
+      "What is reserved, and what it does not block",
       "Verification"
     ],
     "specPath": "specs/042-ledger-lifetime-identity/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "The chain can say what happened but not whether a given decision ever happened, because spec 013 D-5 tells a lost compare-and-swap from a duplicate id by asking whether the id is resident and spec 014 deletes the row when its segment is sealed. Past the hot window a retried append therefore writes a second record under the same id, and full verification passes because a duplicate id is not a broken link. This spec gives every decision a narrow resident identity row that survives sealing, makes that row's primary key the arbitration inside the append transaction rather than a read before it, stamps the row in the seal transaction, and answers presence, proven absence, unproven history and proven ambiguity as four different answers. A chain sealed before this spec has no rows for its archived ids, so a cell refuses to serve until `rahi ledger reindex` has rebuilt them: the upgrade costs a stop, and the alternative is a cell that serves while its audit proof is silently wrong. The refusal, the reindex's behavior on damaged or ambiguous history, the cutover from a binary that does not stamp, and the permanent resident cost are all stated here rather than discovered in production.\n",
     "title": "Lifetime identity: one id names one decision for the life of the chain, and absence is proven rather than assumed"
   },
-  "shardHash": "9dff321fbc8bcf6634d929a28e7574c1887023d094ce6b8e5358bdafbc25274c",
+  "shardHash": "8c58ca4f293a959768fe4dafeef214d4151c743a7cd2011060aef84c6287ba21",
   "specVersion": "1.3.0"
 }

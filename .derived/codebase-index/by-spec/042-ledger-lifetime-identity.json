@@ -308,8 +308,8 @@
       }
     ],
     "specId": "042-ledger-lifetime-identity",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "3e9302232ea1066a61f54e6dee9f6303ff50a273d59686408872e5a31675f2be"
+  "shardHash": "9a16cb980b8dba9254f4eea2d9d2c1864a4b3a10674fad86ade4a42b7d5f4892"
 }

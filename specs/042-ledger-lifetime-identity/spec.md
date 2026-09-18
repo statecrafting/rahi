@@ -1,7 +1,7 @@
 ---
 id: "042-ledger-lifetime-identity"
 title: "Lifetime identity: one id names one decision for the life of the chain, and absence is proven rather than assumed"
-status: draft
+status: approved
 kind: kernel
 domain: ledger
 created: "2026-09-17"
@@ -1017,16 +1017,72 @@ further.
   body. `rahi ledger reindex` exits non-zero in every such case and in every
   case where it recorded a collision.
 - **AC-9.** The cutover is detectable and priced: FR-020 passes, and B-9's
-  per-decision figure is checked against the implementation by a test that
-  writes a known number of identity rows to a temporary store, measures the
-  resulting database growth, and fails if it exceeds B-9's figure by more
-  than a stated factor. B-9's table is an estimate until this test runs; this
-  test is the measurement, and it is what makes the spec wrong about cost
-  only in a way the suite catches. The measurement establishes a per-row
-  figure and nothing more: every figure in B-9's table stays labelled an
-  estimate until it is replaced by a measured one, and no criterion in this
-  section asserts a supported lifetime-decision ceiling, because D-2 declines
-  to declare one without both a measurement and a defined boundary behavior.
+  per-decision figure is checked against the implementation by a measurement
+  whose fixture, isolation, and tolerance are all fixed here rather than
+  chosen once results are in. D-7 records the tolerance and derives it.
+
+  *The fixture.* A single-node store (spec 032's N=1, so the figure is the
+  per-replica one and B-9's cluster column is that figure times N), freshly
+  migrated, on a temporary directory. Append **100,000** decisions, the first
+  row of B-9's table, each with a **distinct** id of exactly **36 ASCII
+  bytes**, the UUID shape B-9 prices. Ids are generated deterministically
+  from a fixed seed and appended in an order uncorrelated with their sort
+  order, which is the page-fill-pessimistic one of the two shapes B-9 names
+  (a prefixed ULID appends in key order and packs better; a UUID does not).
+  Distinct ids keep `kernel_decision_collisions` empty, so the figure is the
+  clean-path cost. Seal so that exactly **10,000** records stay resident, the
+  default `hot_window` of spec 014 B-1, and the other **90,000** are archived
+  across **90** sealed segments at 014's default `segment_size` of 1,000;
+  `kernel_decision_coverage` therefore holds 90 rows. The 90 percent sealed
+  share is the point of the measurement: identity rows outlive the bodies,
+  so the cost being priced is the one a sealed chain pays.
+
+  *What is measured, and the baseline that is subtracted.* Exactly the
+  storage this spec adds: `kernel_decision_identity` with its `TEXT PRIMARY
+  KEY` index and `kernel_decision_identity_segment`,
+  `kernel_decision_collisions` with its primary-key index and
+  `kernel_decision_collisions_segment`, and `kernel_decision_coverage` with
+  its primary-key index. Nothing else: `kernel_decisions`, `kernel_segments`
+  and every table another spec owns are outside the figure. The isolation is
+  a drop-and-difference on a copy of the fixture database, not a file-size
+  comparison against an empty store, because a store baseline would also
+  subtract the ledger's own growth and an empty-store baseline would
+  subtract none of it:
+
+  1. Fully checkpoint the write-ahead log (`PRAGMA wal_checkpoint(TRUNCATE)`)
+     so every page lives in the main database file, and assert
+     `PRAGMA auto_vacuum` is `0` so a later drop frees pages to the freelist
+     rather than reclaiming them mid-measurement.
+  2. Record `used_before = (page_count - freelist_count) * page_size`.
+  3. `DROP TABLE` the five tables above, which drops their indexes with them,
+     then checkpoint again and record `used_after` the same way.
+  4. The identity cost is `used_before - used_after`, and the measured
+     per-decision figure is that difference divided by 100,000.
+
+  The database is **never** `VACUUM`ed at any point in the procedure. VACUUM
+  repacks B-tree pages to near-full and would report a figure no live cell
+  ever pays, while B-9's estimate is explicitly inclusive of page slack; the
+  page-count difference preserves the slack that is being priced.
+
+  *The tolerance.* The measured per-decision figure must not exceed B-9's
+  400 bytes by more than a factor of **2.0**, that is, it must be at most 800
+  bytes per decision. D-7 derives that factor from the arithmetic and from
+  SQLite's B-tree split invariant, records it before any implementation
+  exists to measure, and states what it does and does not certify. The
+  tolerance may be tightened by a later change that cites a measurement; it
+  may not be widened, and it may not be revisited because a measurement came
+  in above it. A measurement above 800 bytes per decision is a failure of
+  this criterion, and the answer is either an implementation that costs less
+  or an owner decision that re-prices B-9, never a larger factor chosen to
+  accommodate the result.
+
+  *What the measurement establishes.* The test prints the measured figure so
+  a later change can replace B-9's estimates with measured ones. Until such a
+  change lands, every figure in B-9's table stays labelled an estimate. The
+  measurement establishes a per-row figure and nothing more: no criterion in
+  this section asserts a supported lifetime-decision ceiling, because D-2
+  declines to declare one without both a measurement and a defined boundary
+  behavior.
 - **AC-10.** Coverage stays cheap, and this criterion says which cost is
   permitted rather than forbidding the design it accepts. FR-018 passes, and
   the boot path's coverage evaluation reads exactly two things: the hot
@@ -1100,12 +1156,14 @@ this spec claims no requirement there.
 
 ## 7. Resolved decisions
 
-D-1 to D-6 are the owner's, taken on the draft and recorded before approval;
-they answer section 8's four questions and the corrections that came with
-them. The build session records further D-n entries here for choices this
-spec is still silent on (date, provenance, the decision, the alternative
-rejected). Nothing in D-1 to D-6 approves this spec or authorizes its
-implementation: it stays `draft` and `implementation: pending`.
+D-1 to D-7 are the owner's, taken on the draft and recorded as the condition
+of approval; they answer section 8's four questions and carry the corrections
+that came with them. The build session records further D-n entries here for
+choices this spec is still silent on (date, provenance, the decision, the
+alternative rejected). The owner's approval covers D-1 to D-7 and the text
+they fix; it authorizes no implementation, and this spec holds at
+`implementation: pending` until a build session takes it in the order D-5
+sets.
 
 - **D-1 (2026-09-18, owner decision; resolves D-required-1, amends spec
   030).** `rahi ledger reindex <archive>` stays an explicit mutating command
@@ -1117,10 +1175,12 @@ implementation: it stays `draft` and `implementation: pending`.
   the same change: spec 030 B-1's argv list gains `ledger reindex <archive>`
   annotated `(042)`, the convention that spec's own `supervise (031)` and
   `first-boot (031)` entries already use for a verb a later spec establishes;
-  spec 030 AC-2 is amended to say that `--help` lists exactly the verbs of
-  B-1 the binary implements, so a verb B-1 attributes to a later spec joins
-  the list when that spec lands; and spec 030 carries its own dated decision
-  recording both edits. Nothing else in 030 changes, and 030's `complete`
+  spec 030 AC-2 is amended to judge `--help` against a required verb set
+  derived from B-1's list and each annotated spec's `implementation` field
+  rather than from the binary, so a verb B-1 attributes to a later spec joins
+  the list in the change that implements that spec and a verb that ought to
+  be present and is not is a failure; and spec 030 carries its own dated
+  decision recording both edits. Nothing else in 030 changes, and 030's `complete`
   status and its other acceptance criteria are untouched. This spec may not
   make either edit on its own authority and did not: the amendment is the
   owner's, recorded here and in 030.
@@ -1228,6 +1288,52 @@ implementation: it stays `draft` and `implementation: pending`.
   store limits, and nothing removes a duplicate that is already history. What
   detection buys is that the damage is seen, not that it is undone.
 
+- **D-7 (2026-09-18, owner-directed correction; fixes AC-9's tolerance
+  before any measurement exists).** AC-9's tolerance is a factor of **2.0**
+  over B-9's 400 bytes per decision, that is, a ceiling of 800 bytes, and it
+  is recorded here, in the specification session, before there is an
+  implementation to measure. The reason it is recorded now is the failure
+  mode it forecloses: a tolerance chosen after the first run is not a
+  criterion, it is a description of whatever the implementation happened to
+  cost, and it would make AC-9 unable to fail.
+
+  *The derivation, from the arithmetic and from SQLite rather than from a
+  measurement.* B-9's per-row content at a 36-byte id is 36 for the id, 64
+  for each of `identity_digest` and `record_hash`, and 64 for a stamped
+  `segment_hash`, which with the row header is about 240 bytes in the table
+  B-tree; the `TEXT PRIMARY KEY` index carries the id and the rowid again at
+  about 50 bytes; the `segment_hash` index carries a 64-character hash and
+  the rowid at about 75. That is about 365 bytes of content, and B-9 rounds
+  to 400 to allow for page slack. The remaining unknown is therefore page
+  occupancy, not content, and SQLite bounds it: a B-tree page split leaves
+  its pages at least half full, so occupancy asymptotically cannot fall below
+  50 percent, and insertion in random key order (which AC-9's fixture forces)
+  settles nearer 65 to 70 percent in practice. The pessimistic bound is
+  365 / 0.5, about 730 bytes, or 1.83 times B-9's figure. A factor of 2.0 is
+  that bound with a little headroom for the per-table fixed pages and the
+  coverage table's 90 rows.
+
+  *What it certifies, and what it does not.* It certifies the order of
+  magnitude and the shape: an extra wide index, a hash stored with unexpected
+  overhead, an id that is not the length B-9 prices, or a second row per
+  decision would all breach it. It does **not** certify B-9's 400 to any
+  precision the underlying model supports, and a measurement of, say, 520
+  bytes per decision passes while still meaning B-9's table understates the
+  bill by 30 percent. That is the honest reach of a threshold derived from
+  arithmetic rather than from evidence, and AC-9 says so by requiring the
+  measured figure to be printed: replacing B-9's estimates with measured
+  figures, and tightening this factor to what the measurement supports, is
+  the follow-up change that turns the estimate into a number. Widening the
+  factor is not available to that change or to any build session; it is an
+  owner decision that re-prices B-9 in the open.
+
+  *The alternative rejected.* Stating AC-9 with "a stated factor" and leaving
+  the number to the implementing session, which is what the draft did. It was
+  rejected for the reason above: the session that chooses the tolerance is
+  the session that knows the result, and a criterion written that way cannot
+  constrain the thing it exists to constrain.
+
+
 ## 8. Owner decisions, answered
 
 The four questions this draft raised are answered. Each named a requirement
@@ -1263,7 +1369,13 @@ DDL, with the downgrade protection stated exactly as none from any store
 version check, and the withdrawn claim that a violated cutover leaves a
 bounded, repairable ambiguity.
 
-### What remains before approval
+The two corrections the owner attached to the approval are landed in the same
+change: AC-2 of spec 030 now derives its expected verb set from B-1's text and
+the corpus lifecycle rather than from the binary (D-1, and spec 030's D-9),
+and AC-9's measurement procedure and tolerance are fixed here rather than left
+to the session that would see the result (D-7).
+
+### What is reserved, and what it does not block
 
 One item is reserved rather than resolved, and it does not block this spec:
 
@@ -1276,8 +1388,20 @@ One item is reserved rather than resolved, and it does not block this spec:
   state today is diagnosable, exportable and repairable; what it is not is
   servable.
 
-Nothing else is outstanding. Approval is the owner's flip, and this spec
-holds at `draft` and `implementation: pending` until they take it.
+One item is deliberately deferred to the implementing change and is named
+rather than hidden:
+
+- **Replacing B-9's estimated table with measured figures.** AC-9's tolerance
+  is derived from arithmetic and from SQLite's page-split invariant, which is
+  evidence available without an implementation, so acceptance is specified and
+  falsifiable today. What that derivation cannot do is certify B-9's 400 bytes
+  to better than the factor of 2.0 it bounds. D-7 states that reach exactly,
+  requires the measured figure to be printed, and allows a later change to
+  tighten the factor on the strength of a measurement while forbidding any
+  change from widening it. No approval decision waits on this.
+
+Nothing else is outstanding, and the owner's approval flip is taken in this
+change. Implementation stays `pending`.
 
 ## Verification
 

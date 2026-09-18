@@ -129,14 +129,30 @@ boot, key generation, and supervision (031) are modules added to
 
 - **AC-1.** `cargo test -p rahi-ops --locked` and `cargo test -p rahi-cli
   --locked` pass.
-- **AC-2.** `cargo run -p rahi-cli -- --help` lists exactly the verbs of
-  B-1 that the binary implements, and no other. A verb B-1 attributes to a
-  later spec by its ordinal joins that list when that spec lands and not
-  before, so the help is complete for the binary that prints it rather than
-  for a corpus that has not shipped yet. `rahi_cli::VERBS` is the
-  machine-readable form of that set and is what the test compares the help
-  against; extending `VERBS` is part of landing the spec that adds the verb
-  (D-9).
+- **AC-2.** `cargo run -p rahi-cli -- --help` lists exactly the **required
+  verb set**, and no other. The required set is derived from B-1's argv list
+  and the corpus lifecycle, never from what the binary happens to parse: it
+  is every entry B-1 carries with no ordinal annotation, plus every entry
+  annotated with the ordinal of a spec whose `implementation` is `complete`,
+  plus every entry annotated with the ordinal of the spec the change under
+  test is implementing. An entry annotated with any other ordinal must be
+  absent, and an entry B-1 does not carry at all must be absent. So the help
+  is complete for the binary that prints it rather than for a corpus that has
+  not shipped, while a verb that ought to be there and is not is a failure
+  rather than a definition.
+
+  `rahi_cli::VERBS` is the declaration of that required set and is what the
+  test compares the help against. `VERBS` is therefore itself under test: a
+  verb the required set contains and `VERBS` omits is an AC-2 failure, not a
+  redefinition of the criterion, and the test must assert `VERBS` against the
+  required set rather than take it as given. Extending `VERBS` is part of
+  landing the spec that adds the verb (D-9).
+
+  Today the required set has nine members: B-1's seven unannotated entries
+  plus `supervise` and `first-boot`, whose spec 031 is `complete`. `ledger
+  reindex` is annotated `(042)`, whose implementation is `pending`, so it is
+  excluded today and joins as the tenth in the change that implements spec
+  042, and not before.
 
 ## 6. Out of scope
 
@@ -273,11 +289,20 @@ where archives land in a cluster (032).
   one 042 introduced. B-1 has annotated `supervise` and `first-boot` with
   `(031)` since this spec was written, so "exactly the verbs of B-1" was
   already a claim about a set the binary did not hold until 031 landed,
-  while the test compared the help against `rahi_cli::VERBS`. Naming `VERBS`
-  as the machine-readable form of the implemented set makes the text and the
-  test agree, and makes extending `VERBS` an explicit obligation of the spec
-  that adds a verb. The tenth entry lands with spec 042 and not before; until
-  then `--help` lists nine and AC-2 holds, as it holds today.
+  while the test compared the help against `rahi_cli::VERBS`.
+
+  The rewording derives the expected set from B-1's text and each annotated
+  spec's `implementation` field, plus the spec the change under test is
+  implementing, and never from the binary. That ordering matters: an earlier
+  draft of this decision said the help lists the verbs of B-1 "that the
+  binary implements", which would have made the criterion unfalsifiable,
+  since a verb accidentally left out of the parser would have left itself out
+  of the expected set too. `VERBS` is the declaration of the required set and
+  is asserted against it, so it can no longer define a missing verb away. The
+  arithmetic is unchanged by the tightening: the required set is nine today,
+  because 031 is `complete` and 042 is `pending`, and becomes ten in the
+  change that implements 042. `--help` lists nine today and AC-2 holds, as it
+  held before this amendment.
 
   Recorded on the same day and in the same change as spec 042's D-1, which
   states the owner's reasoning from 042's side. Spec 042 stays `draft` and
