@@ -1,7 +1,7 @@
 ---
 id: "038-native-clients-and-bearer-revocation"
 title: "Native clients and bearer revocation: the CSRF exemption wired, a public client for a CLI declared in the manifest, token lifetimes set, and a token that can be revoked"
-status: draft
+status: approved
 kind: feature
 domain: identity
 created: "2026-09-11"
@@ -196,7 +196,10 @@ the manifest's `[auth]` table (015), the serve composition and preflight
 
 The owner decided the lifetimes, bearer writes, device refresh, and runners
 on 2026-09-12 (decision RH-04 of the revision-3 register, which names P-1 to
-P-3). The spec stays `draft` until a human flips it.
+P-3), and decided the three questions those left open on 2026-09-17 (D-4 to
+D-6), attaching two build obligations (D-7, D-8). The spec was flipped to
+`approved` on 2026-09-17; `implementation` stays `pending` until a session
+builds it.
 
 - **D-1 (2026-09-12, owner decision RH-04; lifetimes and device refresh).**
   The manifest configures a 600-second access token lifetime and an
@@ -227,16 +230,60 @@ P-3). The spec stays `draft` until a human flips it.
   by refresh token. P-3 is not adopted; its text stays as the record of the
   alternative for when unattended runners are reopened.
 
-Still open before approval:
+The owner decided the three remaining questions on 2026-09-17 and flipped
+this spec to `approved`. Each entry names the question as it stood.
 
-- whether native clients belong in the manifest (proposed, since they are
-  part of what the cell permits) or in deployment configuration;
-- whether `RAHI_IDP_REGISTRATION` should default to `off` once declared
-  native clients exist, since a dynamically registered client cannot pass
-  the resource server without an admin call anyway (025 D-3 chose
-  `token`);
-- whether the operator revocation surface is the route proposed here or
-  a verb, which would amend spec 030 AC-2's exact verb list.
+- **D-4 (2026-09-17, owner decision; native clients are manifest
+  content).** B-2 stands: `[[auth.native_clients]]` is declared in the
+  manifest, not in deployment configuration, because a native client is
+  part of what the cell permits and belongs inside the ceiling the manifest
+  declares and the kernel enforces. It therefore moves the manifest hash,
+  and spec 036 governs that change. Alternative rejected: deployment
+  configuration, which would let an operator add a client without moving
+  the hash, so the chain would not record the ceiling it was actually
+  serving.
+- **D-5 (2026-09-17, owner decision; dynamic registration stays
+  token-gated).** `RAHI_IDP_REGISTRATION` keeps the `token` default that
+  025 D-3 chose. Declared native clients do not turn it `off`. Alternative
+  rejected: defaulting to `off` once native clients exist, which reads as
+  tightening but removes a gated path 025 deliberately kept, and would
+  amend a `complete` spec's decision to buy nothing the token gate does not
+  already buy.
+- **D-6 (2026-09-17, owner decision; revocation is a route, not a verb).**
+  The surfaces stay the routes B-5 proposes, `POST /session/token/revoke`
+  for a bearer client revoking its own token and `POST
+  /operator/tokens/revoke` for an operator revoking by `jti` or `sub`. No
+  operational verb is added, so spec 030 AC-2's exact verb list stays true
+  and is not amended. Alternative rejected: a verb, which would amend a
+  `complete` spec's acceptance criterion for a surface that is reachable
+  only while the cell is serving anyway.
+
+Two obligations the owner attached to this approval on 2026-09-17. They
+bind the build; they are recorded here rather than left to the keyboard
+because D-1 noticed both and decided neither.
+
+- **D-7 (2026-09-17, owner decision; the deny-list outlives the token it
+  denies).** A deny-list entry must cover the token's **entire accepted
+  validity**, not its nominal lifetime. The resource server accepts `exp`
+  and `nbf` with 60 seconds of leeway (025), so a TTL equal to
+  `access_token_lifetime_secs` lapses while a token at the edge of the
+  leeway window still validates, and the token comes back to life. B-4's
+  "the lifetime is the deny-list's TTL" is therefore a floor, not the
+  value: the TTL is the accepted validity including the leeway on both
+  ends, and the build states the arithmetic it used and tests a token
+  revoked at the edge of that window. B-6's preflight bound is checked
+  against the same figure.
+- **D-8 (2026-09-17, owner decision; revoking access is not ending the
+  grant).** Subject revocation under B-5 refuses access tokens issued
+  before its instant. It does **not**, by itself, end a refresh grant: a
+  refresh presented after the instant yields a token issued after it,
+  which the deny-list then accepts. The build must either name and call the
+  rauthy mechanism that ends the refresh grant or session, and test that a
+  refresh after revocation is refused, or state explicitly in the spec and
+  in the consumer contract that revocation bounds access tokens only and
+  that full sign-out is not offered. It may not leave the question implied
+  by a test that never presents a refresh token after revoking. Whichever
+  is built is what the documentation claims.
 
 ### Evidence and proposals (2026-09-12)
 

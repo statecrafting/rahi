@@ -19,9 +19,10 @@ Encore and Turso and what remains is what this is.
 
 This repository is a specification corpus, the harness that builds it, and
 the code it specifies. Spec ordinals are the build order, and each spec is
-bounded to one driven session's territory. Specs 036, 038, 040, and 041
-remain `status: draft`: proposals from the consumer contract below that
-schedule nothing until a human approves them. Nine crates and the reference app exist
+bounded to one driven session's territory. Specs 036 and 038 were approved
+on 2026-09-17 and are `implementation: pending`: schedulable, not yet built.
+Specs 040 and 041 remain `status: draft`: proposals from the consumer
+contract below that schedule nothing until a human approves them. Nine crates and the reference app exist
 (`rahi-types`, `rahi-store`, `rahi-ledger`, `rahi-kernel`, `rahi-edge`,
 `rahi-idp`, `rahi-ops`, `rahi-cli`, `rahi-harness`, and `apps/hello-cell`),
 every source file claimed by the spec that built it. `spec-spine registry

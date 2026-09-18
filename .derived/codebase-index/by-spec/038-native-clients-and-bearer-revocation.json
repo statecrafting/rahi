@@ -291,8 +291,8 @@
       }
     ],
     "specId": "038-native-clients-and-bearer-revocation",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "9440acdb5aa477e437e6e816a88f1a498946dca2d62d56e91c821a33c1e84c65"
+  "shardHash": "94745ce09397de31c37105a008f69dbc1daba2073d267a770f0a81bac815c9dc"
 }
