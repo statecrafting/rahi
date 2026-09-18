@@ -96,6 +96,13 @@ hiqlite.
   `listen_notify` (remote listeners are a second egress path). hiqlite is
   the released crate from the registry, never a fork or a patch (D-10).
   *(Amended 2026-09-12, D-11: `counters` arrived through spec 012 D-8.)*
+  *(Scoped exception 2026-09-17, D-12: a temporary `[patch.crates-io]`
+  pins `hiqlite` and `hiqlite-wal` to the upstream commit carrying the
+  lock-handler fix, because no published release contains it. The rule
+  above is suspended for that one dependency and revision, not amended,
+  and returns when upstream publishes. Published crates keep the registry
+  declaration, so a consumer resolving from crates.io does not receive the
+  fix and must declare the same patch itself.)*
 - **B-7 (rauthy's store is invisible).** No function in this crate accepts
   or derives a path under the rauthy data directory; the config type has no
   field for it.
@@ -208,6 +215,72 @@ Locks, notify, outbox, and the revision watermark (012); the decision chain
   on 2026-09-06 and which the workspace has built with since, so the
   list matches the dependency as declared. D-1's "exactly the B-6 set" is
   true again. No code changed.
+- **D-12 (2026-09-17, owner decision, explicit and scoped; a temporary
+  `[patch.crates-io]` for the lock-handler fix).** This is a **narrow,
+  temporary exception** to B-6's "never a fork or a patch" and to D-10's
+  "no `[patch]`, no git source, and no vendored copy". D-9, D-10 and B-6's
+  original text stand exactly as written and are not amended: this entry
+  suspends them for one dependency, for one named revision, until one
+  stated condition is met.
+
+  **What is superseded.** For the duration of this exception only: D-10's
+  prohibition on `[patch]` and a git source, as it applies to `hiqlite`
+  and `hiqlite-wal` and to nothing else. D-10's reversal of the fork
+  proposal is untouched, and rahi still maintains no fork: a patch to an
+  upstream commit is not a fork, and no rahi-authored change to hiqlite is
+  permitted under this exception.
+
+  **The revision.** `[patch.crates-io]` pins `hiqlite` and `hiqlite-wal` to
+  `https://github.com/sebadob/hiqlite` at commit
+  `8f3b9bde9454d563d604f49c527e1527e193c4ab`, the merge commit of upstream
+  PR #352, "fix: Make the distributed-lock handler fault-tolerant and
+  deadlock-free", merged 2026-08-11. The pin is that exact commit and not a
+  branch: upstream `main` has since taken eleven further commits, including
+  a state-machine engine (#364) and WAL durability changes (#357, #361),
+  which this exception deliberately does not adopt.
+
+  **Why.** Releasing a stale lease after another holder has taken over on
+  TTL can panic hiqlite 0.14.0's lock handler and take unrelated locks down
+  with it. The fix is merged upstream and unreleased: the newest published
+  hiqlite is 0.14.0 of 2026-07-06, which predates the merge, so no
+  registry version carries it (verified 2026-09-17 against the crates.io
+  API and the repository's releases). D-10's instruction is to go upstream
+  or wait for a release. rahi went upstream: the release request is
+  https://github.com/sebadob/hiqlite/issues/366, opened 2026-09-17 after
+  confirming no equivalent request existed. Waiting is what this exception
+  declines, because a downstream consumer is blocked on a defect whose
+  repair exists.
+
+  **What it does not reach.** A `[patch.crates-io]` binds this workspace's
+  own builds: rahi's tests, its binaries, and the images a tag builds. It
+  is **not** inherited by anyone who depends on rahi. A consumer resolving
+  the chassis from crates.io gets published crates whose dependency
+  declaration is the unchanged registry requirement `hiqlite = "0.14"`,
+  which resolves to 0.14.0 **without** the fix. Passing tests in this
+  patched workspace are therefore evidence about this workspace and about
+  nothing a registry consumer runs. A consumer that needs the fix declares
+  the identical `[patch.crates-io]` in its own workspace root; the
+  consumer contract states this.
+
+  **Preserved deliberately.** Every crate keeps its registry version
+  declaration, so `cargo package` and `cargo publish` continue to work and
+  spec 039's crates.io channel and AC-4 stay intact. A `[patch]` section is
+  workspace-root metadata that publication does not carry.
+
+  **The supply-chain gate.** `deny.toml` keeps `unknown-git = "deny"` and
+  gains exactly one `allow-git` entry, the upstream repository, following
+  D-9's practice of extending that file additively rather than weakening the
+  policy. cargo-deny matches an allow-git entry by repository and not by
+  revision, so the entry admits the repository while the pinned revision is
+  held by the workspace root and `Cargo.lock`. The entry is removed with the
+  patch.
+
+  **Removal condition.** The moment an upstream registry release contains
+  PR #352, the patch is removed, the dependency moves to that published
+  version, and the lease regression tests are re-run against it. The
+  exception ends there; it does not survive into the release that adopts
+  the fix. Adopting that release is its own governed change, and reviews
+  the whole release, not only #352.
 
 ## Verification
 

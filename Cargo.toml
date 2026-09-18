@@ -116,3 +116,25 @@ unwrap_used = "deny"
 expect_used = "deny"
 indexing_slicing = "deny"
 float_arithmetic = "deny"
+
+# A temporary, scoped exception to spec 011 B-6 and D-10, recorded as 011
+# D-12 (2026-09-17, owner decision). Releasing a stale lease after a TTL
+# takeover can panic hiqlite 0.14.0's lock handler and take unrelated locks
+# with it. Upstream PR #352 fixes it, is merged, and is unreleased: the
+# newest published hiqlite is 0.14.0 of 2026-07-06, which predates the
+# merge. The pin is that PR's merge commit exactly, not a branch, so the
+# eleven later commits on upstream main are deliberately not adopted.
+#
+# This binds THIS workspace only. It is not inherited: every crate keeps its
+# registry version declaration, so publication is unaffected and a consumer
+# resolving rahi from crates.io gets hiqlite 0.14.0 WITHOUT the fix. A
+# consumer that needs it declares this same section in its own workspace
+# root (docs/design/01-consumer-contract.md).
+#
+# Removal condition: an upstream registry release containing #352. Tracking
+# https://github.com/sebadob/hiqlite/issues/366. On publication the patch is
+# removed, the dependency moves to that version, and the lease regression is
+# re-run against it.
+[patch.crates-io]
+hiqlite = { git = "https://github.com/sebadob/hiqlite", rev = "8f3b9bde9454d563d604f49c527e1527e193c4ab" }
+hiqlite-wal = { git = "https://github.com/sebadob/hiqlite", rev = "8f3b9bde9454d563d604f49c527e1527e193c4ab" }

@@ -48,4 +48,12 @@ highlight = "all"
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-allow-git = []
+# One entry, for the scoped `[patch.crates-io]` that spec 011 D-12 authorized
+# on 2026-09-17: hiqlite's merged, unreleased lock-handler fix (upstream
+# PR #352). `unknown-git` stays "deny" for everything else. cargo-deny matches
+# an allow-git entry by repository, not by revision, so this admits the
+# upstream repository rather than only the pinned commit; the exact revision
+# is pinned in the workspace root and in Cargo.lock, which is what holds it.
+# Removed together with the patch when upstream publishes a release
+# containing the fix (https://github.com/sebadob/hiqlite/issues/366).
+allow-git = ["https://github.com/sebadob/hiqlite"]

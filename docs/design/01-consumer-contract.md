@@ -109,8 +109,12 @@ This is a prospective stanza, not a claim that crates.io resolves it now.
 Use the same release for every chassis dependency. Before publication, a
 consumer can pin the actual preparation commit over git or test locally
 staged `.crate` artifacts. Neither route passes published-only acceptance.
-Third-party dependencies stay registry-sourced; hiqlite remains locked to
-0.14.0. Consumer lockfiles resolve independently and need their own checks.
+Third-party dependencies stay registry-sourced in every **published** crate,
+and every published crate still declares `hiqlite = "0.14"`, which resolves
+to 0.14.0. rahi's own workspace now carries a temporary `[patch.crates-io]`
+for the hiqlite lock-handler fix, which publication does not carry and a
+consumer does not inherit: see 2.0.1. Consumer lockfiles resolve
+independently and need their own checks.
 
 The upgrade boundary is explicit:
 
@@ -156,6 +160,59 @@ anonymous pulls, and the published-image walkthrough. The earlier merged
 037 checks cited in the changelog are inherited evidence, not new-release
 acceptance. The existing Kubernetes target remains 0.1.0; neither this PR
 nor artifact publication changes that target or proves a consumer rollout.
+
+### 2.0.1 The hiqlite lock-handler patch, and what a consumer must configure
+
+Releasing a stale lease after another holder has taken it over on TTL can
+panic hiqlite 0.14.0's lock handler and take unrelated locks down with it.
+Upstream fixed it in PR #352, merged 2026-08-11. **No published hiqlite
+contains that fix**: the newest release is 0.14.0 of 2026-07-06, which
+predates the merge (verified 2026-09-17). The upstream release request is
+[sebadob/hiqlite#366](https://github.com/sebadob/hiqlite/issues/366).
+
+rahi's workspace root therefore carries a temporary, scoped
+`[patch.crates-io]` pinned to that PR's merge commit, recorded as spec 011
+D-12, a deliberate exception to 011 B-6 and D-10:
+
+```toml
+[patch.crates-io]
+hiqlite = { git = "https://github.com/sebadob/hiqlite", rev = "8f3b9bde9454d563d604f49c527e1527e193c4ab" }
+hiqlite-wal = { git = "https://github.com/sebadob/hiqlite", rev = "8f3b9bde9454d563d604f49c527e1527e193c4ab" }
+```
+
+**A consumer does not inherit this.** `[patch]` is workspace-root metadata.
+It binds the workspace that declares it and is carried neither by
+`cargo publish` nor by a dependency edge, so:
+
+| How you consume rahi | Which hiqlite you get |
+|---|---|
+| crates.io stanza (`rahi-store = "=0.2.0"`) | **0.14.0, without the fix** |
+| git stanza pinned to a rahi tag or sha | **0.14.0, without the fix**, unless you add the patch yourself |
+| building inside this repository | the patched commit |
+
+The second row is the one that surprises people: depending on rahi over git
+gives you rahi's source, not rahi's dependency resolution. Cargo honors
+`[patch]` only from the root of the workspace being built, and yours is the
+root.
+
+**What aicortex, hqgit, or any other consumer must do** to get the fix
+before upstream publishes: copy the two lines above into **your own
+workspace root** `Cargo.toml`, then confirm resolution rather than assuming
+it. `cargo tree -i hiqlite` must show the `git+…#8f3b9bde` source, and
+`Cargo.lock` must carry `source = "git+https://github.com/sebadob/hiqlite?rev=8f3b9bde…"`
+with no `checksum` line for it. A consumer that skips this runs the
+unfixed lock handler no matter which rahi it pins.
+
+Two consequences worth stating plainly, because they are easy to get
+backwards:
+
+- Tests passing in rahi's patched workspace are evidence about **rahi's
+  workspace**. They say nothing about what a registry consumer runs, and
+  must never be cited as proof that a published crate contains the fix.
+- The exception ends when upstream publishes a release containing #352. At
+  that point the patch is removed, the dependency moves to the published
+  version, and the lease regression is re-run against it. Consumers should
+  drop their copy of the patch at the same time.
 
 ### 2.1 What was published at 0.1.0 (historical)
 
