@@ -3139,7 +3139,7 @@ name = "rahi-cli"
 version = "0.2.0"
 dependencies = [
  "axum",
- "base64 0.22.1",
+ "base64 0.23.1",
  "rahi-edge",
  "rahi-idp",
  "rahi-kernel",
@@ -3157,7 +3157,7 @@ name = "rahi-edge"
 version = "0.2.0"
 dependencies = [
  "axum",
- "base64 0.22.1",
+ "base64 0.23.1",
  "futures-core",
  "getrandom 0.4.3",
  "opentelemetry",
@@ -3196,7 +3196,7 @@ name = "rahi-idp"
 version = "0.2.0"
 dependencies = [
  "axum",
- "base64 0.22.1",
+ "base64 0.23.1",
  "getrandom 0.4.3",
  "rahi-kernel",
  "rahi-ledger",
@@ -3237,7 +3237,7 @@ dependencies = [
  "async-trait",
  "attest-ledger-core",
  "attest-ledger-types",
- "base64 0.22.1",
+ "base64 0.23.1",
  "canonical-keysort-json",
  "ed25519-dalek",
  "rahi-store",
@@ -3256,7 +3256,7 @@ version = "0.2.0"
 dependencies = [
  "age",
  "axum",
- "base64 0.22.1",
+ "base64 0.23.1",
  "fs4",
  "getrandom 0.4.3",
  "nix",
