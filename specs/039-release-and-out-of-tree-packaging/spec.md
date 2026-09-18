@@ -25,6 +25,7 @@ establishes:
   - ".github/consumer-cell/"
 extends:
   - { spec: "010-workspace-and-core-types", unit: { kind: section, file: "Cargo.toml", anchor: "workspace.package" }, nature: additive }
+  - { spec: "010-workspace-and-core-types", unit: { kind: section, file: "Cargo.toml", anchor: "workspace.dependencies" }, nature: additive }
   - { spec: "031-single-container-packaging", unit: ".github/workflows/image.yml", nature: additive }
   - { spec: "031-single-container-packaging", unit: "docker/Dockerfile", nature: additive }
   - { spec: "031-single-container-packaging", unit: "crates/rahi-ops/src/rauthy_env.rs", nature: additive }
@@ -402,6 +403,48 @@ RH-05 and RH-06 of the revision-3 register), and approved the spec on
   settings. AC-2 and AC-3 (which pulls the hello-cell image) stay open
   until the owner takes it, and no document here calls the images public
   meanwhile.
+
+- **D-13 (2026-09-17, release preparation under B-1 and B-2).** The
+  coordinator selected 0.2.0 under Bart's standing build, push, PR, merge,
+  and release authority for completed 037 at
+  `ea6d0da125aaafe0927570410a8a1b0ee9d1286e`. Its key-set, backup
+  authentication, recovery, and export API changes cross the consumer
+  compatibility boundary, so B-1 requires a minor release; 0.1.1 is
+  rejected. This is maintenance of the completed release mechanism, not a
+  new lifecycle completion. The inherited version, nine internal version
+  requirements, lockfile, changelog, README, and current consumer guidance
+  move together. The added `workspace.dependencies` edge makes D-8's
+  second version-edit surface explicit; no third-party pin changes.
+  Existing key sets are not relabeled compatible: backup needs an
+  origin-bound passkey, and neither automatic old-key-set migration nor
+  cross-origin recovery is supplied. Historical records remain intact.
+
+  This preparation commits no invented release SHA. The consumer contract
+  retains B-2's in-repository release identity through a prospective
+  [`v0.2.0` source link](https://github.com/statecrafting/rahi/tree/v0.2.0).
+  After publication, the release revision is the tested merged `main`
+  commit to which the annotated `v0.2.0` tag resolves. The link asserts no
+  publication; the coordinator's exact SHA and date in forge metadata
+  supplement this identity. The preparation names the real 037 merge as
+  its implementation basis and labels 0.2.0 a
+  candidate. AC-2 through AC-4 and FR-005 must be checked for the new tag;
+  0.1.0's evidence cannot pass them for 0.2.0. Local Cargo packaging can
+  stage sibling versions; an out-of-tree proof using extracted packages
+  and explicit Cargo path patches for only those nine candidate crates is
+  packaging evidence, never registry publication. hiqlite and all other
+  dependencies remain published registry packages.
+
+  Release and image triggers were read before editing: publication is
+  gated on `v*`; main builds and smokes images without pushing them. No
+  production deployment trigger is present in these workflows. Deployment
+  references stay at their existing 0.1.0 target. A new artifact is not a
+  consumer rollout. The changelog and consumer guidance disclose the
+  independent hiqlite 0.14.0 stale-release defect after TTL takeover,
+  unverified full-node second-lease restart, and resident-only ledger ID
+  classification after sealing. Neither 037 nor this release fixes them;
+  lifetime idempotence needs separately governed design and migration.
+  Drafts 036, 038, 040, and 041 and the lease/ledger implementation remain
+  untouched. This decision changes no requirement and grants no waiver.
 
 ## Verification
 

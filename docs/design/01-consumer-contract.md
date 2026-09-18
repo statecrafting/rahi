@@ -1,5 +1,18 @@
 # The consumer contract, as built
 
+**Current release preparation, 2026-09-17:** 0.2.0 is an unpublished
+candidate under approved spec 039, carrying completed spec 037 from
+`ea6d0da125aaafe0927570410a8a1b0ee9d1286e`. Section 2.0 is the current
+consumer guidance; the dated readings below remain historical evidence.
+The final release revision is not known inside this preparation commit.
+The prospective in-repository release identity is
+[`v0.2.0` source](https://github.com/statecrafting/rahi/tree/v0.2.0): after
+publication, the release revision is the tested merged `main` commit to
+which the annotated `v0.2.0` tag resolves (039 B-2). This link does not
+assert that the tag or release exists yet. The coordinator must record the
+exact SHA and release date in forge metadata to supplement this identity.
+A version declaration is not publication or downstream adoption.
+
 Version 0, 2026-09-11, for review; revised the same day with the runtime
 binding of section 11. This note is a consumer's view of the chassis: how
 to depend on it today, what it guarantees, what it does not, and which of
@@ -66,7 +79,85 @@ nothing in the chassis distributes jobs to workers.
 
 ## 2. Consuming today
 
-### 2.1 What is published
+### 2.0 The 0.2.0 candidate and its compatibility boundary
+
+All nine inherited chassis versions and internal requirements are 0.2.0.
+Spec 039 B-1 permits a consumer-contract change only at a minor bump before
+1.0. This release carries the key-set, backup authentication, restore, and
+export API changes of 037; it is not a compatible patch to 0.1.0. The
+complete release proposal is [CHANGELOG.md](../../CHANGELOG.md#020-release-candidate-not-published).
+
+After all nine crates are published and `consumer-registry` passes for the
+new tag, the intended registry stanza is:
+
+```toml
+[dependencies]
+rahi-cli    = "=0.2.0"
+rahi-edge   = "=0.2.0"
+rahi-idp    = "=0.2.0"
+rahi-kernel = "=0.2.0"
+rahi-ledger = "=0.2.0"
+rahi-ops    = "=0.2.0"
+rahi-store  = "=0.2.0"
+rahi-types  = "=0.2.0"
+
+[dev-dependencies]
+rahi-harness = "=0.2.0"
+```
+
+This is a prospective stanza, not a claim that crates.io resolves it now.
+Use the same release for every chassis dependency. Before publication, a
+consumer can pin the actual preparation commit over git or test locally
+staged `.crate` artifacts. Neither route passes published-only acceptance.
+Third-party dependencies stay registry-sourced; hiqlite remains locked to
+0.14.0. Consumer lockfiles resolve independently and need their own checks.
+
+The upgrade boundary is explicit:
+
+- New first boots and exported key sets include `backup_passkey.json`, bound
+  to the intended public origin. `first-boot --export` requires
+  `RAHI_PUBLIC_URL`; Rust callers pass an `EnvReader` to `first_boot::export`.
+  A container export uses `--entrypoint /usr/local/bin/rahi` to reach that
+  verb. The backup account is passkey-only and satisfies rauthy's MFA.
+- Old key sets are not silently upgraded. They can start with a supervisor
+  warning, but `backup` refuses without a usable backup passkey. Re-running
+  first boot on existing keys does not add it. There is no automatic key-set
+  migration, cross-origin re-enrollment, or safe replacement-key procedure
+  in this release. An old archive does not gain a missing credential.
+- N=1 recovery is proven at the same origin and ports with matching keys
+  and rauthy registration. Restoring at another origin is not covered.
+  The restore marker records application of the exact snapshot after child
+  health; missing pending files fail closed. Old markers without the applied
+  field are pending, not proof that their contents are usable.
+- Each store's backup has its own bounded freshness guarantee, with a
+  120-second default deadline. A rapid second backup may wait about a minute.
+  The two snapshots do not establish one cross-store evidence head. The
+  archive envelope and chain format are unchanged, but the key payload and
+  restore behavior have changed. No rollback or old-binary compatibility
+  across these changes has been established.
+- The `Cell` trait, schema version `1.0.0`, exit codes, and production bearer
+  audience validation are unchanged. Manifest evolution, native-client
+  changes, runtime identity, and deployment epochs remain drafts 036, 038,
+  040, and 041, with no approval implied by this release.
+
+Two independent limitations constrain adoption. Published hiqlite 0.14.0
+has the stale lease release defect after TTL takeover; full-node restart
+followed by a second lease is unverified. Ledger ID/content classification
+looks only at resident records, so retry after sealing can append a duplicate
+ID even when chain verification passes (013 D-5, 014 sealing). Atomic
+lifetime idempotence and migration/backfill need a separately governed
+design, including unavailable-history handling. Neither limitation is fixed
+by 037 or 0.2.0, and aicortex must not adopt it as such. Section 5.1's journal
+recommendation does not establish these missing guarantees.
+
+Publication still requires the annotated tag on tested main, all nine
+crates, the tag and registry consumer jobs, both architecture images,
+anonymous pulls, and the published-image walkthrough. The earlier merged
+037 checks cited in the changelog are inherited evidence, not new-release
+acceptance. The existing Kubernetes target remains 0.1.0; neither this PR
+nor artifact publication changes that target or proves a consumer rollout.
+
+### 2.1 What was published at 0.1.0 (historical)
 
 **Verified** on 2026-09-16 (`git ls-remote`, `gh run view`, crates.io API),
 revising the 2026-09-11 reading that found nothing published:
@@ -86,7 +177,7 @@ Pin the version. The images are the one part still gated on an owner step,
 so a consumer building a cell from the crates is unblocked and a consumer
 pulling the runtime image is not.
 
-### 2.2 The dependency stanza
+### 2.2 The 0.1.0 dependency stanza (historical proof)
 
 **Verified** on 2026-09-16 by `consumer-registry` in the `v0.1.0` run: a
 consumer cell outside this workspace, with its own manifest and one
@@ -128,7 +219,8 @@ lists the other chassis crates and not this one cannot compose a cell.
 `rahi-idp` is needed only for `Authenticated`, `RequireScope`, and the
 bearer layers.
 
-Constraints, all **Verified**:
+Historical constraints **verified on 2026-09-11**, before publication;
+the no-tag and packaging blockers below were superseded by 039:
 
 - rustc 1.96 or newer and edition 2024 (`rust-version = "1.96"`; 1.95
   refuses).
@@ -253,6 +345,13 @@ test and runs it in CI.
 
 ### 2.5 Packaging an out-of-tree cell
 
+**Current:** spec 039 supplies `rahi-runtime` with the pinned rauthy,
+entrypoint, non-root user, and static directory. A consumer adds its binary
+at `/usr/local/bin/rahi` and assets at `/usr/local/share/rahi/static`.
+`RAHI_STATIC_DIR` selects that directory. Use 0.2.0 only after publication
+and verification of its image digest and anonymous availability. The
+following is the pre-039 observation, preserved as historical evidence.
+
 **Verified** (`docker/Dockerfile`). The image recipe builds a package of
 *this* workspace (`COPY . .`, `cargo build -p $RAHI_PACKAGE`), so a cell
 in another repository writes its own Dockerfile today. It needs three
@@ -341,6 +440,13 @@ teaching `verify!` to flag raw use. It is a breaking change to `AppState`
 and to every cell, so it waits for a release line (spec 039).
 
 ## 5. What the chain records, and when a record can be lost
+
+**Current qualification:** the shutdown and replica-ID findings below
+predate 035 and were corrected in 0.1.0: shutdown drains within a bound,
+loss counters distinguish causes, and IDs include the replica node.
+This does not provide lifetime ID uniqueness across sealed history.
+The independent archived-retry limitation in section 2.0 remains in 0.2.0.
+The following dated findings preserve the evidence that motivated 035.
 
 **Verified** (`crates/rahi-kernel/src/lib.rs`, `adjudicate.rs`,
 `crates/rahi-edge/src/obs/mod.rs`, spec 015 B-6, D-5, D-7):
