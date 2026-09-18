@@ -154,6 +154,57 @@ design, including unavailable-history handling. Neither limitation is fixed
 by 037 or 0.2.0, and aicortex must not adopt it as such. Section 5.1's journal
 recommendation does not establish these missing guarantees.
 
+The second of those limitations now has an approved design, spec 042, and an
+approved specification is not a capability. **042 is `status: approved` and
+`implementation: pending`: no code implements it, no release contains it, and
+nothing in 0.1.0 or 0.2.0 behaves as it describes.** A consumer must keep
+treating lifetime ID uniqueness across sealed history as absent.
+
+The owner's decisions were taken on 2026-09-18 and are recorded in the spec as
+D-1 to D-7; the approval flip was taken in the same governed change. Approval
+fixes the design and its acceptance criteria. It is not a schedule and not a
+release: the spec is built when a build session takes it, in the order D-5
+sets (036, then 042, then 038), and a consumer's plan changes only when a
+release says so.
+
+Five properties of the approved design matter to a consumer:
+
+- Adopting it would be a **stop-the-world upgrade**, not a rolling one,
+  because a chain sealed before it carries none of the state it needs. The
+  cutover is operationally guaranteed and not enforced: no store version
+  check fences it in either direction, and implementing spec 036 does not
+  change that, because 036's check runs in the new binary and so stops
+  neither an older binary nor a replica already running.
+- A cell whose sealed history has not been reindexed would **refuse to
+  start**, and the owner has declined an override: there is no
+  `--allow-uncovered` and no other flag or environment variable that starts
+  normal service on incomplete historical coverage. Diagnosis, export and
+  repair stay available on such a chain. A chain whose archive has
+  permanently lost a segment body cannot be proven covered and therefore
+  cannot serve; recovering from that state is reserved as a separate decision
+  and is explicitly not solved by starting the cell anyway.
+- The guarantee is exactly-once **append**, never exactly-once **delivery**.
+  A consumer's own side effects still need the consumer's own idempotency
+  record and cannot be driven from the chassis's return value.
+- It would add one **permanent resident row per decision**, estimated at
+  about 400 bytes per decision on every replica and carried in every
+  snapshot, backup, restore and cluster join. That figure is an estimate
+  until the spec's own measurement test runs; what the spec's acceptance
+  binds is a ceiling of 800 bytes per decision, twice the estimate, so a
+  consumer sizing conservatively should size against 800 rather than 400. No supported lifetime-decision
+  ceiling is declared: 10^5 to 10^7 is the range the arithmetic was aimed at,
+  not a capacity the chassis has verified, and nothing states what a cell
+  does at or past any figure. A consumer sizing a cell must count **every**
+  append to the chain, kernel denials included, not only its own governed
+  acts; a denial stream is driven by traffic the operator does not control.
+- A chain that already contains duplicate IDs would be **served with per-ID
+  containment**: lookup of an affected ID answers ambiguous with every copy,
+  appends under it are refused, the evidence is preserved and reported, and
+  the rest of the chain works. Indexing a duplicate records evidence and does
+  not repair, resolve or deduplicate it; no copy is selected as the winner
+  and no history is rewritten. A consumer must not read a covered chain as a
+  clean one.
+
 Publication still requires the annotated tag on tested main, all nine
 crates, the tag and registry consumer jobs, both architecture images,
 anonymous pulls, and the published-image walkthrough. The earlier merged
@@ -502,7 +553,9 @@ and to every cell, so it waits for a release line (spec 039).
 predate 035 and were corrected in 0.1.0: shutdown drains within a bound,
 loss counters distinguish causes, and IDs include the replica node.
 This does not provide lifetime ID uniqueness across sealed history.
-The independent archived-retry limitation in section 2.0 remains in 0.2.0.
+The independent archived-retry limitation in section 2.0 remains in 0.2.0,
+and the approved 042 design for it is unimplemented in every released
+version.
 The following dated findings preserve the evidence that motivated 035.
 
 **Verified** (`crates/rahi-kernel/src/lib.rs`, `adjudicate.rs`,

@@ -180,6 +180,45 @@ credentials' provisioning (031, 032).
   thirty-one records, two seals, and eleven resident, which is not the
   outcome FR-001 states. The test is written the first way.
 
+- **D-7 (2026-09-18, owner decision; clarifies the summary and Purpose, and
+  carves out spec 042).** This spec's summary says an unbounded audit history
+  cannot live in the replicated store, and its Purpose says unboundedness is
+  a property only of the tail. Read as written, that rules out any table in
+  the replicated store that grows one row per decision forever, which is what
+  spec 042 B-1 adds for lifetime idempotence. The owner records the
+  distinction rather than leaving the two specs in tension.
+
+  What this spec keeps out of the replicated store is unbounded *history*:
+  the decision bodies, which carry the payload, the reason, the signature and
+  the public key, and whose size is set by what an application writes. Those
+  still leave the hot table at every seal and still live only in the archive,
+  and nothing in 042 returns a body to residency. What 042 adds is bounded
+  per-decision *identity evidence*: a narrow fixed-shape row naming an id,
+  two hashes and a nullable third, plus one row per duplicate copy and one
+  counter row per segment. It is a permanent resident cost and this decision
+  accepts it as a carve-out from the sentence above, for the reason 042's
+  Purpose gives: with the body archived and no resident trace of the id, the
+  chain cannot tell a retried append from a new one, so a lost acknowledgement
+  writes a second record under the same id and full verification still passes.
+  Evidence that an id was spent is the minimum residency that closes that,
+  and 042 B-9 prices it and rejects the bounded alternatives one by one.
+
+  The carve-out is narrow and this decision states its edges. It licenses
+  identity evidence only: nothing here permits a decision body, a payload, a
+  reason or a signature to stay resident past its seal, and B-1 to B-6, the
+  functional requirements and AC-1 are untouched, as is this spec's
+  `implementation: complete`. The figures 042 B-9 gives are estimates until
+  its AC-9 measures them, and neither spec declares a supported
+  lifetime-decision ceiling: a limit needs a measurement and a defined
+  boundary behavior, and 042 D-2 records that it has neither yet. Growth is
+  counted over every append to the chain, kernel denials included, not only
+  over an application's own acts.
+
+  Recorded on the same day and in the same change as spec 042's D-2. Spec 042 is
+  approved in the same change and holds at `implementation: pending`; this
+  clarification authorizes no implementation and changes nothing this spec
+  requires.
+
 ## Verification
 
 ```verify:cli

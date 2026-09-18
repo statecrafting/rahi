@@ -70,7 +70,11 @@ boot, key generation, and supervision (031) are modules added to
   Router; fn operator_routes(state) -> Router { empty } }`. `rahi_cli::run
   (cell)` parses argv: `serve`, `preflight`, `migrate`, `backup`, `restore
   <archive>`, `ledger verify [--full]`, `ledger export <path>`, `supervise`
-  (031), `first-boot` (031). Exit codes are `rahi_types::Error::exit_code`.
+  (031), `first-boot` (031), `ledger reindex <archive>` (042). Exit codes are
+  `rahi_types::Error::exit_code`. A verb annotated with an ordinal is
+  established by that spec and enters the binary when that spec lands;
+  `ledger reindex` is the only mutating verb under `ledger`, and D-9 records
+  why it is a verb rather than a flag on `ledger verify`.
 - **B-2 (serve).** Load config, open the store, open the ledger (fatal on
   integrity), boot the kernel with the manifest hash, build the edge with
   the idp routes and the cell's routes, listen on the configured address.
@@ -125,8 +129,30 @@ boot, key generation, and supervision (031) are modules added to
 
 - **AC-1.** `cargo test -p rahi-ops --locked` and `cargo test -p rahi-cli
   --locked` pass.
-- **AC-2.** `cargo run -p rahi-cli -- --help` lists exactly the verbs of
-  B-1.
+- **AC-2.** `cargo run -p rahi-cli -- --help` lists exactly the **required
+  verb set**, and no other. The required set is derived from B-1's argv list
+  and the corpus lifecycle, never from what the binary happens to parse: it
+  is every entry B-1 carries with no ordinal annotation, plus every entry
+  annotated with the ordinal of a spec whose `implementation` is `complete`,
+  plus every entry annotated with the ordinal of the spec the change under
+  test is implementing. An entry annotated with any other ordinal must be
+  absent, and an entry B-1 does not carry at all must be absent. So the help
+  is complete for the binary that prints it rather than for a corpus that has
+  not shipped, while a verb that ought to be there and is not is a failure
+  rather than a definition.
+
+  `rahi_cli::VERBS` is the declaration of that required set and is what the
+  test compares the help against. `VERBS` is therefore itself under test: a
+  verb the required set contains and `VERBS` omits is an AC-2 failure, not a
+  redefinition of the criterion, and the test must assert `VERBS` against the
+  required set rather than take it as given. Extending `VERBS` is part of
+  landing the spec that adds the verb (D-9).
+
+  Today the required set has nine members: B-1's seven unannotated entries
+  plus `supervise` and `first-boot`, whose spec 031 is `complete`. `ledger
+  reindex` is annotated `(042)`, whose implementation is `pending`, so it is
+  excluded today and joins as the tenth in the change that implements spec
+  042, and not before.
 
 ## 6. Out of scope
 
@@ -241,6 +267,47 @@ where archives land in a cluster (032).
   `Error::Stale` (exit 2) on purpose: like a store behind on migrations,
   a follower is a node that cannot proceed from where it is, and the
   message names where to go.
+
+- **D-9 (2026-09-18, owner decision; amends B-1's argv list and AC-2).**
+  B-1's list gains `ledger reindex <archive>`, established by spec 042 B-8,
+  and AC-2 is reworded so that `--help` is judged complete for the binary
+  that prints it rather than for a corpus that has not shipped.
+
+  The alternative was to express the operation as `ledger verify --reindex
+  <archive>`, a flag on a verb B-1 already names, which would have amended
+  nobody and is the resolution the coherence guard prefers when a mechanism
+  honors both texts. The owner rejects it: `ledger verify` is the read-only
+  check an operator reaches for while diagnosing an incident, `reindex`
+  writes to the store, and a mutating repair must not be reachable by
+  mistyping a flag on a diagnostic. The cost is this amendment to a
+  `complete` spec, taken by the owner rather than by a build session, and
+  taken narrowly: no behavior of any existing verb changes, no functional
+  requirement changes, AC-1 is untouched, and this spec's implementation
+  stays complete.
+
+  The AC-2 rewording repairs a drift this spec already carried rather than
+  one 042 introduced. B-1 has annotated `supervise` and `first-boot` with
+  `(031)` since this spec was written, so "exactly the verbs of B-1" was
+  already a claim about a set the binary did not hold until 031 landed,
+  while the test compared the help against `rahi_cli::VERBS`.
+
+  The rewording derives the expected set from B-1's text and each annotated
+  spec's `implementation` field, plus the spec the change under test is
+  implementing, and never from the binary. That ordering matters: an earlier
+  draft of this decision said the help lists the verbs of B-1 "that the
+  binary implements", which would have made the criterion unfalsifiable,
+  since a verb accidentally left out of the parser would have left itself out
+  of the expected set too. `VERBS` is the declaration of the required set and
+  is asserted against it, so it can no longer define a missing verb away. The
+  arithmetic is unchanged by the tightening: the required set is nine today,
+  because 031 is `complete` and 042 is `pending`, and becomes ten in the
+  change that implements 042. `--help` lists nine today and AC-2 holds, as it
+  held before this amendment.
+
+  Recorded on the same day and in the same change as spec 042's D-1, which
+  states the owner's reasoning from 042's side. Spec 042 is approved in the same
+  change and holds at `implementation: pending`; this amendment authorizes no
+  implementation and changes nothing this spec requires.
 
 ## 8. Status
 
