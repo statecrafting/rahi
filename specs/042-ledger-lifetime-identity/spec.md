@@ -1167,7 +1167,11 @@ implementation: it stays `draft` and `implementation: pending`.
   contains known duplicate ids, with containment per affected id: `lookup`
   of such an id answers `Ambiguous` carrying every copy, `append` of it is
   `Error::Conflict`, every copy's evidence is preserved, and the condition is
-  visible in `coverage()`, `ledger verify`, the reindex report and the logs.
+  visible in `identity_totals()`, `ledger verify`, the reindex report and the
+  logs. It is deliberately not visible in `coverage()`: a collision does not
+  make a segment uncovered (B-7 counts records, and every copy beyond the
+  first is a counted collision row), which is exactly what lets `serve` start
+  on such a chain.
   Refusing the whole cell was the alternative and is rejected: the duplicate
   is unrepairable history, so the refusal would be permanent and would punish
   every other id for two records written years earlier. Two constraints ride
