@@ -100,13 +100,16 @@ entrypoint (031), and the migration Job (032). Two new test files.
 - **B-2 (the transition record).** A decision of kind
   `manifest.transition` whose payload carries `from` (the current manifest
   hash), `to` (the adopted one), `model` (the adopted manifest's canonical
-  JSON, the bytes its hash is computed over, when it fits
-  `ledger.max_record_bytes`; otherwise its hash and the text travels in
-  `note`), `schema_version` (the store's, after the deploy's migrations),
-  `binary` (the rahi version and the cell's `contract.version`), and
-  `actor` (the operator's `sub`, or `system:deploy`). It is appended
-  through `Ledger::append`, synchronously, and is CAS-protected like every
-  record (013 B-3).
+  JSON, the bytes its hash is computed over), `schema_version` (the
+  store's, after the deploy's migrations), `binary` (the rahi version and
+  the cell's `contract.version`), and `actor` (the operator's `sub`, or
+  `system:deploy`). The manifest is retained whole or the adoption is
+  refused: there is no truncated model, no overflow into a second field,
+  and no hash-only record. D-6 states the serialization the size is
+  measured over, the bound it is measured against
+  (`ledger.max_record_bytes`), where the measurement happens, and what the
+  refusal is. It is appended through `Ledger::append`, synchronously, and
+  is CAS-protected like every record (013 B-3).
 - **B-3 (adoption is a deploy step).** `rahi migrate --adopt-manifest`
   applies the cell's migrations and then, on the leader, appends a
   transition when the booted manifest differs from the chain's current
@@ -185,6 +188,13 @@ entrypoint (031), and the migration Job (032). Two new test files.
 - **FR-005.** A restore test refuses a newer non-additive archive and an
   unadopted manifest before writing anything, and accepts both with the
   conditions B-9 names.
+- **FR-006.** A ledger test builds the transition record for a manifest
+  whose measured record is exactly `ledger.max_record_bytes` and asserts it
+  is admitted, and for one a single byte over and asserts `Error::Validation`
+  naming the measured size and the bound. An ops test runs
+  `migrate --adopt-manifest` against an oversized manifest and asserts exit
+  1, that `schema_version` did not move, and that the chain gained no
+  record.
 
 ## 5. Acceptance criteria
 
@@ -195,6 +205,14 @@ entrypoint (031), and the migration Job (032). Two new test files.
   with no transition verifies byte for byte as before this spec.
 - **AC-3.** `docs/design/01-consumer-contract.md` section 7 is replaced by
   the procedure below, and `deploy/README.md` names the flag.
+- **AC-4 (the size boundary, D-6).** A manifest whose measured transition
+  record is at most `ledger.max_record_bytes` is adopted with its `model`
+  intact, and the appended record's stored bytes are no longer than the
+  measure the preflight took. A manifest one byte over is refused with
+  `Error::Validation` (exit 1) whose message names the measured size, the
+  bound, and `ledger.max_record_bytes` as the setting that carries it; the
+  run applies no migration, appends no record, and leaves the chain's
+  current manifest where it was.
 
 ### The worked consumer example
 
@@ -290,6 +308,71 @@ record shows what was asked as well as what was answered.
   a bad signature, or a fork remains `Error::Integrity` and remains fatal
   at boot (constitution XI). Verification is being re-anchored, never
   relaxed.
+
+- **D-6 (2026-09-18, owner decision; the oversized manifest is refused,
+  never reduced).** D-2 reserved the bounded reference or failure path for
+  a manifest whose transition record does not fit, and required this spec
+  to state it before implementation rather than decide it at the keyboard.
+  The owner decides a bounded **failure** policy, and B-2 is reconciled
+  with it above: the transition retains the canonical manifest when the
+  complete serialized record fits `ledger.max_record_bytes`, and otherwise
+  adoption is refused with `Error::Validation`, a diagnostic naming the
+  size and the bound, and no transition appended. The manifest is never
+  truncated, never moved into a second field, never written to storage
+  outside the chain, and never silently reduced to hash-only evidence. A
+  cell that outgrows its own `ledger.max_record_bytes` raises that bound in
+  its manifest, which is itself a manifest change and so is adopted through
+  the same step. Alternatives rejected: a `note` overflow field, which
+  splits one record's evidence across two places an auditor must reassemble;
+  external storage, which puts the evidence somewhere the chain cannot
+  commit to; and a silent hash-only fallback, which is the outcome D-2
+  already rejected, arrived at by accident instead of by choice.
+
+  *The serialization the size is measured over.* The measure is the byte
+  length of the record's canonical JSON, `SignedRecord::to_canonical_json`:
+  the whole signed record, envelope and signature and public key together,
+  key-sorted at every depth. That string is exactly what the `record`
+  column stores and exactly what one line of `ledger export` carries, so
+  the bound is measured over the bytes the chain actually holds rather than
+  over the payload alone. `model` inside it is the manifest's own canonical
+  JSON, the first half of what `Manifest::hash` digests (015 B-2), carried
+  as a JSON string so that the model the record retains and the bytes the
+  hash was taken over are the same bytes.
+
+  *What is measured before the append, and how it is made deterministic.*
+  Two fields of the record are not final until `Ledger::append` chains it:
+  `previous_record_hash`, whose length is fixed at 71 characters for every
+  hash this chain admits (013 B-1), and the envelope's `timestamp`, which
+  is `revision:<n>`. The measurement therefore runs against a candidate
+  record built with a placeholder parent of that fixed length and with `n`
+  widened to the largest `u64`, so the measure is an upper bound that can
+  exceed the appended record only by the decimal digits the revision did
+  not need. A manifest within a few bytes of the bound can be refused when
+  the record would in fact have fitted; that direction is the safe one and
+  is the price of a preflight that never passes something the append then
+  refuses.
+
+  *Where it runs, and what that guarantees.* `migrate --adopt-manifest`
+  takes the measure **before** it applies any migration, because every
+  field the record carries is known at that point: `from` and `to` from the
+  chain and the booted manifest, `model` from the booted manifest,
+  `schema_version` from the cell's own migration list (the value the
+  store's `schema_version` will hold once this run has applied them),
+  `binary` from the build, and `actor` from the invocation. So the
+  guarantee is exact: when the manifest is oversized, the run exits 1 with
+  nothing applied and nothing appended, and the store and the chain are
+  byte-for-byte as they were. When the preflight passes, the append cannot
+  afterwards be refused for size.
+
+  What the preflight does not guarantee is that the append succeeds. It can
+  still lose the compare-and-swap past `APPEND_ATTEMPTS` (013 B-3), meet a
+  store failure, or find the chain damaged, and each of those keeps its own
+  error and its own exit code. It can also find, at the moment it reads the
+  head, that another deploy step already adopted the same manifest, which
+  B-3 answers by appending nothing and saying so. The size check is
+  additionally kept on the append path itself, so a caller that builds a
+  transition without going through the verb still cannot write a record
+  past the bound.
 
 ## Verification
 
