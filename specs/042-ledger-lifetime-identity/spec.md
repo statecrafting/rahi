@@ -134,11 +134,14 @@ lands this spec. `docs/` is in the coupling gate's bypass floor, so that edit
 needs no edge; the `references` edge above records the dependency in the
 other direction.
 
-Two things this spec's Territory deliberately does not contain, because they
-belong to owners it may not amend: spec 030 B-1's verb list, which does not
-name `ledger reindex` (D-required-1), and spec 014's rationale that the
-replicated store holds no history that grows without bound (D-required-2).
-Section 8 states both.
+Two things this spec's Territory still does not contain, because they belong
+to owners it may not amend: spec 030 B-1's verb list and spec 014's rationale
+that the replicated store holds no history that grows without bound. Both now
+carry an amendment for this spec, and neither is this spec's work: the owner
+took them as D-1 and D-2, each edit is recorded as a dated decision in the
+spec that owns it, and the change that lands them is the same change that
+records the decisions here. A build session implementing 042 amends neither
+further.
 
 ## 3. Behavior
 
@@ -146,7 +149,9 @@ Section 8 states both.
   `Ledger::open` as the chassis's own baseline rather than an application
   migration, for the reason spec 013 D-4 gives for `kernel_decisions`: the
   shape is fixed here, no app versions it, and a boot that found no table
-  could not tell an empty chain from a deleted one.
+  could not tell an empty chain from a deleted one. D-6 settles this against
+  the non-additive-migration alternative and B-13 states exactly what the
+  choice does and does not fence.
   - `kernel_decision_identity (id TEXT PRIMARY KEY, identity_digest TEXT NOT
     NULL, record_hash TEXT NOT NULL, segment_hash TEXT NULL)`, with
     `INDEX kernel_decision_identity_segment (segment_hash)`, which every
@@ -317,19 +322,30 @@ Section 8 states both.
   the sealed half is one row per segment. A segment with no counter row, or
   a counter below its header's `count`, is uncovered: it was sealed by a
   binary that does not stamp, or a reindex over it has not finished.
-  - `Ledger::coverage() -> Coverage` reports the uncovered segment hashes,
-    the count of resident records that are not accounted for (no identity row
-    and no collision row naming them), the identity row count, and the
-    collision count, and reads through the leader
-    (`query_consistent`, spec 011 B-3) because it is the input to a refusal.
-  - It is evaluated at `open`, by `Ledger::recheck_coverage()`, and by
-    `rahi ledger verify` and `rahi preflight`. It is **not** evaluated per
+  - `Ledger::coverage() -> Coverage` reports the verdict and only the
+    verdict: the uncovered segment hashes, and the count of resident records
+    that are not accounted for (no identity row and no collision row naming
+    them). Both are answerable from the hot window and one metadata row per
+    segment, so the verdict costs nothing that grows with the identity table,
+    and it reads through the leader (`query_consistent`, spec 011 B-3)
+    because it is the input to a refusal.
+  - The identity row total and the collision total are deliberately **not**
+    part of that verdict. Counting either is a lifetime aggregate over a
+    table that grows one row per decision, and the boot path may not pay it
+    (AC-10). `Ledger::identity_totals()` answers them separately, and only
+    `rahi ledger verify` and `rahi preflight` call it: they are operator
+    commands run on demand, where an aggregate proportional to the chain is
+    the honest price of the number the operator asked for. Nothing on the
+    boot path or the append path calls it.
+  - The verdict is evaluated at `open`, by `Ledger::recheck_coverage()`, and
+    by `rahi ledger verify` and `rahi preflight`. It is **not** evaluated per
     append: a leader round trip inside every append would make the audit
     path the slowest path in the cell. `append` reads a cached verdict that
     `open` and `recheck_coverage` set, and that only this node's own
     observations can move (B-11).
-  - `rahi ledger verify` prints all four numbers at both depths, and nothing
-    consults the archive to compute any of them.
+  - `rahi ledger verify` prints all four numbers at both depths, the two
+    verdict numbers and the two totals, and nothing consults the archive to
+    compute any of them.
 - **B-8 (reindex closes a chain sealed before this spec, or says why it
   cannot).** `Ledger::reindex(&dyn Archive) -> ReindexReport` walks the
   uncovered segments from the newest backwards. For each one it fetches the
@@ -410,7 +426,7 @@ Section 8 states both.
   measurement, and is written so that the spec can only be wrong about this
   cost in a way the suite catches.
 
-  | decisions | identity state, one replica | at spec 032's N=3 |
+  | decisions | identity state, one replica (estimated) | at spec 032's N=3 (estimated) |
   |---|---|---|
   | 100,000 | about 40 MB | about 120 MB |
   | 1,000,000 | about 400 MB | about 1.2 GB |
@@ -425,16 +441,33 @@ Section 8 states both.
   than the table does, but the disk, the snapshot and the join transfer grow
   by the full figure.
 
-  *Expected growth, and the regime this design is sized for.* The rate is one
-  row per appended decision and nothing ever removes one. A cell appending
-  one decision per second reaches about 31.5 million rows and about 12.6 GB
-  per replica per year, which this design does not carry. A cell whose chain
-  records governed acts (denials, admin decisions, lifecycle and erasure
-  events, manifest transitions) rather than a row per request lands in the
-  10^5 to 10^7 range over its life, which it does carry. That boundary is a
-  real limit of this design and not a tuning knob: above roughly 10^7
-  lifetime decisions per cell the resident cost stops being narrow, and
-  D-required-2 is the place that question is decided rather than discovered.
+  *Expected growth, and the regime these estimates were sized against.* The
+  rate is one row per appended decision and nothing ever removes one, and
+  **every** append to the chain takes a row, not only the ones a consuming
+  application initiates. A cell's lifetime row count is the sum of its kernel
+  denials (spec 015 B-5, and spec 035, which makes a denial survive a
+  shutdown rather than be dropped), its manifest transitions (spec 036 B-2),
+  its deployment epochs (spec 041), its genesis record, and the application's
+  own governed acts. A sizing that counts only the application's decisions
+  undercounts, and on a cell under attack or misconfiguration the denial
+  stream is the term that dominates: denials are driven by traffic the
+  operator does not control, so the row count is not bounded by the
+  application's own act rate. A cell appending one decision per second
+  reaches about 31.5 million rows and about 12.6 GB per replica per year on
+  the estimates above. A cell whose chain records governed acts rather than a
+  row per request lands in the 10^5 to 10^7 range over its life, and that is
+  the range these estimates were aimed at.
+
+  *No ceiling is declared, and D-2 says why.* A supported limit needs a
+  measurement and a defined boundary behavior, and this spec has neither yet.
+  AC-9 supplies the measurement. What a cell does as it approaches or passes
+  whatever figure that measurement supports (refuse, warn, evict, compact,
+  or nothing) is undefined here and is not decided by this spec. So 10^7 is
+  where the arithmetic was aimed and never a tested limit: nothing in this
+  spec makes 10^7 + 1 behave differently from 10^7, and no acceptance
+  criterion asserts a ceiling. A consumer sizing a cell reads the table as
+  arithmetic to check against its own total append rate, including denials,
+  not as a capacity the chassis has verified.
 
   *Lookup and coverage cost.* The append path gains one row insert and two
   index insertions inside the transaction it already runs: no extra Raft
@@ -460,8 +493,10 @@ Section 8 states both.
   false positives would refuse ids that were never used. `rahi ledger verify`
   reports the row count so the growth is visible to the operator who is
   paying for it. Whether that growth is compatible with spec 014's stated
-  reason for existing is an owner's question, not this spec's: section 8
-  states it.
+  reason for existing was an owner's question and is now answered: D-2
+  accepts permanent resident identity and collision evidence while the
+  decision bodies themselves stay archived, and spec 014 carries the narrow
+  clarification that records the carve-out.
 - **B-10 (a chain this spec cannot vouch for does not append, and says so at
   the boot).** `Ledger::open` computes coverage after its backfill.
   Incomplete coverage is `Error::Stale` (exit 2) naming the uncovered segment
@@ -494,12 +529,19 @@ Section 8 states both.
   stops recording, which constitution XI calls worse than a cell that is
   down.
 
-  The cost of this refusal has a floor the owner should see plainly: a chain
-  whose archive has permanently lost a body can never be covered, so under
-  this behavior alone it can never serve again. Reindex will keep reporting
-  that segment uncovered by cause `NotFound` forever, which is honest and is
-  also unrecoverable. That case is the strongest argument for the escape
-  hatch D-required-3 puts to the owner, and this spec does not decide it.
+  The cost of this refusal has a floor, and D-3 accepts it deliberately: a
+  chain whose archive has permanently lost a body can never be covered, so
+  it never serves again under this spec. Reindex keeps reporting that segment
+  uncovered by cause `NotFound`, which is honest and is also unrecoverable
+  here. This spec ships no `serve --allow-uncovered` and no other override:
+  normal service refuses incomplete historical coverage, because starting a
+  cell whose new audit entries cannot be proven unique is not a substitute
+  for recovering the evidence that is missing. What stays available on such a
+  chain is diagnosis, export and repair: `ledger verify`, `ledger export` and
+  `ledger reindex` all open through B-15, all work, and all print the
+  uncovered count. Recovering a chain whose legacy archive evidence is
+  permanently gone is a separate recovery decision the owner has reserved
+  (section 8), not a flag this spec adds.
 - **B-11 (the append backstop).** Coverage can still degrade under a running
   cell, because a replica on a binary that does not stamp can append an
   unstamped record after this node booted. So `append` keeps a backstop
@@ -541,8 +583,8 @@ Section 8 states both.
   `Ambiguous` carrying every copy and never `Resident`, `Sealed` or
   `Absent`; `append` of a colliding id is `Error::Conflict` naming every
   copy, because no retry can be verified against a history that spent the id
-  twice; `coverage()` counts the collisions and `rahi ledger verify` prints
-  them and exits 1 (`Error::Conflict`, spec 030 B-1's mapping); and
+  twice; `identity_totals()` counts the collisions and `rahi ledger verify`
+  prints them and exits 1 (`Error::Conflict`, spec 030 B-1's mapping); and
   `reindex` exits non-zero when it recorded one, so no operator is told the
   repair succeeded on a chain that contradicts itself (B-8).
 
@@ -552,13 +594,23 @@ Section 8 states both.
   copy beyond the first is a collision row carrying its segment's hash, and
   the counter recomputed by B-5's last statement counts identity and
   collision rows together, so a segment holding a twice-spent id reaches its
-  header's `count` exactly. Ambiguity also cannot be repaired by
-  any amount of reindexing, because the duplicate is history. So an
-  ambiguous chain reaches complete coverage, `serve` starts on it, and the
-  containment is per id: every colliding id refuses its own appends and
-  answers `Ambiguous`, while the rest of the chain works. Whether that is the
-  right trade, or whether ambiguity should also stop the cell, is the second
-  half of D-required-3. `verify_chain` at either depth still passes: a
+  header's `count` exactly. So an ambiguous chain reaches complete coverage,
+  `serve` starts on it (D-4), and the containment is per id: every colliding
+  id refuses its own appends and answers `Ambiguous`, while the rest of the
+  chain works.
+
+  Indexing a duplicate is evidence, not repair, and D-4 binds the vocabulary
+  as well as the mechanism. Writing a collision row records that history
+  spent an id twice; it does not repair, resolve, correct, deduplicate, or
+  reconcile anything, and no verb, report field, log line, or crate
+  documentation in this spec may say that it does. Nothing here selects a
+  winner: the identity row that stands is whichever the walk reached first,
+  it is never reported as the decision, `lookup` refuses to answer with it,
+  and no code path prefers one copy of a colliding id over another. Nothing
+  here rewrites history either: no archived byte is written, no identity row
+  is redirected, and no row of either table is ever deleted. The duplicate
+  survives every reindex, every restart, and every later binary, because it
+  is what the chain actually contains. AC-6 asserts both halves. `verify_chain` at either depth still passes: a
   duplicated id is not a broken link, and this spec does not change what spec
   013 and 014 mean by an intact chain. Resolving a collision is an owner's
   act on the consuming application's own terms and is out of scope here.
@@ -616,18 +668,46 @@ Section 8 states both.
   that `ledger verify` prints and exits non-zero on. That is a strictly
   smaller claim than "a refusal rather than a wrong answer", and it is the
   one the mechanism supports. A mixed-version cluster is out of scope
-  (section 6) and no guarantee is offered across one; what is offered is
-  that the cost of violating the procedure is a detectable, bounded,
-  repairable ambiguity rather than an undetected one.
+  (section 6) and no guarantee is offered across one. The ambiguity such a
+  violation writes is neither bounded nor repairable, and this spec claims
+  neither word: its size is however many ids the old writer duplicates before
+  it is stopped, which nothing in the store limits, and no reindex, no verb,
+  and no later binary removes a duplicate that is already history. What the
+  violation costs is permanent per-id containment (B-12) on every id it
+  touched. Detection is worth having because the alternative is the same
+  damage unseen, not because it undoes any of it.
 
-  *What can enforce the next one.* Spec 036 B-8 makes `serve` refuse a store
-  that is ahead of the binary across a non-additive migration, and B-10
-  refuses an old image after a manifest transition. Both are checks in the
-  *new* binary, so neither helps against 0.1.0, but once 036 has shipped, a
-  later downgrade past this spec can be fenced by shipping the identity
-  tables as a migration declared non-additive instead of as baseline DDL.
-  Making that the cutover mechanism means building 036 first; D-required-4
-  puts the ordering to the owner and recommends it for exactly this reason.
+  *The DDL mechanism, chosen and priced (D-6).* The identity tables ship as
+  chassis baseline DDL created by `Ledger::open` (B-1), not as a migration
+  declared non-additive. The alternative was rejected on mechanism rather
+  than taste: `schema_version` carries one numbered list and spec 030 B-4
+  fills it from `Cell::migrations()`, which is the application's, so putting
+  chassis ledger DDL there would make every app version a table B-1 says no
+  app versions; and the corpus establishes no chassis-owned numbered
+  migration lane to put it in instead. Creating one is a change to spec 011's
+  and spec 036's territory, which this spec may not make.
+
+  *What that choice protects against, stated exactly.* Baseline DDL writes no
+  `schema_version` row, so **no store version check fences this spec in
+  either direction**. Spec 030 B-2 refuses a store *behind* the binary and
+  says nothing about one ahead; spec 036 B-8 refuses a store ahead across a
+  non-additive migration, but the identity tables are not a migration, so 036
+  B-8 never sees them. The protection that exists is entirely inside a binary
+  that already carries this spec: B-10's gate at open, B-11's backstop on
+  append, and this behavior's detection. A binary without this spec has none
+  of it and can be given none.
+
+  Two consequences, stated rather than left for a reader to infer comfort
+  from. Implementing 036 fences nothing here: 036 B-8's check runs in the
+  *new* binary, so it cannot stop a pre-036 binary, which has no such check
+  at all, and it cannot stop a replica already running on an old image, which
+  re-evaluates nothing after it has booted. D-5 orders 036 before 042 for
+  reconciliation reasons (`Ledger::open`'s two refusals composing into one
+  message and one exit code, and building reindex against 036 B-5's final
+  segment header shape), never for a fencing claim. And if the owner later
+  wants a real version fence across this spec, it is a separate governed
+  change that must first establish a chassis-owned migration lane; section 6
+  puts it out of scope here.
 
   *What it costs.* Downtime is one full cluster stop plus one reindex: one
   archive fetch and one full-depth verification per uncovered segment, so it
@@ -848,13 +928,24 @@ Section 8 states both.
   exactly one identity row per id, `verify_chain` passes at both depths, and
   the counters equal the row counts they claim. Two reindexers over the same
   uncovered segment converge to the same rows and neither errors.
-- **FR-018 (coverage is cheap and never a per-append read, B-7).** A test
-  counts the leader reads issued across N appends on a covered chain and
-  asserts the count does not grow with N. A test asserts every
-  `kernel_decision_coverage` value equals the number of identity rows plus
-  collision rows carrying that segment hash, after a seal, after a reindex,
-  after an interrupted reindex, and over a segment holding a twice-spent
-  id.
+- **FR-018 (coverage adds no per-append leader read, B-7).** The quantity
+  under test is the *coverage-related* leader read, not every leader read.
+  `append` already reads the head consistently (spec 013 B-3) and this spec
+  neither adds to nor removes from that, so a test asserting that total
+  leader reads do not grow with N would assert something false about the
+  pre-existing append path and would fail for a reason this spec did not
+  cause. A test therefore counts, across N appends on a covered chain, only
+  the leader reads attributable to coverage (the reads `coverage()` issues
+  against `kernel_decision_coverage`, `kernel_decision_identity`,
+  `kernel_decision_collisions` and `kernel_segments`) and asserts that count
+  is zero for every N: `append` consults the cached verdict of B-7 and
+  nothing else, while the head read it already performed is unchanged in
+  count and in kind, which the same test asserts by comparing against a
+  baseline measured on the same fixture without this spec's tables in play.
+  A second test asserts every `kernel_decision_coverage` value equals the
+  number of identity rows plus collision rows carrying that segment hash,
+  after a seal, after a reindex, after an interrupted reindex, and over a
+  segment holding a twice-spent id.
 - **FR-019 (the repair open, B-15).** `append` and `append_once` on a handle
   from `open_for_repair` are `Error::Conflict` naming the gate, on a covered
   chain as well as an uncovered one, and no argument or environment variable
@@ -882,6 +973,9 @@ Section 8 states both.
   over FR-005's fixture exits 0 and reports complete coverage, and `rahi
   ledger verify` prints the uncovered segment count, the unstamped resident
   count, the identity row count, and the collision count at both depths.
+  `rahi --help` lists `ledger reindex <archive>` among the verbs of spec 030
+  B-1, which D-1 amended for it, and its one-line description names it as
+  mutating so no operator mistakes it for the read-only `ledger verify`.
 - **AC-3.** The committed `v0.1.0-sealed` fixture of FR-014, opened under
   this spec, reproduces the whole migration in one test run: `open` returns
   `Error::Stale` naming the reindex command; `verify_chain` passes at both
@@ -894,6 +988,10 @@ Section 8 states both.
   FR-010 and FR-019 pass, `rahi serve` against an uncovered chain exits 2
   with the reindex command in its output, and `ledger verify` and `ledger
   export` succeed against the same chain while naming its uncovered count.
+  The refusal has no override (D-3): a test asserts that no argument, flag,
+  or environment variable starts `serve` on a chain with incomplete coverage,
+  that `serve --help` offers none, and that `open_for_repair` is unreachable
+  from `serve`'s code path.
 - **AC-5.** The guarantee survives concurrency: FR-002, FR-011 and FR-017
   pass, and no test in this spec's suite establishes its result with a
   process-local lock or a pre-read.
@@ -901,8 +999,15 @@ Section 8 states both.
   archived bodies of its fixture are byte-identical before and after
   `reindex`, asserted by digest. FR-012's coverage assertion is part of this
   criterion: the ambiguous chain is fully accounted for, which is what lets
-  `serve` start on it, and no seal or reindex over it redirects an identity
-  row to a record or a segment other than the one it names (FR-011).
+  `serve` start on it (D-4), and no seal or reindex over it redirects an
+  identity row to a record or a segment other than the one it names (FR-011).
+  The vocabulary is part of the criterion too: no verb's output, no
+  `ReindexReport` field, no log line, and no crate documentation describes a
+  recorded collision as repaired, resolved, corrected, deduplicated, or
+  reconciled, and no code path selects among the copies of a colliding id. A
+  test asserts the `reindex` and `ledger verify` output for FR-012's fixture
+  against that vocabulary and asserts that `lookup` of the colliding id never
+  returns a single copy.
 - **AC-7.** `append_once`'s contract is documented as B-14 states it, FR-013
   and FR-021 pass, and neither the crate documentation nor the consumer
   contract claims exactly-once delivery or any form of authorship.
@@ -917,9 +1022,31 @@ Section 8 states both.
   resulting database growth, and fails if it exceeds B-9's figure by more
   than a stated factor. B-9's table is an estimate until this test runs; this
   test is the measurement, and it is what makes the spec wrong about cost
-  only in a way the suite catches.
-- **AC-10.** Coverage stays cheap: FR-018 passes, and the boot path issues
-  no scan whose cost grows with the number of archived decisions.
+  only in a way the suite catches. The measurement establishes a per-row
+  figure and nothing more: every figure in B-9's table stays labelled an
+  estimate until it is replaced by a measured one, and no criterion in this
+  section asserts a supported lifetime-decision ceiling, because D-2 declines
+  to declare one without both a measurement and a defined boundary behavior.
+- **AC-10.** Coverage stays cheap, and this criterion says which cost is
+  permitted rather than forbidding the design it accepts. FR-018 passes, and
+  the boot path's coverage evaluation reads exactly two things: the hot
+  window, bounded by spec 014 B-1's `hot_window` (default 10,000 resident
+  records), and one metadata row per sealed segment, joining
+  `kernel_segments` to `kernel_decision_coverage`. That per-segment read
+  grows with the number of *segments*, which is archived decisions divided by
+  `segment_size`, and it is explicitly allowed. What is prohibited is a scan
+  or aggregate over `kernel_decision_identity` or
+  `kernel_decision_collisions` whose cost grows with the number of rows those
+  tables hold: no `GROUP BY segment_hash` over the identity table, no
+  lifetime row count, no unindexed predicate over either table. This binds
+  the boot and append paths, and nothing else: `Ledger::identity_totals()`
+  does pay a lifetime aggregate, which is why B-7 keeps it out of the
+  verdict and why only `ledger verify` and `preflight` call it, and AC-12's
+  accounting assertions are made by the test suite over fixtures rather than
+  by any shipped boot path. A test asserts the boot path issues no prohibited
+  statement, and asserts the boot path's row-read count against a fixture
+  whose hot window and segment count are fixed while its identity-table size
+  grows, where that count must not move.
 - **AC-11.** The three consumer reproductions named in section 1 are
   transcribed as FR-001, FR-002 and FR-004 with their assertions inverted,
   each test naming the reproduction it descends from in a comment, so a
@@ -940,7 +1067,10 @@ Section 8 states both.
   its header's `count`. A segment whose body is unreadable is excluded from
   the archived half and reported uncovered, never assumed accounted for.
   This is the criterion that makes B-7's counting rule and B-12's
-  serve-while-ambiguous rule one rule rather than two that contradict.
+  serve-while-ambiguous rule one rule rather than two that contradict. Its
+  assertions are the test suite's, taken over fixtures of a known size; they
+  are not statements a shipped boot path makes, and AC-10's prohibition on
+  lifetime aggregates binds that path and not this criterion.
 ## 6. Out of scope
 
 The hiqlite 0.14.0 stale lease release after TTL takeover, and the
@@ -952,6 +1082,13 @@ spec may revisit if the resident cost proves material. Resolving a collision
 B-12 reports: which copy of a twice-spent id is the real decision is a
 question about the consuming application's semantics, not about the chain.
 Any guarantee across a mixed-version cluster, which B-13 declines to offer.
+A `serve --allow-uncovered` escape hatch, or any other flag, argument or
+environment variable that starts normal service on incomplete historical
+coverage: D-3 declines it. Recovering a chain whose legacy archive evidence
+is permanently gone, which D-3 reserves as a separate recovery decision. A
+chassis-owned numbered migration lane and any store version fence across
+this spec, which D-6 declines to invent in spec 011's and spec 036's
+territory.
 A Prometheus series for coverage or for unstamped writers: `/metrics` is spec
 023's territory and this spec does not extend it, so the detection of B-13
 reaches an operator through `ledger verify`, `preflight` and logs. Flipping
@@ -963,112 +1100,180 @@ this spec claims no requirement there.
 
 ## 7. Resolved decisions
 
-None yet. The build session records D-n entries here for choices this spec
-is silent on (date, provenance, the decision, the alternative rejected).
+D-1 to D-6 are the owner's, taken on the draft and recorded before approval;
+they answer section 8's four questions and the corrections that came with
+them. The build session records further D-n entries here for choices this
+spec is still silent on (date, provenance, the decision, the alternative
+rejected). Nothing in D-1 to D-6 approves this spec or authorizes its
+implementation: it stays `draft` and `implementation: pending`.
 
-## 8. Owner decisions this draft requires before approval
+- **D-1 (2026-09-18, owner decision; resolves D-required-1, amends spec
+  030).** `rahi ledger reindex <archive>` stays an explicit mutating command
+  rather than becoming a `ledger verify --reindex` flag. B-8's reason is
+  accepted: a repair that writes must not share a verb with a read-only
+  check, because an operator reaching for a diagnostic must not be able to
+  mutate the store by mistyping a flag. The cost is an amendment to a
+  `complete` spec, and the owner authorized it narrowly and transparently in
+  the same change: spec 030 B-1's argv list gains `ledger reindex <archive>`
+  annotated `(042)`, the convention that spec's own `supervise (031)` and
+  `first-boot (031)` entries already use for a verb a later spec establishes;
+  spec 030 AC-2 is amended to say that `--help` lists exactly the verbs of
+  B-1 the binary implements, so a verb B-1 attributes to a later spec joins
+  the list when that spec lands; and spec 030 carries its own dated decision
+  recording both edits. Nothing else in 030 changes, and 030's `complete`
+  status and its other acceptance criteria are untouched. This spec may not
+  make either edit on its own authority and did not: the amendment is the
+  owner's, recorded here and in 030.
+- **D-2 (2026-09-18, owner decision; resolves D-required-2, clarifies spec
+  014).** The owner accepts the permanent resident cost: one narrow identity
+  row per decision, plus a collision row per duplicate copy, held forever in
+  the replicated store, while the decision bodies themselves stay archived
+  under spec 014. What 014 keeps out of the replicated store is unbounded
+  *history*; what 042 adds is bounded-per-decision *identity evidence*, and
+  the owner records that distinction in spec 014 as a narrow clarification
+  rather than leaving 042 in tension with 014's stated reason for existing.
+  Spec 014's B-n, FR-n and AC-n are untouched; the clarification is a dated
+  decision entry in 014 alone.
 
-These are not this spec's to take. Each names a requirement owned by another
-spec that this design needs changed or explicitly carved out. The coherence
-guard forbids a build session resolving any of them by editing the owning
-spec, and none is a waiver.
+  Three limits come with the acceptance. Every storage figure in B-9 stays
+  explicitly an estimate until AC-9's test measures it; the table is labelled
+  so. Ten million lifetime decisions is **not** established as a supported
+  limit: a limit needs a measurement and a defined boundary behavior, this
+  spec has neither, and 10^5 to 10^7 is now stated as the range the
+  arithmetic was aimed at rather than as a capacity the chassis carries.
+  Nothing here says what a cell does at or past any figure, and no acceptance
+  criterion asserts a ceiling. And consumer growth is accounted over *all*
+  ledger decisions: kernel denials (015 B-5, 035), manifest transitions (036
+  B-2), deployment epochs (041) and the genesis record take rows exactly as
+  an application's own governed acts do. B-9 says so, and says that a denial
+  stream is driven by traffic the operator does not control, so a sizing that
+  counts only application decisions undercounts.
+- **D-3 (2026-09-18, owner decision; resolves D-required-3(a)).** No
+  `serve --allow-uncovered` is added in 042, and no other flag, argument or
+  environment variable starts normal service on incomplete historical
+  coverage. Normal service refuses, as B-10 writes it. The draft recommended
+  the escape hatch and the owner declines it: a cell that starts while it
+  cannot prove its new audit entries unique is not a recovery, it is the
+  silent-wrong-answer outcome constitution XI ranks below being down.
+  Diagnostic, export and repair access stay available on an uncovered chain
+  through B-15, which is what an operator working the incident actually
+  needs. The floor B-10 names is accepted with open eyes: a chain whose
+  archive evidence is permanently gone does not serve under this spec.
+  Recovering from that state is a separate recovery decision the owner
+  reserves, out of scope here (section 6) and not substituted for by starting
+  service. AC-4 asserts the absence of the override.
+- **D-4 (2026-09-18, owner decision; resolves D-required-3(b), confirms
+  B-12).** Service is permitted on a chain that is fully accounted for and
+  contains known duplicate ids, with containment per affected id: `lookup`
+  of such an id answers `Ambiguous` carrying every copy, `append` of it is
+  `Error::Conflict`, every copy's evidence is preserved, and the condition is
+  visible in `coverage()`, `ledger verify`, the reindex report and the logs.
+  Refusing the whole cell was the alternative and is rejected: the duplicate
+  is unrepairable history, so the refusal would be permanent and would punish
+  every other id for two records written years earlier. Two constraints ride
+  with the permission. A collision that has been indexed is **not** repaired,
+  resolved, corrected, deduplicated or reconciled, and no output, report
+  field, log line or crate documentation may describe it that way; indexing
+  records evidence. And there is no silent winner selection and no historical
+  rewriting: the identity row that stands is whichever the walk reached
+  first, it is never reported as the decision, no code path prefers a copy,
+  no archived byte is written, no identity row is redirected, and no row of
+  either table is ever deleted. B-12 carries both constraints and AC-6
+  asserts them.
+- **D-5 (2026-09-18, owner decision; resolves D-required-4).** Once 042 is
+  approved, implementation is prioritized **036, then 042, then 038**. This
+  is an explicit scheduling exception to the corpus's ordinal build order,
+  taken because 042 blocks aicortex's spec 014 and 038 does not block
+  anything: 038 has no declared territory overlap with 042 and touches the
+  edge and identity surfaces rather than the ledger, so deferring it costs
+  no reconciliation. 036 keeps its place ahead of 042 for the two
+  reconciliation reasons B-13 and D-required-4 give (`Ledger::open` gains two
+  `Error::Stale` refusals that must compose into one message and one exit
+  code, and reindex should be built against 036 B-5's final segment header
+  shape) and for no fencing reason: D-6 records that 036 fences nothing about
+  this spec. This session neither implements any spec nor changes any spec's
+  approval state, and it alters neither 040 nor 041.
+- **D-6 (2026-09-18, owner-directed correction; settles B-1 against B-13's
+  alternative).** The identity, collision and coverage tables ship as chassis
+  baseline DDL created by `Ledger::open`, not as a migration declared
+  non-additive. The alternative is rejected on mechanism: `schema_version`
+  carries one numbered list that spec 030 B-4 fills from `Cell::migrations()`,
+  which is the application's, and the corpus establishes no chassis-owned
+  numbered migration lane; putting chassis ledger DDL in the application's
+  list would make every app version a table B-1 says no app versions, and
+  creating a chassis lane is a change to spec 011's and spec 036's territory
+  that this spec may not make.
 
-- **D-required-1 (spec 030 B-1's verb list).** B-8 adds `rahi ledger
-  reindex`. Spec 030 B-1 enumerates nine verbs and its AC-2 requires
-  `--help` to list *exactly* those. The existing test compares the help
-  output against the `VERBS` constant rather than against B-1's text, so
-  adding a tenth entry keeps the test green while making 030 AC-2 false:
-  green gate, drifted corpus. Two resolutions exist and the owner picks
-  one. Amend 030 B-1 to name `ledger reindex`, which is the honest form and
-  costs an amendment to a `complete` spec; or express the operation as
-  `rahi ledger verify --reindex <archive>`, a flag on a verb B-1 already
-  names, which amends nobody and is the resolution the coherence guard
-  prefers when a mechanism honors both texts. This draft is written for the
-  verb because B-8 wants an operator verb that cannot be confused with a
-  read-only check; if the owner declines the amendment, B-8 and the
-  Verification block take the flag form with no other change.
+  The downgrade protection that choice actually provides is stated rather
+  than implied: **none from any store version check**, in either direction.
+  Baseline DDL writes no `schema_version` row, spec 030 B-2 refuses only a
+  store *behind* the binary, and spec 036 B-8 refuses a store ahead across a
+  non-additive migration, which these tables are not. The protection that
+  exists lives entirely in a binary that already carries 042: B-10's gate at
+  open, B-11's backstop, B-13's detection. Implementing 036 fences nothing
+  here, and the spec must not imply otherwise: 036 B-8's check runs in the
+  new binary, so it stops neither a pre-036 binary, which has no such check,
+  nor a replica already running on an old image, which re-evaluates nothing
+  after boot. A real version fence across this spec would require a
+  chassis-owned migration lane first; section 6 puts it out of scope.
+
+  The same correction removes the claim B-13 used to make that a violated
+  cutover leaves a *bounded, repairable* ambiguity. Neither word is
+  justified and neither is claimed: the size of the ambiguity is however many
+  ids an old writer duplicates before it is stopped, which nothing in the
+  store limits, and nothing removes a duplicate that is already history. What
+  detection buys is that the damage is seen, not that it is undone.
+
+## 8. Owner decisions, answered
+
+The four questions this draft raised are answered. Each named a requirement
+owned by another spec that this design needed changed or carved out, and the
+coherence guard forbade a build session resolving any of them; none was a
+waiver and none is one now. The answers are the owner's, dated 2026-09-18,
+and they live as D-1 to D-5 in section 7 with their reasoning and their
+constraints. This section keeps the questions on the record beside the
+answers so a later reader sees what was asked as well as what was decided.
+
+- **D-required-1 (spec 030 B-1's verb list).** Answered by **D-1**: the verb
+  stays, and 030 B-1 and AC-2 are amended narrowly in this change, with 030
+  carrying its own dated entry. The `ledger verify --reindex` flag form is
+  rejected.
 - **D-required-2 (spec 014's reason for existing, and the ceiling B-9
-  implies).** Spec 014's summary says the replicated store cannot hold an
-  audit history that grows without bound, and its Purpose says unboundedness
-  is a property only of the tail. B-9 puts a table in the replicated store
-  that grows one row per decision forever, at about 400 bytes per decision
-  per replica, and states that the design is sized for cells in the 10^5 to
-  10^7 lifetime-decision range and does not carry a cell that appends a
-  decision per request. Spec 014 is `approved` and `implementation:
-  complete`, so nothing in this draft touches it and no build session may.
-  Two questions for the owner, and the second is the one that binds a
-  consumer: whether 014's rationale binds later specs, and if it does,
-  whether 042 is recorded in 014 as a carve-out or must find a bounded
-  mechanism B-9 argues does not exist; and whether the stated ceiling is
-  acceptable as the chassis's answer, or whether an eviction or compaction
-  story must exist before this design is approved rather than after the
-  first cell reaches it. Checked against the consumer that needs this: the
-  aicortex requirement is one identity row per erasure and lifecycle
-  Decision, not per memory or per request, which sits inside the supported
-  regime; the check is stated here so that the owner is approving a number
-  rather than a direction.
-- **D-required-3 (the availability promise of B-8's predecessor, and what an
-  ambiguous chain may do).** Two related availability calls.
-  - *(a) The uncovered chain.* Spec 014 D-3 reasons that a cell with no
-    object storage configured must still open, append, and verify, which is
-    why the archive is an argument rather than a field. B-10 suspends that
-    for exactly one population: a chain with sealed segments and no identity
-    rows, between the upgrade and the reindex, cannot boot without the
-    archive. Every chain appended entirely under this spec keeps 014 D-3's
-    promise intact. B-10 also states the floor: a chain whose archive has
-    permanently lost a body can never be covered and so, under this draft,
-    can never serve again. The owner decides whether that is acceptable or
-    whether `serve` should offer an explicit `--allow-uncovered` start, in
-    which case the cell serves with B-11's backstop refusing unknown ids and
-    `kernel_decisions_lost` rising. This draft recommends the escape hatch
-    only as an explicit, logged, non-default flag whose use is itself
-    appended to the chain when the chain can take an append: a permanently
-    unrecoverable archive is a real state, and a chassis with no exit from
-    it converts a lost object into a dead cell. This draft does not add the
-    flag, because adding it is the owner's call.
-  - *(b) The ambiguous chain.* B-12 lets a chain with recorded collisions
-    reach complete coverage and serve, containing the damage per id. The
-    alternative is to treat any collision as a refusal to serve. This draft
-    chooses containment because a collision is unrepairable history: a
-    refusal would be permanent, and it would punish every other id in the
-    chain for two records written years earlier. The owner decides.
-- **D-required-4 (sequencing against 036, refreshed).** The corpus currently
-  declares these overlaps for 042: with 036 on `crates/rahi-cli/src/lib.rs`,
-  `crates/rahi-ledger/src/chain.rs`, `crates/rahi-ledger/src/lib.rs`,
-  `crates/rahi-ledger/src/segment.rs` and `crates/rahi-ledger/src/verify.rs`,
-  and with 040 on `crates/rahi-cli/src/lib.rs`. Spec 036 B-4 rewrites
-  `Ledger::open` and B-5 changes what a segment header carries; this spec
-  changes both files too, and adds the coverage gate to the same `open`. The
-  overlap is on shared files, not a dependency: 042 `depends_on` 013, 014 and
-  030, all `complete`, so it is buildable without 036.
+  implies).** Answered by **D-2**: the permanent per-decision identity and
+  collision evidence is accepted while bodies stay archived, spec 014 carries
+  a narrow clarification recording the carve-out, every storage figure stays
+  explicitly an estimate until AC-9 measures it, ten million decisions is not
+  established as a supported limit, and growth is accounted over all ledger
+  decisions including kernel denials.
+- **D-required-3 (availability).** Answered by **D-3** and **D-4**: (a) no
+  `--allow-uncovered` and no other override, with diagnosis, export and
+  repair still available; (b) service on a fully accounted-for ambiguous
+  chain is permitted with per-id containment, no repair language, no winner
+  selection, and no historical rewriting.
+- **D-required-4 (sequencing against 036).** Answered by **D-5**: 036, then
+  042, then 038, as an explicit scheduling exception because 042 blocks
+  aicortex 014.
 
-  The approval state matters more than the ready set here, and it has moved
-  since this question was first written. The ready set is 036, 038, 040 and
-  042; of those **036 and 038 are `approved` and `implementation: pending`**,
-  while 040 and 042 are still `draft`. So the owner is not choosing among
-  four peers: two specs are already cleared to build and this one is not
-  cleared at all, which means any ordering that puts 042 first also asks for
-  042 to be approved first. Against 038 there is nothing to sequence: the
-  corpus declares no territory overlap between 038 and 042 (038's overlaps
-  are with 036 and 040, on `crates/rahi-cli/src/serve.rs`), and 038 touches
-  the edge and identity surfaces rather than the ledger, so the two can run
-  in either order without either session inheriting the other's
-  reconciliation. The sequencing question is 036 alone.
+The DDL question B-13 left open beside them is settled by **D-6**: baseline
+DDL, with the downgrade protection stated exactly as none from any store
+version check, and the withdrawn claim that a violated cutover leaves a
+bounded, repairable ambiguity.
 
-  This draft recommends **036 first, then 042**, for three reasons rather
-  than for tidiness. `Ledger::open` gains two refusals that must compose into
-  one message and one exit code (an unadopted manifest and an uncovered
-  chain, both `Error::Stale`, exit 2), and writing the second onto a settled
-  first is smaller than reconciling two half-built ones. 036 B-5 changes the
-  segment header, which B-8's reindex reads and verifies per segment, so
-  building reindex against the final header shape avoids a rewrite. And
-  036 B-8's non-additive migration check is the only mechanism in the corpus
-  that could fence a downgrade past 042 (B-13), so 042 landing after it can
-  be shipped as that migration rather than as unfenceable baseline DDL. The
-  cost of this order is that the consumer's unblocking waits for 036. If the
-  owner prefers 042 first, nothing in this draft blocks it and the 036
-  session inherits the reconciliation instead; the decision is the owner's
-  and the backlog's, not this spec's.
+### What remains before approval
+
+One item is reserved rather than resolved, and it does not block this spec:
+
+- **A recovery path for permanently missing legacy archive evidence.** D-3
+  accepts that a chain whose archived body is permanently gone never serves
+  again under this spec, and reserves the recovery decision for a separate
+  governed change. That change is not 042's to write, 042 does not depend on
+  it, and starting service while new audit entries cannot be proven unique is
+  explicitly not an acceptable substitute for it. A cell that reaches this
+  state today is diagnosable, exportable and repairable; what it is not is
+  servable.
+
+Nothing else is outstanding. Approval is the owner's flip, and this spec
+holds at `draft` and `implementation: pending` until they take it.
 
 ## Verification
 

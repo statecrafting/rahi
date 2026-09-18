@@ -70,7 +70,11 @@ boot, key generation, and supervision (031) are modules added to
   Router; fn operator_routes(state) -> Router { empty } }`. `rahi_cli::run
   (cell)` parses argv: `serve`, `preflight`, `migrate`, `backup`, `restore
   <archive>`, `ledger verify [--full]`, `ledger export <path>`, `supervise`
-  (031), `first-boot` (031). Exit codes are `rahi_types::Error::exit_code`.
+  (031), `first-boot` (031), `ledger reindex <archive>` (042). Exit codes are
+  `rahi_types::Error::exit_code`. A verb annotated with an ordinal is
+  established by that spec and enters the binary when that spec lands;
+  `ledger reindex` is the only mutating verb under `ledger`, and D-9 records
+  why it is a verb rather than a flag on `ledger verify`.
 - **B-2 (serve).** Load config, open the store, open the ledger (fatal on
   integrity), boot the kernel with the manifest hash, build the edge with
   the idp routes and the cell's routes, listen on the configured address.
@@ -126,7 +130,13 @@ boot, key generation, and supervision (031) are modules added to
 - **AC-1.** `cargo test -p rahi-ops --locked` and `cargo test -p rahi-cli
   --locked` pass.
 - **AC-2.** `cargo run -p rahi-cli -- --help` lists exactly the verbs of
-  B-1.
+  B-1 that the binary implements, and no other. A verb B-1 attributes to a
+  later spec by its ordinal joins that list when that spec lands and not
+  before, so the help is complete for the binary that prints it rather than
+  for a corpus that has not shipped yet. `rahi_cli::VERBS` is the
+  machine-readable form of that set and is what the test compares the help
+  against; extending `VERBS` is part of landing the spec that adds the verb
+  (D-9).
 
 ## 6. Out of scope
 
@@ -241,6 +251,37 @@ where archives land in a cluster (032).
   `Error::Stale` (exit 2) on purpose: like a store behind on migrations,
   a follower is a node that cannot proceed from where it is, and the
   message names where to go.
+
+- **D-9 (2026-09-18, owner decision; amends B-1's argv list and AC-2).**
+  B-1's list gains `ledger reindex <archive>`, established by spec 042 B-8,
+  and AC-2 is reworded so that `--help` is judged complete for the binary
+  that prints it rather than for a corpus that has not shipped.
+
+  The alternative was to express the operation as `ledger verify --reindex
+  <archive>`, a flag on a verb B-1 already names, which would have amended
+  nobody and is the resolution the coherence guard prefers when a mechanism
+  honors both texts. The owner rejects it: `ledger verify` is the read-only
+  check an operator reaches for while diagnosing an incident, `reindex`
+  writes to the store, and a mutating repair must not be reachable by
+  mistyping a flag on a diagnostic. The cost is this amendment to a
+  `complete` spec, taken by the owner rather than by a build session, and
+  taken narrowly: no behavior of any existing verb changes, no functional
+  requirement changes, AC-1 is untouched, and this spec's implementation
+  stays complete.
+
+  The AC-2 rewording repairs a drift this spec already carried rather than
+  one 042 introduced. B-1 has annotated `supervise` and `first-boot` with
+  `(031)` since this spec was written, so "exactly the verbs of B-1" was
+  already a claim about a set the binary did not hold until 031 landed,
+  while the test compared the help against `rahi_cli::VERBS`. Naming `VERBS`
+  as the machine-readable form of the implemented set makes the text and the
+  test agree, and makes extending `VERBS` an explicit obligation of the spec
+  that adds a verb. The tenth entry lands with spec 042 and not before; until
+  then `--help` lists nine and AC-2 holds, as it holds today.
+
+  Recorded on the same day and in the same change as spec 042's D-1, which
+  states the owner's reasoning from 042's side. Spec 042 stays `draft` and
+  `implementation: pending`; this amendment approves nothing.
 
 ## 8. Status
 
