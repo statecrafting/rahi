@@ -84,6 +84,6 @@
     "summary": "hiqlite replicates the whole database to every node, so an unbounded audit history cannot live in it; the head and a hot window do. When the window exceeds its bound the oldest contiguous run is sealed into an immutable segment (first id, last id, count, segment hash, previous segment hash), written to an object store behind a trait with an S3 implementation, and deleted from the hot table. Segments link to their predecessor and the head links to the last segment, so the chain verifies end to end without archived history resident. Archive is never conflated with backup. Carries enrahitu://032 §3.7 and §3.9.\n",
     "title": "Ledger sealing: a resident hot window, immutable segments archived to object storage"
   },
-  "shardHash": "1a9f8fc6ef2bed28c1a43986d875c53b63c1b4b17f2f12a4aa097037b2df0e38",
+  "shardHash": "5f415dba7517ee4125b03226c4ff0dc8fea450f445cf6e7fbf4f431ef11d385b",
   "specVersion": "1.3.0"
 }

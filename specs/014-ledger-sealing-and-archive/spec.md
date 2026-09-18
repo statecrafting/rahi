@@ -214,9 +214,10 @@ credentials' provisioning (031, 032).
   counted over every append to the chain, kernel denials included, not only
   over an application's own acts.
 
-  Recorded on the same day and in the same change as spec 042's D-2. Spec 042
-  stays `draft` and `implementation: pending`; this clarification approves
-  nothing.
+  Recorded on the same day and in the same change as spec 042's D-2. Spec 042 is
+  approved in the same change and holds at `implementation: pending`; this
+  clarification authorizes no implementation and changes nothing this spec
+  requires.
 
 ## Verification
 

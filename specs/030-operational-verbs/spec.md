@@ -305,8 +305,9 @@ where archives land in a cluster (032).
   held before this amendment.
 
   Recorded on the same day and in the same change as spec 042's D-1, which
-  states the owner's reasoning from 042's side. Spec 042 stays `draft` and
-  `implementation: pending`; this amendment approves nothing.
+  states the owner's reasoning from 042's side. Spec 042 is approved in the same
+  change and holds at `implementation: pending`; this amendment authorizes no
+  implementation and changes nothing this spec requires.
 
 ## 8. Status
 
