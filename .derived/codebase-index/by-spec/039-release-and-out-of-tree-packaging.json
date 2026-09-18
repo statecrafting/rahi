@@ -700,6 +700,24 @@
           {
             "file": "Cargo.toml",
             "span": {
+              "endLine": 109,
+              "startLine": 18
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "anchor": "workspace.dependencies",
+          "file": "Cargo.toml",
+          "kind": "section"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.toml",
+            "span": {
               "endLine": 17,
               "startLine": 8
             }
@@ -744,5 +762,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "194697705248713508edeb4e273c14a761483197cde51e6cda47ed542dbbf4a4"
+  "shardHash": "1e13bddfaed4aeb73f4efd174fe1b84f4b9cf434044313ce9367a892c0a7dced"
 }

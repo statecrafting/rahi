@@ -15,7 +15,7 @@ the chassis; it never forks it.
 The name is the lineage: enrahitu was Encore, Rauthy, Hiqlite, Turso. Drop
 Encore and Turso and what remains is what this is.
 
-## Status: v0.1.0 released, recovery exercised at N=1
+## Status: v0.2.0 release candidate, recovery exercised at N=1
 
 This repository is a specification corpus, the harness that builds it, and
 the code it specifies. Spec ordinals are the build order, and each spec is
@@ -32,9 +32,17 @@ Implementation, publication, and operational proof are separate:
 | | State |
 |---|---|
 | Implemented | `spec-spine registry list` reports each spec's lifecycle. A complete implementation does not imply every deployment procedure was exercised: the N=3 rollout check remains recorded rather than run (032 D-1). |
-| Released or installable | [v0.1.0](https://github.com/statecrafting/rahi/releases/tag/v0.1.0) published all nine chassis crates; the out-of-tree registry consumer passed (039 D-12). Spec 037's recovery changes are newer than that release. Consumers need a commit containing 037 until a later release includes it. Image visibility and the published-image compose walkthrough remain separate operator checks (039 D-12). |
+| Released or installable | [v0.1.0](https://github.com/statecrafting/rahi/releases/tag/v0.1.0) published all nine chassis crates (039 D-12). The workspace now prepares 0.2.0 to deliver completed 037; it is not yet published. The [release proposal](CHANGELOG.md#020-release-candidate-not-published) names upgrade limits and pending tag, registry, and image checks. Consumers need the actual candidate revision until publication. |
 | Exercised against the pinned rauthy | spec 037's `live.yml` runs the whole suite against rauthy 0.36.2 pinned by digest, with gated skips refused. The proof covers login, audience and scope enforcement, fresh backups, restart, and restore with the original user, note, and ledger head. See spec 037's Status for the passing run and revision. |
 | Supported topology | N=1. Three replicas have run only as three processes on one host, without rauthy, in spec 035's test, which CI runs: each replica mints its own decision ids and none of thirty concurrent denials is lost. N=3 on Kubernetes has never run. |
+
+The 0.2.0 candidate changes recovery compatibility: new key sets contain an
+origin-bound backup passkey; old sets are not automatically upgraded and
+backups refuse without it. It does not fix hiqlite 0.14.0's stale lease
+release after TTL takeover, establish full-node second-lease restart, or
+prevent duplicate ledger IDs after sealing. Those require separate governed
+work; aicortex must not adopt this release as their fix. Publication changes
+no consumer rollout target.
 
 [`docs/design/01-consumer-contract.md`](docs/design/01-consumer-contract.md)
 states what a consumer gets and what is proven, by which test, against which
