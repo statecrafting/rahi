@@ -920,6 +920,12 @@ Section 8 states both.
   only in a way the suite catches.
 - **AC-10.** Coverage stays cheap: FR-018 passes, and the boot path issues
   no scan whose cost grows with the number of archived decisions.
+- **AC-11.** The three consumer reproductions named in section 1 are
+  transcribed as FR-001, FR-002 and FR-004 with their assertions inverted,
+  each test naming the reproduction it descends from in a comment, so a
+  reader can follow a red diagnostic in the consumer's corpus to the green
+  regression that closes it here.
+
 - **AC-12 (the accounting is consistent, B-5, B-7 and B-12).** Across the
   fixtures this spec builds, including FR-012's twice-spent id, FR-015's
   damaged archive and FR-016's interrupted reindex, a test asserts the
@@ -935,12 +941,6 @@ Section 8 states both.
   the archived half and reported uncovered, never assumed accounted for.
   This is the criterion that makes B-7's counting rule and B-12's
   serve-while-ambiguous rule one rule rather than two that contradict.
-- **AC-11.** The three consumer reproductions named in section 1 are
-  transcribed as FR-001, FR-002 and FR-004 with their assertions inverted,
-  each test naming the reproduction it descends from in a comment, so a
-  reader can follow a red diagnostic in the consumer's corpus to the green
-  regression that closes it here.
-
 ## 6. Out of scope
 
 The hiqlite 0.14.0 stale lease release after TTL takeover, and the
