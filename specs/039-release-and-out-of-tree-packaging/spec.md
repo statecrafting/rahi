@@ -404,8 +404,9 @@ RH-05 and RH-06 of the revision-3 register), and approved the spec on
   until the owner takes it, and no document here calls the images public
   meanwhile.
 
-- **D-13 (2026-09-17, release preparation under B-1 and B-2).** The owner
-  requested 0.2.0 for completed 037 at
+- **D-13 (2026-09-17, release preparation under B-1 and B-2).** The
+  coordinator selected 0.2.0 under Bart's standing build, push, PR, merge,
+  and release authority for completed 037 at
   `ea6d0da125aaafe0927570410a8a1b0ee9d1286e`. Its key-set, backup
   authentication, recovery, and export API changes cross the consumer
   compatibility boundary, so B-1 requires a minor release; 0.1.1 is
@@ -418,10 +419,14 @@ RH-05 and RH-06 of the revision-3 register), and approved the spec on
   origin-bound passkey, and neither automatic old-key-set migration nor
   cross-origin recovery is supplied. Historical records remain intact.
 
-  This preparation commits no invented release SHA. B-2's final identity
-  is the annotated tag on the tested merged main revision, recorded by the
-  coordinator in the tag and forge release metadata. The preparation names
-  the real 037 merge as its implementation basis and labels 0.2.0 a
+  This preparation commits no invented release SHA. The consumer contract
+  retains B-2's in-repository release identity through a prospective
+  [`v0.2.0` source link](https://github.com/statecrafting/rahi/tree/v0.2.0).
+  After publication, the release revision is the tested merged `main`
+  commit to which the annotated `v0.2.0` tag resolves. The link asserts no
+  publication; the coordinator's exact SHA and date in forge metadata
+  supplement this identity. The preparation names the real 037 merge as
+  its implementation basis and labels 0.2.0 a
   candidate. AC-2 through AC-4 and FR-005 must be checked for the new tag;
   0.1.0's evidence cannot pass them for 0.2.0. Local Cargo packaging can
   stage sibling versions; an out-of-tree proof using extracted packages

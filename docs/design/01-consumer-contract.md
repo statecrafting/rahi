@@ -5,9 +5,13 @@ candidate under approved spec 039, carrying completed spec 037 from
 `ea6d0da125aaafe0927570410a8a1b0ee9d1286e`. Section 2.0 is the current
 consumer guidance; the dated readings below remain historical evidence.
 The final release revision is not known inside this preparation commit.
-The coordinator must bind the tested merged main revision to annotated tag
-`v0.2.0` and record that revision and date in the forge release metadata
-(039 B-2). A version declaration is not publication or downstream adoption.
+The prospective in-repository release identity is
+[`v0.2.0` source](https://github.com/statecrafting/rahi/tree/v0.2.0): after
+publication, the release revision is the tested merged `main` commit to
+which the annotated `v0.2.0` tag resolves (039 B-2). This link does not
+assert that the tag or release exists yet. The coordinator must record the
+exact SHA and release date in forge metadata to supplement this identity.
+A version declaration is not publication or downstream adoption.
 
 Version 0, 2026-09-11, for review; revised the same day with the runtime
 binding of section 11. This note is a consumer's view of the chassis: how
