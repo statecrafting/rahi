@@ -444,6 +444,30 @@ impl Ledger {
         }
     }
 
+    /// Move the verdict to incomplete on this node's own observation of an
+    /// incomplete accounting, with no leader read of its own (spec 042
+    /// B-11).
+    ///
+    /// Degrade only, and that asymmetry is the whole point: a negative
+    /// observation is adopted here, a positive one is not. Restoring
+    /// confidence is [`Ledger::adopt_verdict`] under
+    /// [`Ledger::recheck_coverage`], which `serve` never calls, so a
+    /// degraded cell cannot talk itself back into confidence by reading
+    /// coverage again.
+    ///
+    /// The evidence this consumes was computed for another purpose, so the
+    /// move itself costs nothing: nothing here reads the store.
+    pub(crate) fn degrade_verdict(&self, coverage: &crate::identity::Coverage) {
+        if coverage.is_complete() {
+            return;
+        }
+        let next = crate::identity::CachedCoverage::of(coverage);
+        match self.verdict.lock() {
+            Ok(mut held) => *held = next,
+            Err(poisoned) => *poisoned.into_inner() = next,
+        }
+    }
+
     /// Move the verdict to incomplete on this node's own observation, with
     /// no leader read (spec 042 B-11, B-13).
     ///

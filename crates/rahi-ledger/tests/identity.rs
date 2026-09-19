@@ -23,8 +23,8 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use async_trait::async_trait;
 use rahi_ledger::{
     AppendSeam, AppendStage, Archive, Decision, DecisionId, DecisionKind, Depth, FsArchive, Hash,
-    Ledger, Outcome, Presence, ReindexCause, SealPolicy, SegmentHeader, SignedRecord,
-    identity_digest,
+    Ledger, Outcome, Presence, ReadInterleave, ReindexCause, SealPolicy, SegmentHeader,
+    SignedRecord, identity_digest,
 };
 use rahi_store::{StoreHandle, Value};
 use rahi_types::{Error, Revision, Sub};
@@ -617,6 +617,140 @@ async fn an_archive_failure_is_an_error_and_never_proven_absence() {
         ledger.lookup(&DecisionId::new("never-used")).await.unwrap(),
         Presence::Absent,
         "absence is answered over a chain whose coverage is complete"
+    );
+
+    f.store.shutdown().await.unwrap();
+}
+
+/// B-6, D-15, AC-5. Recovery spans a legitimate resident-to-sealed
+/// transition: the identity row is read, a seal commits, and the record the
+/// row named is in the archive rather than in the resident chain by the time
+/// the resident chain is read.
+///
+/// This is the second of the two findings reproduced against the merged
+/// `9b38b34`, where that crossing returned `Error::Integrity` saying the
+/// record "is not in the resident chain" for a record that was healthy and
+/// immediately recoverable a moment later. The crossing is driven at the
+/// seam, never waited out on a clock, and the fix is a bounded revalidation
+/// of the same row rather than a lock: the row is the coherent evidence,
+/// because sealing stamps it and nothing deletes or redirects it.
+///
+/// The three neighbouring answers are asserted in the same run so the
+/// revalidation cannot be mistaken for a blanket retry: ordinary resident
+/// recovery, ordinary sealed recovery, and a genuinely missing resident
+/// record, which is still `Error::Integrity` and is never converted into an
+/// absence.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn recovery_survives_a_seal_that_lands_between_the_row_and_the_record() {
+    let f = common::open().await;
+    let dir = tempfile::tempdir().unwrap();
+    let archive = FsArchive::open(dir.path().join("archive")).unwrap();
+    let ledger = open_ledger(f.handle()).await;
+
+    let expected = ledger.append(decision("target")).await.unwrap();
+
+    // Ordinary resident recovery, with nothing crossing it and no body
+    // fetched.
+    let counting = Counting::open(dir.path().join("archive"));
+    let resident = ledger
+        .recover(&DecisionId::new("target"), &counting)
+        .await
+        .unwrap();
+    assert_eq!(resident.hash().unwrap(), expected);
+    assert_eq!(counting.gets(), 0, "a resident record needs no archive");
+    assert!(matches!(
+        ledger.lookup(&DecisionId::new("target")).await.unwrap(),
+        Presence::Resident { .. }
+    ));
+
+    for i in 0..4 {
+        ledger
+            .append(decision(&format!("filler-{i}")))
+            .await
+            .unwrap();
+    }
+
+    // The crossing: the hook commits a real seal at the one instant between
+    // the row read and the resident read.
+    let sealer = ledger.clone();
+    let seal_archive = archive.clone();
+    let reader = ledger
+        .clone()
+        .with_read_interleave(ReadInterleave::new(move || {
+            let sealer = sealer.clone();
+            let archive = seal_archive.clone();
+            async move {
+                sealer
+                    .seal_if_needed(&archive, &eager())
+                    .await
+                    .expect("the seal lands")
+                    .expect("a real seal, not a no-op");
+            }
+        }));
+    let across = reader
+        .recover(&DecisionId::new("target"), &archive)
+        .await
+        .expect("a healthy record stays recoverable across a legitimate seal");
+    assert_eq!(
+        across.hash().unwrap(),
+        expected,
+        "and it is the original verified record, not a substitute"
+    );
+    assert_eq!(across.record.id, "target");
+
+    // The record really did move, so the recovery really did span the
+    // transition rather than find it resident after all.
+    assert!(matches!(
+        ledger.lookup(&DecisionId::new("target")).await.unwrap(),
+        Presence::Sealed { .. }
+    ));
+
+    // Ordinary sealed recovery, now that it is archived.
+    let counting = Counting::open(dir.path().join("archive"));
+    let sealed = ledger
+        .recover(&DecisionId::new("target"), &counting)
+        .await
+        .unwrap();
+    assert_eq!(sealed.hash().unwrap(), expected);
+    assert_eq!(
+        counting.gets(),
+        1,
+        "exactly one body, the one the row names"
+    );
+
+    // A genuinely missing resident record: a row naming a record no seal
+    // ever archived and the resident chain does not hold. The revalidation
+    // finds the row unchanged and the answer stays `Integrity`; nothing here
+    // retries it and nothing turns it into an absence.
+    let absent_hash = Hash::parse(format!("sha256:{}", "cd".repeat(32))).unwrap();
+    f.handle()
+        .execute(
+            "INSERT INTO kernel_decision_identity \
+             (id, identity_digest, record_hash, segment_hash) VALUES ($1, $2, $3, NULL)",
+            vec![
+                Value::from("phantom"),
+                Value::from(absent_hash.as_str()),
+                Value::from(absent_hash.as_str()),
+            ],
+        )
+        .await
+        .unwrap();
+    let err = ledger
+        .recover(&DecisionId::new("phantom"), &archive)
+        .await
+        .expect_err("a row naming a record nothing holds is an integrity failure");
+    assert!(matches!(err, Error::Integrity(_)), "{err:?}");
+    assert!(
+        err.message().contains("is not in the resident chain"),
+        "{}",
+        err.message()
+    );
+    assert!(
+        matches!(
+            ledger.lookup(&DecisionId::new("phantom")).await.unwrap(),
+            Presence::Resident { .. }
+        ),
+        "and the answer is never converted into an absence"
     );
 
     f.store.shutdown().await.unwrap();
@@ -1537,6 +1671,203 @@ async fn an_old_writer_is_detected_and_the_backstop_then_refuses_what_it_cannot_
     let repaired = fresh.recheck_coverage().await.unwrap();
     assert!(repaired.is_complete(), "{repaired:?}");
     fresh.append(decision("after-repair")).await.unwrap();
+    f.store.shutdown().await.unwrap();
+}
+
+/// FR-010, FR-020, B-11, D-14. The observation `coverage()` itself makes is
+/// the one B-11 names second: a resident record met without a row. The
+/// verdict this handle carries moves on it, and the move reaches every clone
+/// sharing that handle, because spec 015 clones the ledger into the appender
+/// task and a verdict one clone moved has to be the verdict the other reads.
+///
+/// This is the first of the two findings reproduced against the merged
+/// `9b38b34`, where `coverage()` computed the evidence and discarded it:
+/// `lookup` of the unstamped record answered `Absent` and an append of a new
+/// id returned `Ok` on a handle that had just been told the chain could not
+/// account for itself.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_observed_incomplete_coverage_degrades_the_verdict_on_this_handle_and_its_clones() {
+    let f = common::open().await;
+    let ledger = open_ledger(f.handle()).await;
+    // Spec 015 clones the ledger into the appender task; the verdict is
+    // shared, so this clone is the one that must not keep answering from
+    // confidence the other handle has lost.
+    let appender = ledger.clone();
+
+    // A covered chain: `open`'s gate passed and absence is answerable.
+    let known = ledger.append(decision("known")).await.unwrap();
+    assert_eq!(
+        ledger.lookup(&DecisionId::new("never-used")).await.unwrap(),
+        Presence::Absent,
+        "on a covered chain an unused id is proven absent"
+    );
+
+    // A replica on a binary that does not stamp appends behind this one's
+    // back, which is the degradation B-11 exists for.
+    let unstamped = unstamped_append(&ledger, &f.handle(), "old-writer").await;
+
+    let before = ledger.read_counts();
+    let coverage = ledger.coverage().await.unwrap();
+    let after = ledger.read_counts();
+    assert_eq!(coverage.unstamped_resident(), 1, "{coverage:?}");
+    assert!(!coverage.is_complete(), "{coverage:?}");
+    assert_eq!(
+        after.census - before.census,
+        1,
+        "the verdict moved on the evidence this read already carried: the move \
+         itself issues no leader read"
+    );
+
+    // The record the chain cannot account for is not proven absent, and
+    // neither is anything else, on this handle or on the clone.
+    for handle in [&ledger, &appender] {
+        for id in ["old-writer", "never-used"] {
+            assert!(
+                matches!(
+                    handle.lookup(&DecisionId::new(id)).await.unwrap(),
+                    Presence::Unproven { .. }
+                ),
+                "{id} is unproven once this node has seen the chain cannot account \
+                 for itself"
+            );
+        }
+    }
+    // And the record itself is still there: nothing was repaired, hidden or
+    // deleted by the observation.
+    assert!(
+        ledger
+            .records()
+            .await
+            .unwrap()
+            .iter()
+            .any(|r| r.record.record_hash == unstamped.record.record_hash),
+        "the unstamped record is untouched evidence"
+    );
+
+    // The unknown is refused, on this handle and on the clone, and neither
+    // writes a record.
+    for (handle, id) in [
+        (&ledger, "new-after-observation"),
+        (&appender, "on-a-clone"),
+    ] {
+        let err = handle
+            .append(decision(id))
+            .await
+            .expect_err("an id the chain cannot prove free is not spent");
+        assert!(matches!(err, Error::Conflict(_)), "{err:?}");
+        assert!(
+            err.message().contains("rahi ledger reindex"),
+            "{}",
+            err.message()
+        );
+        assert!(
+            !ledger
+                .records()
+                .await
+                .unwrap()
+                .iter()
+                .any(|r| r.record.id == id),
+            "{id} was refused and written anyway"
+        );
+    }
+
+    // The verified retry is still admitted and a reused id still refused,
+    // which is what keeps a recovery working through the incident.
+    assert_eq!(ledger.append(decision("known")).await.unwrap(), known);
+    let err = ledger
+        .append(other_content("known"))
+        .await
+        .expect_err("a reused id is refused under the backstop too");
+    assert!(matches!(err, Error::Conflict(_)), "{err:?}");
+
+    // Reading coverage again on a chain that is still incomplete never
+    // restores confidence, and neither does anything but `recheck_coverage`
+    // over a chain that has actually been repaired.
+    assert!(!ledger.coverage().await.unwrap().is_complete());
+    assert!(
+        ledger.append(decision("still-refused")).await.is_err(),
+        "a second read of the same evidence is not a repair"
+    );
+    let reopened = open_ledger(f.handle()).await;
+    assert!(
+        reopened.coverage().await.unwrap().is_complete(),
+        "`open`'s backfill gives the resident record its row"
+    );
+    assert!(
+        ledger.append(decision("still-refused")).await.is_err(),
+        "the repaired chain does not restore a verdict this handle has not rechecked"
+    );
+    assert!(ledger.recheck_coverage().await.unwrap().is_complete());
+    ledger.append(decision("after-the-recheck")).await.unwrap();
+    assert_eq!(
+        appender
+            .lookup(&DecisionId::new("never-used"))
+            .await
+            .unwrap(),
+        Presence::Absent,
+        "and the restored verdict reaches the clone too"
+    );
+    f.store.shutdown().await.unwrap();
+}
+
+/// D-16, B-11. An append that loses a compare-and-swap and retries asks the
+/// backstop again, because this node's verdict can go incomplete while the
+/// invocation is still in flight and a later attempt is a new write.
+///
+/// The degradation is driven at the append seam, never waited out on a
+/// clock: the hook writes an unstamped record, has a clone observe it, and
+/// moves the head so this attempt's compare-and-swap loses.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_retry_that_observed_degradation_mid_invocation_refuses_the_unknown() {
+    let f = common::open().await;
+    let ledger = open_ledger(f.handle()).await;
+    ledger.append(decision("known")).await.unwrap();
+
+    let rival = ledger.clone();
+    let store = f.handle();
+    let once = Arc::new(AtomicBool::new(false));
+    let retrying = ledger.clone().with_append_seam({
+        let once = Arc::clone(&once);
+        AppendSeam::new(move |stage| {
+            let once = Arc::clone(&once);
+            let rival = rival.clone();
+            let store = store.clone();
+            async move {
+                if stage != AppendStage::BeforeInsert || once.swap(true, Ordering::SeqCst) {
+                    return None;
+                }
+                // A replica on an old image appends without stamping, this
+                // node observes it, and the head moves off the parent this
+                // attempt chained onto. The attempt therefore loses its
+                // compare-and-swap and retries with a degraded verdict.
+                unstamped_append(&rival, &store, "old-writer").await;
+                assert!(!rival.coverage().await.unwrap().is_complete());
+                None
+            }
+        })
+    });
+
+    let err = retrying
+        .append(decision("unknown-mid-flight"))
+        .await
+        .expect_err("a retry does not spend an id this node can no longer prove free");
+    assert!(matches!(err, Error::Conflict(_)), "{err:?}");
+    assert!(
+        err.message().contains("rahi ledger reindex"),
+        "{}",
+        err.message()
+    );
+    assert!(
+        !ledger
+            .records()
+            .await
+            .unwrap()
+            .iter()
+            .any(|r| r.record.id == "unknown-mid-flight"),
+        "and no record is written"
+    );
+    // The verified retry is still admitted on the same degraded handle.
+    assert!(ledger.append(decision("known")).await.is_ok());
     f.store.shutdown().await.unwrap();
 }
 
