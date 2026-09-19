@@ -51,6 +51,14 @@
 //! hash links and [`Ledger::resident_root`] names the hash the oldest
 //! resident record chains onto.
 //!
+//! The ceiling the chain commits to is not frozen at first boot. Spec 036
+//! makes a manifest change one more ordinary record: a [`ManifestTransition`]
+//! appended at the deploy step, after which [`Ledger::current_manifest`] is
+//! what a booting kernel checks itself against. Verification is re-anchored
+//! on the chain's own genesis record rather than on the manifest the process
+//! happens to hold ([`Ledger::open`]), so a widened ceiling reads as a
+//! missing deploy step and damage still reads as damage.
+//!
 //! What a decision is *about* is spec 015's, which owns the kinds and emits
 //! them.
 
@@ -63,6 +71,7 @@ pub mod record;
 pub mod seal;
 pub mod segment;
 pub mod signer;
+pub mod transition;
 pub mod verify;
 
 pub use append::APPEND_ATTEMPTS;
@@ -74,8 +83,12 @@ pub use record::{
 };
 pub use seal::{Depth, SealPolicy};
 pub use segment::{
-    SEGMENT_PREFIX, SEGMENTS_INDEX_SQL, SEGMENTS_TABLE_SQL, Segment, SegmentHeader, order_segments,
+    SEGMENT_PREFIX, SEGMENTS_ADD_MANIFEST_SQL, SEGMENTS_COLUMNS_SQL, SEGMENTS_INDEX_SQL,
+    SEGMENTS_MANIFEST_COLUMN, SEGMENTS_TABLE_SQL, Segment, SegmentHeader, order_segments,
     segment_hash,
 };
 pub use signer::{DEFAULT_KEY_PATH, LedgerSigner, LedgerVerifier};
+pub use transition::{
+    BinaryVersions, ManifestTransition, SYSTEM_DEPLOY, TRANSITION_KIND, check_fits,
+};
 pub use verify::{order_chain, verify_chain};

@@ -275,19 +275,45 @@ async fn a_decision_without_an_id_never_reaches_the_store() {
     f.store.shutdown().await.unwrap();
 }
 
+/// Spec 036 B-4 and D-5: the chain is its own anchor.
+///
+/// Before spec 036 this open was `Error::Integrity`: the booted manifest was
+/// the verification anchor, so widening a ceiling was reported as a broken
+/// audit proof. The anchor is now the chain's own stored genesis record, so
+/// the open succeeds and reports what the chain says rather than what this
+/// process brought, and the booted manifest is judged against
+/// `Ledger::current_manifest` one step later, by `Kernel::boot`, as
+/// `Error::Stale`. What did not move is damage: the tests below still make a
+/// broken link, a forged signature, and a fork `Error::Integrity` here.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn a_ledger_booted_against_another_manifest_refuses_the_chain() {
+async fn a_ledger_booted_against_another_manifest_reports_the_chains_own_root() {
     let f = common::open().await;
     let ledger = open_ledger(f.handle()).await;
     ledger.append(decision("d-1")).await.unwrap();
 
     let other_manifest = Hash::parse(format!("sha256:{}", "ab".repeat(32))).unwrap();
-    let err = Ledger::open(f.handle(), common::signer(), other_manifest)
+    let reopened = Ledger::open(f.handle(), common::signer(), other_manifest.clone())
         .await
-        .expect_err("refused");
-    assert!(
-        matches!(err, Error::Integrity(_)),
-        "spec 015 B-8: a chain whose genesis parent is not this manifest's hash is damage: {err}"
+        .expect("the chain verifies against its own genesis record");
+    assert_eq!(
+        reopened.genesis_parent(),
+        &common::root(),
+        "the genesis parent is read from the chain, never from the booted manifest"
+    );
+    assert_eq!(
+        reopened.current_manifest().await.unwrap(),
+        common::root(),
+        "with no transition appended, the current manifest is still the genesis parent"
+    );
+    assert_ne!(
+        reopened.current_manifest().await.unwrap(),
+        other_manifest,
+        "the booted manifest has not been adopted, and nothing here pretends it has"
+    );
+    assert_eq!(
+        reopened.count().await.unwrap(),
+        2,
+        "no second genesis record was written over the chain that already existed"
     );
 
     f.store.shutdown().await.unwrap();

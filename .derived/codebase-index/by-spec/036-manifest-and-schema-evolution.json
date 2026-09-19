@@ -39,6 +39,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-ledger/src/seal.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-ledger/src/segment.rs",
         "source": "spec-edge"
       },
@@ -48,6 +52,10 @@
       },
       {
         "path": "crates/rahi-ledger/src/verify.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ledger/tests/append.rs",
         "source": "spec-edge"
       },
       {
@@ -200,6 +208,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-ledger/src/seal.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/src/seal.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-ledger/src/segment.rs"
           }
         ],
@@ -221,6 +242,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-ledger/src/verify.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ledger/tests/append.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/tests/append.rs"
         }
       },
       {
@@ -319,5 +353,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "b4e2d69e6fbcddd818e104e6982800039f4a8f319972e55635d3945d577ad32d"
+  "shardHash": "7c1ed76f75a624429687368ab95192f42d9f339bee99910376a2d01f24de5e19"
 }
