@@ -16,7 +16,12 @@
 //! - **The chain commits to it.** [`Manifest::hash`] is the genesis parent of
 //!   the decision chain (spec 013 B-2), so a ledger and a manifest that do not
 //!   agree cannot boot together ([`Kernel::boot`], spec 015 B-8), and every
-//!   denial becomes a record in that chain ([`observe`], spec 015 B-6).
+//!   denial becomes a record in that chain ([`observe`], spec 015 B-6). The
+//!   ceiling is not frozen at first boot, though: spec 036 makes a manifest
+//!   change a transition record appended at the deploy step, so what
+//!   [`Kernel::boot`] compares against is the chain's *current* manifest, and
+//!   a booted manifest nobody adopted is [`Error::Stale`] naming the step
+//!   that adopts it rather than an integrity failure.
 //!
 //! ```no_run
 //! # use rahi_kernel::{Kernel, Manifest};
@@ -325,18 +330,27 @@ impl fmt::Debug for Kernel {
 }
 
 impl Kernel {
-    /// Boot against an already-open ledger (spec 015 B-8).
+    /// Boot against an already-open ledger (spec 015 B-8, spec 036 B-4).
     ///
-    /// The ledger's genesis parent must be this manifest's hash. A cell whose
-    /// manifest changed without a deploy genesis record would otherwise keep
-    /// appending to a chain that commits to the *old* ceiling, and the whole
-    /// point of rooting the chain at the manifest is that it does not.
+    /// The chain's *current* manifest must be this manifest's hash. A cell
+    /// whose manifest changed without the deploy step that adopts it would
+    /// otherwise keep appending to a chain that commits to the old ceiling,
+    /// and the whole point of committing the chain to a manifest is that it
+    /// does not.
+    ///
+    /// Spec 036 B-4 makes that mismatch [`Error::Stale`] and names the
+    /// command that clears it: an unadopted manifest is a missing deploy
+    /// step, not tampering. Damage is untouched and stays fatal: the chain's
+    /// own verification ran in [`Ledger::open`] before this, a broken link or
+    /// a forged signature is [`Error::Integrity`] there, and this check never
+    /// stands in for it.
     ///
     /// # Errors
     ///
-    /// [`Error::Integrity`] when the ledger is rooted at a different hash;
-    /// [`Error::Validation`] when the manifest's gate cannot be assembled;
-    /// the ledger's own error when the head cannot be read.
+    /// [`Error::Stale`] when the chain's current manifest is not this
+    /// manifest's hash; [`Error::Validation`] when the manifest's gate cannot
+    /// be assembled; the ledger's own error, including
+    /// [`Error::Integrity`], when the chain cannot be read.
     pub async fn boot(
         manifest: Manifest,
         store: StoreHandle,
@@ -379,11 +393,12 @@ impl Kernel {
         F: Future<Output = Result<Hash, Error>> + Send + 'static,
     {
         let hash = manifest.hash()?;
-        if ledger.genesis_parent() != &hash {
-            return Err(Error::Integrity(format!(
-                "the ledger is rooted at {} and the booted manifest hashes to {hash}: the \
-                 manifest changed without a deploy genesis record",
-                ledger.genesis_parent()
+        let current = ledger.current_manifest().await?;
+        if current != hash {
+            return Err(Error::Stale(format!(
+                "the chain's current manifest is {current} and this binary's manifest hashes to \
+                 {hash}: the manifest has not been adopted, which is a missing deploy step and \
+                 not damage; run: rahi migrate --adopt-manifest"
             )));
         }
         let gate = manifest.gate()?;

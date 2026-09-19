@@ -29,7 +29,12 @@ extends:
   - { spec: "014-ledger-sealing-and-archive", unit: "crates/rahi-ledger/src/seal.rs", nature: additive }
   - { spec: "013-ledger-decision-chain", unit: "crates/rahi-ledger/tests/append.rs", nature: additive }
   - { spec: "015-kernel-manifest-and-adjudication", unit: "crates/rahi-kernel/src/lib.rs", nature: additive }
+  - { spec: "015-kernel-manifest-and-adjudication", unit: "crates/rahi-kernel/src/manifest.rs", nature: additive }
+  - { spec: "015-kernel-manifest-and-adjudication", unit: "crates/rahi-kernel/tests/adjudicate.rs", nature: additive }
   - { spec: "011-store-hiqlite", unit: "crates/rahi-store/src/migrate.rs", nature: additive }
+  - { spec: "011-store-hiqlite", unit: "crates/rahi-store/src/lib.rs", nature: additive }
+  - { spec: "011-store-hiqlite", unit: "crates/rahi-store/Cargo.toml", nature: additive }
+  - { spec: "011-store-hiqlite", unit: "crates/rahi-store/tests/migrate.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/migrate.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/restore.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/archive.rs", nature: additive }
@@ -376,6 +381,33 @@ record shows what was asked as well as what was answered.
   additionally kept on the append path itself, so a caller that builds a
   transition without going through the verb still cannot write a record
   past the bound.
+
+- **D-7 (2026-09-18, build session; the transition's decision id).** B-2
+  fixes the payload and leaves the id open. The id is
+  `manifest:<head>:<to>`, each hash abbreviated to its last sixteen hex
+  characters, which is the convention spec 015 D-8 already set for the boot
+  nonce. It has to be unique for the life of the chain and it has to be
+  fixed before the append, because spec 013 B-3 keeps the id across every
+  compare-and-swap retry; naming the head the transition was built against
+  gives both, and it distinguishes the four records a cell writes going H1
+  to H2 to H1 to H2, which `manifest:<from>:<to>` would collide on.
+  Alternatives rejected: an ordinal count of transitions, which is not
+  answerable once a transition has been sealed away without adding a second
+  counter to the segment header that spec 042 would then have to carry; and
+  the target hash alone, which collides on any readoption.
+- **D-8 (2026-09-18, build session; the two absences B-7 and B-8 create).**
+  Both new facts are optional in their types and neither is ever inferred.
+  `Migration::new` produces a migration that is **not** additive and
+  `Migration::additive()` is the declaration B-8 names, so a migration that
+  has not said it is safe to serve from an older binary has not said it;
+  `RecordedMigration::additive` is `None` on a row written before this spec
+  and `is_additive()` reads that as false for the same reason. A
+  `SegmentHeader` sealed before this spec carries `current_manifest: None`,
+  which `Ledger::current_manifest` reads as "this segment names none" and
+  falls back through, rather than as a manifest. Absence is never
+  permission (constitution) and never evidence. Alternative rejected:
+  defaulting an undeclared migration to additive, which would make every
+  pre-036 store look rollback-safe on no evidence at all.
 
 ## Verification
 

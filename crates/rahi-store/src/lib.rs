@@ -49,7 +49,7 @@ pub use backup::{BackupId, BackupListing};
 pub use blob::{Blob, DEFAULT_PAGE_ROWS, EXTENSIONS, EngineReport, MAX_VALUE_BYTES};
 pub use config::{EncKey, EncKeys, Peer, S3Backup, StoreConfig, StoreSecrets};
 pub use lock::{FENCE_TABLE_SQL, LEASE_TTL_SECONDS, Lease};
-pub use migrate::{Migration, MigrationReport};
+pub use migrate::{Migration, MigrationReport, RecordedMigration, check_checksums};
 pub use notify::{Envelope, Listen, Notify};
 pub use outbox::{OUTBOX_TABLE_SQL, Outbox, TxnBuilder};
 pub use query::{Page, Value};

@@ -458,11 +458,28 @@ impl Manifest {
     /// mean the manifest types drifted; [`Error::Validation`] when the gate
     /// cannot be assembled.
     pub fn hash(&self) -> Result<Hash, Error> {
-        let value = serde_json::to_value(self)
-            .map_err(|e| Error::Integrity(format!("the manifest does not serialize: {e}")))?;
-        let model = canonical_keysort_json::to_canonical_string(&value);
+        let model = self.canonical_model()?;
         let gate = self.gate()?.config_hash();
         Hash::parse(sha256_hex(format!("{model}\n{gate}").as_bytes()))
+    }
+
+    /// The canonical (key-sorted) JSON of the parsed model.
+    ///
+    /// The first half of what [`Manifest::hash`] digests, and what spec 036
+    /// B-2 retains in a manifest transition record, so an auditor reading the
+    /// chain recomputes the hash from the record alone rather than needing
+    /// the deploy's artefacts. There is one producer of these bytes, here, so
+    /// the model a transition carries and the model its hash was taken over
+    /// cannot drift apart.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Integrity`] when the model does not serialize, which would
+    /// mean the manifest types drifted.
+    pub fn canonical_model(&self) -> Result<String, Error> {
+        let value = serde_json::to_value(self)
+            .map_err(|e| Error::Integrity(format!("the manifest does not serialize: {e}")))?;
+        Ok(canonical_keysort_json::to_canonical_string(&value))
     }
 }
 

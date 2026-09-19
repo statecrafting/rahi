@@ -31,6 +31,14 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-kernel/src/manifest.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-kernel/tests/adjudicate.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-ledger/src/chain.rs",
         "source": "spec-edge"
       },
@@ -75,7 +83,19 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-store/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-store/src/migrate.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/tests/migrate.rs",
         "source": "spec-edge"
       },
       {
@@ -177,6 +197,32 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-kernel/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-kernel/src/manifest.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/manifest.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-kernel/tests/adjudicate.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/tests/adjudicate.rs"
         }
       },
       {
@@ -299,6 +345,32 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-store/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-store/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-store/src/migrate.rs"
           }
         ],
@@ -307,6 +379,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-store/src/migrate.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-store/tests/migrate.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/migrate.rs"
         }
       },
       {
@@ -353,5 +438,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "7c1ed76f75a624429687368ab95192f42d9f339bee99910376a2d01f24de5e19"
+  "shardHash": "f6e6fd53457085e91581991dc7a7154a189d8f35dfcf46281b66c1056ee2d587"
 }

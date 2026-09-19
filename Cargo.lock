@@ -3276,6 +3276,7 @@ dependencies = [
 name = "rahi-store"
 version = "0.2.0"
 dependencies = [
+ "attest-ledger-core",
  "futures-core",
  "hiqlite",
  "rahi-types",
