@@ -194,6 +194,14 @@ impl Ledger {
     /// answer falls back to the genesis parent, which is what such a chain
     /// has always named.
     ///
+    /// This read inherits spec 016 D-2's hazard and fails closed under it: a
+    /// local read that drops its rows answers `Ok(vec![])`, which reads here
+    /// as "no transition is resident" and walks back to the segment headers
+    /// and then to the genesis parent. The answer is then older than the
+    /// truth, never newer, so `Kernel::boot` refuses a manifest that was in
+    /// fact adopted (`Error::Stale`, naming the deploy step) rather than
+    /// admitting one that was not. Nothing is written on that path.
+    ///
     /// # Errors
     ///
     /// [`Error::Integrity`] when the chain does not read back as one list or

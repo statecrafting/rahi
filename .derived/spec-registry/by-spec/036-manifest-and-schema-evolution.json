@@ -304,6 +304,6 @@
     "summary": "Today a cell's manifest is frozen at its first boot: the manifest hash is the chain's genesis parent, Ledger::open checks the first record against the booted manifest on every open, and any change to the manifest (one added grant, otel switched on) makes serve exit 1 with an integrity error on the existing volume. Spec 015 B-8 names the missing step, \"a deploy genesis record\", and nothing defines it. Migrations have the mirror problems: serve accepts a store ahead of the binary, a changed migration under an applied version is skipped silently, and restore checks no compatibility. This spec makes a manifest change a signed transition record appended at deploy, checks the booted manifest against the chain's current manifest, records a checksum per migration, lets an older binary serve a newer schema only across migrations declared additive, and makes restore refuse an archive it cannot serve. It carries the worked consumer example for an upgrade, a rollback, and a restore.\n",
     "title": "Manifest and schema evolution: a ledgered manifest transition, a checked migration history, and a restore that refuses what it cannot serve"
   },
-  "shardHash": "2956ddc18cc39f4f3af87869a963a6cce72fbb380b49669e2e7fd9597fbb9563",
+  "shardHash": "6c2f3d3d89070e05011d1f4cac5610517061db2503f914cb59999466b728697c",
   "specVersion": "1.3.0"
 }

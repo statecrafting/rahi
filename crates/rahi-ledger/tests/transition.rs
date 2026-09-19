@@ -372,3 +372,48 @@ async fn a_chain_with_no_transition_is_unchanged_by_this_spec() {
 
     f.store.shutdown().await.unwrap();
 }
+
+/// A chain that answers with no root is damage, not an empty chain.
+///
+/// `Ledger::open` reads the chain's genesis parent back from the store
+/// (B-4), and an absent root has two possible causes: there is no chain
+/// yet, or the read did not answer, which a local read reports as no rows
+/// rather than as an error (spec 016 D-2). They have opposite consequences,
+/// because the genesis record the first case wants written is a valid
+/// compare-and-swap onto the real head in the second: it would land, persist,
+/// and leave a `ledger.genesis` record in the middle of an audit chain.
+/// Constitution XI settles which way to fail.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_chain_with_records_but_no_root_refuses_rather_than_re_genesising() {
+    let f = common::open().await;
+
+    // One row whose parent is its own hash: a cycle of one, so the root
+    // query answers nothing while the chain is plainly not empty. This is
+    // the shape a dropped read is indistinguishable from.
+    let mut looped = decision("d-loop");
+    looped.prev_hash = common::root();
+    let mut record = SignedRecord::build(&looped, &common::signer()).expect("builds");
+    record.record.previous_record_hash = record.record.record_hash.clone();
+    common::seed_chain(&f.handle(), std::slice::from_ref(&record)).await;
+
+    let err = Ledger::open(f.handle(), common::signer(), common::root())
+        .await
+        .expect_err("a chain with records and no root is refused");
+    assert!(matches!(err, Error::Integrity(_)), "{err}");
+    assert_eq!(err.exit_code(), 1, "integrity is fatal at boot: {err}");
+    assert!(err.message().contains("no root"), "{err}");
+
+    // And the refusal wrote nothing: the row it found is the only one there.
+    let store = f.handle();
+    #[derive(serde::Deserialize)]
+    struct Count {
+        total: i64,
+    }
+    let rows: Vec<Count> = store
+        .query_consistent("SELECT COUNT(*) AS total FROM kernel_decisions", vec![])
+        .await
+        .unwrap();
+    assert_eq!(rows[0].total, 1, "no second genesis record was appended");
+
+    f.store.shutdown().await.unwrap();
+}

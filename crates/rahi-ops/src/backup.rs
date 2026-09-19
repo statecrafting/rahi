@@ -92,8 +92,11 @@ pub struct Outcome {
 
 /// Gather every part of a backup, or fail with nothing written.
 ///
-/// `manifest_hash` is the booted manifest's hash, recorded so a restore can
-/// be checked against the cell it lands in.
+/// `manifest_hash` is the chain's current manifest at backup time (spec 036
+/// B-9), recorded so a restore can be checked against the cell it lands in.
+/// On an adopted cell that is the booted manifest; on one whose deploy step
+/// has not run it is not, and the chain's answer is the one a restore has to
+/// be judged against.
 ///
 /// # Errors
 ///

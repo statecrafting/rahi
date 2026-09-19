@@ -158,6 +158,7 @@ impl Ledger {
         match ledger.stored_genesis_parent().await? {
             Some(stored) => ledger.genesis_parent = stored,
             None => {
+                ledger.refuse_a_second_genesis().await?;
                 ledger.append(ledger.genesis_decision()).await?;
             }
         }
@@ -189,6 +190,38 @@ impl Ledger {
         }
         let records: Vec<ParentRow> = self.store.query_consistent(RECORD_ROOT_SQL, vec![]).await?;
         one_root(records.into_iter().map(|row| row.prev_hash), "chain")
+    }
+
+    /// Nothing is resident and nothing is sealed, so writing genesis is
+    /// writing the chain's first record rather than a second one.
+    ///
+    /// [`Ledger::stored_genesis_parent`] answering `None` is not on its own
+    /// enough to conclude that. A local read that fails while stepping its
+    /// rows comes back as `Ok(vec![])` rather than an error (spec 016 D-2),
+    /// so an absent root is either an empty chain or a probe that did not
+    /// answer, and the two have opposite consequences: the second genesis
+    /// this would write is a valid compare-and-swap onto the real head, so it
+    /// lands, persists, and leaves a `ledger.genesis` record in the middle of
+    /// an audit chain. Constitution XI settles which way to fail. This is the
+    /// same cross-check [`Ledger::head`] makes before it calls an absent head
+    /// a fresh chain.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Integrity`] when anything is resident or sealed while no root
+    /// was found; the store's own error when a count cannot be read.
+    async fn refuse_a_second_genesis(&self) -> Result<(), Error> {
+        let resident = self.count().await?;
+        let sealed = self.segment_count().await?;
+        if resident == 0 && sealed == 0 {
+            return Ok(());
+        }
+        Err(Error::Integrity(format!(
+            "the chain has {resident} resident record(s) and {sealed} sealed segment(s) but no \
+             root: either its links form a cycle or the read that looks for the root did not \
+             answer, and writing a second genesis record over either would be the damage rather \
+             than the repair"
+        )))
     }
 
     /// The hash the chain's genesis record links to.

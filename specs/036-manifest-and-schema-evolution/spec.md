@@ -444,6 +444,29 @@ record shows what was asked as well as what was answered.
   refusing every pre-036 archive, which would strand exactly the archives an
   upgrading consumer has.
 
+- **D-10 (2026-09-18, build session; an absent root is not an empty chain).**
+  B-4 says the genesis parent is read from the chain and does not say what an
+  absent answer means. It has two possible causes with opposite consequences:
+  there is no chain yet, or the read did not answer, which a local read
+  reports as no rows rather than as an error (spec 016 D-2). Treating the
+  second as the first writes a genesis record that is a valid
+  compare-and-swap onto the real head, so it lands, persists, and leaves a
+  `ledger.genesis` record in the middle of an audit chain. `Ledger::open`
+  therefore cross-checks the resident and sealed counts before it writes
+  genesis, and refuses with `Error::Integrity` when either is non-zero while
+  no root was found. Constitution XI settles the direction: under doubt the
+  ledger stops rather than guesses, and the refusal writes nothing.
+
+  The same shape predates this spec (the previous `open` asked two reads and
+  wrote genesis when both came back empty), and the same hazard is answered
+  the same way twice more in this change, in the two column probes that
+  refuse an empty answer from a table they have just created. The reads this
+  spec adds that are **not** guarded fail closed on their own and are marked
+  so in place: `Ledger::current_manifest` walking back to an older answer
+  makes `Kernel::boot` refuse a manifest that was in fact adopted, and writes
+  nothing. Alternative rejected: retrying the probe, which cannot tell a
+  retry that succeeded from one that dropped its rows again.
+
 ## 8. Status
 
 - **2026-09-18.** B-1 to B-10, FR-001 to FR-006, and AC-1 to AC-4 hold.
