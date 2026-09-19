@@ -24,6 +24,10 @@
 //!   the transition has been sealed away, the last sealed segment's header
 //!   carries the manifest current at its tail (B-5), so the answer survives
 //!   the hot window without fetching an archived body.
+//! - **An answer that did not arrive is never an older manifest.** Both
+//!   reads account for their own rows, and neither falls back past what
+//!   `Ledger::open` established, because an older answer an old image
+//!   matches is what lets that image boot (D-11).
 
 use rahi_types::{Error, Revision, Sub};
 use serde::{Deserialize, Serialize};
@@ -32,6 +36,7 @@ use crate::chain::Ledger;
 use crate::record::{
     Decision, DecisionId, DecisionKind, Hash, Outcome, SignedRecord, revision_stamp,
 };
+use crate::segment::SegmentHeader;
 
 /// The decision kind a manifest transition carries (B-2).
 pub const TRANSITION_KIND: &str = "manifest.transition";
@@ -194,31 +199,109 @@ impl Ledger {
     /// answer falls back to the genesis parent, which is what such a chain
     /// has always named.
     ///
-    /// This read inherits spec 016 D-2's hazard and fails closed under it: a
-    /// local read that drops its rows answers `Ok(vec![])`, which reads here
-    /// as "no transition is resident" and walks back to the segment headers
-    /// and then to the genesis parent. The answer is then older than the
-    /// truth, never newer, so `Kernel::boot` refuses a manifest that was in
-    /// fact adopted (`Error::Stale`, naming the deploy step) rather than
-    /// admitting one that was not. Nothing is written on that path.
+    /// This read fails closed under spec 016 D-2's hazard, and spec 036 D-11
+    /// corrects how. D-10 recorded that walking back to an older answer could
+    /// only make `Kernel::boot` refuse a manifest that was in fact adopted.
+    /// That is wrong: on a chain that has gone H1 to H2, the genesis parent
+    /// *is* H1, so an H1 replica restarting on the old image agrees with the
+    /// stale answer and boots under a ceiling the chain no longer names,
+    /// which is exactly what spec 036 B-10 and D-4 refuse. The sealed case
+    /// has the same shape through the segment headers.
+    ///
+    /// So nothing here walks back past evidence that contradicts it. Both
+    /// reads carry their own census from one snapshot
+    /// ([`crate::chain::check_census`]), so an answer that did not arrive or
+    /// that lost rows is [`Error::Integrity`] rather than an absence. And
+    /// what `Ledger::open` saw is carried forward, because records are only
+    /// appended and segments only added: an empty resident answer on a chain
+    /// `open` found records in, or an empty segment answer on one it found
+    /// segments in, is the read failing and is refused here. Nothing on
+    /// either path writes.
+    ///
+    /// What still falls through, because it is a real absence rather than an
+    /// unread one: a chain that has never transitioned answers its genesis
+    /// parent, and a segment sealed before this spec names no manifest (D-8).
     ///
     /// # Errors
     ///
-    /// [`Error::Integrity`] when the chain does not read back as one list or
-    /// a transition record's payload is not a transition; the store's own
-    /// error when the leader cannot be reached.
+    /// [`Error::Integrity`] when the chain does not read back as one list,
+    /// when a read does not account for its own rows, when a read contradicts
+    /// what `open` established, or when a transition record's payload is not
+    /// a transition; the store's own error when the leader cannot be reached.
     pub async fn current_manifest(&self) -> Result<Hash, Error> {
-        for record in self.records().await?.iter().rev() {
+        let (segments, records) = self.witnessed_chain().await?;
+        for record in records.iter().rev() {
             if let Some(transition) = ManifestTransition::of(record)? {
                 return Ok(transition.to);
             }
         }
-        if let Some(header) = self.segments().await?.last()
+        if let Some(header) = segments.last()
             && let Some(current) = &header.current_manifest
         {
             return Ok(current.clone());
         }
         Ok(self.genesis_parent().clone())
+    }
+
+    /// The canonical text of the manifest the chain currently names, when the
+    /// chain itself still holds it (spec 036 D-9, D-14).
+    ///
+    /// `None` is a real absence and only that: a chain that has never
+    /// transitioned carries no earlier manifest text (the genesis record
+    /// holds the hash, not the model), and one whose last transition has been
+    /// sealed away holds it in the archive, which a deploy step does not
+    /// fetch. A read that did not answer is [`Error::Integrity`] through the
+    /// same guards [`Ledger::current_manifest`] uses, never a `None` a caller
+    /// would report as "no earlier manifest to diff against".
+    ///
+    /// # Errors
+    ///
+    /// As [`Ledger::current_manifest`].
+    pub async fn current_manifest_model(&self) -> Result<Option<String>, Error> {
+        let (_, records) = self.witnessed_chain().await?;
+        for record in records.iter().rev() {
+            if let Some(transition) = ManifestTransition::of(record)? {
+                return Ok(Some(transition.model));
+            }
+        }
+        Ok(None)
+    }
+
+    /// The sealed headers and the resident records, each having accounted for
+    /// its own rows and neither contradicting what `open` established
+    /// (spec 036 D-11).
+    async fn witnessed_chain(&self) -> Result<(Vec<SegmentHeader>, Vec<SignedRecord>), Error> {
+        let opened = self.opened();
+
+        // Both readings are taken, and both are checked against what `open`
+        // established, before either is used. Taking the sealed evidence
+        // first is deliberate: the resident chain is rooted at the last
+        // segment's terminal hash once anything has been sealed, so a segment
+        // read that did not answer would otherwise surface as an unrelated
+        // complaint about the resident chain's root.
+        let segments = self.segments().await?;
+        if segments.is_empty() && opened.sealed {
+            return Err(Error::Integrity(
+                "the segment headers read back empty, and this ledger verified segments when it \
+                 opened: segments are only ever added, so this is the read failing rather than \
+                 the archive emptying, and the manifest the chain names cannot be concluded from \
+                 it"
+                .to_owned(),
+            ));
+        }
+
+        let records = self.records().await?;
+        if records.is_empty() && opened.resident {
+            return Err(Error::Integrity(
+                "the resident chain reads back empty, and this ledger verified records in it when \
+                 it opened: records are only ever appended, so this is the read failing rather \
+                 than the chain emptying, and the manifest the chain names cannot be concluded \
+                 from it"
+                    .to_owned(),
+            ));
+        }
+
+        Ok((segments, records))
     }
 
     /// The manifest current at the tail of a run of records, given what the

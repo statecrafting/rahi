@@ -752,11 +752,25 @@ while a deployed cell's manifest was frozen at its first boot.
 - `serve` accepts a store ahead of the binary only when every applied
   version above the binary's last is recorded additive, and otherwise exits
   2 naming the first that is not.
+- A recorded version whose SQL changed is reported before the binary
+  complains that the store is behind, so a store that is both reports the
+  altered version rather than routine work to do.
 - `restore` reads the archive's `manifest.json`, whose `manifest_hash` is
   the chain's current manifest at backup time and whose `schema` is the
   store's migration history. It refuses, writing nothing, an archive whose
   schema is ahead across a non-additive migration, and one whose manifest
-  differs from the binary's unless `--adopt` is given.
+  differs from the binary's unless `--adopt` is given. Schema compatibility
+  is established before the destination is replaced or the restore refuses:
+  an archive written before spec 036 records no `schema`, and its history is
+  read out of the archived database itself (the app snapshot is the
+  destination's database byte for byte). An archive that yields no such
+  evidence is refused with exit 2, untouched destination. `--adopt`
+  authorizes a manifest difference and nothing else.
+- The chain's current manifest is never answered from a read that did not
+  answer. A replica that restarts on the old image after a transition
+  refuses to boot, and that holds whether the evidence is a resident
+  transition record, a sealed segment header, or a read that came back
+  empty: the last of those is an integrity failure, not an older manifest.
 
 ### The procedure
 

@@ -10,6 +10,7 @@ implementation: complete
 risk: critical
 wave: 3
 depends_on:
+  - "010-workspace-and-core-types"
   - "011-store-hiqlite"
   - "013-ledger-decision-chain"
   - "014-ledger-sealing-and-archive"
@@ -44,6 +45,8 @@ extends:
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/tests/cli.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/verbs.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/backup.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-ops/Cargo.toml", nature: additive }
+  - { spec: "010-workspace-and-core-types", unit: "Cargo.toml", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/tests/common/mod.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/tests/restore.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/tests/backup.rs", nature: additive }
@@ -131,7 +134,11 @@ entrypoint (031), and the migration Job (032). Two new test files.
   applies the cell's migrations and then, on the leader, appends a
   transition when the booted manifest differs from the chain's current
   one; when they are equal it appends nothing and says so. It prints the
-  grants added and removed. `docker/entrypoint.sh` and the migration Job
+  grants added and removed, or reports the diff **unavailable** when the
+  previous ceiling's canonical text cannot be recovered through the
+  supported read path; it never prints an empty diff in that case, and a
+  read that fails is an error rather than an unavailable diff (D-14).
+  `docker/entrypoint.sh` and the migration Job
   pass the flag, so a deployment adopts its manifest in the same step that
   migrates it. A follower refuses as `migrate` does (exit 2).
 - **B-4 (the boot check).** `Ledger::open` verifies the chain from its
@@ -177,8 +184,15 @@ entrypoint (031), and the migration Job (032). Two new test files.
   refuses with exit 2, writing nothing, when the archive's schema is
   ahead of the binary across a non-additive migration, or when the
   archive's current manifest differs from the binary's and `--adopt` was
-  not given. With `--adopt` it restores, and the next deploy step's
-  `--adopt-manifest` appends the transition.
+  not given. Schema compatibility is **established before the destination
+  is replaced, or the restore is refused**: an archive whose
+  `manifest.json` records no history is judged on the history read out of
+  the archived database itself, and refused with exit 2 when that evidence
+  cannot be obtained or does not check (D-12). `--adopt` authorizes a
+  manifest difference and nothing else: it never bypasses the schema check
+  or an integrity check. With `--adopt` it restores a schema-compatible
+  archive, and the next deploy step's `--adopt-manifest` appends the
+  transition.
 
 ### Rolling updates at N=3
 
@@ -212,6 +226,29 @@ entrypoint (031), and the migration Job (032). Two new test files.
   `migrate --adopt-manifest` against an oversized manifest and asserts exit
   1, that `schema_version` did not move, and that the chain gained no
   record.
+- **FR-007 (D-11).** A ledger test appends H1 to H2, verifies, then makes
+  the resident read answer nothing and asserts `current_manifest` is
+  `Error::Integrity` rather than the genesis parent, so an H1 image cannot
+  boot on it; a second does the same for a chain whose transition has been
+  sealed and whose segment read answers nothing. Unit tests over the census
+  assert that a missing witness row and a row count below the witnessed
+  total are both refused, and that a witnessed empty relation is accepted.
+- **FR-008 (D-12).** Restore tests cover a legacy archive whose
+  `manifest.json` records no schema: one whose archived database proves the
+  baseline and restores, one whose archived database is ahead across a
+  non-additive migration and is refused with `Error::Stale`, and one whose
+  payload yields no usable evidence and is refused with `Error::Stale`. Each
+  is run with `--adopt` both set and unset, and the destination is asserted
+  untouched on every refusal.
+- **FR-009 (D-13).** An ops test applies a migration, alters its SQL, adds a
+  further pending migration, and asserts `check_current` is
+  `Error::Integrity` naming the altered version rather than `Error::Stale`;
+  a companion asserts the behind-version `Error::Stale` is unchanged when
+  every checksum agrees.
+- **FR-010 (D-14).** An ops test asserts that an adoption whose previous
+  model cannot be recovered reports the diff unavailable, and that a
+  recovery path whose read does not answer is an error rather than an
+  unavailable diff.
 
 ## 5. Acceptance criteria
 
@@ -230,6 +267,13 @@ entrypoint (031), and the migration Job (032). Two new test files.
   bound, and `ledger.max_record_bytes` as the setting that carries it; the
   run applies no migration, appends no record, and leaves the chain's
   current manifest where it was.
+- **AC-5 (the corrections, D-11 to D-14).** `current_manifest` never
+  answers an older manifest from a read that did not answer; `restore`
+  applies nothing whose schema compatibility has not been established;
+  `check_current` reports an altered applied migration as
+  `Error::Integrity` even when the store is also behind; and an adoption
+  reports an unavailable grant diff only when the chain genuinely holds no
+  earlier manifest text. FR-007 to FR-010 are the tests that hold these.
 
 ### The worked consumer example
 
@@ -467,6 +511,126 @@ record shows what was asked as well as what was answered.
   nothing. Alternative rejected: retrying the probe, which cannot tell a
   retry that succeeded from one that dropped its rows again.
 
+- **D-11 (2026-09-18, owner decision; the manifest read establishes its own
+  evidence, and D-10's safety note was wrong).** D-10 marked
+  `Ledger::current_manifest` as a read that "fails closed on its own",
+  reasoning that walking back to an older answer can only make
+  `Kernel::boot` refuse a manifest that was in fact adopted. That reasoning
+  is wrong and is corrected here; D-10's text is left standing so the record
+  shows what was believed as well as what was found.
+
+  The older answer is not safe, because an older *image* can match it. A
+  cell that adopts H1 to H2 and then restarts a replica on the H1 image is
+  exactly the case B-10 and D-4 refuse: the H1 replica must not boot. If the
+  resident read comes back empty after a successful verification, the walk
+  back reaches the genesis parent, which on that chain **is** H1, the booted
+  manifest agrees with it, and the H1 image boots and adjudicates under a
+  ceiling the chain no longer names. The sealed-history case has the same
+  shape: the transition's segment header carries H2, and a segment read that
+  comes back empty falls back to the same genesis parent with the same
+  result. An absent answer never proves absence, and this read was relying on
+  it twice.
+
+  The correction is that the evidence is made to witness itself, and no
+  fallback is taken past evidence that contradicts it:
+
+  - **Each read carries its own census, from one snapshot.** The resident
+    chain and the sealed headers are each read through one compound
+    statement that always yields a witness row carrying that relation's
+    `COUNT(*)` evaluated in the same statement, followed by the rows
+    themselves. A missing witness row is a read that did not answer, and a
+    row count below the witnessed total is a read that dropped rows; both are
+    `Error::Integrity` and nothing is written. A separate `COUNT(*)` issued
+    as its own statement is deliberately **not** what is used: two statements
+    are two snapshots, and a legitimate append between them is
+    indistinguishable from a lost row.
+  - **What `open` established is carried forward, because it only grows.**
+    `Ledger::open` verifies the chain before it returns, so it knows whether
+    anything was resident and whether anything was sealed. Neither fact can
+    become false afterwards: records are appended and segments are added,
+    and a seal that empties the hot window adds the segment in the same
+    transaction. `current_manifest` therefore refuses, with
+    `Error::Integrity`, to read an empty resident answer as "no transition"
+    when `open` saw records, or an empty segment answer as "nothing sealed"
+    when `open` saw segments, instead of walking back to an older manifest.
+
+  What this does not claim: a store that answers every statement
+  consistently wrong is outside what reading that store can detect, and the
+  guarantee is stated at that bound rather than beyond it. What is preserved:
+  a fresh chain with no transition still answers its genesis parent, a
+  segment sealed before this spec still names no manifest and still falls
+  through (D-8), and nothing on either path writes.
+
+- **D-12 (2026-09-18, owner decision; unknown compatibility does not
+  authorize a restore).** D-9's second paragraph let `restore` apply an
+  archive whose `manifest.json` records no migration history, reporting
+  through `restore::schema_checked` that the schema could not be checked.
+  The owner does not approve restoring on that basis. That exception is
+  superseded: D-9's first paragraph (the grant diff) stands, its second is
+  replaced by this entry.
+
+  The policy is: schema compatibility is established before the destination
+  is replaced, or the restore refuses with `Error::Stale` (exit 2), naming
+  the evidence that is missing and leaving the destination untouched. There
+  is no unchecked-restore bypass and no flag that buys one. `--adopt`
+  authorizes a manifest difference only; it never bypasses the schema check
+  or an integrity check.
+
+  A legacy archive is not stranded, because the evidence it lacks in its
+  metadata it still carries in its payload. The archive's app part is the
+  hiqlite snapshot, written byte for byte as the destination's database
+  (`restore::reset_app_node`), so it is an ordinary SQLite database and its
+  `schema_version` table is the same recorded history a live store answers
+  from. `restore` reads that table out of the archived database and checks it
+  exactly as it checks a recorded `ArchiveSchema`. So a supported legacy
+  success path demonstrates its evidence: the history came from the archive
+  itself. An archive whose payload cannot be opened, or that holds no
+  `schema_version` table when its recorded version is above the baseline, or
+  whose history is ahead of this binary across a non-additive migration, is
+  refused. An archived database that holds no `schema_version` table at all
+  has provably applied no migration, which is the baseline, and that is
+  evidence rather than silence. `restore::schema_checked` therefore no longer
+  reports a restore that happened without a check, because no such restore
+  happens.
+
+- **D-13 (2026-09-18, owner decision; integrity outranks staleness when the
+  store is also behind).** B-7 says `migrate` and `serve` refuse a recorded
+  version whose checksum differs from the binary's, and B-2 of spec 030 says
+  a store behind the binary is `Error::Stale`. The spec was silent on which
+  answers first when both are true, and `migrate::check_current` returned
+  `Error::Stale` before it ever compared a checksum, so a store with an
+  altered applied migration **and** a pending one reported only that it
+  needed migrating. Running the named command would then apply the pending
+  migration on top of a history the binary cannot vouch for.
+
+  The checksum check runs first. A recorded version whose SQL differs from
+  this binary's is `Error::Integrity` (exit 1) naming that version, whether or
+  not the store is also behind, because it is a statement about what already
+  ran rather than about what has yet to run. The ordinary behind-version
+  refusal is unchanged when every recorded checksum agrees. The `migrate`
+  path already had this order, since `StoreHandle::migrate` compares
+  checksums before it applies anything; this makes `serve` agree with it.
+  Alternative rejected: reporting staleness first because it is the more
+  common case, which is how an altered migration came to be reported as
+  routine work.
+
+- **D-14 (2026-09-18, owner decision; the grant diff's bounded
+  unavailability, and what is not an unavailability).** D-9's first paragraph
+  stands and B-3 now carries it: the grant diff is reported **unavailable**
+  when the previous ceiling's canonical text cannot be recovered through the
+  supported read path, which is a chain that has never transitioned and one
+  whose last transition has been sealed away. An empty diff is never printed
+  in that case, because it would read as "no grants changed".
+
+  What this entry adds is the distinction the implementation must keep. A
+  read that fails is not an unavailability. The previous model is recovered
+  through `Ledger::records`, which D-11 makes self-witnessing, so a read that
+  does not answer is `Error::Integrity` and the adoption stops; only a chain
+  that genuinely holds no earlier manifest text reports the diff unavailable.
+  Alternative rejected: treating any `None` from the recovery path as an
+  unavailable diff, which is what turned a failed read into an ordinary
+  report.
+
 ## 8. Status
 
 - **2026-09-18.** B-1 to B-10, FR-001 to FR-006, and AC-1 to AC-4 hold.
@@ -503,6 +667,46 @@ record shows what was asked as well as what was answered.
   that carries it honors the additive rule, a binary built before it has no
   such check and cannot be given one, and a replica already running
   re-evaluates nothing after boot (B-10, D-4).
+
+- **2026-09-18 (the corrections).** Four code-level findings were reproduced
+  against the merged implementation (`ae12c69`) and fixed, each with a
+  regression that fails without the fix. D-11 to D-14 record the decisions;
+  AC-5 and FR-007 to FR-010 are what hold them.
+
+  1. **`Ledger::current_manifest` failed open, not closed.** D-10 reasoned
+     that walking back to an older answer could only refuse a manifest that
+     was adopted. It can also *admit* an older image: on a chain that went
+     H1 to H2, the genesis parent is H1, so an H1 replica agrees with the
+     stale answer and boots under a superseded ceiling (B-10, D-4). The
+     sealed-history path had the same shape through the segment headers. The
+     resident and sealed reads now each carry their own `COUNT(*)` from the
+     same statement, and neither falls back past what `open` verified.
+     `crates/rahi-ledger/tests/transition.rs` reproduces both, and both fail
+     when the guards are removed.
+  2. **An unknown archive schema no longer authorizes a restore.** D-9's
+     legacy exception is superseded by D-12. The history is read out of the
+     archived database's own `schema_version` table, which is the same table
+     a live store answers from because the app part *is* the destination's
+     database. An archive that yields no such evidence is `Error::Stale`,
+     exit 2, destination untouched. `restore::schema_checked` is gone;
+     `restore::SchemaEvidence` names what each restore was judged on.
+  3. **Integrity outranks staleness.** `migrate::check_current` returned
+     `Error::Stale` before it compared a checksum, so an altered applied
+     migration plus a pending one reported only that the store was behind.
+     The checksum check runs first now (D-13). The `migrate` path already had
+     this order through `StoreHandle::migrate`, and the regression asserts
+     both paths.
+  4. **The grant diff's limitation is explicit.** B-3 and D-14 carry it: the
+     diff is reported unavailable only when the chain genuinely holds no
+     earlier manifest text, and a read that does not answer is an error
+     instead. `Ledger::current_manifest_model` is the supported recovery
+     path and shares the guards from finding 1.
+
+  Preserved and re-checked, not assumed: the oversized-manifest policy (D-6,
+  AC-4), spec 030's independent command-set test, spec 015 AC-2's dependency
+  shape, the fresh-chain and pre-036 fallbacks (D-8), and every existing
+  integrity guarantee. Consumer-visible API movement is recorded in
+  `CHANGELOG.md` under the unreleased 0.2.0 section.
 
 ## Verification
 

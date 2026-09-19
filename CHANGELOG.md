@@ -98,8 +98,14 @@ is neither registry availability nor evidence of consumer deployment.
 - **Archive format**: `manifest.json` gains `schema`, the store's migration
   history at backup time, and its `manifest_hash` is now the chain's current
   manifest rather than the booted one. An archive written before this
-  release carries no `schema`; `restore` reports that its schema could not
-  be checked rather than treating silence as a passed check.
+  release carries no `schema`, and its compatibility is established from the
+  archived database itself: `restore` reads `schema_version` out of the app
+  snapshot (which is the destination's database byte for byte) and judges it
+  exactly as it judges a recorded history. There is no restore that was not
+  judged. An archive whose payload yields no such evidence is refused with
+  `Error::Stale`, exit 2, and the destination is untouched. `--adopt`
+  authorizes a manifest difference only; it never bypasses the schema check
+  or an integrity check.
 - **`Cell` surface**: `Migration` gains `additive` and the builder
   `Migration::additive()`. A migration that does not declare itself additive
   is not additive. `serve` accepts a store ahead of the binary only when
@@ -114,7 +120,24 @@ is neither registry availability nor evidence of consumer deployment.
 - `restore` gains `--adopt` and refuses, writing nothing, an archive whose
   schema is ahead across a non-additive migration or whose chain names a
   manifest this binary does not. The Rust API is now
-  `rahi_ops::restore::run(&config, &archive, &key, &Compatibility)`.
+  `rahi_ops::restore::run(&config, &archive, &key, &Compatibility)`;
+  `restore::Outcome::Restored` carries a `restore::SchemaEvidence` naming
+  what the restore was judged on, `restore::check_compatible` takes the
+  archive's parts and returns that evidence, and `restore::schema_checked`
+  is gone because a restore that was not checked no longer happens.
+- `serve` reports an applied migration whose SQL differs from this binary's
+  as `Error::Integrity`, exit 1, naming that version, even when the store is
+  also behind the binary. Earlier in this release cycle such a store was
+  reported only as stale, and running the named command would have applied
+  the pending migration on top of a history the binary cannot vouch for.
+- `Ledger::current_manifest` refuses rather than answering an older manifest
+  from a read that did not answer. Both reads carry their own row count from
+  one snapshot, and neither falls back past what `Ledger::open` verified, so
+  a replica cannot boot on a superseded ceiling because a read came back
+  empty. `Ledger::current_manifest_model` is the supported way to recover
+  the previous ceiling's text; `migrate --adopt-manifest` reports the grant
+  diff as unavailable only when the chain genuinely holds no earlier
+  manifest text, never because a read failed.
 - A transition retains the adopted manifest whole or adoption is refused:
   a record that would exceed the cell's `ledger.max_record_bytes` is
   `Error::Validation` (exit 1) naming the measured size and the bound, with

@@ -77,11 +77,12 @@ pub fn expected_version(migrations: &[Migration]) -> u32 {
 
 /// The store is one this binary may serve (B-2, spec 036 B-7 and B-8).
 ///
-/// Three questions, in the order an operator wants them answered. Behind the
-/// binary is [`Error::Stale`] naming the command that closes the gap, as
-/// B-2 has always had it. A recorded version whose SQL differs from this
-/// binary's is [`Error::Integrity`] and fatal, because what ran and what
-/// this build declares are not the same migration (036 B-7). Ahead of the
+/// Three questions. A recorded version whose SQL differs from this binary's
+/// is asked first and is [`Error::Integrity`], fatal, because what ran and
+/// what this build declares are not the same migration (036 B-7), and that
+/// is true whether or not the store is also behind (036 D-13). Behind the
+/// binary is then [`Error::Stale`] naming the command that closes the gap,
+/// as B-2 has always had it. Ahead of the
 /// binary is admitted only when every version above the binary's last
 /// declared itself additive, and refused with [`Error::Stale`] naming the
 /// first that did not (036 B-8): before this spec it was admitted in
@@ -95,6 +96,12 @@ pub fn expected_version(migrations: &[Migration]) -> u32 {
 /// a checksum mismatch; a store failure as itself.
 pub async fn check_current(store: &Store, migrations: &[Migration]) -> Result<()> {
     let history = store.handle().recorded_migrations().await?;
+    // Spec 036 D-13: the checksum check runs first, whether or not the store
+    // is also behind. It is a statement about what already ran, and a store
+    // that is behind as well would otherwise be told only to run `migrate`,
+    // which would apply the pending version on top of a history this binary
+    // cannot vouch for.
+    check_checksums(&history, migrations)?;
     let current = history
         .last()
         .map_or(rahi_store::migrate::BASELINE_VERSION, |row| row.version);
@@ -104,7 +111,6 @@ pub async fn check_current(store: &Store, migrations: &[Migration]) -> Result<()
             "schema_version is {current}, the cell expects {expected}; run: rahi migrate"
         )));
     }
-    check_checksums(&history, migrations)?;
     check_ahead(&history, expected)
 }
 
@@ -330,18 +336,20 @@ pub async fn adopt(
 }
 
 /// The manifest the chain currently names, parsed back from the newest
-/// resident transition record (D-9).
+/// resident transition record (D-9, D-14).
 ///
-/// `None` when the chain has never transitioned, or when the transition that
-/// set the current manifest has been sealed away: the model is in the
-/// archive then, and a deploy step does not fetch archived bodies.
+/// `None` is a real absence and only that: the chain has never transitioned,
+/// or the transition that set the current manifest has been sealed away and
+/// the model is in the archive, which a deploy step does not fetch. A read
+/// that did not answer comes back as [`rahi_types::Error::Integrity`] from
+/// the guarded read rather than as a `None` the caller would print as an
+/// unavailable diff (D-11, D-14).
 async fn previous_model(ledger: &Ledger) -> Result<Option<Manifest>> {
-    for record in ledger.records().await?.iter().rev() {
-        if let Some(transition) = ManifestTransition::of(record)? {
-            return Manifest::parse_model(&transition.model).map(Some);
-        }
-    }
-    Ok(None)
+    ledger
+        .current_manifest_model()
+        .await?
+        .map(|model| Manifest::parse_model(&model))
+        .transpose()
 }
 
 /// The grants added and removed, and whether the two lists are a diff.

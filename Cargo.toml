@@ -100,6 +100,13 @@ opentelemetry-otlp = { version = "0.32", default-features = false, features = ["
 # copy of a primitive already in the tree.
 tar = "0.4"
 age = { version = "0.12", default-features = false }
+# Restore (spec 036 D-12) establishes an archive's schema compatibility
+# before it replaces the destination. An archive written before that spec
+# records no history in its manifest, but its app part is the destination's
+# database byte for byte, so the history is read out of that file directly.
+# rusqlite is already in this tree under hiqlite at this version, so this
+# adds no second SQLite engine.
+rusqlite = { version = "0.40", default-features = false }
 # Preflight (spec 030 B-3) reads the volume's free space; std has no call
 # for it and the workspace forbids unsafe, so a thin wrapper carries it.
 fs4 = "1"

@@ -210,41 +210,175 @@ fn restore_refuses_a_newer_non_additive_archive_and_an_unadopted_manifest() {
         adopt,
     };
 
+    let no_parts: [Part; 0] = [];
+
     // Ahead across a non-additive migration: refused, whatever --adopt says.
-    let err = restore::check_compatible(&archive_manifest(ours, schema(false)), &cell(false))
-        .expect_err("a schema this binary cannot read is refused");
+    let err = restore::check_compatible(
+        &archive_manifest(ours, schema(false)),
+        &no_parts,
+        &cell(false),
+    )
+    .expect_err("a schema this binary cannot read is refused");
     assert!(matches!(err, Error::Stale(_)), "{err}");
     assert_eq!(err.exit_code(), 2, "{err}");
     assert!(err.message().contains("version 2"), "{err}");
-    restore::check_compatible(&archive_manifest(ours, schema(false)), &cell(true))
-        .expect_err("--adopt is about the manifest, never about the schema");
+    restore::check_compatible(
+        &archive_manifest(ours, schema(false)),
+        &no_parts,
+        &cell(true),
+    )
+    .expect_err("--adopt is about the manifest, never about the schema");
 
     // Ahead across an additive one: served.
-    restore::check_compatible(&archive_manifest(ours, schema(true)), &cell(false))
-        .expect("an additive version above the binary restores");
+    let evidence = restore::check_compatible(
+        &archive_manifest(ours, schema(true)),
+        &no_parts,
+        &cell(false),
+    )
+    .expect("an additive version above the binary restores");
+    assert_eq!(evidence, restore::SchemaEvidence::Recorded);
 
     // A manifest the binary does not name: refused without --adopt.
-    let err = restore::check_compatible(&archive_manifest(&theirs, schema(true)), &cell(false))
-        .expect_err("an unadopted manifest is refused");
+    let err = restore::check_compatible(
+        &archive_manifest(&theirs, schema(true)),
+        &no_parts,
+        &cell(false),
+    )
+    .expect_err("an unadopted manifest is refused");
     assert!(matches!(err, Error::Stale(_)), "{err}");
     assert_eq!(err.exit_code(), 2, "{err}");
     assert!(err.message().contains("--adopt"), "{err}");
     assert!(err.message().contains(&theirs), "{err}");
-    restore::check_compatible(&archive_manifest(&theirs, schema(true)), &cell(true))
-        .expect("--adopt restores it, and the next deploy step ledgers the change");
+    restore::check_compatible(
+        &archive_manifest(&theirs, schema(true)),
+        &no_parts,
+        &cell(true),
+    )
+    .expect("--adopt restores it, and the next deploy step ledgers the change");
+}
 
-    // An archive written before this spec records no history at all; that is
-    // reported rather than passed off as a check that ran.
-    let old = archive_manifest(ours, None);
-    restore::check_compatible(&old, &cell(false)).expect("the manifest still matches");
-    assert!(
-        !restore::schema_checked(&old),
-        "and the verb says the schema could not be checked"
-    );
-    assert!(restore::schema_checked(&archive_manifest(
-        ours,
-        schema(true)
-    )));
+/// An app part that is an ordinary SQLite database, the way a hiqlite
+/// snapshot is: `restore` writes it to the destination byte for byte.
+///
+/// `rows` are `schema_version` rows; `None` means the table is never created,
+/// which is what a store no migration has touched looks like.
+fn archived_db(rows: Option<&[(u32, &str, Option<bool>)]>) -> Vec<u8> {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("hiqlite.db");
+    {
+        let db = rusqlite::Connection::open(&path).unwrap();
+        db.execute_batch("CREATE TABLE notes (id TEXT PRIMARY KEY)")
+            .unwrap();
+        if let Some(rows) = rows {
+            db.execute_batch(
+                "CREATE TABLE schema_version (version INTEGER PRIMARY KEY, name TEXT NOT NULL, \
+                 checksum TEXT NULL, additive INTEGER NULL)",
+            )
+            .unwrap();
+            for (version, name, additive) in rows {
+                db.execute(
+                    "INSERT INTO schema_version (version, name, checksum, additive) \
+                     VALUES (?1, ?2, ?3, ?4)",
+                    rusqlite::params![
+                        i64::from(*version),
+                        *name,
+                        format!("sha256:{}", "ee".repeat(32)),
+                        additive.map(i64::from),
+                    ],
+                )
+                .unwrap();
+            }
+        }
+    }
+    std::fs::read(&path).unwrap()
+}
+
+/// A pre-036 archive: its manifest records no schema, and its app part is
+/// the database the evidence has to come out of.
+fn legacy_archive(manifest_hash: &str, app: Vec<u8>) -> (ArchiveManifest, Vec<Part>) {
+    let parts = vec![
+        Part::new("app-hiqlite", "db", app),
+        Part::new("rauthy", "snapshot", vec![2]),
+        Part::new("keys", "ledger.key", vec![3]),
+    ];
+    let manifest = ArchiveManifest::over(&parts, 0, manifest_hash.to_owned(), None);
+    (manifest, parts)
+}
+
+/// Spec 036 FR-008, D-12: an archive whose manifest records no history is
+/// judged on the history in its own payload, or it is refused. There is no
+/// unchecked restore, and `--adopt` never buys one.
+#[test]
+fn a_legacy_archive_is_judged_on_the_database_it_carries_or_refused() {
+    let ours = common::manifest_hash_text();
+    let list = migrations();
+    let cell = |adopt: bool| Compatibility {
+        manifest_hash: ours,
+        migrations: &list,
+        adopt,
+    };
+
+    for adopt in [false, true] {
+        // A database that has applied nothing has provably applied nothing:
+        // the baseline, read out of the file's own catalogue.
+        let (manifest, parts) = legacy_archive(ours, archived_db(None));
+        let evidence = restore::check_compatible(&manifest, &parts, &cell(adopt))
+            .expect("a legacy archive at the baseline is compatible");
+        assert_eq!(
+            evidence,
+            restore::SchemaEvidence::ArchivedDatabase,
+            "and it says where the evidence came from"
+        );
+
+        // Ahead across a version the archived database records additive.
+        let (manifest, parts) = legacy_archive(
+            ours,
+            archived_db(Some(&[(1, "notes", Some(true)), (2, "widen", Some(true))])),
+        );
+        restore::check_compatible(&manifest, &parts, &cell(adopt))
+            .expect("every version above this binary's last is recorded additive");
+
+        // Ahead across one it does not: refused, with or without --adopt.
+        let (manifest, parts) = legacy_archive(
+            ours,
+            archived_db(Some(&[
+                (1, "notes", Some(true)),
+                (2, "rewrite", Some(false)),
+            ])),
+        );
+        let err = restore::check_compatible(&manifest, &parts, &cell(adopt))
+            .expect_err("a schema this binary cannot read is refused");
+        assert!(matches!(err, Error::Stale(_)), "{err}");
+        assert_eq!(err.exit_code(), 2, "{err}");
+        assert!(err.message().contains("version 2"), "{err}");
+
+        // A version that declared nothing is not additive (D-8), so the same
+        // refusal stands for a row written before spec 036.
+        let (manifest, parts) = legacy_archive(
+            ours,
+            archived_db(Some(&[(1, "notes", Some(true)), (2, "undeclared", None)])),
+        );
+        restore::check_compatible(&manifest, &parts, &cell(adopt))
+            .expect_err("an undeclared version above the binary is not permission");
+
+        // A payload that yields no evidence at all: refused, never restored
+        // on a warning.
+        let (manifest, parts) = legacy_archive(ours, b"this is not a database".to_vec());
+        let err = restore::check_compatible(&manifest, &parts, &cell(adopt))
+            .expect_err("no evidence, no restore");
+        assert!(matches!(err, Error::Stale(_)), "{err}");
+        assert_eq!(err.exit_code(), 2, "{err}");
+        assert!(
+            err.message().contains("cannot be established"),
+            "the message names the missing evidence: {err}"
+        );
+
+        // And an archive with no app part at all.
+        let (manifest, _) = legacy_archive(ours, archived_db(None));
+        let err = restore::check_compatible(&manifest, &[], &cell(adopt))
+            .expect_err("nothing to read the history out of");
+        assert!(matches!(err, Error::Stale(_)), "{err}");
+    }
 }
 
 /// Spec 036 B-9: the refusal happens before a byte of the volume is written.
@@ -313,4 +447,125 @@ async fn a_refused_restore_writes_nothing() {
     .await
     .expect("--adopt restores it");
     assert!(rahi_ops::restore_marker(&into).exists());
+}
+
+/// Spec 036 FR-009, D-13 and B-7: an applied migration whose SQL changed is
+/// an integrity failure even when the store is also behind the binary.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_altered_applied_migration_outranks_the_behind_version_refusal() {
+    let dir = tempfile::tempdir().unwrap();
+    let stub = common::stub(b"rauthy-snapshot", false).await;
+    let config = common::config(dir.path(), stub.addr);
+    let keys = common::write_keys(&config.keys_dir());
+    let store = common::open_store(&config, &keys).await;
+
+    // Version 1 applied, as it was declared.
+    migrate::run(&store, &migrations())
+        .await
+        .expect("1 applies");
+    migrate::check_current(&store, &migrations())
+        .await
+        .expect("the store is exactly what this binary declares");
+
+    // The binary now declares a different version 1 and a pending 2. Before
+    // D-13 this reported only that the store was behind, and running the
+    // named command would have applied 2 on top of a history this binary
+    // cannot vouch for.
+    let altered = vec![
+        Migration::new(
+            1,
+            "notes",
+            "CREATE TABLE notes (id TEXT PRIMARY KEY, body TEXT)",
+        )
+        .additive(),
+        Migration::new(2, "widen", "CREATE TABLE widen (id TEXT PRIMARY KEY)").additive(),
+    ];
+    let err = migrate::check_current(&store, &altered)
+        .await
+        .expect_err("what ran and what this build declares are not the same migration");
+    assert!(matches!(err, Error::Integrity(_)), "{err}");
+    assert_eq!(err.exit_code(), 1, "{err}");
+    assert!(
+        err.message().contains("migration 1"),
+        "it names the altered version: {err}"
+    );
+
+    // B-7 on the migrate path too: the verb refuses before it applies the
+    // pending version, which is where this order already held.
+    let err = migrate::run(&store, &altered)
+        .await
+        .expect_err("migrate refuses the altered history");
+    assert!(matches!(err, Error::Integrity(_)), "{err}");
+    assert_eq!(
+        migrate::schema_version(&store).await.unwrap(),
+        1,
+        "and nothing was applied"
+    );
+
+    // The ordinary behind-version refusal is unchanged when every recorded
+    // checksum agrees.
+    let mut honest = migrations();
+    honest.push(Migration::new(2, "widen", "CREATE TABLE widen (id TEXT PRIMARY KEY)").additive());
+    let err = migrate::check_current(&store, &honest)
+        .await
+        .expect_err("the store is behind");
+    assert!(matches!(err, Error::Stale(_)), "{err}");
+    assert_eq!(err.exit_code(), 2, "{err}");
+    assert!(err.message().contains("rahi migrate"), "{err}");
+
+    store.shutdown().await.unwrap();
+}
+
+/// Spec 036 FR-010, D-14: a read that does not answer is an error, never an
+/// unavailable grant diff.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_recovery_read_that_does_not_answer_is_never_an_unavailable_diff() {
+    let dir = tempfile::tempdir().unwrap();
+    let stub = common::stub(b"rauthy-snapshot", false).await;
+    let config = common::config(dir.path(), stub.addr);
+    let keys = common::write_keys(&config.keys_dir());
+    let store = common::open_store(&config, &keys).await;
+    let ledger = common::open_ledger(&store, &keys).await;
+
+    let manifest = Manifest::parse(&widened()).expect("the widened manifest parses");
+    migrate::adopt(&store, &ledger, &manifest, &migrations())
+        .await
+        .expect("the deploy step runs");
+    assert!(
+        ledger.current_manifest_model().await.unwrap().is_some(),
+        "the chain holds the adopted manifest's text"
+    );
+
+    // The resident read stops answering, the rows all still there.
+    store
+        .handle()
+        .execute(
+            "ALTER TABLE kernel_decisions RENAME TO kernel_decisions_kept",
+            vec![],
+        )
+        .await
+        .unwrap();
+    store
+        .handle()
+        .execute(
+            "CREATE VIEW kernel_decisions AS SELECT id, prev_hash, hash, record FROM \
+             kernel_decisions_kept WHERE 0",
+            vec![],
+        )
+        .await
+        .unwrap();
+
+    let err = ledger
+        .current_manifest_model()
+        .await
+        .expect_err("a read that did not answer is not an absent manifest");
+    assert!(matches!(err, Error::Integrity(_)), "{err}");
+
+    // And the deploy step stops rather than printing an unavailable diff.
+    let err = migrate::adopt(&store, &ledger, &manifest, &migrations())
+        .await
+        .expect_err("the adoption stops");
+    assert!(matches!(err, Error::Integrity(_)), "{err}");
+
+    store.shutdown().await.unwrap();
 }

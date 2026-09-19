@@ -3265,6 +3265,7 @@ dependencies = [
  "rahi-types",
  "reqwest",
  "ring",
+ "rusqlite",
  "serde",
  "serde_json",
  "tar",
