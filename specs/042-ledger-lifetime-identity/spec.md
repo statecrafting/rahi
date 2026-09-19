@@ -6,7 +6,7 @@ kind: kernel
 domain: ledger
 created: "2026-09-17"
 authors: ["Bartek Kus"]
-implementation: pending
+implementation: in-progress
 risk: critical
 wave: 3
 depends_on:
