@@ -704,7 +704,8 @@ further.
   re-evaluates nothing after it has booted. D-5 orders 036 before 042 for
   reconciliation reasons (the two recoverable startup refusals reading as one
   boot path, in the order D-8 states, and building reindex against 036 B-5's
-  final segment header shape), never for a fencing claim. And if the owner later
+  final segment header shape), never for a fencing claim. And if the owner
+  later
   wants a real version fence across this spec, it is a separate governed
   change that must first establish a chassis-owned migration lane; section 6
   puts it out of scope here.
@@ -1255,8 +1256,9 @@ sets.
   refusal this spec adds has to read as one boot path beside the one 036
   adds, which D-8 states exactly, and reindex should be built against 036
   B-5's final segment header shape) and for no fencing reason: D-6 records
-  that 036 fences nothing about this spec. This session neither implements any spec nor changes any spec's
-  approval state, and it alters neither 040 nor 041.
+  that 036 fences nothing about this spec. This session neither implements
+  any spec nor changes any spec's approval state, and it alters neither 040
+  nor 041.
 - **D-6 (2026-09-18, owner-directed correction; settles B-1 against B-13's
   alternative).** The identity, collision and coverage tables ship as chassis
   baseline DDL created by `Ledger::open`, not as a migration declared
