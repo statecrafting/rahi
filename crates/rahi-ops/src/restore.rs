@@ -356,6 +356,9 @@ fn read_schema_version(db: &rusqlite::Connection) -> rusqlite::Result<Vec<Record
         let checksum: Option<String> = row.get(2)?;
         let additive: Option<i64> = row.get(3)?;
         Ok(RecordedMigration {
+            // A negative version is damage; saturating it puts the row above
+            // any version this binary carries, with nothing declaring it
+            // additive, so the archive is refused rather than admitted.
             version: u32::try_from(version).unwrap_or(u32::MAX),
             name,
             checksum: checksum.filter(|text| !text.is_empty()),

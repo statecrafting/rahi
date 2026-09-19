@@ -548,7 +548,7 @@ pub(crate) fn check_census(
     }
     Err(Error::Integrity(format!(
         "the read of {what} witnessed {expected} row(s) in its own snapshot and carried \
-         {carried}: the answer is incomplete, so nothing may be concluded from it"
+         {carried}: the answer does not account for itself, so nothing may be concluded from it"
     )))
 }
 
@@ -627,7 +627,11 @@ mod tests {
     fn a_read_that_carried_fewer_rows_than_it_witnessed_is_refused() {
         let err = check_census("kernel_decisions", Some(3), 2).expect_err("a short answer");
         assert!(matches!(err, Error::Integrity(_)), "{err:?}");
-        assert!(err.message().contains("incomplete"), "{}", err.message());
+        assert!(
+            err.message().contains("does not account for itself"),
+            "{}",
+            err.message()
+        );
 
         let err = check_census("kernel_decisions", Some(3), 0).expect_err("nothing carried");
         assert!(matches!(err, Error::Integrity(_)), "{err:?}");
