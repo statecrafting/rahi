@@ -218,7 +218,7 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
                 adopt,
             };
             match rahi_ops::restore::run(&config, &archive, &source, &cell).await? {
-                Outcome::Restored(marker) => {
+                Outcome::Restored(marker, evidence) => {
                     println!(
                         "restore: applied {} ({} parts); rauthy's snapshot is at {}; marker written to {}",
                         marker.archive,
@@ -226,12 +226,13 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
                         marker.rauthy_snapshot,
                         rahi_ops::restore_marker(&config).display()
                     );
-                    if !rahi_ops::restore::schema_checked(&marker.manifest) {
-                        println!(
-                            "restore: the archive predates spec 036 and records no migration \
-                             history, so its schema could not be checked against this binary"
-                        );
-                    }
+                    // Spec 036 D-12: a restore that happened was judged, so
+                    // this names the evidence rather than reporting an
+                    // unchecked one.
+                    println!(
+                        "restore: schema compatibility was established from {}",
+                        evidence.describe()
+                    );
                     if marker.manifest.manifest_hash != hash {
                         println!(
                             "restore: the restored chain names manifest {}, this binary's is {}; \

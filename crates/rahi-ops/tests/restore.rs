@@ -51,7 +51,7 @@ async fn restore_yields_a_verifying_store_with_the_same_keys_and_is_single_shot(
     let outcome = restore::run(&config, &archive_path, &key, &common::compatibility())
         .await
         .expect("the archive restores into an empty volume");
-    let Outcome::Restored(marker) = outcome else {
+    let Outcome::Restored(marker, _) = outcome else {
         panic!("first restore applies");
     };
     assert_eq!(

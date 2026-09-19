@@ -27,11 +27,13 @@ getrandom = { workspace = true }
 nix = { workspace = true }
 tempfile = { workspace = true }
 tar = { workspace = true }
+rusqlite = { workspace = true }
 age = { workspace = true }
 tokio = { workspace = true, features = ["fs", "macros", "net", "process", "signal", "time"] }
 
 [dev-dependencies]
 axum = { workspace = true }
+rusqlite = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "time"] }
 

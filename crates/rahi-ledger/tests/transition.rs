@@ -417,3 +417,149 @@ async fn a_chain_with_records_but_no_root_refuses_rather_than_re_genesising() {
 
     f.store.shutdown().await.unwrap();
 }
+
+/// Make every read of `table` come back with no rows while the rows are all
+/// still there: the shape spec 016 D-2 leaves behind, reproduced through the
+/// store's own DDL rather than by deleting anything.
+///
+/// The table keeps its rows under a second name and a view of the same name
+/// answers nothing, so a read that "did not answer" and a relation that is
+/// genuinely empty are indistinguishable to the reader, which is the whole
+/// of the hazard.
+async fn reads_stop_answering(store: &rahi_store::StoreHandle, table: &str, columns: &str) {
+    store
+        .execute(
+            format!("ALTER TABLE {table} RENAME TO {table}_kept"),
+            vec![],
+        )
+        .await
+        .expect("the table is set aside");
+    store
+        .execute(
+            format!("CREATE VIEW {table} AS SELECT {columns} FROM {table}_kept WHERE 0"),
+            vec![],
+        )
+        .await
+        .expect("a view of the same name that answers nothing");
+}
+
+/// FR-007, D-11: H1 to H2, then a resident read that answers nothing.
+///
+/// This is the defect D-10 called safe. The walk back reached the genesis
+/// parent, which on this chain **is** H1, so an H1 image agrees with the
+/// stale answer and boots under a ceiling the chain no longer names, which
+/// spec 036 B-10 and D-4 refuse. Now the read stops instead.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_resident_read_that_does_not_answer_never_names_an_older_manifest() {
+    let f = common::open().await;
+    let ledger = open_ledger(f.handle()).await;
+    let h1 = common::root();
+    let h2 = manifest("22");
+
+    ledger
+        .append_transition(
+            &transition(h1.clone(), h2.clone(), r#"{"grants":2}"#),
+            ROOMY,
+        )
+        .await
+        .expect("H1 -> H2 is appended");
+    assert_eq!(ledger.current_manifest().await.unwrap(), h2);
+    ledger
+        .verify_chain(Depth::Resident)
+        .await
+        .expect("the chain verifies before the read is lost");
+
+    reads_stop_answering(
+        &f.handle(),
+        "kernel_decisions",
+        "id, prev_hash, hash, record",
+    )
+    .await;
+
+    // The answer this read used to give is exactly the manifest an H1 image
+    // carries, which is why an older answer is not the safe direction.
+    assert_eq!(
+        ledger.genesis_parent(),
+        &h1,
+        "the fallback would have been H1"
+    );
+    let err = ledger
+        .current_manifest()
+        .await
+        .expect_err("D-11: an absent answer is not an absence");
+    assert!(matches!(err, Error::Integrity(_)), "{err:?}");
+    assert!(
+        err.message().contains("read failing"),
+        "the message says what it found: {}",
+        err.message()
+    );
+
+    f.store.shutdown().await.unwrap();
+}
+
+/// FR-007, D-11: the same shape once the transition has been sealed away.
+///
+/// The segment header carries H2 (B-5). A segment read that answers nothing
+/// used to fall through to the same genesis parent with the same result.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_sealed_read_that_does_not_answer_never_names_an_older_manifest() {
+    let f = common::open().await;
+    let ledger = open_ledger(f.handle()).await;
+    let archive = FsArchive::open(f.dir.path().join("archive")).expect("the archive opens");
+    let policy = SealPolicy::new(4, 4).expect("a tiny window");
+    let h1 = common::root();
+    let h2 = manifest("22");
+
+    ledger
+        .append_transition(
+            &transition(h1.clone(), h2.clone(), r#"{"grants":2}"#),
+            ROOMY,
+        )
+        .await
+        .expect("H1 -> H2 is appended");
+    for i in 1..=12 {
+        ledger.append(decision(&format!("s-{i:02}"))).await.unwrap();
+        ledger.seal_if_needed(&archive, &policy).await.unwrap();
+    }
+    assert!(!ledger.segments().await.unwrap().is_empty());
+    assert!(
+        ledger
+            .records()
+            .await
+            .unwrap()
+            .iter()
+            .all(|r| ManifestTransition::of(r).unwrap().is_none()),
+        "the transition is no longer resident, so the header is the only evidence"
+    );
+    assert_eq!(ledger.current_manifest().await.unwrap(), h2);
+
+    // Reopen so this handle's own verification covers the sealed chain, then
+    // lose the segment read.
+    let reopened = Ledger::open(f.handle(), common::signer(), h1.clone())
+        .await
+        .expect("the sealed chain reopens and verifies");
+    reads_stop_answering(
+        &f.handle(),
+        "kernel_segments",
+        "first_id, last_id, count, segment_hash, prev_segment_hash, last_hash, current_manifest",
+    )
+    .await;
+
+    let err = reopened
+        .current_manifest()
+        .await
+        .expect_err("D-11: the sealed evidence is not absent, it is unread");
+    assert!(matches!(err, Error::Integrity(_)), "{err:?}");
+    assert!(
+        err.message().contains("segment headers read back empty"),
+        "the sealed guard is what refuses: {}",
+        err.message()
+    );
+    assert_ne!(
+        reopened.genesis_parent(),
+        &h2,
+        "H1 is what the fallback would have named"
+    );
+
+    f.store.shutdown().await.unwrap();
+}

@@ -34,8 +34,22 @@ use crate::chain::Ledger;
 use crate::record::{DecisionId, Hash, SignedRecord};
 use crate::segment::{Segment, SegmentHeader, order_segments};
 
-const SEGMENTS_SQL: &str = "SELECT first_id, last_id, count, segment_hash, prev_segment_hash, \
-     last_hash, current_manifest FROM kernel_segments";
+/// Every sealed header, and the count of them taken in the same statement
+/// (spec 036 D-11).
+///
+/// The shape is the decisions table's: a witness row with no `FROM`, so the
+/// statement always yields it, carrying a `COUNT(*)` evaluated in this one
+/// snapshot, and then the rows themselves. An empty answer from this read
+/// used to let [`Ledger::current_manifest`] walk back to the genesis parent,
+/// which on a chain that has transitioned is the manifest an older image
+/// carries.
+const SEGMENTS_CENSUS_SQL: &str = "SELECT 0 AS witness, \
+     (SELECT COUNT(*) FROM kernel_segments) AS total, \
+     '' AS first_id, '' AS last_id, 0 AS count, '' AS segment_hash, \
+     '' AS prev_segment_hash, '' AS last_hash, NULL AS current_manifest \
+     UNION ALL \
+     SELECT 1 AS witness, 0 AS total, first_id, last_id, count, segment_hash, \
+     prev_segment_hash, last_hash, current_manifest FROM kernel_segments";
 
 /// The last segment: the one no other segment claims as its predecessor.
 const SEGMENT_HEAD_SQL: &str = "SELECT first_id, last_id, count, segment_hash, \
@@ -168,6 +182,15 @@ impl SegmentRow {
 }
 
 #[derive(Debug, Deserialize)]
+struct SegmentCensusRow {
+    witness: i64,
+    #[serde(default)]
+    total: i64,
+    #[serde(flatten)]
+    row: SegmentRow,
+}
+
+#[derive(Debug, Deserialize)]
 struct CountRow {
     total: i64,
 }
@@ -221,8 +244,21 @@ impl Ledger {
     /// not form one list rooted at the genesis parent; the store's own error
     /// when the read fails.
     pub async fn segments(&self) -> Result<Vec<SegmentHeader>, Error> {
-        let rows: Vec<SegmentRow> = self.store().query_consistent(SEGMENTS_SQL, vec![]).await?;
-        let headers = rows
+        let rows: Vec<SegmentCensusRow> = self
+            .store()
+            .query_consistent(SEGMENTS_CENSUS_SQL, vec![])
+            .await?;
+        let mut witnessed = None;
+        let mut carried = Vec::new();
+        for row in rows {
+            if row.witness == 0 {
+                witnessed = Some(row.total);
+            } else {
+                carried.push(row.row);
+            }
+        }
+        crate::chain::check_census("kernel_segments", witnessed, carried.len())?;
+        let headers = carried
             .into_iter()
             .map(SegmentRow::into_header)
             .collect::<Result<Vec<_>, Error>>()?;
@@ -340,6 +376,18 @@ impl Ledger {
     /// the archive's own error when a body cannot be fetched at
     /// [`Depth::Full`].
     pub async fn verify_chain(&self, depth: Depth<'_>) -> Result<(), Error> {
+        self.verify_chain_witnessed(depth).await.map(|_| ())
+    }
+
+    /// [`Ledger::verify_chain`], reporting what it saw (spec 036 D-11).
+    ///
+    /// `open` keeps the answer, because verification has already paid for
+    /// both reads and because neither fact it records can become false
+    /// afterwards.
+    pub(crate) async fn verify_chain_witnessed(
+        &self,
+        depth: Depth<'_>,
+    ) -> Result<crate::chain::OpenedChain, Error> {
         let segments = self.segments().await?;
         let root = self.resident_root().await?;
         // `records` is ordered from `root`, and 013's verifier checks that
@@ -351,7 +399,10 @@ impl Ledger {
         if let Depth::Full(archive) = depth {
             self.verify_segment_bodies(archive, &segments).await?;
         }
-        Ok(())
+        Ok(crate::chain::OpenedChain {
+            resident: !records.is_empty(),
+            sealed: !segments.is_empty(),
+        })
     }
 
     /// Fetch and re-verify every archived body, oldest segment first.

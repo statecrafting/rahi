@@ -53,7 +53,20 @@ pub const DECISIONS_INDEX_SQL: &str =
 const HEAD_SQL: &str = "SELECT hash FROM kernel_decisions \
      WHERE hash NOT IN (SELECT prev_hash FROM kernel_decisions)";
 
-const RECORDS_SQL: &str = "SELECT record FROM kernel_decisions";
+/// Every resident record, and the count of them taken in the same statement
+/// (spec 036 D-11).
+///
+/// The first branch has no `FROM`, so SQLite yields it whatever the table
+/// holds: it is the witness that the read answered at all. Its `total` is a
+/// scalar subquery evaluated inside this one statement, so it is the same
+/// snapshot the rows come from, which a second `COUNT(*)` statement would
+/// not be. A missing witness row or a row count below the witnessed total is
+/// a read that did not answer or that dropped rows, and neither may be read
+/// as "the chain holds nothing".
+const RECORDS_CENSUS_SQL: &str = "SELECT 0 AS witness, \
+     (SELECT COUNT(*) FROM kernel_decisions) AS total, X'' AS record \
+     UNION ALL \
+     SELECT 1 AS witness, 0 AS total, record FROM kernel_decisions";
 
 const COUNT_SQL: &str = "SELECT COUNT(*) AS total FROM kernel_decisions";
 
@@ -89,7 +102,10 @@ struct ColumnRow {
 }
 
 #[derive(Debug, Deserialize)]
-struct RecordRow {
+struct RecordCensusRow {
+    witness: i64,
+    #[serde(default)]
+    total: i64,
     record: Vec<u8>,
 }
 
@@ -108,6 +124,23 @@ pub struct Ledger {
     store: StoreHandle,
     signer: LedgerSigner,
     genesis_parent: Hash,
+    opened: OpenedChain,
+}
+
+/// What [`Ledger::open`] established about the chain it verified (spec 036
+/// D-11).
+///
+/// Both facts are monotone: records are only appended, segments are only
+/// added, and a seal that empties the hot window commits its segment in the
+/// same transaction that removes the rows. So neither can become false while
+/// this handle lives, and a later read that contradicts one is the read
+/// failing rather than the chain shrinking.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct OpenedChain {
+    /// `open` saw at least one resident record.
+    pub(crate) resident: bool,
+    /// `open` saw at least one sealed segment.
+    pub(crate) sealed: bool,
 }
 
 impl Ledger {
@@ -148,6 +181,7 @@ impl Ledger {
             store,
             signer,
             genesis_parent,
+            opened: OpenedChain::default(),
         };
         ledger.create_schema().await?;
 
@@ -162,8 +196,17 @@ impl Ledger {
                 ledger.append(ledger.genesis_decision()).await?;
             }
         }
-        ledger.verify_chain(Depth::Resident).await?;
+        // Spec 036 D-11: verification reads the whole resident chain and every
+        // segment header, so what it saw is what this handle carries forward.
+        // Both facts only ever become more true, and `current_manifest`
+        // refuses to walk back past either of them.
+        ledger.opened = ledger.verify_chain_witnessed(Depth::Resident).await?;
         Ok(ledger)
+    }
+
+    /// What [`Ledger::open`] established about this chain (spec 036 D-11).
+    pub(crate) fn opened(&self) -> OpenedChain {
+        self.opened
     }
 
     /// The genesis parent the stored chain itself names, or `None` when
@@ -294,10 +337,23 @@ impl Ledger {
     /// records do not form one list rooted at [`Ledger::resident_root`]; the
     /// store's own error when the read fails.
     pub async fn records(&self) -> Result<Vec<SignedRecord>, Error> {
-        let rows: Vec<RecordRow> = self.store.query_consistent(RECORDS_SQL, vec![]).await?;
-        let records = rows
-            .into_iter()
-            .map(|row| SignedRecord::from_bytes(&row.record))
+        let rows: Vec<RecordCensusRow> = self
+            .store
+            .query_consistent(RECORDS_CENSUS_SQL, vec![])
+            .await?;
+        let mut witnessed = None;
+        let mut carried = Vec::new();
+        for row in rows {
+            if row.witness == 0 {
+                witnessed = Some(row.total);
+            } else {
+                carried.push(row.record);
+            }
+        }
+        check_census("kernel_decisions", witnessed, carried.len())?;
+        let records = carried
+            .iter()
+            .map(|bytes| SignedRecord::from_bytes(bytes))
             .collect::<Result<Vec<_>, Error>>()?;
         order_chain(&self.resident_root().await?, records)
     }
@@ -451,6 +507,51 @@ impl Ledger {
     }
 }
 
+/// A census-bearing read answered, and answered whole (spec 036 D-11).
+///
+/// `witnessed` is the `COUNT(*)` the statement's own witness row carried,
+/// evaluated inside the same statement as the rows, and `carried` is how many
+/// rows the read actually delivered.
+///
+/// There are three ways to fail and each is the same class of fault: a read
+/// whose evidence does not account for itself. `None` is a read that did not
+/// answer at all, which hiqlite reports as an empty result rather than as an
+/// error (spec 016 D-2), and which is exactly the shape an absent answer and
+/// an empty table share. A `carried` below the witness is a read that lost
+/// rows while stepping them. A `carried` above it cannot happen and is not
+/// quietly accepted either.
+///
+/// None of them may be read as "the relation holds nothing": absence is never
+/// evidence (constitution), and the caller that would otherwise walk back to
+/// an older answer stops here instead, having written nothing.
+///
+/// # Errors
+///
+/// [`Error::Integrity`] naming the relation, the witnessed total, and what
+/// the read carried.
+pub(crate) fn check_census(
+    what: &str,
+    witnessed: Option<i64>,
+    carried: usize,
+) -> Result<(), Error> {
+    let Some(total) = witnessed else {
+        return Err(Error::Integrity(format!(
+            "the read of {what} carried no witness row, so it did not answer: an empty result is \
+             not evidence that {what} is empty, and nothing may be concluded from it"
+        )));
+    };
+    let expected = u64::try_from(total)
+        .map_err(|_| Error::Integrity(format!("{what} witnessed a negative count of {total}")))?;
+    let carried = u64::try_from(carried).unwrap_or(u64::MAX);
+    if carried == expected {
+        return Ok(());
+    }
+    Err(Error::Integrity(format!(
+        "the read of {what} witnessed {expected} row(s) in its own snapshot and carried \
+         {carried}: the answer is incomplete, so nothing may be concluded from it"
+    )))
+}
+
 /// The one root of a list, or [`Error::Integrity`] when it has several.
 ///
 /// A list with two roots is a fork at the root, which is the one shape
@@ -497,4 +598,60 @@ pub(crate) async fn hash_of(store: &StoreHandle, id: &DecisionId) -> Result<Opti
         .next()
         .map(|row| Hash::parse(row.hash))
         .transpose()
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used)]
+mod tests {
+    use super::check_census;
+    use rahi_types::Error;
+
+    /// FR-007, D-11: a read that did not answer is not an empty relation.
+    ///
+    /// This is the defect D-10 called safe. Before the correction the absent
+    /// answer fell through to an older manifest, which an older image can
+    /// match; now it stops here.
+    #[test]
+    fn a_read_with_no_witness_row_is_never_an_empty_relation() {
+        let err = check_census("kernel_decisions", None, 0).expect_err("no witness row");
+        assert!(matches!(err, Error::Integrity(_)), "{err:?}");
+        assert!(
+            err.message().contains("did not answer"),
+            "the message says why: {}",
+            err.message()
+        );
+    }
+
+    /// FR-007, D-11: rows lost while stepping are caught by the same snapshot.
+    #[test]
+    fn a_read_that_carried_fewer_rows_than_it_witnessed_is_refused() {
+        let err = check_census("kernel_decisions", Some(3), 2).expect_err("a short answer");
+        assert!(matches!(err, Error::Integrity(_)), "{err:?}");
+        assert!(err.message().contains("incomplete"), "{}", err.message());
+
+        let err = check_census("kernel_decisions", Some(3), 0).expect_err("nothing carried");
+        assert!(matches!(err, Error::Integrity(_)), "{err:?}");
+    }
+
+    /// FR-007, D-11: an emptiness the read witnessed for itself is admitted,
+    /// which is what keeps a fresh chain working.
+    #[test]
+    fn a_witnessed_empty_relation_is_accepted() {
+        check_census("kernel_decisions", Some(0), 0).expect("a witnessed empty relation");
+        check_census("kernel_segments", Some(2), 2).expect("a complete answer");
+    }
+
+    /// More rows than the snapshot holds is not quietly accepted either.
+    #[test]
+    fn a_read_that_carried_more_rows_than_it_witnessed_is_refused() {
+        let err = check_census("kernel_segments", Some(1), 4).expect_err("an over-long answer");
+        assert!(matches!(err, Error::Integrity(_)), "{err:?}");
+    }
+
+    /// A negative witness is damage, not a count.
+    #[test]
+    fn a_negative_witness_is_refused() {
+        let err = check_census("kernel_decisions", Some(-1), 0).expect_err("a negative witness");
+        assert!(matches!(err, Error::Integrity(_)), "{err:?}");
+    }
 }

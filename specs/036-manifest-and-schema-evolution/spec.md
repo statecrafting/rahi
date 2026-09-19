@@ -6,7 +6,7 @@ kind: kernel
 domain: kernel
 created: "2026-09-11"
 authors: ["Bartek Kus"]
-implementation: in-progress
+implementation: complete
 risk: critical
 wave: 3
 depends_on:
@@ -667,6 +667,46 @@ record shows what was asked as well as what was answered.
   that carries it honors the additive rule, a binary built before it has no
   such check and cannot be given one, and a replica already running
   re-evaluates nothing after boot (B-10, D-4).
+
+- **2026-09-18 (the corrections).** Four code-level findings were reproduced
+  against the merged implementation (`ae12c69`) and fixed, each with a
+  regression that fails without the fix. D-11 to D-14 record the decisions;
+  AC-5 and FR-007 to FR-010 are what hold them.
+
+  1. **`Ledger::current_manifest` failed open, not closed.** D-10 reasoned
+     that walking back to an older answer could only refuse a manifest that
+     was adopted. It can also *admit* an older image: on a chain that went
+     H1 to H2, the genesis parent is H1, so an H1 replica agrees with the
+     stale answer and boots under a superseded ceiling (B-10, D-4). The
+     sealed-history path had the same shape through the segment headers. The
+     resident and sealed reads now each carry their own `COUNT(*)` from the
+     same statement, and neither falls back past what `open` verified.
+     `crates/rahi-ledger/tests/transition.rs` reproduces both, and both fail
+     when the guards are removed.
+  2. **An unknown archive schema no longer authorizes a restore.** D-9's
+     legacy exception is superseded by D-12. The history is read out of the
+     archived database's own `schema_version` table, which is the same table
+     a live store answers from because the app part *is* the destination's
+     database. An archive that yields no such evidence is `Error::Stale`,
+     exit 2, destination untouched. `restore::schema_checked` is gone;
+     `restore::SchemaEvidence` names what each restore was judged on.
+  3. **Integrity outranks staleness.** `migrate::check_current` returned
+     `Error::Stale` before it compared a checksum, so an altered applied
+     migration plus a pending one reported only that the store was behind.
+     The checksum check runs first now (D-13). The `migrate` path already had
+     this order through `StoreHandle::migrate`, and the regression asserts
+     both paths.
+  4. **The grant diff's limitation is explicit.** B-3 and D-14 carry it: the
+     diff is reported unavailable only when the chain genuinely holds no
+     earlier manifest text, and a read that does not answer is an error
+     instead. `Ledger::current_manifest_model` is the supported recovery
+     path and shares the guards from finding 1.
+
+  Preserved and re-checked, not assumed: the oversized-manifest policy (D-6,
+  AC-4), spec 030's independent command-set test, spec 015 AC-2's dependency
+  shape, the fresh-chain and pre-036 fallbacks (D-8), and every existing
+  integrity guarantee. Consumer-visible API movement is recorded in
+  `CHANGELOG.md` under the unreleased 0.2.0 section.
 
 ## Verification
 
