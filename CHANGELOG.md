@@ -169,6 +169,74 @@ is neither registry availability nor evidence of consumer deployment.
 - `preflight` is unchanged and does not report an unadopted manifest; `serve`
   and `migrate --adopt-manifest` are where that is answered.
 
+### Lifetime identity for decisions (spec 042)
+
+- Every decision now carries a narrow resident identity row that **survives
+  sealing**: `(id, identity_digest, record_hash, segment_hash)` in
+  `kernel_decision_identity`, written in the same `txn` as the record. The
+  identity table's primary key is the arbitration for a duplicate id, the way
+  the unique parent index is the arbitration for a lost compare-and-swap.
+  Nothing decides a duplicate by reading first.
+- The defect this closes: classification used to ask whether the id was
+  *resident*, and sealing deletes the row, so past the hot window an appender
+  that lost its acknowledgement and retried wrote a **second record under one
+  id** while full verification still passed. `Ledger::append` is now lifetime
+  idempotent on a covered chain, and a retry of a sealed decision returns the
+  original record hash.
+- `Ledger::lookup(id)` answers `Resident`, `Sealed`, `Absent`, `Unproven` and
+  `Ambiguous` as five different answers. An archive that is missing, corrupt
+  or unreadable is `NotFound`, `Integrity` or `Io`, and never `Absent`:
+  absence is proven from complete coverage or it is not claimed.
+  `Ledger::recover(id, archive)` fetches exactly the one segment body the row
+  names and verifies it at full depth before taking a record out of it.
+- `Ledger::append_once` returns `Landing { hash, appended_now, sealed_in }`.
+  `hash` is durable presence and holds across lost acknowledgements, retries,
+  restarts and replicas. `appended_now` is knowledge about the invocation and
+  is never `true` for a commit this process did not observe. This is
+  exactly-once **append**, never exactly-once **delivery**: a caller that
+  needs a side effect exactly once still records its intent in its own
+  transaction.
+- A chain that already spent an id more than once is recorded in
+  `kernel_decision_collisions` and never resolved: lookup of such an id
+  answers `Ambiguous` with every copy, appends under it are refused, no copy
+  is selected, no archived byte is written, and no row of either table is
+  ever deleted. Coverage counts records, so such a chain is still fully
+  accounted for and `serve` starts on it with the containment per affected id.
+
+### Upgrade limits (spec 042)
+
+- **This is a stop-the-world upgrade.** A chain sealed before this release
+  has no identity rows for its archived ids, so `Ledger::open` refuses with
+  `Error::Stale` (exit 2) naming `rahi ledger reindex <archive>`, and `serve`
+  and every verb that appends refuse with it. Stop every replica, run the
+  reindex against the archive while nothing appends, then start the cluster.
+- The cutover is **operationally guaranteed, not enforced**. Baseline DDL
+  writes no `schema_version` row, so no store version check fences this
+  release in either direction, and spec 036 fences nothing here. A new binary
+  *detects* an old writer after the fact (a seal that had to create an
+  identity row, a resident record met without one), which makes the damage
+  visible rather than undone. No mixed-version guarantee is offered.
+- There is **no override**: no `--allow-uncovered`, no other flag, argument or
+  environment variable starts normal service on incomplete historical
+  coverage. `ledger verify`, `ledger export` and `ledger reindex` keep working
+  on an uncovered chain and each prints the uncovered count; `preflight`
+  reports coverage as a named check and fails on it. A chain whose archive
+  has permanently lost a body can never be proven covered and therefore never
+  serves again under this release; recovering from that is a separate,
+  reserved decision.
+- **New permanent resident cost**: one row per decision, forever, on every
+  replica and in every snapshot, backup, restore and cluster join. Estimated
+  at about 400 bytes per decision; the acceptance ceiling is 800. No supported
+  lifetime-decision limit is declared. Size against **every** append to the
+  chain, kernel denials included, not only an application's own acts.
+- New verb: `rahi ledger reindex <archive>`, the only mutating verb under
+  `ledger`. `rahi ledger verify` additionally prints the uncovered segment
+  count, the unstamped resident count, the identity row count and the
+  collision count at both depths, and exits 1 when a collision is recorded.
+- Rolling back to a binary without this release is a one-way door in the
+  other direction: it appends unstamped records, coverage breaks again, and
+  returning requires another stop and another reindex.
+
 ### Evidence and release tooling since 0.1.0
 
 - The digest-pinned rauthy 0.36.2 live suite refuses missing fixtures with

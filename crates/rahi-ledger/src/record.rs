@@ -357,6 +357,37 @@ impl Decision {
         self.at = revision;
         self
     }
+
+    /// The canonical bytes of this decision with its parent omitted
+    /// (spec 042 B-2).
+    ///
+    /// Every other field is covered: id, kind, actor, capability, outcome,
+    /// reason, payload, and `at`. The parent is excluded because a retry
+    /// re-chains onto whatever head it finds, so it is the one field an
+    /// honest retry is expected to change, and an identity digest that
+    /// covered it could never recognise the retry it exists to recognise.
+    ///
+    /// These bytes are hashed into a resident column and enter no envelope:
+    /// nothing a record, a segment, or an export hashes moves because of
+    /// them (spec 042 FR-007).
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Integrity`] when the decision does not serialize to a JSON
+    /// object, which would mean the record types drifted.
+    pub fn identity_bytes(&self) -> Result<Vec<u8>, Error> {
+        let mut value = serde_json::to_value(self)
+            .map_err(|e| Error::Integrity(format!("decision does not serialize: {e}")))?;
+        let object = value.as_object_mut().ok_or_else(|| {
+            Error::Integrity(
+                "a decision does not serialize to a JSON object: its identity cannot be \
+                 digested"
+                    .to_owned(),
+            )
+        })?;
+        object.remove("prev_hash");
+        Ok(canonical_keysort_json::to_canonical_string(&value).into_bytes())
+    }
 }
 
 /// The envelope's `timestamp` slot for a decision taken at `revision`.

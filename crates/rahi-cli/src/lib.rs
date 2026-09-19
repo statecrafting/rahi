@@ -23,7 +23,7 @@ pub mod verbs;
 
 use std::collections::BTreeMap;
 
-use rahi_ledger::Depth;
+use rahi_ledger::{Depth, FsArchive, Ledger};
 use rahi_ops::backup::Destination;
 use rahi_ops::restore::{KeySource, Outcome};
 use rahi_types::{EnvReader, Error, Result};
@@ -257,10 +257,22 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
             booted.shutdown().await;
             result
         }
+        Verb::LedgerReindex { archive } => {
+            let booted = Booted::open::<C>(env).await?;
+            let result = ledger_reindex(&booted, &archive).await;
+            booted.shutdown().await;
+            result
+        }
         Verb::LedgerExport { path } => {
             let booted = Booted::open::<C>(env).await?;
             let result = async {
-                let ledger = booted.ledger().await?;
+                // Spec 042 B-10 and B-15: export works on an uncovered
+                // chain, because an operator diagnosing that state needs it
+                // most, and it prints the uncovered count so no reader
+                // mistakes the output for a proof about a chain that has
+                // none.
+                let ledger = ledger_for_repair(&booted).await?;
+                let coverage = ledger.coverage().await?;
                 let jsonl = ledger.export_jsonl().await?;
                 let segments = ledger.segments().await?;
                 let mut out = jsonl;
@@ -279,6 +291,12 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
                     ledger.count().await?,
                     segments.len(),
                     path.display()
+                );
+                println!(
+                    "ledger export: {} sealed segment(s) and {} resident record(s) are not \
+                     accounted for in the lifetime identity index",
+                    coverage.uncovered().len(),
+                    coverage.unstamped_resident()
                 );
                 Ok(())
             }
@@ -354,8 +372,28 @@ async fn backup(booted: &Booted, to: &Destination, env: &dyn EnvReader) -> Resul
     Ok(())
 }
 
+/// The chain, opened without spec 042 B-10's coverage gate and unable to
+/// append (042 B-15).
+///
+/// The three verbs that construct one are `ledger verify`, `ledger export`
+/// and `ledger reindex`, and nothing else in this binary does: `serve` has
+/// no argument, flag or environment variable that reaches it, and the type
+/// makes the refusal to append a property of the handle rather than a check
+/// someone can forget.
+async fn ledger_for_repair(booted: &Booted) -> Result<Ledger> {
+    Ledger::open_for_repair(
+        booted.store.handle(),
+        booted.keys.ledger_signer()?,
+        booted.hash.clone(),
+    )
+    .await
+}
+
 async fn ledger_verify(booted: &Booted, full: bool, env: &dyn EnvReader) -> Result<()> {
-    let ledger = booted.ledger().await?;
+    // Spec 042 B-10: `ledger verify` works on an uncovered chain and prints
+    // the uncovered count, because an operator diagnosing the refusal needs
+    // the diagnostic that names it.
+    let ledger = ledger_for_repair(booted).await?;
     let depth = if full { "full" } else { "resident" };
     if full {
         let archive = booted.ledger_archive(env)?;
@@ -369,5 +407,55 @@ async fn ledger_verify(booted: &Booted, full: bool, env: &dyn EnvReader) -> Resu
         ledger.segment_count().await?,
         ledger.head().await?
     );
+    // Spec 042 B-7: all four numbers at both depths, and nothing consults
+    // the archive to compute any of them. The two totals are lifetime
+    // aggregates, which is why only this verb and `preflight` pay for them.
+    let coverage = ledger.coverage().await?;
+    let totals = ledger.identity_totals().await?;
+    println!(
+        "ledger verify: identity coverage: {} uncovered segment(s), {} unstamped resident \
+         record(s), {} identity row(s), {} collision(s)",
+        coverage.uncovered().len(),
+        coverage.unstamped_resident(),
+        totals.identity_rows,
+        totals.collisions
+    );
+    if !coverage.is_complete() {
+        println!("ledger verify: {}", coverage.why());
+    }
+    if totals.collisions > 0 {
+        // Spec 042 B-12: history spent an id more than once. The evidence is
+        // kept, nothing chooses between the copies, and the verb does not
+        // report success over a chain that contradicts itself.
+        return Err(Error::Conflict(format!(
+            "the chain records {} copy(ies) of an id history spent more than once; every \
+             affected id answers Ambiguous and refuses its own appends, and resolving which \
+             copy is the real decision is not the chain's question",
+            totals.collisions
+        )));
+    }
+    Ok(())
+}
+
+/// Spec 042 B-8: rebuild the accounting of every uncovered segment from the
+/// archive, and never report a repair the archive did not support.
+async fn ledger_reindex(booted: &Booted, archive: &std::path::Path) -> Result<()> {
+    let ledger = ledger_for_repair(booted).await?;
+    let archive = FsArchive::open(archive)?;
+    let report = ledger.reindex(&archive).await?;
+    println!("{}", report.render());
+    // The verdict this node carries is recomputed through the leader only
+    // here, because this is the one place that has just repaired what made
+    // it incomplete (B-11).
+    let coverage = ledger.recheck_coverage().await?;
+    println!(
+        "ledger reindex: {} sealed segment(s) and {} resident record(s) remain unaccounted for",
+        coverage.uncovered().len(),
+        coverage.unstamped_resident()
+    );
+    report.outcome()?;
+    if !coverage.is_complete() {
+        return Err(Error::Stale(coverage.why()));
+    }
     Ok(())
 }

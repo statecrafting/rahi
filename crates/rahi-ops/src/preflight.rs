@@ -20,7 +20,7 @@ use crate::rauthy_api::RauthyApi;
 pub const MIN_FREE_BYTES: u64 = 512 * 1024 * 1024;
 
 /// The check names, in the order they are reported.
-pub const CHECKS: [&str; 9] = [
+pub const CHECKS: [&str; 10] = [
     "config",
     "data_dir",
     "keys",
@@ -29,6 +29,7 @@ pub const CHECKS: [&str; 9] = [
     "engine",
     "rauthy",
     "ledger",
+    "coverage",
     "disk",
 ];
 
@@ -231,11 +232,15 @@ async fn run_inner(env: &dyn EnvReader, manifest_text: &str) -> Report {
     }
 
     match &store {
-        Some(store) => checks.push(Check::of(
-            "ledger",
-            verify_ledger(store, &keys, manifest_text).await,
-        )),
-        None => checks.push(Check::skipped("ledger", "the store did not open")),
+        Some(store) => {
+            let (ledger, coverage) = verify_ledger(store, &keys, manifest_text).await;
+            checks.push(Check::of("ledger", ledger));
+            checks.push(Check::of("coverage", coverage));
+        }
+        None => {
+            checks.push(Check::skipped("ledger", "the store did not open"));
+            checks.push(Check::skipped("coverage", "the store did not open"));
+        }
     }
 
     checks.push(Check::of("disk", free_disk(&config)));
@@ -288,7 +293,46 @@ async fn open_store(
     Ok((store, detail))
 }
 
-async fn verify_ledger(store: &Store, keys: &KeySet, manifest_text: &str) -> Result<String> {
+/// The chain, and what this binary can prove about the ids in it
+/// (spec 030 B-3, spec 042 B-10).
+///
+/// Two verdicts because there are two questions, and spec 042 D-8 keeps them
+/// apart deliberately: whether the chain verifies, and whether its lifetime
+/// identity index accounts for every record in it. The first is damage and
+/// the second is a missing upgrade step, and an operator told the wrong one
+/// chases the wrong thing.
+///
+/// This never constructs a repair handle: `preflight` is not one of the
+/// three verbs spec 042 B-15 gives one to. It opens the chain the ordinary
+/// way, and reads B-10's refusal for what it is. Since that refusal is
+/// raised only after verification has already passed, an `Error::Stale` here
+/// is itself the evidence that the chain verified.
+async fn verify_ledger(
+    store: &Store,
+    keys: &KeySet,
+    manifest_text: &str,
+) -> (Result<String>, Result<String>) {
+    match verify_ledger_inner(store, keys, manifest_text).await {
+        Ok(pair) => pair,
+        Err(Error::Stale(said)) => (
+            Ok("verified at resident depth; the chain opened as far as verification".to_owned()),
+            Err(Error::Stale(said)),
+        ),
+        Err(err) => (
+            Err(err.clone()),
+            Err(Error::Validation(format!(
+                "not established: the chain did not open ({})",
+                err.message()
+            ))),
+        ),
+    }
+}
+
+async fn verify_ledger_inner(
+    store: &Store,
+    keys: &KeySet,
+    manifest_text: &str,
+) -> Result<(Result<String>, Result<String>)> {
     let signer = keys.ledger_signer()?;
     let manifest = Manifest::parse(manifest_text)?;
     let hash = manifest.hash()?;
@@ -307,7 +351,10 @@ async fn verify_ledger(store: &Store, keys: &KeySet, manifest_text: &str) -> Res
         )
         .await?;
     if !tables.iter().any(|t| t.name == "kernel_decisions") {
-        return Ok("no chain yet; serve writes genesis".to_owned());
+        return Ok((
+            Ok("no chain yet; serve writes genesis".to_owned()),
+            Ok("no chain yet; a chain with no history has nothing to account for".to_owned()),
+        ));
     }
     #[derive(serde::Deserialize)]
     struct Id {
@@ -317,13 +364,42 @@ async fn verify_ledger(store: &Store, keys: &KeySet, manifest_text: &str) -> Res
         .query_consistent("SELECT id FROM kernel_decisions LIMIT 1", Vec::new())
         .await?;
     if rows.iter().all(|r| r.id.is_empty()) {
-        return Ok("chain table is empty; serve writes genesis".to_owned());
+        return Ok((
+            Ok("chain table is empty; serve writes genesis".to_owned()),
+            Ok(
+                "chain table is empty; a chain with no history has nothing to account for"
+                    .to_owned(),
+            ),
+        ));
     }
     let ledger = Ledger::open(store.handle(), signer, hash).await?;
     let count = ledger.count().await?;
     let segments = ledger.segment_count().await?;
-    Ok(format!(
-        "verified at resident depth: {count} resident record(s), {segments} sealed segment(s)"
+    // Spec 042 B-7: `preflight` is one of the two commands that pay for the
+    // lifetime aggregates, because an operator asked for the number.
+    let coverage = ledger.coverage().await?;
+    let totals = ledger.identity_totals().await?;
+    let said = format!(
+        "{} uncovered segment(s), {} unstamped resident record(s), {} identity row(s), {} \
+         collision(s)",
+        coverage.uncovered().len(),
+        coverage.unstamped_resident(),
+        totals.identity_rows,
+        totals.collisions
+    );
+    // A recorded collision does not make coverage incomplete and does not
+    // stop `serve` (spec 042 B-12, D-4), so it is reported rather than
+    // failed on: the containment is per affected id.
+    let coverage = if coverage.is_complete() {
+        Ok(said)
+    } else {
+        Err(Error::Stale(format!("{said}: {}", coverage.why())))
+    };
+    Ok((
+        Ok(format!(
+            "verified at resident depth: {count} resident record(s), {segments} sealed segment(s)"
+        )),
+        coverage,
     ))
 }
 

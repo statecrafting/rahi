@@ -931,3 +931,361 @@ fn first_boot_then_supervise_without_a_rauthy_binary_is_exit_3() {
         run.stderr
     );
 }
+
+// ---------------------------------------------------------------------------
+// Spec 042: the boot gate, the repair verb, and the verb boundary
+// ---------------------------------------------------------------------------
+
+/// The committed fixture of spec 042 FR-014, written by the published 0.1.0
+/// crates. Its absence is a broken checkout, never a skip.
+fn v010_dir() -> PathBuf {
+    let dir = repo_root()
+        .join("crates")
+        .join("rahi-ledger")
+        .join("testdata")
+        .join("chains")
+        .join("v0.1.0-sealed");
+    assert!(
+        dir.is_dir(),
+        "the committed fixture {} is missing: this is a broken checkout, not a missing optional \
+         tool. Rebuild it with its write.sh, which pulls rahi-ledger = \"=0.1.0\" from crates.io.",
+        dir.display()
+    );
+    dir
+}
+
+fn copy_tree(from: &Path, to: &Path) {
+    std::fs::create_dir_all(to).unwrap();
+    for entry in std::fs::read_dir(from).unwrap().filter_map(Result::ok) {
+        let target = to.join(entry.file_name());
+        if entry.file_type().unwrap().is_dir() {
+            copy_tree(&entry.path(), &target);
+        } else {
+            std::fs::copy(entry.path(), &target).unwrap();
+        }
+    }
+}
+
+/// Seed the 0.1.0 fixture into a volume's own store: its resident rows, its
+/// pre-036 segment headers, its signing key, and a copy of its archive.
+///
+/// Nothing here creates an identity row, because 0.1.0 had no such table.
+/// That is the state spec 042 B-10 refuses to serve.
+fn seed_v010(volume: &Volume) -> PathBuf {
+    let dir = v010_dir();
+    // The chain is verified against the key that signed it, so the volume
+    // has to carry the fixture's key rather than its own.
+    KeySet::at(volume.path().join("keys"))
+        .write(
+            rahi_ops::LEDGER_KEY_FILE,
+            std::fs::read_to_string(dir.join("signing-key.b64"))
+                .unwrap()
+                .trim()
+                .as_bytes(),
+        )
+        .unwrap();
+
+    // The default `RAHI_LEDGER_ARCHIVE_DIR`, so `ledger verify --full`
+    // reaches the same bodies `ledger reindex <archive>` is pointed at.
+    let archive = volume
+        .path()
+        .join(rahi_cli::serve::DEFAULT_LEDGER_ARCHIVE_DIR);
+    copy_tree(&dir.join("archive"), &archive);
+
+    let env: BTreeMap<String, String> = volume.env.iter().cloned().collect();
+    let config = rahi_types::Config::from_env(&env).unwrap();
+    let keys = KeySet::at(volume.path().join("keys"));
+    let cfg = rahi_ops::store_config(&config, &env, keys.store_secrets().unwrap()).unwrap();
+
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    runtime.block_on(async move {
+        let store = rahi_store::Store::open(&cfg).await.unwrap();
+        let handle = store.handle();
+        handle
+            .execute(rahi_ledger::DECISIONS_TABLE_SQL, vec![])
+            .await
+            .unwrap();
+        for line in std::fs::read_to_string(dir.join("resident.jsonl"))
+            .unwrap()
+            .lines()
+            .filter(|l| !l.trim().is_empty())
+        {
+            let record = rahi_ledger::SignedRecord::from_bytes(line.as_bytes()).unwrap();
+            handle
+                .execute(
+                    "INSERT INTO kernel_decisions (id, prev_hash, hash, record) \
+                     VALUES ($1, $2, $3, $4)",
+                    vec![
+                        rahi_store::Value::from(record.record.id.as_str()),
+                        rahi_store::Value::from(record.record.previous_record_hash.as_str()),
+                        rahi_store::Value::from(record.record.record_hash.as_str()),
+                        rahi_store::Value::Blob(record.to_canonical_bytes().unwrap()),
+                    ],
+                )
+                .await
+                .unwrap();
+        }
+        // The pre-036 shape: no `current_manifest` column, which `open` adds.
+        handle
+            .execute(
+                "CREATE TABLE IF NOT EXISTS kernel_segments (\
+                 segment_hash TEXT PRIMARY KEY, prev_segment_hash TEXT NOT NULL, \
+                 last_hash TEXT NOT NULL, first_id TEXT NOT NULL, last_id TEXT NOT NULL, \
+                 count INTEGER NOT NULL)",
+                vec![],
+            )
+            .await
+            .unwrap();
+        for line in std::fs::read_to_string(dir.join("segments.jsonl"))
+            .unwrap()
+            .lines()
+            .filter(|l| !l.trim().is_empty())
+        {
+            let header: rahi_ledger::SegmentHeader = serde_json::from_str(line).unwrap();
+            handle
+                .execute(
+                    "INSERT INTO kernel_segments \
+                     (segment_hash, prev_segment_hash, last_hash, first_id, last_id, count) \
+                     VALUES ($1, $2, $3, $4, $5, $6)",
+                    vec![
+                        rahi_store::Value::from(header.segment_hash.as_str()),
+                        rahi_store::Value::from(header.prev_segment_hash.as_str()),
+                        rahi_store::Value::from(header.last_hash.as_str()),
+                        rahi_store::Value::from(header.first_id.as_str()),
+                        rahi_store::Value::from(header.last_id.as_str()),
+                        rahi_store::Value::from(header.count),
+                    ],
+                )
+                .await
+                .unwrap();
+        }
+        store.shutdown().await.unwrap();
+    });
+    archive
+}
+
+/// Spec 042 AC-2, AC-4, FR-009. The whole operator-facing migration, driven
+/// over argv against a chain the published 0.1.0 crates wrote.
+///
+/// `serve` refuses and names the command; `ledger verify` and `ledger export`
+/// work on the same chain and print the uncovered count; `preflight` fails
+/// with coverage as the named check; `ledger reindex` exits 0 and reports
+/// complete coverage; and then all of them pass.
+#[test]
+fn an_unreindexed_chain_refuses_service_until_ledger_reindex_has_run() {
+    let volume = Volume::new();
+    // The cell's own migrations first, so the refusal under test is spec
+    // 042's coverage gate and not spec 030 B-2's schema check.
+    assert_eq!(volume.run(&["migrate"]).code, 0);
+    let archive = seed_v010(&volume);
+    let archive = archive.to_str().unwrap().to_owned();
+
+    // `serve` refuses, exit 2, naming the one command that clears it.
+    let run = volume.run(&["serve"]);
+    assert_eq!(
+        run.code, 2,
+        "stdout:\n{}\nstderr:\n{}",
+        run.stdout, run.stderr
+    );
+    assert!(
+        run.stderr.contains("rahi ledger reindex"),
+        "the refusal names the command: {}",
+        run.stderr
+    );
+
+    // Diagnosis, export and repair stay available, and each says the chain
+    // is not accounted for so no reader mistakes the output for a proof.
+    let run = volume.run(&["ledger", "verify"]);
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert!(
+        run.stdout.contains("ok at resident depth"),
+        "{}",
+        run.stdout
+    );
+    assert!(
+        run.stdout.contains("3 uncovered segment(s)"),
+        "ledger verify prints the uncovered count: {}",
+        run.stdout
+    );
+    let full = volume.run(&["ledger", "verify", "--full"]);
+    assert_eq!(full.code, 0, "{}", full.stderr);
+
+    let out = volume.path().join("chain.jsonl");
+    let run = volume.run(&["ledger", "export", out.to_str().unwrap()]);
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert!(
+        run.stdout.contains("are not accounted for"),
+        "ledger export names the uncovered count: {}",
+        run.stdout
+    );
+
+    let run = volume.run(&["preflight"]);
+    assert_eq!(run.code, 1, "{}", run.stdout);
+    assert!(
+        run.stdout.contains("FAIL coverage:"),
+        "coverage is the named failing check: {}",
+        run.stdout
+    );
+    assert!(
+        run.stdout.contains("rahi ledger reindex"),
+        "and it names the command: {}",
+        run.stdout
+    );
+    assert!(
+        run.stdout.contains("PASS ledger:"),
+        "the chain itself verified: a missing upgrade step is not damage: {}",
+        run.stdout
+    );
+
+    // The repair.
+    let run = volume.run(&["ledger", "reindex", &archive]);
+    assert_eq!(
+        run.code, 0,
+        "stdout:\n{}\nstderr:\n{}",
+        run.stdout, run.stderr
+    );
+    assert!(run.stdout.contains("3 segment(s) walked"), "{}", run.stdout);
+    assert!(
+        run.stdout
+            .contains("0 sealed segment(s) and 0 resident record(s) remain unaccounted for"),
+        "{}",
+        run.stdout
+    );
+    for forbidden in [
+        "repaired",
+        "resolved",
+        "corrected",
+        "deduplicated",
+        "reconciled",
+    ] {
+        assert!(
+            !run.stdout.contains(forbidden),
+            "{forbidden:?} in {}",
+            run.stdout
+        );
+    }
+
+    // And the four numbers, at both depths, none of them from the archive.
+    for depth in [vec!["ledger", "verify"], vec!["ledger", "verify", "--full"]] {
+        let run = volume.run(&depth);
+        assert_eq!(run.code, 0, "{}", run.stderr);
+        assert!(
+            run.stdout.contains(
+                "identity coverage: 0 uncovered segment(s), 0 unstamped resident record(s), \
+                 9 identity row(s), 0 collision(s)"
+            ),
+            "{:?}: {}",
+            depth,
+            run.stdout
+        );
+    }
+
+    let run = volume.run(&["preflight"]);
+    assert!(run.stdout.contains("PASS coverage:"), "{}", run.stdout);
+
+    // A second reindex is a no-op that still exits 0.
+    let run = volume.run(&["ledger", "reindex", &archive]);
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert!(run.stdout.contains("0 segment(s) walked"), "{}", run.stdout);
+}
+
+/// Spec 042 AC-4, D-3. The refusal has no override.
+///
+/// No argument, flag, or environment variable starts `serve` on a chain with
+/// incomplete coverage; `serve` offers none in the usage; and
+/// `open_for_repair` is unreachable from `serve`'s code path.
+#[test]
+fn nothing_starts_serve_on_a_chain_with_incomplete_coverage() {
+    let volume = Volume::new();
+    assert_eq!(volume.run(&["migrate"]).code, 0);
+    seed_v010(&volume);
+
+    for extra in [
+        vec!["serve", "--allow-uncovered"],
+        vec!["serve", "--force"],
+        vec!["serve", "--repair"],
+        vec!["serve", "--skip-coverage"],
+    ] {
+        let run = volume.run(&extra);
+        assert_ne!(
+            run.code, 0,
+            "{extra:?} must not start serve: {}",
+            run.stdout
+        );
+        assert!(
+            run.stderr.contains("serve does not take"),
+            "{extra:?}: {}",
+            run.stderr
+        );
+    }
+
+    for (key, value) in [
+        ("RAHI_ALLOW_UNCOVERED", "1"),
+        ("RAHI_LEDGER_ALLOW_UNCOVERED", "true"),
+        ("RAHI_SKIP_COVERAGE", "1"),
+    ] {
+        let mut cmd = Command::new(env!("CARGO_BIN_EXE_rahi"));
+        cmd.arg("serve");
+        for (k, v) in &volume.env {
+            cmd.env(k, v);
+        }
+        cmd.env_remove(rahi_ops::RESTORE_ENV_VAR);
+        cmd.env(key, value);
+        let run = Run::of(cmd.output().unwrap());
+        assert_eq!(run.code, 2, "{key} must not start serve: {}", run.stdout);
+        assert!(run.stderr.contains("rahi ledger reindex"), "{}", run.stderr);
+    }
+
+    let usage = bare(&["--help"]).stdout;
+    for forbidden in ["allow-uncovered", "skip-coverage", "--force"] {
+        assert!(
+            !usage.contains(forbidden),
+            "the usage offers {forbidden:?}:\n{usage}"
+        );
+    }
+
+    // The repair open is unreachable from `serve`'s code path: it is
+    // constructed only where the three diagnostic and repair verbs are
+    // dispatched, which is not this file.
+    let serve = std::fs::read_to_string(
+        repo_root()
+            .join("crates")
+            .join("rahi-cli")
+            .join("src")
+            .join("serve.rs"),
+    )
+    .unwrap();
+    assert!(
+        !serve.contains("open_for_repair"),
+        "serve.rs must not be able to reach the repair open"
+    );
+}
+
+/// Spec 042 D-1, spec 030 B-1 and AC-2. `ledger reindex` is a verb of its
+/// own and is announced as mutating, so an operator reaching for the
+/// read-only diagnostic cannot get the repair by mistyping a flag.
+#[test]
+fn ledger_reindex_is_a_verb_of_its_own_and_says_it_mutates() {
+    let usage = bare(&["--help"]).stdout;
+    let line = usage
+        .lines()
+        .find(|l| l.trim_start().starts_with("ledger reindex"))
+        .unwrap_or_else(|| panic!("--help lists ledger reindex:\n{usage}"));
+    assert!(line.contains("<archive>"), "it takes the archive: {line}");
+    assert!(
+        line.contains("MUTATES"),
+        "and says so, beside the read-only `ledger verify`: {line}"
+    );
+    assert!(
+        !usage.contains("verify [--full] [--reindex]") && !usage.contains("--reindex"),
+        "the repair is not a flag on the diagnostic (D-1):\n{usage}"
+    );
+
+    // Its argument is required.
+    let run = bare(&["ledger", "reindex"]);
+    assert_eq!(run.code, 1);
+    assert!(run.stderr.contains("ledger reindex needs an archive"));
+}

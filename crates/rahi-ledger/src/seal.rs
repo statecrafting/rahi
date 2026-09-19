@@ -31,6 +31,7 @@ use serde::Deserialize;
 
 use crate::archive::Archive;
 use crate::chain::Ledger;
+use crate::identity::{Accounted, AccountingOutcome, accounting_statements};
 use crate::record::{DecisionId, Hash, SignedRecord};
 use crate::segment::{Segment, SegmentHeader, order_segments};
 
@@ -346,13 +347,28 @@ impl Ledger {
             .await?;
 
         let deleted = u64::from(segment.header.count);
-        let results = self
-            .store()
-            .txn(vec![
-                insert_segment(&segment.header),
-                delete_records(&segment.records),
-            ])
-            .await?;
+        // Spec 042 B-5: the transaction that inserts the header and deletes
+        // the archived rows additionally accounts for every record it
+        // archives, and recomputes that segment's counter from the two
+        // tables it just wrote. It decides nothing by reading first, because
+        // `txn` takes a batch of statements and offers no read between them:
+        // each record's accounting is self-arbitrating statements, in the
+        // same spirit as B-3's insert.
+        let accounted = segment
+            .records
+            .iter()
+            .map(Accounted::of)
+            .collect::<Result<Vec<_>, Error>>()?;
+        let mut statements = vec![
+            insert_segment(&segment.header),
+            delete_records(&segment.records),
+        ];
+        let accounting_at = statements.len();
+        statements.extend(accounting_statements(
+            &accounted,
+            &segment.header.segment_hash,
+        ));
+        let results = self.store().txn(statements).await?;
         let sealed = results.first().is_some_and(|r| r.rows_affected == 1);
         let removed = results.get(1).is_some_and(|r| r.rows_affected == deleted);
         if !sealed || !removed {
@@ -361,6 +377,21 @@ impl Ledger {
                 segment.key()
             )));
         }
+        // Spec 042 B-13: a row this seal had to **create** rather than stamp
+        // is a record appended by a binary that does not stamp. It is
+        // counted, logged at `warn` naming the id, and moves this node's
+        // cached verdict to incomplete with no leader read.
+        let outcome = AccountingOutcome::read(&results, &accounted, accounting_at);
+        self.note_unstamped_writer(&outcome);
+
+        // Spec 042 B-5: a post-commit detection, not a rollback, because
+        // `txn` commits the batch before any result is inspected. What it
+        // reports is that the segment is not fully accounted for, which is
+        // exactly the uncovered state B-7 reports and B-8 repairs, so the
+        // operator is handed a repairable condition rather than a
+        // half-written one. This spec claims no rollback it cannot perform.
+        let stamped = self.stamped_of(&segment.header.segment_hash).await?;
+        crate::identity::accounted_fully(&segment.key(), stamped, segment.header.count)?;
         Ok(Some(segment.header))
     }
 
@@ -426,15 +457,15 @@ impl Ledger {
             let segment = Segment::from_bytes(&bytes).map_err(|e| {
                 Error::Integrity(format!("archived segment {key}: {}", e.message()))
             })?;
-            segment.verify()?;
             if segment.header != *header {
                 return Err(Error::Integrity(format!(
                     "archived segment {key} carries a header the store does not agree with"
                 )));
             }
-            crate::verify::verify_chain(&parent, &segment.records, &verifier).map_err(|e| {
-                Error::Integrity(format!("archived segment {key}: {}", e.message()))
-            })?;
+            // Spec 042 B-8 needs one body verified on its own, and a reindex
+            // must verify exactly what a full-depth boot verifies: one seam,
+            // used by both.
+            crate::verify::verify_segment(&parent, &segment, &verifier)?;
             parent = header.last_hash.clone();
         }
         Ok(())

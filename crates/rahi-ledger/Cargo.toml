@@ -8,6 +8,15 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 
+# Spec 042 FR-014's fixture is a chain written by the published 0.1.0 crates,
+# and spec 014 B-3 derives an archive key from the ids it holds, so the
+# genesis segment's body is a file named `genesis:sha256:<hash>-d-0001.json`.
+# `cargo package` refuses a colon in a packaged filename (042 D-13). The
+# fixture stays in the repository, where it is auditable and where the tests
+# that consume it run; it is simply not shipped inside the published crate,
+# which never runs an integration test.
+exclude = ["testdata/chains/v0.1.0-sealed/archive/**"]
+
 [package.metadata.spec-spine]
 spec = "013-ledger-decision-chain"
 
@@ -27,9 +36,19 @@ s3-simple = { workspace = true }
 url = { workspace = true }
 # The wait between compare-and-swap attempts (spec 013 B-3 as amended by D-9).
 tokio = { workspace = true, features = ["time"] }
+# Spec 042 B-13: a seal that had to create an identity row names the id at
+# `warn`, because a replica on a binary that does not stamp has to show up as
+# something an operator reads rather than as a silent duplicate.
+tracing = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+# Spec 042 AC-9 measures the resident cost of lifetime identity by a
+# drop-and-difference over the page counts of a *copy* of the fixture
+# database, which is a read of the SQLite file the store leaves behind rather
+# than anything the store itself exposes. Same version as everywhere else in
+# this tree, so it adds no second SQLite engine.
+rusqlite = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
 
 [lints]

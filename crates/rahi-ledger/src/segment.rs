@@ -239,6 +239,37 @@ impl Segment {
     }
 }
 
+/// Fetch and parse the one archived body `header` names (spec 042 B-6, B-8).
+///
+/// The three ways a body can fail stay three different answers, because
+/// conflating them is what makes an archive failure look like proven
+/// absence: a body that is gone is [`Error::NotFound`], one that cannot be
+/// read is [`Error::Io`], and one that does not parse or that carries a
+/// header the store does not agree with is [`Error::Integrity`]. What is
+/// *inside* the body is [`crate::verify::verify_segment`]'s question, asked
+/// separately so a caller that only wants the bytes does not pay for the
+/// signatures.
+///
+/// # Errors
+///
+/// The archive's own [`Error::NotFound`] or [`Error::Io`];
+/// [`Error::Integrity`] when the bytes are not this segment.
+pub async fn fetch_segment(
+    archive: &dyn crate::archive::Archive,
+    header: &SegmentHeader,
+) -> Result<Segment, Error> {
+    let key = header.key();
+    let bytes = archive.get(&key).await?;
+    let segment = Segment::from_bytes(&bytes)
+        .map_err(|e| Error::Integrity(format!("archived segment {key}: {}", e.message())))?;
+    if segment.header != *header {
+        return Err(Error::Integrity(format!(
+            "archived segment {key} carries a header the store does not agree with"
+        )));
+    }
+    Ok(segment)
+}
+
 /// sha256 over the canonical bytes of `records` (spec 014 B-2).
 ///
 /// The bytes are the canonical JSON array of the records, the same

@@ -249,3 +249,72 @@ async fn a_sealed_chain_reopens_where_it_left_off() {
 
     store.shutdown().await.unwrap();
 }
+
+/// Spec 042 B-5: sealing stamps the identity rows of the records it
+/// archives, and never deletes one.
+///
+/// Additive beside spec 014's own assertions, which are unchanged: the
+/// records still leave `kernel_decisions` and the segment body is still
+/// written first. What this adds is that the evidence of the ids survives.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn sealing_stamps_the_identity_rows_it_archives_and_deletes_none() {
+    #[derive(serde::Deserialize)]
+    struct Row {
+        segment_hash: Option<String>,
+    }
+
+    let f = common::open().await;
+    let dir = tempfile::tempdir().unwrap();
+    let archive = FsArchive::open(dir.path().join("archive")).unwrap();
+    let ledger = open_ledger(f.handle()).await;
+    let policy = SealPolicy::new(2, 2).unwrap();
+
+    for i in 0..4 {
+        ledger.append(decision(&format!("d-{i}"))).await.unwrap();
+    }
+    let before: Vec<Row> = f
+        .handle()
+        .query_consistent(
+            "SELECT segment_hash FROM kernel_decision_identity ORDER BY id",
+            vec![],
+        )
+        .await
+        .unwrap();
+    assert_eq!(before.len(), 5, "genesis plus four decisions");
+
+    while ledger
+        .seal_if_needed(&archive, &policy)
+        .await
+        .unwrap()
+        .is_some()
+    {}
+    assert!(ledger.segment_count().await.unwrap() > 0);
+
+    let after: Vec<Row> = f
+        .handle()
+        .query_consistent(
+            "SELECT segment_hash FROM kernel_decision_identity ORDER BY id",
+            vec![],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        after.len(),
+        before.len(),
+        "no identity row is deleted by a seal: an id is spent for the life of the chain"
+    );
+    assert!(
+        after.iter().any(|r| r.segment_hash.is_some()),
+        "the archived records' rows carry the segment they went into"
+    );
+
+    // Every sealed segment is fully accounted for by the transaction that
+    // sealed it.
+    for header in ledger.segments().await.unwrap() {
+        assert_eq!(
+            ledger.stamped_of(&header.segment_hash).await.unwrap(),
+            i64::from(header.count)
+        );
+    }
+    f.store.shutdown().await.unwrap();
+}

@@ -147,36 +147,44 @@ The upgrade boundary is explicit:
 Two independent limitations constrain adoption. Published hiqlite 0.14.0
 has the stale lease release defect after TTL takeover; full-node restart
 followed by a second lease is unverified. Ledger ID/content classification
-looks only at resident records, so retry after sealing can append a duplicate
-ID even when chain verification passes (013 D-5, 014 sealing). Atomic
-lifetime idempotence and migration/backfill need a separately governed
-design, including unavailable-history handling. Neither limitation is fixed
-by 037 or 0.2.0, and aicortex must not adopt it as such. Section 5.1's journal
-recommendation does not establish these missing guarantees.
+looked only at resident records, so retry after sealing could append a
+duplicate ID even when chain verification passed (013 D-5, 014 sealing).
+Neither limitation was fixed by 037 or by 0.2.0 as that release was prepared,
+and section 5.1's journal recommendation does not establish either guarantee.
 
-The second of those limitations now has an approved design, spec 042, and an
-approved specification is not a capability. **042 is `status: approved` and
-`implementation: pending`: no code implements it, no release contains it, and
-nothing in 0.1.0 or 0.2.0 behaves as it describes.** A consumer must keep
-treating lifetime ID uniqueness across sealed history as absent.
+The second of those limitations is now **implemented in the repository and
+published in no release.** Spec 042 is `implementation: complete` on `main`:
+every decision carries a resident identity row that survives sealing, the
+identity table's primary key arbitrates a duplicate id inside the append
+transaction, lookup answers presence, proven absence, unproven history and
+proven ambiguity as four different answers, and `rahi ledger reindex` rebuilds
+the accounting of a chain sealed before it. **Every published version still
+behaves as the limitation describes: 0.1.0 does, and so does any artifact
+built from a commit before 042 landed.** A consumer must keep treating
+lifetime ID uniqueness across sealed history as absent until it is consuming
+a release that carries 042, and the version numbers and lock stanzas in this
+section are unchanged by that landing: implementation is not publication, and
+publication is not consumer integration.
 
 The owner's decisions were taken on 2026-09-18 and are recorded in the spec as
-D-1 to D-7; the approval flip was taken in the same governed change. Approval
-fixes the design and its acceptance criteria. It is not a schedule and not a
-release: the spec is built when a build session takes it, in the order D-5
-sets (036, then 042, then 038), and a consumer's plan changes only when a
-release says so.
+D-1 to D-7, with the build session's own choices as D-9 to D-12; the approval
+flip was taken in the governed change that recorded them. The build followed
+the order D-5 sets (036, then 042, then 038); 038 is unimplemented and this
+landing implies nothing about it.
 
-Five properties of the approved design matter to a consumer:
+Five properties of the implemented design matter to a consumer, and every one
+of them is a property of a binary that carries 042, never of one that does
+not:
 
-- Adopting it would be a **stop-the-world upgrade**, not a rolling one,
+- Adopting it is a **stop-the-world upgrade**, not a rolling one,
   because a chain sealed before it carries none of the state it needs. The
   cutover is operationally guaranteed and not enforced: no store version
   check fences it in either direction, and implementing spec 036 does not
   change that, because 036's check runs in the new binary and so stops
   neither an older binary nor a replica already running.
-- A cell whose sealed history has not been reindexed would **refuse to
-  start**, and the owner has declined an override: there is no
+- A cell whose sealed history has not been reindexed **refuses to
+  start** (`Error::Stale`, exit 2, naming `rahi ledger reindex <archive>`),
+  and the owner has declined an override: there is no
   `--allow-uncovered` and no other flag or environment variable that starts
   normal service on incomplete historical coverage. Diagnosis, export and
   repair stay available on such a chain. A chain whose archive has
@@ -186,18 +194,20 @@ Five properties of the approved design matter to a consumer:
 - The guarantee is exactly-once **append**, never exactly-once **delivery**.
   A consumer's own side effects still need the consumer's own idempotency
   record and cannot be driven from the chassis's return value.
-- It would add one **permanent resident row per decision**, estimated at
+- It adds one **permanent resident row per decision**, estimated at
   about 400 bytes per decision on every replica and carried in every
-  snapshot, backup, restore and cluster join. That figure is an estimate
-  until the spec's own measurement test runs; what the spec's acceptance
-  binds is a ceiling of 800 bytes per decision, twice the estimate, so a
-  consumer sizing conservatively should size against 800 rather than 400. No supported lifetime-decision
+  snapshot, backup, restore and cluster join. B-9's table stays labelled an
+  estimate: what the spec's acceptance binds is a ceiling of 800 bytes per
+  decision, twice the estimate, and the implementation's own measurement over
+  AC-9's 100,000-decision fixture is reported in the spec's acceptance run
+  rather than substituted for B-9's table here. A consumer sizing
+  conservatively should size against 800 rather than 400. No supported lifetime-decision
   ceiling is declared: 10^5 to 10^7 is the range the arithmetic was aimed at,
   not a capacity the chassis has verified, and nothing states what a cell
   does at or past any figure. A consumer sizing a cell must count **every**
   append to the chain, kernel denials included, not only its own governed
   acts; a denial stream is driven by traffic the operator does not control.
-- A chain that already contains duplicate IDs would be **served with per-ID
+- A chain that already contains duplicate IDs is **served with per-ID
   containment**: lookup of an affected ID answers ambiguous with every copy,
   appends under it are refused, the evidence is preserved and reported, and
   the rest of the chain works. Indexing a duplicate records evidence and does
@@ -553,9 +563,10 @@ and to every cell, so it waits for a release line (spec 039).
 predate 035 and were corrected in 0.1.0: shutdown drains within a bound,
 loss counters distinguish causes, and IDs include the replica node.
 This does not provide lifetime ID uniqueness across sealed history.
-The independent archived-retry limitation in section 2.0 remains in 0.2.0,
-and the approved 042 design for it is unimplemented in every released
-version.
+The independent archived-retry limitation in section 2.0 is closed in the
+repository by spec 042 and remains present in every released version,
+0.1.0 included: a consumer gains it only from a release built after 042
+landed.
 The following dated findings preserve the evidence that motivated 035.
 
 **Verified** (`crates/rahi-kernel/src/lib.rs`, `adjudicate.rs`,

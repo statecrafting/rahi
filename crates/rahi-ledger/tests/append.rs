@@ -318,3 +318,45 @@ async fn a_ledger_booted_against_another_manifest_reports_the_chains_own_root() 
 
     f.store.shutdown().await.unwrap();
 }
+
+/// Spec 042 B-3: the record and its identity row are one transaction, and
+/// the identity table's primary key is the arbitration for a duplicate id
+/// exactly as the unique parent index is for a lost compare-and-swap.
+///
+/// Additive beside spec 013's own assertions, which are unchanged: this
+/// asserts what the append now *also* writes, never what it used to.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_append_writes_the_record_and_its_identity_row_in_one_transaction() {
+    #[derive(serde::Deserialize)]
+    struct Row {
+        id: String,
+        record_hash: String,
+        segment_hash: Option<String>,
+    }
+
+    let f = common::open().await;
+    let ledger = open_ledger(f.handle()).await;
+    let hash = ledger.append(decision("d-1")).await.unwrap();
+
+    let rows: Vec<Row> = f
+        .handle()
+        .query_consistent(
+            "SELECT id, record_hash, segment_hash FROM kernel_decision_identity WHERE id = $1",
+            vec![Value::from("d-1")],
+        )
+        .await
+        .unwrap();
+    assert_eq!(rows.len(), 1, "one identity row, written with the record");
+    assert_eq!(rows[0].id, "d-1");
+    assert_eq!(rows[0].record_hash, hash.as_str());
+    assert!(
+        rows[0].segment_hash.is_none(),
+        "nothing is sealed, so the row carries no segment"
+    );
+
+    // And the retry of the identical decision is idempotent rather than a
+    // second record.
+    assert_eq!(ledger.append(decision("d-1")).await.unwrap(), hash);
+    assert_eq!(ledger.records().await.unwrap().len(), 2);
+    f.store.shutdown().await.unwrap();
+}
