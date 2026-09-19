@@ -17,8 +17,8 @@ mod common;
 
 use rahi_ledger::{
     BinaryVersions, Decision, DecisionId, DecisionKind, Depth, FsArchive, Hash, Ledger,
-    LedgerSigner, ManifestTransition, Outcome, SYSTEM_DEPLOY, SealPolicy, SignedRecord,
-    TRANSITION_KIND,
+    LedgerSigner, ManifestTransition, Outcome, ReadInterleave, SYSTEM_DEPLOY, SealPolicy,
+    SignedRecord, TRANSITION_KIND,
 };
 use rahi_types::{Error, Revision, Sub};
 use serde_json::json;
@@ -562,4 +562,181 @@ async fn a_sealed_read_that_does_not_answer_never_names_an_older_manifest() {
     );
 
     f.store.shutdown().await.unwrap();
+}
+
+/// FR-011, D-15: a seal that commits between the chain read's two halves.
+///
+/// The interleave the census could not see: the sealed headers are read,
+/// a concurrent seal moves the H1 -> H2 transition out of the hot table and
+/// into a segment in one transaction, and the resident read that follows no
+/// longer holds the transition. Each half accounts for its own rows, both
+/// agree with what `open` verified, and the combined answer is still H1,
+/// which is exactly the manifest an old image carries.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_seal_between_the_reads_never_names_an_older_manifest() {
+    let f = common::open().await;
+    let ledger = open_ledger(f.handle()).await;
+    let archive = std::sync::Arc::new(
+        FsArchive::open(f.dir.path().join("archive")).expect("the archive opens"),
+    );
+    let policy = SealPolicy::new(4, 4).expect("a tiny window");
+    let h1 = common::root();
+    let h2 = manifest("22");
+
+    ledger
+        .append_transition(
+            &transition(h1.clone(), h2.clone(), r#"{"grants":2}"#),
+            ROOMY,
+        )
+        .await
+        .expect("H1 -> H2 is appended");
+    for i in 1..=5 {
+        ledger.append(decision(&format!("i-{i:02}"))).await.unwrap();
+    }
+    assert!(
+        ledger.segments().await.unwrap().is_empty(),
+        "nothing is sealed when the read starts"
+    );
+    assert_eq!(ledger.current_manifest().await.unwrap(), h2);
+
+    let reader = interleaved(&ledger, &archive, policy);
+    let answer = reader
+        .current_manifest()
+        .await
+        .expect("a legitimate seal is not an integrity failure");
+    assert_ne!(answer, h1, "D-15: the older manifest an H1 image carries");
+    assert_eq!(
+        answer, h2,
+        "the manifest the chain names on both sides of the seal"
+    );
+
+    assert!(
+        !ledger.segments().await.unwrap().is_empty(),
+        "the interleaved seal really did commit"
+    );
+    f.store.shutdown().await.unwrap();
+}
+
+/// FR-011, D-15: the model reader answers from the same snapshot.
+///
+/// `current_manifest_model` reports `None` for a real absence and only that
+/// (D-14). A seal landing between the two halves of the old read took the
+/// transition out of the resident answer, so the recovery path reported "the
+/// chain holds no earlier manifest" about a chain that had just named one.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_seal_between_the_reads_never_invents_an_absent_model() {
+    let f = common::open().await;
+    let ledger = open_ledger(f.handle()).await;
+    let archive = std::sync::Arc::new(
+        FsArchive::open(f.dir.path().join("archive")).expect("the archive opens"),
+    );
+    let policy = SealPolicy::new(4, 4).expect("a tiny window");
+    let model = r#"{"grants":2}"#;
+
+    ledger
+        .append_transition(&transition(common::root(), manifest("22"), model), ROOMY)
+        .await
+        .expect("H1 -> H2 is appended");
+    for i in 1..=5 {
+        ledger.append(decision(&format!("m-{i:02}"))).await.unwrap();
+    }
+
+    let reader = interleaved(&ledger, &archive, policy);
+    assert_eq!(
+        reader.current_manifest_model().await.unwrap(),
+        Some(model.to_owned()),
+        "D-14: an absence is a chain that holds no earlier text, never a seal that moved it"
+    );
+    f.store.shutdown().await.unwrap();
+}
+
+/// FR-011, D-15: the same crossing on a chain that already has history.
+///
+/// The first variant crosses from nothing sealed to one segment. This one
+/// crosses from one segment naming H2 to a second naming H3, which is the
+/// shape that survives every guard D-11 added: both censuses account for
+/// their rows, `open` saw segments and records, and the segment answer is
+/// not empty. Only the seam check refuses it.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_seal_between_the_reads_never_names_a_superseded_segment() {
+    let f = common::open().await;
+    let ledger = open_ledger(f.handle()).await;
+    let archive = std::sync::Arc::new(
+        FsArchive::open(f.dir.path().join("archive")).expect("the archive opens"),
+    );
+    let policy = SealPolicy::new(4, 4).expect("a tiny window");
+    let h2 = manifest("22");
+    let h3 = manifest("33");
+
+    // History first: H1 -> H2 sealed into a segment that names H2.
+    ledger
+        .append_transition(
+            &transition(common::root(), h2.clone(), r#"{"grants":2}"#),
+            ROOMY,
+        )
+        .await
+        .expect("H1 -> H2 is appended");
+    for i in 1..=5 {
+        ledger.append(decision(&format!("h-{i:02}"))).await.unwrap();
+        ledger
+            .seal_if_needed(archive.as_ref(), &policy)
+            .await
+            .unwrap();
+    }
+    let sealed = ledger.segments().await.unwrap();
+    assert_eq!(
+        sealed.last().unwrap().current_manifest,
+        Some(h2.clone()),
+        "the segment names the manifest at its tail"
+    );
+
+    // A handle that verified that history, so `open` saw both relations.
+    let reopened = Ledger::open(f.handle(), common::signer(), common::root())
+        .await
+        .expect("the sealed chain reopens and verifies");
+    reopened
+        .append_transition(
+            &transition(h2.clone(), h3.clone(), r#"{"grants":3}"#),
+            ROOMY,
+        )
+        .await
+        .expect("H2 -> H3 is appended");
+    for i in 1..=5 {
+        reopened
+            .append(decision(&format!("n-{i:02}")))
+            .await
+            .unwrap();
+    }
+    assert_eq!(reopened.current_manifest().await.unwrap(), h3);
+
+    let reader = interleaved(&reopened, &archive, policy);
+    let answer = reader
+        .current_manifest()
+        .await
+        .expect("a legitimate seal is not an integrity failure");
+    assert_ne!(answer, h2, "the manifest the older segment still names");
+    assert_eq!(
+        answer, h3,
+        "D-15: the manifest the chain names, either side of the seal"
+    );
+    f.store.shutdown().await.unwrap();
+}
+
+/// A reader whose chain read is interrupted, exactly once, by a real seal
+/// committing through the production path (spec 036 D-15).
+fn interleaved(ledger: &Ledger, archive: &std::sync::Arc<FsArchive>, policy: SealPolicy) -> Ledger {
+    let sealer = ledger.clone();
+    let archive = std::sync::Arc::clone(archive);
+    ledger
+        .clone()
+        .with_read_interleave(ReadInterleave::new(move || {
+            let sealer = sealer.clone();
+            let archive = std::sync::Arc::clone(&archive);
+            async move {
+                sealer
+                    .seal_if_needed(archive.as_ref(), &policy)
+                    .await
+                    .expect("the concurrent seal commits");
+            }
+        }))
 }

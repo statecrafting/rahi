@@ -150,21 +150,26 @@ pub enum Depth<'a> {
     Full(&'a dyn Archive),
 }
 
+/// One `kernel_segments` row, as every read of that table deserializes it.
+///
+/// `pub(crate)` since spec 036 D-15: the manifest read takes the segment
+/// headers and the resident records in one statement, and builds its headers
+/// out of these same rows rather than out of a second shape.
 #[derive(Debug, Deserialize)]
-struct SegmentRow {
-    first_id: String,
-    last_id: String,
-    count: u32,
-    segment_hash: String,
-    prev_segment_hash: String,
-    last_hash: String,
+pub(crate) struct SegmentRow {
+    pub(crate) first_id: String,
+    pub(crate) last_id: String,
+    pub(crate) count: u32,
+    pub(crate) segment_hash: String,
+    pub(crate) prev_segment_hash: String,
+    pub(crate) last_hash: String,
     /// `NULL` on a segment sealed before spec 036 B-5 (segment.rs).
     #[serde(default)]
-    current_manifest: Option<String>,
+    pub(crate) current_manifest: Option<String>,
 }
 
 impl SegmentRow {
-    fn into_header(self) -> Result<SegmentHeader, Error> {
+    pub(crate) fn into_header(self) -> Result<SegmentHeader, Error> {
         Ok(SegmentHeader {
             first_id: DecisionId::new(self.first_id),
             last_id: DecisionId::new(self.last_id),

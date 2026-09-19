@@ -114,6 +114,45 @@ struct CountRow {
     total: i64,
 }
 
+/// A hook run inside the chain read, so a test can commit a seal at the one
+/// instant the read is vulnerable to it (spec 036 D-15).
+///
+/// Test scaffolding, carried deliberately and named as such: `None` on every
+/// ledger this crate builds, installed only by
+/// [`Ledger::with_read_interleave`], and doing nothing at all until it is.
+/// It is `#[doc(hidden)]` rather than feature-gated because the feature that
+/// would hide it can only be turned on for this crate's own tests by a
+/// dependency on itself, which `cargo package` cannot resolve.
+#[doc(hidden)]
+#[derive(Clone)]
+pub struct ReadInterleave(
+    std::sync::Arc<
+        dyn Fn() -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> + Send + Sync,
+    >,
+);
+
+impl ReadInterleave {
+    /// Install `hook` as the interleave point of the chain read.
+    #[doc(hidden)]
+    pub fn new<F, Fut>(hook: F) -> Self
+    where
+        F: Fn() -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = ()> + Send + 'static,
+    {
+        Self(std::sync::Arc::new(move || Box::pin(hook())))
+    }
+
+    pub(crate) async fn run(&self) {
+        (self.0)().await;
+    }
+}
+
+impl std::fmt::Debug for ReadInterleave {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ReadInterleave")
+    }
+}
+
 /// The cell's decision ledger.
 ///
 /// Cheap to clone: it holds the store handle, the ledger key, and the hash
@@ -125,6 +164,9 @@ pub struct Ledger {
     signer: LedgerSigner,
     genesis_parent: Hash,
     opened: OpenedChain,
+    /// Spec 036 D-15's test seam: `None` everywhere but this crate's own
+    /// regressions.
+    interleave: Option<ReadInterleave>,
 }
 
 /// What [`Ledger::open`] established about the chain it verified (spec 036
@@ -182,6 +224,7 @@ impl Ledger {
             signer,
             genesis_parent,
             opened: OpenedChain::default(),
+            interleave: None,
         };
         ledger.create_schema().await?;
 
@@ -207,6 +250,21 @@ impl Ledger {
     /// What [`Ledger::open`] established about this chain (spec 036 D-11).
     pub(crate) fn opened(&self) -> OpenedChain {
         self.opened
+    }
+
+    /// Install the test seam (spec 036 D-15).
+    #[doc(hidden)]
+    #[must_use]
+    pub fn with_read_interleave(mut self, hook: ReadInterleave) -> Self {
+        self.interleave = Some(hook);
+        self
+    }
+
+    /// Run the installed seam, if any.
+    pub(crate) async fn read_interleave(&self) {
+        if let Some(hook) = self.interleave.clone() {
+            hook.run().await;
+        }
     }
 
     /// The genesis parent the stored chain itself names, or `None` when
