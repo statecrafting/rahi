@@ -702,9 +702,10 @@ further.
   *new* binary, so it cannot stop a pre-036 binary, which has no such check
   at all, and it cannot stop a replica already running on an old image, which
   re-evaluates nothing after it has booted. D-5 orders 036 before 042 for
-  reconciliation reasons (`Ledger::open`'s two refusals composing into one
-  message and one exit code, and building reindex against 036 B-5's final
-  segment header shape), never for a fencing claim. And if the owner later
+  reconciliation reasons (the two recoverable startup refusals reading as one
+  boot path, in the order D-8 states, and building reindex against 036 B-5's
+  final segment header shape), never for a fencing claim. And if the owner
+  later
   wants a real version fence across this spec, it is a separate governed
   change that must first establish a chassis-owned migration lane; section 6
   puts it out of scope here.
@@ -1251,12 +1252,13 @@ sets.
   anything: 038 has no declared territory overlap with 042 and touches the
   edge and identity surfaces rather than the ledger, so deferring it costs
   no reconciliation. 036 keeps its place ahead of 042 for the two
-  reconciliation reasons B-13 and D-required-4 give (`Ledger::open` gains two
-  `Error::Stale` refusals that must compose into one message and one exit
-  code, and reindex should be built against 036 B-5's final segment header
-  shape) and for no fencing reason: D-6 records that 036 fences nothing about
-  this spec. This session neither implements any spec nor changes any spec's
-  approval state, and it alters neither 040 nor 041.
+  reconciliation reasons B-13 and D-required-4 give (the recoverable startup
+  refusal this spec adds has to read as one boot path beside the one 036
+  adds, which D-8 states exactly, and reindex should be built against 036
+  B-5's final segment header shape) and for no fencing reason: D-6 records
+  that 036 fences nothing about this spec. This session neither implements
+  any spec nor changes any spec's approval state, and it alters neither 040
+  nor 041.
 - **D-6 (2026-09-18, owner-directed correction; settles B-1 against B-13's
   alternative).** The identity, collision and coverage tables ship as chassis
   baseline DDL created by `Ledger::open`, not as a migration declared
@@ -1333,6 +1335,42 @@ sets.
   the session that knows the result, and a criterion written that way cannot
   constrain the thing it exists to constrain.
 
+- **D-8 (2026-09-18, owner-directed correction; what "reconciliation with
+  036" means, exactly).** Earlier wording in B-13 and D-5 described the
+  sequencing against spec 036 as `Ledger::open` gaining "two `Error::Stale`
+  refusals that must compose into one message and one exit code". That
+  reading is wrong twice and is corrected here. It is corrected without
+  changing a single requirement: B-10 keeps the refusal it states, where it
+  states it, and 036 keeps B-4 and B-7 as written.
+
+  *The two refusals are not in one function.* Spec 036 B-4 moves the manifest
+  comparison **out** of the chain's open and into `Kernel::boot`, where an
+  unadopted manifest is `Error::Stale` naming `rahi migrate
+  --adopt-manifest`. This spec's B-10 adds a different `Error::Stale`
+  **inside** `Ledger::open`, naming `rahi ledger reindex`. They sit at two
+  points of one boot sequence, in that order, and neither relocates into the
+  other. What has to read as one path is the operator's experience of a
+  startup that stops on a missing prerequisite: each refusal names the one
+  command that clears it, exit 2 either way, and a boot that owes both
+  reports the chain's own prerequisite first, because `Ledger::open` runs
+  before `Kernel::boot` and reindex is the step that has to precede the
+  adopt step (B-10, B-13). The extension point this spec lands against is
+  therefore ordinary: one more recoverable check before the ledger returns,
+  not a rearrangement of 036's.
+
+  *An integrity failure is never a stale failure, and is never masked by
+  one.* Nothing here converts an `Error::Integrity` into an `Error::Stale`
+  or lets a recoverable diagnostic stand in for one. A broken link, a bad
+  signature, a fork, or a segment whose body does not match its header stays
+  `Error::Integrity`, stays exit 1, and stays fatal at boot (constitution
+  XI); spec 036 B-7's migration checksum mismatch is `Error::Integrity` for
+  the same reason and is not reclassified by this spec or by 036. The
+  ordering above is an ordering of *recoverable* checks only, and it never
+  outranks an integrity verdict: when the chain does not verify,
+  `Ledger::open` fails with integrity and says so, whether or not coverage
+  is also incomplete, so the operator is never told to run `ledger reindex`
+  on a chain whose real problem is that it has been tampered with. Where
+  both answers are available, integrity is the one reported.
 
 ## 8. Owner decisions, answered
 

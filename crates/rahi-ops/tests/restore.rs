@@ -48,7 +48,7 @@ async fn restore_yields_a_verifying_store_with_the_same_keys_and_is_single_shot(
     let fresh = tempfile::tempdir().unwrap();
     let config = common::config(fresh.path(), common::free_addr());
     let key = KeySource::File(source_keys.path(rahi_ops::BACKUP_KEY_FILE));
-    let outcome = restore::run(&config, &archive_path, &key)
+    let outcome = restore::run(&config, &archive_path, &key, &common::compatibility())
         .await
         .expect("the archive restores into an empty volume");
     let Outcome::Restored(marker) = outcome else {
@@ -88,7 +88,9 @@ async fn restore_yields_a_verifying_store_with_the_same_keys_and_is_single_shot(
     );
     store.shutdown().await.unwrap();
 
-    let again = restore::run(&config, &archive_path, &key).await.unwrap();
+    let again = restore::run(&config, &archive_path, &key, &common::compatibility())
+        .await
+        .unwrap();
     assert!(matches!(again, Outcome::AlreadyRestored(m) if m == marker));
 }
 
@@ -102,7 +104,7 @@ async fn a_running_node_refuses_restore() {
     std::fs::create_dir_all(lock.parent().unwrap()).unwrap();
     std::fs::write(&lock, b"").unwrap();
     let key = KeySource::File(source_keys.path(rahi_ops::BACKUP_KEY_FILE));
-    let err = restore::run(&config, &archive_path, &key)
+    let err = restore::run(&config, &archive_path, &key, &common::compatibility())
         .await
         .unwrap_err();
     assert!(matches!(err, Error::Conflict(_)), "{err}");
@@ -117,7 +119,7 @@ async fn a_tampered_part_is_refused_before_anything_is_written() {
         archive::Part::new(archive::RAUTHY_DIR, "r.sqlite", b"rauthy".to_vec()),
         archive::Part::new(KEYS_DIR, "ledger.key", b"k".to_vec()),
     ];
-    let manifest = archive::ArchiveManifest::over(&parts, 0, "h".to_owned());
+    let manifest = archive::ArchiveManifest::over(&parts, 0, "h".to_owned(), None);
     // Build the same tar by hand, with one part altered after the manifest
     // named its hash, and seal it to the identity.
     let mut tar = tar::Builder::new(Vec::new());
@@ -158,9 +160,14 @@ async fn a_tampered_part_is_refused_before_anything_is_written() {
     std::fs::create_dir_all(&volume).unwrap();
     let config = common::config(&volume, common::free_addr());
 
-    let err = restore::run(&config, &archive_path, &KeySource::File(key_path))
-        .await
-        .unwrap_err();
+    let err = restore::run(
+        &config,
+        &archive_path,
+        &KeySource::File(key_path),
+        &common::compatibility(),
+    )
+    .await
+    .unwrap_err();
     assert!(matches!(err, Error::Integrity(_)), "{err}");
     assert!(!config.keys_dir().exists(), "no key was written");
     assert!(!config.hiqlite_dir().exists(), "no node state was touched");
@@ -177,9 +184,14 @@ async fn the_wrong_key_does_not_open_the_archive() {
     let volume = fresh.path().join("volume");
     std::fs::create_dir_all(&volume).unwrap();
     let config = common::config(&volume, common::free_addr());
-    let err = restore::run(&config, &archive_path, &KeySource::File(key_path))
-        .await
-        .unwrap_err();
+    let err = restore::run(
+        &config,
+        &archive_path,
+        &KeySource::File(key_path),
+        &common::compatibility(),
+    )
+    .await
+    .unwrap_err();
     assert!(matches!(err, Error::Unauthorized(_)), "{err}");
     assert!(!config.keys_dir().exists());
 }

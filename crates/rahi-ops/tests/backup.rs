@@ -174,13 +174,13 @@ fn seal_refuses_a_manifest_that_is_incomplete_or_stale() {
         archive::Part::new(APP_DIR, "a.sqlite", b"a".to_vec()),
         archive::Part::new(RAUTHY_DIR, "r.sqlite", b"r".to_vec()),
     ];
-    let manifest = archive::ArchiveManifest::over(&parts, 0, "h".to_owned());
+    let manifest = archive::ArchiveManifest::over(&parts, 0, "h".to_owned(), None);
     let err = archive::seal(&parts, &manifest, &identity.to_public()).unwrap_err();
     assert!(matches!(err, Error::Validation(_)), "no keys/ part: {err}");
 
     let mut parts = parts;
     parts.push(archive::Part::new(KEYS_DIR, "k", b"k".to_vec()));
-    let manifest = archive::ArchiveManifest::over(&parts, 0, "h".to_owned());
+    let manifest = archive::ArchiveManifest::over(&parts, 0, "h".to_owned(), None);
     parts[0].bytes = b"changed".to_vec();
     let err = archive::seal(&parts, &manifest, &identity.to_public()).unwrap_err();
     assert!(

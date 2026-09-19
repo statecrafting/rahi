@@ -67,6 +67,22 @@ pub fn manifest_hash() -> Hash {
     Manifest::parse(MANIFEST).unwrap().hash().unwrap()
 }
 
+/// The fixture manifest's hash as text, for spec 036 B-9's restore check.
+pub fn manifest_hash_text() -> &'static str {
+    static TEXT: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    TEXT.get_or_init(|| manifest_hash().to_string())
+}
+
+/// The running cell a restore is checked against (spec 036 B-9): this
+/// fixture, with no migrations and no `--adopt`.
+pub fn compatibility() -> rahi_ops::restore::Compatibility<'static> {
+    rahi_ops::restore::Compatibility {
+        manifest_hash: manifest_hash_text(),
+        migrations: &[],
+        adopt: false,
+    }
+}
+
 /// Write a complete key set under `dir`, and return it.
 pub fn write_keys(dir: &Path) -> KeySet {
     let keys = KeySet::at(dir);

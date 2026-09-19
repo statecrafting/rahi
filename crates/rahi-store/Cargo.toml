@@ -13,6 +13,10 @@ spec = "011-store-hiqlite"
 
 [dependencies]
 rahi-types = { workspace = true }
+# Spec 036 B-7: a migration's checksum is sha256 over its SQL, taken with the
+# same primitive every hash in this workspace is taken with, so nothing here
+# is a second implementation of a digest.
+attest-ledger-core = { workspace = true }
 futures-core = { workspace = true }
 hiqlite = { workspace = true }
 serde = { workspace = true }

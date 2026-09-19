@@ -34,7 +34,7 @@ refuses a render that names `:latest` or a cell image outside
 | `k8s/statefulset.yaml` | one container per pod, `volumeClaimTemplates` for `/data`, the keys mounted read-only at `/data/keys`, the probes |
 | `k8s/service.yaml` | the headless Service that names the pods (`rahi-<n>.rahi-hl`) and the ClusterIP Service the Ingress reaches |
 | `k8s/ingress.yaml` | TLS termination, `/metrics` closed at the edge |
-| `k8s/migrate-job.yaml` | the Job that runs a new image's migrations before a rollout |
+| `k8s/migrate-job.yaml` | the Job that runs a new image's `migrate --adopt-manifest` before a rollout (spec 036 B-3) |
 | `k8s/backup-cronjob.yaml` | the nightly `rahi backup --to s3://` against the leader, with the RBAC it needs |
 | `k8s/servicemonitor.yaml` | the in-cluster scrape of `/metrics` |
 | `k8s/secret.example.yaml` | the shape of `rahi-keys` and `rahi-s3`, which the operator custodies and applies by hand |
@@ -63,8 +63,8 @@ docker run --rm --entrypoint rahi -e RAHI_PUBLIC_URL=https://cell.example.com \
 ```
 
 `--entrypoint rahi` is load bearing. The image's entry point is
-`entrypoint.sh`, which takes no arguments and runs `first-boot`, `migrate`,
-`exec supervise`; without the override the arguments are discarded and the
+`entrypoint.sh`, which takes no arguments and runs `first-boot`,
+`migrate --adopt-manifest`, `exec supervise`; without the override the arguments are discarded and the
 command starts a cell instead of rendering a Secret (spec 037 D-6).
 `RAHI_PUBLIC_URL` is load bearing too: the backup admin's passkey in the set
 is minted for that origin's WebAuthn relying party, and a Secret minted for
@@ -104,9 +104,18 @@ and liveness on `/healthz`.
 ## Migrations are a Job, run once, before the rollout
 
 At N=1 a container start is the deployment and the image's entrypoint runs
-`rahi migrate` before `supervise`. At N=3 the entrypoint's migrate step is
-wrapped so a follower's refusal (exit 2) does not stop the pod: on a fresh
-cluster the leader applies the migrations and the followers carry on.
+`rahi migrate --adopt-manifest` before `supervise`. At N=3 the entrypoint's
+migrate step is wrapped so a follower's refusal (exit 2) does not stop the
+pod: on a fresh cluster the leader applies the migrations and the followers
+carry on.
+
+`--adopt-manifest` is spec 036 B-3: the same step that moves the schema
+moves the ceiling. When the image's manifest differs from the one the chain
+currently names, the step appends a `manifest.transition` record and prints
+the grants added and removed; when they are the same it appends nothing and
+says so. Without it a changed manifest meets `serve` as exit 2 naming this
+command, because `Kernel::boot` checks the booted manifest against the
+chain's current one (036 B-4).
 
 For every rollout after the first, run the migrations before rolling the
 image, with the image that carries them:
@@ -120,10 +129,21 @@ kubectl apply -k deploy/n3
 kubectl -n rahi rollout status statefulset/rahi
 ```
 
-The Job runs `rahi migrate` with `RAHI_STORE_CLIENT=true`: a pure client
-of the peers in `RAHI_HIQ_NODES`, no volume, no node of its own. hiqlite
-routes the migration to the leader and Raft replicates it to every
-replica, so a new pod finds the store current when its `serve` checks.
+The Job runs `rahi migrate --adopt-manifest` with
+`RAHI_STORE_CLIENT=true`: a pure client of the peers in `RAHI_HIQ_NODES`, no
+volume, no node of its own. hiqlite routes the migration to the leader and
+Raft replicates it to every replica, so a new pod finds the store current
+when its `serve` checks.
+
+One transition per deploy, appended here, before the rollout (036 B-10).
+Replicas still running the old image keep serving and keep stamping the old
+manifest hash on their decisions; a replica that **restarts** on the old
+image after the Job has run refuses to boot (exit 2) rather than adjudicate
+under a ceiling the chain no longer names. Rolling back the image is the
+same command run with the old image: migration 2 stays applied, and an older
+binary may serve a store ahead of it only across migrations the cell
+declared additive (036 B-8). None of this reaches a binary built before spec
+036, which carries no such check.
 
 ## Backups go to S3 from the leader
 

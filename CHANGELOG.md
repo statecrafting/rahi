@@ -67,9 +67,74 @@ is neither registry availability nor evidence of consumer deployment.
 - Passkeys are origin-bound. The proven restore uses the original origin
   and ports and carries both the private key and its rauthy registration.
   Changing `RAHI_PUBLIC_URL` does not rebind an existing credential.
-  Cross-origin recovery, key rotation, N=3 restore, and manifest/schema
-  migration are not delivered here. Specs 036, 038, 040, and 041 remain
-  unapproved drafts.
+  Cross-origin recovery, key rotation, and N=3 restore are not delivered
+  here. Manifest and schema evolution is now delivered, by spec 036 below.
+  Specs 038, 040, and 041 remain unimplemented.
+
+### Manifest and schema evolution (spec 036)
+
+- A manifest change is a chain record. `rahi migrate --adopt-manifest`
+  applies the cell's migrations and then, on the leader, appends a
+  `manifest.transition` decision carrying `from`, `to`, the adopted
+  manifest's canonical JSON, the store's schema version, the binary, and the
+  actor. When the booted manifest already is the chain's current one it
+  appends nothing and says so. `docker/entrypoint.sh` and
+  `deploy/k8s/migrate-job.yaml` pass the flag, so an ordinary deployment
+  adopts its manifest in the step that migrates it.
+- The boot check moved. `Kernel::boot` compares the booted manifest against
+  the chain's **current** manifest (its genesis parent until the first
+  transition, then the `to` of the latest one) and a mismatch is
+  `Error::Stale`, exit 2, naming both hashes and the command that clears it.
+  Before this release a changed manifest was reported as an integrity
+  failure and a deployed cell's manifest was frozen at its first boot.
+- Verification is re-anchored, not relaxed. `Ledger::open` reads the genesis
+  parent from the chain's own stored records rather than from the booted
+  manifest, with the cell's ledger key's signatures as the anchor. A broken
+  link, a bad signature, or a fork is still `Error::Integrity`, exit 1, and
+  still fatal at boot.
+- **Chain record format**: a new decision kind, `manifest.transition`. No
+  existing record gained a field, and a chain with no transition verifies
+  byte for byte as before.
+- **Archive format**: `manifest.json` gains `schema`, the store's migration
+  history at backup time, and its `manifest_hash` is now the chain's current
+  manifest rather than the booted one. An archive written before this
+  release carries no `schema`; `restore` reports that its schema could not
+  be checked rather than treating silence as a passed check.
+- **`Cell` surface**: `Migration` gains `additive` and the builder
+  `Migration::additive()`. A migration that does not declare itself additive
+  is not additive. `serve` accepts a store ahead of the binary only when
+  every applied version above the binary's last is recorded additive, and
+  otherwise exits 2 naming the first that is not. Before this release a
+  store ahead was served in silence.
+- `schema_version` gains `checksum` and `additive` columns, added to an
+  existing store in place. A recorded version whose SQL differs from the
+  binary's is `Error::Integrity` naming the version, rather than being
+  skipped as applied. A row written before this release carries no checksum;
+  the first `migrate` under it records the binary's.
+- `restore` gains `--adopt` and refuses, writing nothing, an archive whose
+  schema is ahead across a non-additive migration or whose chain names a
+  manifest this binary does not. The Rust API is now
+  `rahi_ops::restore::run(&config, &archive, &key, &Compatibility)`.
+- A transition retains the adopted manifest whole or adoption is refused:
+  a record that would exceed the cell's `ledger.max_record_bytes` is
+  `Error::Validation` (exit 1) naming the measured size and the bound, with
+  no migration applied and no record appended. Nothing is truncated, moved
+  to another field, or reduced to hash-only evidence.
+
+### Upgrade limits (spec 036)
+
+- Everything above is enforced by a binary that carries spec 036. A binary
+  built before it has none of these checks and cannot be given them from
+  outside; an older binary that *does* carry 036 is a different thing from a
+  pre-036 one, and only the former honors the additive rule.
+- At N=3 one transition is appended per deploy, by the migration Job, before
+  the rollout. Replicas already running the old image keep serving and keep
+  stamping the old manifest hash on their decisions: this release offers no
+  protection against a replica that is already up, and claims none. A
+  replica that **restarts** on the old image after the transition refuses to
+  boot.
+- `preflight` is unchanged and does not report an unadopted manifest; `serve`
+  and `migrate --adopt-manifest` are where that is answered.
 
 ### Evidence and release tooling since 0.1.0
 

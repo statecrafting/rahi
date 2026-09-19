@@ -25,7 +25,10 @@ use serde_json::json;
 
 use crate::record::{Decision, DecisionId, DecisionKind, Hash, Outcome, SignedRecord};
 use crate::seal::Depth;
-use crate::segment::{SEGMENTS_INDEX_SQL, SEGMENTS_TABLE_SQL};
+use crate::segment::{
+    SEGMENTS_ADD_MANIFEST_SQL, SEGMENTS_COLUMNS_SQL, SEGMENTS_INDEX_SQL, SEGMENTS_MANIFEST_COLUMN,
+    SEGMENTS_TABLE_SQL,
+};
 use crate::signer::{LedgerSigner, LedgerVerifier};
 use crate::verify::order_chain;
 
@@ -57,6 +60,16 @@ const COUNT_SQL: &str = "SELECT COUNT(*) AS total FROM kernel_decisions";
 const DUPLICATE_PARENT_SQL: &str = "SELECT prev_hash FROM kernel_decisions \
      GROUP BY prev_hash HAVING COUNT(*) > 1 LIMIT 1";
 
+/// The parent the oldest resident record links to: the record no other
+/// resident record is the parent of (spec 036 B-4).
+const RECORD_ROOT_SQL: &str = "SELECT prev_hash FROM kernel_decisions \
+     WHERE prev_hash NOT IN (SELECT hash FROM kernel_decisions)";
+
+/// The predecessor the oldest sealed segment links to: the ledger's genesis
+/// parent once anything has been sealed (spec 014 B-4, spec 036 B-4).
+const SEGMENT_ROOT_SQL: &str = "SELECT prev_segment_hash FROM kernel_segments \
+     WHERE prev_segment_hash NOT IN (SELECT segment_hash FROM kernel_segments)";
+
 #[derive(Debug, Deserialize)]
 struct HashRow {
     hash: String,
@@ -64,7 +77,15 @@ struct HashRow {
 
 #[derive(Debug, Deserialize)]
 struct ParentRow {
+    #[serde(default)]
     prev_hash: String,
+    #[serde(default)]
+    prev_segment_hash: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ColumnRow {
+    name: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -92,47 +113,122 @@ pub struct Ledger {
 impl Ledger {
     /// Open the chain, writing genesis if it is absent, and verify it whole.
     ///
-    /// `genesis_parent` is the booted manifest's hash (spec 015 B-8). It is
-    /// what the genesis record links to, so two cells running different
-    /// manifests cannot produce chains that could be spliced together, and a
-    /// manifest change without a deploy genesis record is caught here rather
-    /// than believed.
+    /// `genesis_parent` is the booted manifest's hash (spec 015 B-8), and it
+    /// is what a **fresh** chain's genesis record links to, so two cells
+    /// starting from different manifests cannot produce chains that could be
+    /// spliced together. On a chain that already exists it is not the
+    /// anchor: spec 036 B-4 and D-5 re-anchor verification on the chain's
+    /// own stored genesis record, read back by
+    /// [`Ledger::stored_genesis_parent`], with the cell's ledger key's
+    /// signatures as the proof (spec 013 B-5). A booted manifest that
+    /// differs from the chain's *current* manifest is a missing deploy step
+    /// rather than damage, and spec 036 B-4 makes `Kernel::boot` say so with
+    /// [`Error::Stale`]; nothing about it is decided here.
     ///
     /// Verification runs over the whole resident chain and every sealed
     /// segment's header on every open ([`crate::Depth::Resident`], spec 014
     /// B-4) and fails closed. The caller is a boot path and constitution XI
     /// makes the consequence explicit: on [`Error::Integrity`] the process
-    /// exits rather than serves.
+    /// exits rather than serves. Verification is re-anchored here, never
+    /// relaxed.
     ///
     /// # Errors
     ///
     /// [`Error::Integrity`] when the chain does not verify, when the unique
-    /// parent index cannot be built over records already resident, or when a
-    /// stored row is not a record this crate wrote. Store failures keep their
-    /// own variants: a leader that cannot be reached is not tamper evidence.
+    /// parent index cannot be built over records already resident, when the
+    /// stored chain has more than one root, or when a stored row is not a
+    /// record this crate wrote. Store failures keep their own variants: a
+    /// leader that cannot be reached is not tamper evidence.
     pub async fn open(
         store: StoreHandle,
         signer: LedgerSigner,
         genesis_parent: Hash,
     ) -> Result<Self, Error> {
-        let ledger = Self {
+        let mut ledger = Self {
             store,
             signer,
             genesis_parent,
         };
         ledger.create_schema().await?;
 
-        // A chain whose whole head window has been sealed is empty here and
-        // is not a fresh chain: spec 014's segments are the rest of it, and
-        // re-genesising over them would fork the ledger at its root.
-        if ledger.records().await?.is_empty() && ledger.segment_count().await? == 0 {
-            ledger.append(ledger.genesis_decision()).await?;
+        // A chain whose whole head window has been sealed is not a fresh
+        // chain: spec 014's segments are the rest of it, and re-genesising
+        // over them would fork the ledger at its root. Both cases are one
+        // question, asked of the chain rather than of the caller.
+        match ledger.stored_genesis_parent().await? {
+            Some(stored) => ledger.genesis_parent = stored,
+            None => {
+                ledger.refuse_a_second_genesis().await?;
+                ledger.append(ledger.genesis_decision()).await?;
+            }
         }
         ledger.verify_chain(Depth::Resident).await?;
         Ok(ledger)
     }
 
-    /// The hash the genesis record links to: the booted manifest's hash.
+    /// The genesis parent the stored chain itself names, or `None` when
+    /// there is no chain yet (spec 036 B-4).
+    ///
+    /// The archive answers first when anything has been sealed, because the
+    /// oldest segment links the genesis parent directly and the oldest
+    /// resident record does not once history has moved out from under it.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Integrity`] when either list has more than one root, which
+    /// is a fork at the root; the store's own error when the read fails.
+    pub async fn stored_genesis_parent(&self) -> Result<Option<Hash>, Error> {
+        let segments: Vec<ParentRow> = self
+            .store
+            .query_consistent(SEGMENT_ROOT_SQL, vec![])
+            .await?;
+        if let Some(root) = one_root(
+            segments.into_iter().map(|row| row.prev_segment_hash),
+            "archive",
+        )? {
+            return Ok(Some(root));
+        }
+        let records: Vec<ParentRow> = self.store.query_consistent(RECORD_ROOT_SQL, vec![]).await?;
+        one_root(records.into_iter().map(|row| row.prev_hash), "chain")
+    }
+
+    /// Nothing is resident and nothing is sealed, so writing genesis is
+    /// writing the chain's first record rather than a second one.
+    ///
+    /// [`Ledger::stored_genesis_parent`] answering `None` is not on its own
+    /// enough to conclude that. A local read that fails while stepping its
+    /// rows comes back as `Ok(vec![])` rather than an error (spec 016 D-2),
+    /// so an absent root is either an empty chain or a probe that did not
+    /// answer, and the two have opposite consequences: the second genesis
+    /// this would write is a valid compare-and-swap onto the real head, so it
+    /// lands, persists, and leaves a `ledger.genesis` record in the middle of
+    /// an audit chain. Constitution XI settles which way to fail. This is the
+    /// same cross-check [`Ledger::head`] makes before it calls an absent head
+    /// a fresh chain.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Integrity`] when anything is resident or sealed while no root
+    /// was found; the store's own error when a count cannot be read.
+    async fn refuse_a_second_genesis(&self) -> Result<(), Error> {
+        let resident = self.count().await?;
+        let sealed = self.segment_count().await?;
+        if resident == 0 && sealed == 0 {
+            return Ok(());
+        }
+        Err(Error::Integrity(format!(
+            "the chain has {resident} resident record(s) and {sealed} sealed segment(s) but no \
+             root: either its links form a cycle or the read that looks for the root did not \
+             answer, and writing a second genesis record over either would be the damage rather \
+             than the repair"
+        )))
+    }
+
+    /// The hash the chain's genesis record links to.
+    ///
+    /// On an open chain this is what the chain itself stores, whatever
+    /// manifest this process booted (spec 036 B-4). The booted manifest is
+    /// compared against [`Ledger::current_manifest`] instead, by the kernel.
     #[must_use]
     pub fn genesis_parent(&self) -> &Hash {
         &self.genesis_parent
@@ -288,6 +384,42 @@ impl Ledger {
                 Statement::new(SEGMENTS_INDEX_SQL),
             ])
             .await?;
+        self.add_segment_manifest_column().await?;
+        Ok(())
+    }
+
+    /// Give an existing segment table spec 036 B-5's column.
+    ///
+    /// `CREATE TABLE IF NOT EXISTS` leaves a table that already exists
+    /// exactly as it was, and SQLite has no `ADD COLUMN IF NOT EXISTS`, so
+    /// the column list is read first and the `ALTER` runs only when it is
+    /// missing. This is the chassis's own baseline, not an application
+    /// migration (spec 013 D-4), so it records nothing in `schema_version`.
+    async fn add_segment_manifest_column(&self) -> Result<(), Error> {
+        let columns: Vec<ColumnRow> = self
+            .store
+            .query_consistent(SEGMENTS_COLUMNS_SQL, vec![])
+            .await?;
+        // A read that answers nothing at all is the store failing, not a
+        // table with no columns (spec 016 D-2): the table was just created
+        // above, so an empty answer means the probe did not run and the
+        // `ALTER` must not be guessed at either way.
+        if columns.is_empty() {
+            return Err(Error::Integrity(
+                "kernel_segments reports no columns immediately after it was created: the \
+                 leader did not answer the schema probe"
+                    .to_owned(),
+            ));
+        }
+        if columns
+            .iter()
+            .any(|column| column.name == SEGMENTS_MANIFEST_COLUMN)
+        {
+            return Ok(());
+        }
+        self.store
+            .txn(vec![Statement::new(SEGMENTS_ADD_MANIFEST_SQL)])
+            .await?;
         Ok(())
     }
 
@@ -317,6 +449,24 @@ impl Ledger {
             .await?;
         Ok(rows.into_iter().next().map(|row| row.prev_hash))
     }
+}
+
+/// The one root of a list, or [`Error::Integrity`] when it has several.
+///
+/// A list with two roots is a fork at the root, which is the one shape
+/// walking from a genesis parent cannot detect afterwards: each half would
+/// verify against its own.
+fn one_root(roots: impl Iterator<Item = String>, what: &str) -> Result<Option<Hash>, Error> {
+    let mut roots = roots;
+    let Some(first) = roots.next() else {
+        return Ok(None);
+    };
+    if let Some(rival) = roots.next() {
+        return Err(Error::Integrity(format!(
+            "the {what} has two roots, {first} and {rival}: it forked at the root"
+        )));
+    }
+    Hash::parse(first).map(Some)
 }
 
 /// The row an append inserts, as one statement.

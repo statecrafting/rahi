@@ -181,9 +181,12 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
                 Err(Error::Validation("preflight failed".to_owned()))
             }
         }
-        Verb::Migrate { backup } => {
+        Verb::Migrate {
+            backup,
+            adopt_manifest,
+        } => {
             let booted = Booted::open_or_attach::<C>(env).await?;
-            let result = migrate::<C>(&booted, backup, env).await;
+            let result = migrate::<C>(&booted, backup, adopt_manifest, env).await;
             booted.shutdown().await;
             result
         }
@@ -197,10 +200,24 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
             booted.shutdown().await;
             result
         }
-        Verb::Restore { archive, key } => {
+        Verb::Restore {
+            archive,
+            key,
+            adopt,
+        } => {
             let config = rahi_types::Config::from_env(env)?;
             let source = key.map_or(KeySource::KeySet, KeySource::File);
-            match rahi_ops::restore::run(&config, &archive, &source).await? {
+            // Spec 036 B-9: the running cell's manifest and migrations are
+            // what the archive is checked against, and the check happens
+            // inside `run`, before it writes anything.
+            let manifest = rahi_kernel::Manifest::parse(C::manifest())?;
+            let hash = manifest.hash()?.to_string();
+            let cell = rahi_ops::restore::Compatibility {
+                manifest_hash: &hash,
+                migrations: C::migrations(),
+                adopt,
+            };
+            match rahi_ops::restore::run(&config, &archive, &source, &cell).await? {
                 Outcome::Restored(marker) => {
                     println!(
                         "restore: applied {} ({} parts); rauthy's snapshot is at {}; marker written to {}",
@@ -209,6 +226,19 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
                         marker.rauthy_snapshot,
                         rahi_ops::restore_marker(&config).display()
                     );
+                    if !rahi_ops::restore::schema_checked(&marker.manifest) {
+                        println!(
+                            "restore: the archive predates spec 036 and records no migration \
+                             history, so its schema could not be checked against this binary"
+                        );
+                    }
+                    if marker.manifest.manifest_hash != hash {
+                        println!(
+                            "restore: the restored chain names manifest {}, this binary's is {}; \
+                             run: rahi migrate --adopt-manifest",
+                            marker.manifest.manifest_hash, hash
+                        );
+                    }
                 }
                 Outcome::AlreadyRestored(marker) => {
                     println!(
@@ -258,12 +288,33 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
     }
 }
 
-async fn migrate<C: Cell>(booted: &Booted, with_backup: bool, env: &dyn EnvReader) -> Result<()> {
+async fn migrate<C: Cell>(
+    booted: &Booted,
+    with_backup: bool,
+    adopt_manifest: bool,
+    env: &dyn EnvReader,
+) -> Result<()> {
     if with_backup {
         backup(booted, &Destination::default_for(&booted.config), env).await?;
     }
-    let report = rahi_ops::migrate::run(&booted.store, C::migrations()).await?;
+    if !adopt_manifest {
+        let report = rahi_ops::migrate::run(&booted.store, C::migrations()).await?;
+        println!("{}", rahi_ops::migrate::render(&report));
+        return Ok(());
+    }
+    // Spec 036 B-3: a follower refuses as `migrate` does, and it refuses
+    // before the chain is opened, so a follower's deploy step writes nothing
+    // at all rather than creating the chain's schema on its way to exit 2.
+    rahi_ops::migrate::refuse_follower(&booted.store).await?;
+    // One deploy step moves the schema and the ceiling together. The chain is
+    // opened here because the adoption reads the manifest it currently names
+    // and appends to it; opening it verifies it first, as every other verb
+    // that touches the chain does.
+    let ledger = booted.ledger().await?;
+    let (report, adoption) =
+        rahi_ops::migrate::adopt(&booted.store, &ledger, &booted.manifest, C::migrations()).await?;
     println!("{}", rahi_ops::migrate::render(&report));
+    println!("{}", rahi_ops::migrate::render_adoption(&adoption));
     Ok(())
 }
 
@@ -276,11 +327,18 @@ async fn backup(booted: &Booted, to: &Destination, env: &dyn EnvReader) -> Resul
         booted.keys.admin_token()?,
     )?
     .with_passkey(booted.keys.backup_passkey()?);
+    // Spec 036 B-9: the archive records the chain's *current* manifest, which
+    // is what a restore has to be checked against. On an adopted cell that is
+    // the booted manifest; on one whose deploy step has not run it is not,
+    // and recording the booted hash there would make a restore check itself
+    // against a ceiling the chain never named.
+    let ledger = booted.ledger().await?;
+    let current = ledger.current_manifest().await?;
     let outcome = rahi_ops::backup::run(
         &booted.store,
         &rauthy,
         &booted.keys,
-        &booted.hash.to_string(),
+        &current.to_string(),
         to,
         env,
     )

@@ -26,6 +26,10 @@
       {
         "kind": "file",
         "path": "crates/rahi-cli/tests/evolution.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/tests/evolution.rs"
       }
     ],
     "extends": [
@@ -63,6 +67,22 @@
       },
       {
         "nature": "additive",
+        "spec": "014-ledger-sealing-and-archive",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/src/seal.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "013-ledger-decision-chain",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/tests/append.rs"
+        }
+      },
+      {
+        "nature": "additive",
         "spec": "015-kernel-manifest-and-adjudication",
         "unit": {
           "kind": "file",
@@ -71,10 +91,50 @@
       },
       {
         "nature": "additive",
+        "spec": "015-kernel-manifest-and-adjudication",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/manifest.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "015-kernel-manifest-and-adjudication",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/tests/adjudicate.rs"
+        }
+      },
+      {
+        "nature": "additive",
         "spec": "011-store-hiqlite",
         "unit": {
           "kind": "file",
           "path": "crates/rahi-store/src/migrate.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "011-store-hiqlite",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "011-store-hiqlite",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/Cargo.toml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "011-store-hiqlite",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/migrate.rs"
         }
       },
       {
@@ -119,6 +179,78 @@
       },
       {
         "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/cli.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/verbs.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/backup.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/common/mod.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/restore.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/backup.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "037-identity-recovery-and-live-proof",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/rauthy_restore.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "032-cluster-topology",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/README.md"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "039-release-and-out-of-tree-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "CHANGELOG.md"
+        }
+      },
+      {
+        "nature": "additive",
         "spec": "031-single-container-packaging",
         "unit": {
           "kind": "file",
@@ -138,7 +270,7 @@
       "wave": 3
     },
     "id": "036-manifest-and-schema-evolution",
-    "implementation": "pending",
+    "implementation": "complete",
     "kind": "kernel",
     "references": [
       {
@@ -164,6 +296,7 @@
       "The worked consumer example",
       "6. Out of scope",
       "7. Resolved decisions",
+      "8. Status",
       "Verification"
     ],
     "specPath": "specs/036-manifest-and-schema-evolution/spec.md",
@@ -171,6 +304,6 @@
     "summary": "Today a cell's manifest is frozen at its first boot: the manifest hash is the chain's genesis parent, Ledger::open checks the first record against the booted manifest on every open, and any change to the manifest (one added grant, otel switched on) makes serve exit 1 with an integrity error on the existing volume. Spec 015 B-8 names the missing step, \"a deploy genesis record\", and nothing defines it. Migrations have the mirror problems: serve accepts a store ahead of the binary, a changed migration under an applied version is skipped silently, and restore checks no compatibility. This spec makes a manifest change a signed transition record appended at deploy, checks the booted manifest against the chain's current manifest, records a checksum per migration, lets an older binary serve a newer schema only across migrations declared additive, and makes restore refuse an archive it cannot serve. It carries the worked consumer example for an upgrade, a rollback, and a restore.\n",
     "title": "Manifest and schema evolution: a ledgered manifest transition, a checked migration history, and a restore that refuses what it cannot serve"
   },
-  "shardHash": "e9f647702ba1fa17df2fe9fe8c2cb27791ae8d470f8e1445bb8356adb74e4c66",
+  "shardHash": "6c2f3d3d89070e05011d1f4cac5610517061db2503f914cb59999466b728697c",
   "specVersion": "1.3.0"
 }

@@ -6,7 +6,7 @@ kind: kernel
 domain: kernel
 created: "2026-09-11"
 authors: ["Bartek Kus"]
-implementation: pending
+implementation: complete
 risk: critical
 wave: 3
 depends_on:
@@ -21,18 +21,35 @@ establishes:
   - "crates/rahi-ledger/src/transition.rs"
   - "crates/rahi-ledger/tests/transition.rs"
   - "crates/rahi-cli/tests/evolution.rs"
+  - "crates/rahi-ops/tests/evolution.rs"
 extends:
   - { spec: "013-ledger-decision-chain", unit: "crates/rahi-ledger/src/chain.rs", nature: additive }
   - { spec: "013-ledger-decision-chain", unit: "crates/rahi-ledger/src/verify.rs", nature: additive }
   - { spec: "013-ledger-decision-chain", unit: "crates/rahi-ledger/src/lib.rs", nature: additive }
   - { spec: "014-ledger-sealing-and-archive", unit: "crates/rahi-ledger/src/segment.rs", nature: additive }
+  - { spec: "014-ledger-sealing-and-archive", unit: "crates/rahi-ledger/src/seal.rs", nature: additive }
+  - { spec: "013-ledger-decision-chain", unit: "crates/rahi-ledger/tests/append.rs", nature: additive }
   - { spec: "015-kernel-manifest-and-adjudication", unit: "crates/rahi-kernel/src/lib.rs", nature: additive }
+  - { spec: "015-kernel-manifest-and-adjudication", unit: "crates/rahi-kernel/src/manifest.rs", nature: additive }
+  - { spec: "015-kernel-manifest-and-adjudication", unit: "crates/rahi-kernel/tests/adjudicate.rs", nature: additive }
   - { spec: "011-store-hiqlite", unit: "crates/rahi-store/src/migrate.rs", nature: additive }
+  - { spec: "011-store-hiqlite", unit: "crates/rahi-store/src/lib.rs", nature: additive }
+  - { spec: "011-store-hiqlite", unit: "crates/rahi-store/Cargo.toml", nature: additive }
+  - { spec: "011-store-hiqlite", unit: "crates/rahi-store/tests/migrate.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/migrate.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/restore.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/archive.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/lib.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/serve.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-cli/tests/cli.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/verbs.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/backup.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-ops/tests/common/mod.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-ops/tests/restore.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-ops/tests/backup.rs", nature: additive }
+  - { spec: "037-identity-recovery-and-live-proof", unit: "crates/rahi-ops/tests/rauthy_restore.rs", nature: additive }
+  - { spec: "032-cluster-topology", unit: "deploy/README.md", nature: additive }
+  - { spec: "039-release-and-out-of-tree-packaging", unit: "CHANGELOG.md", nature: additive }
   - { spec: "031-single-container-packaging", unit: "docker/entrypoint.sh", nature: additive }
   - { spec: "032-cluster-topology", unit: "deploy/k8s/migrate-job.yaml", nature: additive }
 references:
@@ -100,13 +117,16 @@ entrypoint (031), and the migration Job (032). Two new test files.
 - **B-2 (the transition record).** A decision of kind
   `manifest.transition` whose payload carries `from` (the current manifest
   hash), `to` (the adopted one), `model` (the adopted manifest's canonical
-  JSON, the bytes its hash is computed over, when it fits
-  `ledger.max_record_bytes`; otherwise its hash and the text travels in
-  `note`), `schema_version` (the store's, after the deploy's migrations),
-  `binary` (the rahi version and the cell's `contract.version`), and
-  `actor` (the operator's `sub`, or `system:deploy`). It is appended
-  through `Ledger::append`, synchronously, and is CAS-protected like every
-  record (013 B-3).
+  JSON, the bytes its hash is computed over), `schema_version` (the
+  store's, after the deploy's migrations), `binary` (the rahi version and
+  the cell's `contract.version`), and `actor` (the operator's `sub`, or
+  `system:deploy`). The manifest is retained whole or the adoption is
+  refused: there is no truncated model, no overflow into a second field,
+  and no hash-only record. D-6 states the serialization the size is
+  measured over, the bound it is measured against
+  (`ledger.max_record_bytes`), where the measurement happens, and what the
+  refusal is. It is appended through `Ledger::append`, synchronously, and
+  is CAS-protected like every record (013 B-3).
 - **B-3 (adoption is a deploy step).** `rahi migrate --adopt-manifest`
   applies the cell's migrations and then, on the leader, appends a
   transition when the booted manifest differs from the chain's current
@@ -185,6 +205,13 @@ entrypoint (031), and the migration Job (032). Two new test files.
 - **FR-005.** A restore test refuses a newer non-additive archive and an
   unadopted manifest before writing anything, and accepts both with the
   conditions B-9 names.
+- **FR-006.** A ledger test builds the transition record for a manifest
+  whose measured record is exactly `ledger.max_record_bytes` and asserts it
+  is admitted, and for one a single byte over and asserts `Error::Validation`
+  naming the measured size and the bound. An ops test runs
+  `migrate --adopt-manifest` against an oversized manifest and asserts exit
+  1, that `schema_version` did not move, and that the chain gained no
+  record.
 
 ## 5. Acceptance criteria
 
@@ -195,6 +222,14 @@ entrypoint (031), and the migration Job (032). Two new test files.
   with no transition verifies byte for byte as before this spec.
 - **AC-3.** `docs/design/01-consumer-contract.md` section 7 is replaced by
   the procedure below, and `deploy/README.md` names the flag.
+- **AC-4 (the size boundary, D-6).** A manifest whose measured transition
+  record is at most `ledger.max_record_bytes` is adopted with its `model`
+  intact, and the appended record's stored bytes are no longer than the
+  measure the preflight took. A manifest one byte over is refused with
+  `Error::Validation` (exit 1) whose message names the measured size, the
+  bound, and `ledger.max_record_bytes` as the setting that carries it; the
+  run applies no migration, appends no record, and leaves the chain's
+  current manifest where it was.
 
 ### The worked consumer example
 
@@ -290,6 +325,184 @@ record shows what was asked as well as what was answered.
   a bad signature, or a fork remains `Error::Integrity` and remains fatal
   at boot (constitution XI). Verification is being re-anchored, never
   relaxed.
+
+- **D-6 (2026-09-18, owner decision; the oversized manifest is refused,
+  never reduced).** D-2 reserved the bounded reference or failure path for
+  a manifest whose transition record does not fit, and required this spec
+  to state it before implementation rather than decide it at the keyboard.
+  The owner decides a bounded **failure** policy, and B-2 is reconciled
+  with it above: the transition retains the canonical manifest when the
+  complete serialized record fits `ledger.max_record_bytes`, and otherwise
+  adoption is refused with `Error::Validation`, a diagnostic naming the
+  size and the bound, and no transition appended. The manifest is never
+  truncated, never moved into a second field, never written to storage
+  outside the chain, and never silently reduced to hash-only evidence. A
+  cell that outgrows its own `ledger.max_record_bytes` raises that bound in
+  its manifest, which is itself a manifest change and so is adopted through
+  the same step. Alternatives rejected: a `note` overflow field, which
+  splits one record's evidence across two places an auditor must reassemble;
+  external storage, which puts the evidence somewhere the chain cannot
+  commit to; and a silent hash-only fallback, which is the outcome D-2
+  already rejected, arrived at by accident instead of by choice.
+
+  *The serialization the size is measured over.* The measure is the byte
+  length of the record's canonical JSON, `SignedRecord::to_canonical_json`:
+  the whole signed record, envelope and signature and public key together,
+  key-sorted at every depth. That string is exactly what the `record`
+  column stores and exactly what one line of `ledger export` carries, so
+  the bound is measured over the bytes the chain actually holds rather than
+  over the payload alone. `model` inside it is the manifest's own canonical
+  JSON, the first half of what `Manifest::hash` digests (015 B-2), carried
+  as a JSON string so that the model the record retains and the bytes the
+  hash was taken over are the same bytes.
+
+  *What is measured before the append, and how it is made deterministic.*
+  Two fields of the record are not final until `Ledger::append` chains it:
+  `previous_record_hash`, whose length is fixed at 71 characters for every
+  hash this chain admits (013 B-1), and the envelope's `timestamp`, which
+  is `revision:<n>`. The measurement therefore runs against a candidate
+  record built with a placeholder parent of that fixed length and with `n`
+  widened to the largest `u64`, so the measure is an upper bound that can
+  exceed the appended record only by the decimal digits the revision did
+  not need. A manifest within a few bytes of the bound can be refused when
+  the record would in fact have fitted; that direction is the safe one and
+  is the price of a preflight that never passes something the append then
+  refuses.
+
+  *Where it runs, and what that guarantees.* `migrate --adopt-manifest`
+  takes the measure **before** it applies any migration, because every
+  field the record carries is known at that point: `from` and `to` from the
+  chain and the booted manifest, `model` from the booted manifest,
+  `schema_version` from the cell's own migration list (the value the
+  store's `schema_version` will hold once this run has applied them),
+  `binary` from the build, and `actor` from the invocation. So the
+  guarantee is exact: when the manifest is oversized, the run exits 1 with
+  nothing applied and nothing appended, and the store and the chain are
+  byte-for-byte as they were. When the preflight passes, the append cannot
+  afterwards be refused for size.
+
+  What the preflight does not guarantee is that the append succeeds. It can
+  still lose the compare-and-swap past `APPEND_ATTEMPTS` (013 B-3), meet a
+  store failure, or find the chain damaged, and each of those keeps its own
+  error and its own exit code. It can also find, at the moment it reads the
+  head, that another deploy step already adopted the same manifest, which
+  B-3 answers by appending nothing and saying so. The size check is
+  additionally kept on the append path itself, so a caller that builds a
+  transition without going through the verb still cannot write a record
+  past the bound.
+
+- **D-7 (2026-09-18, build session; the transition's decision id).** B-2
+  fixes the payload and leaves the id open. The id is
+  `manifest:<head>:<to>`, each hash abbreviated to its last sixteen hex
+  characters, which is the convention spec 015 D-8 already set for the boot
+  nonce. It has to be unique for the life of the chain and it has to be
+  fixed before the append, because spec 013 B-3 keeps the id across every
+  compare-and-swap retry; naming the head the transition was built against
+  gives both, and it distinguishes the four records a cell writes going H1
+  to H2 to H1 to H2, which `manifest:<from>:<to>` would collide on.
+  Alternatives rejected: an ordinal count of transitions, which is not
+  answerable once a transition has been sealed away without adding a second
+  counter to the segment header that spec 042 would then have to carry; and
+  the target hash alone, which collides on any readoption.
+- **D-8 (2026-09-18, build session; the two absences B-7 and B-8 create).**
+  Both new facts are optional in their types and neither is ever inferred.
+  `Migration::new` produces a migration that is **not** additive and
+  `Migration::additive()` is the declaration B-8 names, so a migration that
+  has not said it is safe to serve from an older binary has not said it;
+  `RecordedMigration::additive` is `None` on a row written before this spec
+  and `is_additive()` reads that as false for the same reason. A
+  `SegmentHeader` sealed before this spec carries `current_manifest: None`,
+  which `Ledger::current_manifest` reads as "this segment names none" and
+  falls back through, rather than as a manifest. Absence is never
+  permission (constitution) and never evidence. Alternative rejected:
+  defaulting an undeclared migration to additive, which would make every
+  pre-036 store look rollback-safe on no evidence at all.
+
+- **D-9 (2026-09-18, build session; two absences the record cannot invent).**
+  B-3 says the adoption step prints the grants added and removed, and B-9
+  makes `restore` check the archive's schema. Both need a fact an older
+  artefact may simply not carry, and in both cases the verb says so instead
+  of guessing.
+
+  The grant diff is against the manifest the chain previously named, whose
+  *text* lives only in the previous transition record's `model`. A chain
+  that has never transitioned holds no earlier manifest text (the genesis
+  record carries the hash, not the model), and one whose last transition has
+  been sealed away holds it in the archive, which a deploy step does not
+  fetch. `Adoption::diffed` is false in both cases and the verb prints
+  "grants added and removed: not shown; the chain holds no earlier manifest
+  to diff against" rather than an empty diff, which would read as "nothing
+  changed". Alternative rejected: fetching archived segment bodies from a
+  deploy step, which would make the cost of adopting a manifest depend on
+  how much history the cell has.
+
+  An archive written before this spec records no migration history at all.
+  `restore` still makes B-9's manifest check against it, because the
+  archive's `manifest_hash` predates this spec too, and reports that the
+  schema could not be checked (`restore::schema_checked`) rather than
+  letting silence read as a check that passed. Alternative rejected:
+  refusing every pre-036 archive, which would strand exactly the archives an
+  upgrading consumer has.
+
+- **D-10 (2026-09-18, build session; an absent root is not an empty chain).**
+  B-4 says the genesis parent is read from the chain and does not say what an
+  absent answer means. It has two possible causes with opposite consequences:
+  there is no chain yet, or the read did not answer, which a local read
+  reports as no rows rather than as an error (spec 016 D-2). Treating the
+  second as the first writes a genesis record that is a valid
+  compare-and-swap onto the real head, so it lands, persists, and leaves a
+  `ledger.genesis` record in the middle of an audit chain. `Ledger::open`
+  therefore cross-checks the resident and sealed counts before it writes
+  genesis, and refuses with `Error::Integrity` when either is non-zero while
+  no root was found. Constitution XI settles the direction: under doubt the
+  ledger stops rather than guesses, and the refusal writes nothing.
+
+  The same shape predates this spec (the previous `open` asked two reads and
+  wrote genesis when both came back empty), and the same hazard is answered
+  the same way twice more in this change, in the two column probes that
+  refuse an empty answer from a table they have just created. The reads this
+  spec adds that are **not** guarded fail closed on their own and are marked
+  so in place: `Ledger::current_manifest` walking back to an older answer
+  makes `Kernel::boot` refuse a manifest that was in fact adopted, and writes
+  nothing. Alternative rejected: retrying the probe, which cannot tell a
+  retry that succeeded from one that dropped its rows again.
+
+## 8. Status
+
+- **2026-09-18.** B-1 to B-10, FR-001 to FR-006, and AC-1 to AC-4 hold.
+  `spec-spine verify 036-manifest-and-schema-evolution` passes all four
+  declared commands, and `make ci` is green (gate, k8s, build, the whole
+  workspace suite, clippy with warnings denied, fmt, and cargo-deny).
+
+  AC-2's two halves, checked rather than assumed: `cargo tree -p rahi-kernel`
+  still shows only `rahi-ledger`, `rahi-store`, and `rahi-types` as workspace
+  dependencies (spec 015 AC-2), and a chain with no transition is byte for
+  byte what it was. No record gained a field; the only shape this spec could
+  have moved is the archived segment body, and a header that names no
+  manifest is absent from the serialized form, so a pre-036 body round-trips
+  unchanged and the committed fixture chains under
+  `crates/rahi-ledger/testdata/chains/` keep verifying against the same
+  bytes (`tests/transition.rs`,
+  `a_chain_with_no_transition_is_unchanged_by_this_spec`).
+
+  Three tests that asserted the behavior this spec replaces were rewritten
+  to assert the new one, each keeping a note of what it used to say:
+  the ledger's `a_ledger_booted_against_another_manifest_refuses_the_chain`
+  (now reports the chain's own root), the kernel's
+  `a_ledger_rooted_at_another_manifest_will_not_boot` (now `Error::Stale`
+  naming the deploy step), and the store's
+  `recorded_versions_are_skipped_even_when_their_sql_changed` (now the
+  checksum refusal, still asserting that an unchanged applied version is
+  skipped). Each is one of the three defects section 1 reproduces.
+
+  Two things are deliberately unchanged and named so no reader infers them.
+  `preflight` reports no unadopted manifest: this spec's Territory does not
+  name it and spec 030 B-3's check list does not ask for it, so `serve` and
+  `migrate --adopt-manifest` remain where that question is answered. And
+  every check here lives in a binary that carries this spec: an older binary
+  that carries it honors the additive rule, a binary built before it has no
+  such check and cannot be given one, and a replica already running
+  re-evaluates nothing after boot (B-10, D-4).
 
 ## Verification
 

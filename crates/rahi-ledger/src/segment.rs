@@ -38,7 +38,24 @@ pub const SEGMENTS_TABLE_SQL: &str = "CREATE TABLE IF NOT EXISTS kernel_segments
     last_hash TEXT NOT NULL, \
     first_id TEXT NOT NULL, \
     last_id TEXT NOT NULL, \
-    count INTEGER NOT NULL)";
+    count INTEGER NOT NULL, \
+    current_manifest TEXT NULL)";
+
+/// The column spec 036 B-5 adds, for a volume whose table predates it.
+///
+/// `CREATE TABLE IF NOT EXISTS` above does nothing to a table that already
+/// exists, so an existing archive gains the column here instead. It is
+/// nullable because a segment sealed before this spec recorded no manifest
+/// and nothing can invent one for it: the absence is the honest value and
+/// [`crate::Ledger::current_manifest`] reads it as one.
+pub const SEGMENTS_MANIFEST_COLUMN: &str = "current_manifest";
+
+/// Whether the segment table already carries a column.
+pub const SEGMENTS_COLUMNS_SQL: &str = "SELECT name FROM pragma_table_info('kernel_segments')";
+
+/// Adding it.
+pub const SEGMENTS_ADD_MANIFEST_SQL: &str =
+    "ALTER TABLE kernel_segments ADD COLUMN current_manifest TEXT NULL";
 
 /// The unique parent index over the segment chain.
 ///
@@ -75,6 +92,18 @@ pub struct SegmentHeader {
     /// The record hash of the newest record in the segment: what the next
     /// record in the chain links to.
     pub last_hash: Hash,
+    /// The chain's current manifest at this segment's tail (spec 036 B-5).
+    ///
+    /// `None` on a segment sealed by a binary older than spec 036, which
+    /// recorded no manifest; every segment sealed since carries one, so the
+    /// current manifest is answerable at [`crate::Depth::Resident`] after the
+    /// transition that set it has been sealed away.
+    ///
+    /// Absent from the serialized form when it is `None`, so a body archived
+    /// before this spec round-trips byte for byte and spec 036 AC-2 holds for
+    /// every segment written before it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_manifest: Option<Hash>,
 }
 
 impl SegmentHeader {
@@ -100,18 +129,27 @@ pub struct Segment {
 }
 
 impl Segment {
-    /// Seal `records` into a segment linked to `prev_segment_hash`.
+    /// Seal `records` into a segment linked to `prev_segment_hash`, naming
+    /// the manifest current at its tail (spec 036 B-5).
     ///
     /// `records` must already be in chain order; sealing does not reorder
     /// them, because the order is the chain and re-deriving it here would be
-    /// a second implementation of linearity.
+    /// a second implementation of linearity. `current_manifest` is the
+    /// caller's to compute for the same reason: it is the newest transition
+    /// at or before this tail, which is a fact about the chain rather than
+    /// about the run being sealed, and [`crate::Ledger::manifest_at_tail`] is
+    /// where that is worked out.
     ///
     /// # Errors
     ///
     /// [`Error::Validation`] when `records` is empty or longer than a `u32`;
     /// [`Error::Integrity`] when a record does not serialize or its hash does
     /// not parse.
-    pub fn seal(prev_segment_hash: Hash, records: Vec<SignedRecord>) -> Result<Self, Error> {
+    pub fn seal(
+        prev_segment_hash: Hash,
+        records: Vec<SignedRecord>,
+        current_manifest: Option<Hash>,
+    ) -> Result<Self, Error> {
         let (Some(first), Some(last)) = (records.first(), records.last()) else {
             return Err(Error::Validation(
                 "a segment seals at least one record".to_owned(),
@@ -127,6 +165,7 @@ impl Segment {
             segment_hash: segment_hash(&records)?,
             prev_segment_hash,
             last_hash: last.hash()?,
+            current_manifest,
         };
         Ok(Self { header, records })
     }
@@ -303,12 +342,16 @@ mod tests {
     fn sealing_names_the_run_and_the_hash_the_next_record_links_to() {
         let records = chain(3);
         let last = records[2].hash().expect("a hash");
-        let segment = Segment::seal(root(), records).expect("seals");
+        let segment = Segment::seal(root(), records, None).expect("seals");
 
         assert_eq!(segment.header.first_id, DecisionId::new("d-0"));
         assert_eq!(segment.header.last_id, DecisionId::new("d-2"));
         assert_eq!(segment.header.count, 3);
         assert_eq!(segment.header.prev_segment_hash, root());
+        assert_eq!(
+            segment.header.current_manifest, None,
+            "a run with no transition in it names no manifest of its own"
+        );
         assert_eq!(
             segment.header.last_hash, last,
             "the next record links the last record, not the content digest"
@@ -323,20 +366,20 @@ mod tests {
 
     #[test]
     fn an_empty_segment_is_refused() {
-        let err = Segment::seal(root(), Vec::new()).expect_err("refused");
+        let err = Segment::seal(root(), Vec::new(), None).expect_err("refused");
         assert!(matches!(err, Error::Validation(_)), "{err}");
     }
 
     #[test]
     fn a_segment_round_trips_through_its_archived_bytes() {
-        let segment = Segment::seal(root(), chain(2)).expect("seals");
+        let segment = Segment::seal(root(), chain(2), None).expect("seals");
         let bytes = segment.to_canonical_bytes().expect("serializes");
         assert_eq!(Segment::from_bytes(&bytes).expect("parses"), segment);
     }
 
     #[test]
     fn a_rewritten_body_no_longer_matches_its_content_digest() {
-        let mut segment = Segment::seal(root(), chain(3)).expect("seals");
+        let mut segment = Segment::seal(root(), chain(3), None).expect("seals");
         segment.records[1].record.payload = serde_json::json!({ "tampered": true });
         let err = segment.verify().expect_err("refused");
         assert!(matches!(err, Error::Integrity(_)), "{err}");
@@ -348,8 +391,8 @@ mod tests {
 
     #[test]
     fn segments_order_from_the_genesis_parent_however_they_were_read() {
-        let first = Segment::seal(root(), chain(2)).expect("seals").header;
-        let second = Segment::seal(first.segment_hash.clone(), chain(2))
+        let first = Segment::seal(root(), chain(2), None).expect("seals").header;
+        let second = Segment::seal(first.segment_hash.clone(), chain(2), None)
             .expect("seals")
             .header;
         let ordered = order_segments(&root(), vec![second.clone(), first.clone()]).expect("orders");
@@ -360,7 +403,7 @@ mod tests {
         assert!(matches!(err, Error::Integrity(_)), "{err}");
 
         // Two segments claiming one predecessor are a fork.
-        let rival = Segment::seal(root(), chain(3)).expect("seals").header;
+        let rival = Segment::seal(root(), chain(3), None).expect("seals").header;
         let err = order_segments(&root(), vec![first, rival]).expect_err("refused");
         assert!(matches!(err, Error::Integrity(_)), "{err}");
     }

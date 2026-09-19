@@ -6,8 +6,14 @@
 # completion, then roll the StatefulSet.
 #
 # On a fresh cluster there is nothing to reach yet: the pods' own start
-# runs `rahi migrate` (the image's entrypoint, spec 031 B-3), so this Job
-# is for every rollout after the first.
+# runs `rahi migrate --adopt-manifest` (the image's entrypoint, spec 031
+# B-3), so this Job is for every rollout after the first.
+#
+# The Job adopts the manifest too (spec 036 B-3 and B-10): one transition per
+# deploy, appended here on the leader, before the rollout. Replicas still on
+# the old image keep serving and keep stamping the old hash on their
+# decisions; one that restarts on the old image after this Job has run
+# refuses to boot rather than serve a ceiling the chain no longer names.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -31,7 +37,7 @@ spec:
       containers:
         - name: migrate
           image: ghcr.io/statecrafting/rahi
-          command: ["rahi", "migrate"]
+          command: ["rahi", "migrate", "--adopt-manifest"]
           env:
             - name: RAHI_STORE_CLIENT
               value: "true"

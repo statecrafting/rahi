@@ -13,6 +13,7 @@
 use std::collections::BTreeMap;
 use std::io::{Read as _, Write as _};
 
+use rahi_store::RecordedMigration;
 use serde::{Deserialize, Serialize};
 
 use rahi_types::{Error, Result};
@@ -81,6 +82,21 @@ pub struct Versions {
     pub ledger_schema: String,
 }
 
+/// The store's migration history at backup time (spec 036 B-9).
+///
+/// What a restore needs in order to answer "can this binary serve what is in
+/// here": the version the store had reached, and enough about each applied
+/// migration to tell whether a binary older than it may serve across them.
+/// The declarations travel with the archive because a version above the
+/// restoring binary's last is one that binary knows nothing about.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ArchiveSchema {
+    /// The recorded `schema_version` when the backup was taken.
+    pub version: u32,
+    /// Every recorded migration, oldest first.
+    pub migrations: Vec<RecordedMigration>,
+}
+
 /// `manifest.json`: what the archive holds and what each part hashes to.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ArchiveManifest {
@@ -90,9 +106,15 @@ pub struct ArchiveManifest {
     pub created: u64,
     /// The versions in play.
     pub versions: Versions,
-    /// The booted manifest's hash, so a restore can be checked against the
-    /// cell it is restored into.
+    /// The chain's current manifest at backup time (spec 036 B-9), so a
+    /// restore can be checked against the cell it is restored into.
     pub manifest_hash: String,
+    /// The store's migration history at backup time (spec 036 B-9).
+    ///
+    /// `None` in an archive written before spec 036, which recorded no
+    /// history; `restore` says so rather than inventing one.
+    #[serde(default)]
+    pub schema: Option<ArchiveSchema>,
     /// Every part's path and its sha256, hex.
     pub parts: BTreeMap<String, String>,
 }
@@ -100,7 +122,12 @@ pub struct ArchiveManifest {
 impl ArchiveManifest {
     /// A manifest over `parts`.
     #[must_use]
-    pub fn over(parts: &[Part], created: u64, manifest_hash: String) -> Self {
+    pub fn over(
+        parts: &[Part],
+        created: u64,
+        manifest_hash: String,
+        schema: Option<ArchiveSchema>,
+    ) -> Self {
         Self {
             format: FORMAT,
             created,
@@ -110,6 +137,7 @@ impl ArchiveManifest {
                 ledger_schema: rahi_types::LEDGER_SCHEMA_VERSION.to_owned(),
             },
             manifest_hash,
+            schema,
             parts: parts
                 .iter()
                 .map(|p| (p.path.clone(), sha256_hex(&p.bytes)))

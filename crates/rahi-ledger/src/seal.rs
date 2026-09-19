@@ -35,11 +35,11 @@ use crate::record::{DecisionId, Hash, SignedRecord};
 use crate::segment::{Segment, SegmentHeader, order_segments};
 
 const SEGMENTS_SQL: &str = "SELECT first_id, last_id, count, segment_hash, prev_segment_hash, \
-     last_hash FROM kernel_segments";
+     last_hash, current_manifest FROM kernel_segments";
 
 /// The last segment: the one no other segment claims as its predecessor.
 const SEGMENT_HEAD_SQL: &str = "SELECT first_id, last_id, count, segment_hash, \
-     prev_segment_hash, last_hash FROM kernel_segments \
+     prev_segment_hash, last_hash, current_manifest FROM kernel_segments \
      WHERE segment_hash NOT IN (SELECT prev_segment_hash FROM kernel_segments)";
 
 const SEGMENT_COUNT_SQL: &str = "SELECT COUNT(*) AS total FROM kernel_segments";
@@ -144,6 +144,9 @@ struct SegmentRow {
     segment_hash: String,
     prev_segment_hash: String,
     last_hash: String,
+    /// `NULL` on a segment sealed before spec 036 B-5 (segment.rs).
+    #[serde(default)]
+    current_manifest: Option<String>,
 }
 
 impl SegmentRow {
@@ -155,6 +158,11 @@ impl SegmentRow {
             segment_hash: Hash::parse(self.segment_hash)?,
             prev_segment_hash: Hash::parse(self.prev_segment_hash)?,
             last_hash: Hash::parse(self.last_hash)?,
+            current_manifest: self
+                .current_manifest
+                .filter(|text| !text.is_empty())
+                .map(Hash::parse)
+                .transpose()?,
         })
     }
 }
@@ -276,12 +284,21 @@ impl Ledger {
         }
         records.truncate(size);
 
-        let previous = self
-            .segments()
-            .await?
+        let sealed = self.segments().await?;
+        let previous = sealed
             .last()
             .map_or_else(|| self.genesis_parent().clone(), |h| h.segment_hash.clone());
-        let segment = Segment::seal(previous, records)?;
+        // Spec 036 B-5: what the tail of this run leaves current. A run with
+        // no transition in it inherits what the segment before it named, and
+        // the first segment of a chain that has never transitioned inherits
+        // the genesis parent, which is what B-1 calls the current manifest
+        // until a transition exists.
+        let before = sealed
+            .last()
+            .and_then(|h| h.current_manifest.clone())
+            .unwrap_or_else(|| self.genesis_parent().clone());
+        let current_manifest = Some(Self::manifest_at_tail(&records, before)?);
+        let segment = Segment::seal(previous, records, current_manifest)?;
 
         archive
             .put(&segment.key(), segment.to_canonical_bytes()?)
@@ -375,8 +392,9 @@ impl Ledger {
 fn insert_segment(header: &SegmentHeader) -> Statement {
     Statement::with_params(
         "INSERT INTO kernel_segments \
-         (segment_hash, prev_segment_hash, last_hash, first_id, last_id, count) \
-         VALUES ($1, $2, $3, $4, $5, $6)",
+         (segment_hash, prev_segment_hash, last_hash, first_id, last_id, count, \
+          current_manifest) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7)",
         vec![
             Value::from(header.segment_hash.as_str()),
             Value::from(header.prev_segment_hash.as_str()),
@@ -384,6 +402,10 @@ fn insert_segment(header: &SegmentHeader) -> Statement {
             Value::from(header.first_id.as_str()),
             Value::from(header.last_id.as_str()),
             Value::from(header.count),
+            header
+                .current_manifest
+                .as_ref()
+                .map_or(Value::Null, |h| Value::from(h.as_str())),
         ],
     )
 }

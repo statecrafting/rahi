@@ -367,30 +367,48 @@ async fn a_constraint_denial_names_the_capability_it_fell_out_of() {
     assert_eq!(seen[0].payload.as_value()["key"], "rl:client-7");
 }
 
+/// Spec 015 B-8 as spec 036 B-4 settles it: an unadopted manifest is stale.
+///
+/// This test asserted `integrity` and the words "deploy genesis record"
+/// before spec 036, which is exactly the report spec 036's Purpose
+/// reproduces: an operator told the chain is broken when what changed is the
+/// ceiling. The chain still opens and still verifies; the boot refuses with
+/// `Error::Stale`, exit 2, naming both hashes and the deploy step that
+/// clears it. Damage is untouched: spec 013's and spec 036's own tests keep
+/// a broken link, a forged signature, and a fork at `Error::Integrity`.
 #[tokio::test]
-async fn a_ledger_rooted_at_another_manifest_will_not_boot() {
+async fn a_manifest_the_chain_has_not_adopted_is_stale_not_damage() {
     let dir = tempfile::tempdir().expect("a temp dir");
     let node = Store::open(&store_config(&dir.path().join("hiqlite")))
         .await
         .expect("a node opens");
     let other = Manifest::parse(CHANGED_GRANT).expect("parses");
+    let other_hash = other.hash().expect("hashes");
     let ledger = Ledger::open(
         node.handle(),
         LedgerSigner::from_seed([9u8; 32]),
-        other.hash().expect("hashes"),
+        other_hash.clone(),
     )
     .await
     .expect("the chain opens");
 
+    let ours = manifest().hash().expect("hashes");
     let err = Kernel::boot(manifest(), node.handle(), ledger)
         .await
-        .expect_err("the manifest changed without a deploy genesis record");
-    assert_eq!(err.kind(), "integrity");
-    assert!(
-        err.message().contains("deploy genesis record"),
-        "{}",
-        err.message()
-    );
+        .expect_err("the booted manifest has not been adopted");
+    assert_eq!(err.kind(), "stale", "{}", err.message());
+    assert_eq!(err.exit_code(), 2, "{}", err.message());
+    for fragment in [
+        other_hash.as_str(),
+        ours.as_str(),
+        "rahi migrate --adopt-manifest",
+    ] {
+        assert!(
+            err.message().contains(fragment),
+            "{fragment}: {}",
+            err.message()
+        );
+    }
 }
 
 #[tokio::test]
