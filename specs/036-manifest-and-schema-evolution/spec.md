@@ -700,6 +700,18 @@ record shows what was asked as well as what was answered.
   process-local lock around the pair, which cannot see another replica's
   seal at all.
 
+  **What is not changed, and why that is safe.** `Ledger::records` and
+  `Ledger::verify_chain` still take more than one statement: the records and
+  the root they are ordered against, and for verification the segment headers
+  too. A seal crossing those reads cannot produce a wrong answer, because the
+  root a later read names is the one the oldest resident record must link and
+  a pair from two moments cannot satisfy it: the crossing surfaces as
+  `Error::Integrity` and the caller fails closed. That is a refusal where a
+  single snapshot would have answered, which is the safe direction and not
+  the failure this entry corrects. Folding them onto the same snapshot is a
+  legitimate later change and is deliberately not made here, because it moves
+  code spec 013 and spec 014 own for a reason this correction does not need.
+
   **The seam this needs, and its cost.** A deterministic test has to commit
   the seal at exactly that instant, and the reads are inside one private
   function, so `rahi-ledger` gains a `read-interleave` feature carrying a
