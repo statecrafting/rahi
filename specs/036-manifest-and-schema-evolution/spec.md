@@ -33,6 +33,7 @@ extends:
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/archive.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/lib.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/serve.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-cli/tests/cli.rs", nature: additive }
   - { spec: "031-single-container-packaging", unit: "docker/entrypoint.sh", nature: additive }
   - { spec: "032-cluster-topology", unit: "deploy/k8s/migrate-job.yaml", nature: additive }
 references:

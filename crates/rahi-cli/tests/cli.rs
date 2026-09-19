@@ -5,7 +5,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::net::TcpListener;
 use std::os::unix::fs::PermissionsExt as _;
 use std::path::{Path, PathBuf};
@@ -138,25 +138,185 @@ impl Run {
     }
 }
 
-#[test]
-fn help_lists_exactly_the_verbs_of_b1() {
-    let run = bare(&["--help"]);
-    assert_eq!(run.code, 0, "{}", run.stderr);
-    for verb in VERBS {
-        assert!(
-            run.stdout.lines().any(|l| l.trim_start().starts_with(verb)),
-            "help lists {verb:?}:\n{}",
-            run.stdout
-        );
+/// The repository root, from this crate's own directory.
+fn repo_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+}
+
+/// The `implementation:` of the spec with this ordinal, read from the spec
+/// document's own front matter.
+///
+/// The lifecycle half of AC-2's required set. Read from `specs/`, which is
+/// the source the derived registry is compiled from, so this test never
+/// parses a derived artefact by hand (the governed-artefact-reads rule) and
+/// never asks the binary under test what it thinks the corpus says.
+fn implementation_of(ordinal: &str) -> String {
+    let specs = repo_root().join("specs");
+    let dir = std::fs::read_dir(&specs)
+        .unwrap_or_else(|e| panic!("{} is readable: {e}", specs.display()))
+        .filter_map(Result::ok)
+        .map(|e| e.path())
+        .find(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with(&format!("{ordinal}-")))
+        })
+        .unwrap_or_else(|| panic!("B-1 annotates ({ordinal}) and specs/{ordinal}-* exists"));
+    let text = std::fs::read_to_string(dir.join("spec.md"))
+        .unwrap_or_else(|e| panic!("{} is readable: {e}", dir.display()));
+    text.lines()
+        .find_map(|l| l.strip_prefix("implementation:"))
+        .map(|v| v.trim().trim_matches('"').to_owned())
+        .unwrap_or_else(|| panic!("specs/{ordinal}-* names an implementation state"))
+}
+
+/// The bare verb of one B-1 argv entry: the words before its first
+/// placeholder or flag group. `restore <archive>` is `restore`; `ledger
+/// verify [--full]` is `ledger verify`.
+fn verb_of(entry: &str) -> String {
+    let end = entry
+        .find(" <")
+        .into_iter()
+        .chain(entry.find(" ["))
+        .min()
+        .unwrap_or(entry.len());
+    entry[..end].trim().to_owned()
+}
+
+/// Spec 030 B-1's argv list, as the spec document writes it: each entry and
+/// the ordinal annotation it carries, if any.
+///
+/// The parse is deliberately literal. Everything between `parses argv:` and
+/// the sentence that follows it is a comma-separated list of backticked
+/// entries, each optionally followed by `(NNN)`, and that is all this reads.
+fn b1_argv_entries() -> Vec<(String, Option<String>)> {
+    let path = repo_root()
+        .join("specs")
+        .join("030-operational-verbs")
+        .join("spec.md");
+    let text = std::fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("{} is readable: {e}", path.display()));
+    // The document wraps B-1 over several lines; the list is one sentence.
+    let flat = text.replace('\n', " ");
+    let start = flat.find("parses argv:").expect("B-1 names the argv list") + "parses argv:".len();
+    let rest = &flat[start..];
+    let end = rest
+        .find("Exit codes")
+        .expect("B-1's argv list ends at the exit codes");
+    let list = &rest[..end];
+
+    let mut out = Vec::new();
+    let bytes: Vec<char> = list.chars().collect();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] != '`' {
+            i += 1;
+            continue;
+        }
+        let open = i + 1;
+        let Some(close) = (open..bytes.len()).find(|&j| bytes[j] == '`') else {
+            break;
+        };
+        let entry: String = bytes[open..close].iter().collect();
+        // An annotation is `(NNN)` after optional whitespace.
+        let mut k = close + 1;
+        while k < bytes.len() && bytes[k].is_whitespace() {
+            k += 1;
+        }
+        let mut ordinal = None;
+        if k < bytes.len() && bytes[k] == '(' {
+            let digits: String = bytes[k + 1..]
+                .iter()
+                .copied()
+                .take_while(char::is_ascii_digit)
+                .collect();
+            if digits.len() == 3 && bytes.get(k + 1 + digits.len()) == Some(&')') {
+                ordinal = Some(digits);
+            }
+        }
+        out.push((
+            entry.split_whitespace().collect::<Vec<_>>().join(" "),
+            ordinal,
+        ));
+        i = close + 1;
     }
-    let listed = run
-        .stdout
+    out
+}
+
+/// AC-2's **required verb set**, derived from spec 030 B-1's argv list and
+/// the corpus lifecycle, and from nothing else.
+///
+/// Every unannotated entry, plus every entry annotated with the ordinal of a
+/// spec that is `complete`, plus every entry annotated with the ordinal of
+/// the spec the change under test is implementing, which is the spec the
+/// corpus has at `in-progress`. Neither `rahi_cli::VERBS` nor the parser is
+/// consulted: they are what this set is the expectation for.
+fn required_verb_set() -> BTreeSet<String> {
+    let entries = b1_argv_entries();
+    assert!(
+        entries.len() >= 9,
+        "B-1's argv list parsed to {} entries, which is not a list: {entries:?}",
+        entries.len()
+    );
+    entries
+        .into_iter()
+        .filter(|(_, ordinal)| match ordinal {
+            None => true,
+            Some(o) => matches!(implementation_of(o).as_str(), "complete" | "in-progress"),
+        })
+        .map(|(entry, _)| verb_of(&entry))
+        .collect()
+}
+
+/// The verbs `--help` lists, by name, in the order it lists them.
+fn listed_verbs(stdout: &str) -> Vec<String> {
+    stdout
         .lines()
         .skip_while(|l| !l.starts_with("verbs:"))
         .skip(1)
         .take_while(|l| l.starts_with("  "))
-        .count();
-    assert_eq!(listed, VERBS.len(), "no verb beyond B-1's list");
+        .map(|l| {
+            let line = l.trim();
+            let column = line.find("  ").unwrap_or(line.len());
+            verb_of(&line[..column])
+        })
+        .collect()
+}
+
+/// Spec 030 AC-2, in the order the criterion states it.
+///
+/// First `VERBS` is judged against the required set, which is derived from
+/// B-1's text and the corpus lifecycle rather than taken as given: a verb the
+/// required set carries and `VERBS` omits is an AC-2 failure, not a
+/// redefinition of the criterion. Only then is the help compared against that
+/// same independent set.
+#[test]
+fn help_lists_exactly_the_required_verb_set() {
+    let required = required_verb_set();
+    let declared: BTreeSet<String> = VERBS.iter().map(|v| (*v).to_owned()).collect();
+    assert_eq!(
+        declared, required,
+        "rahi_cli::VERBS is the declaration of AC-2's required set and is itself under test"
+    );
+    assert_eq!(VERBS.len(), declared.len(), "VERBS names each verb once");
+
+    let run = bare(&["--help"]);
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    let listed = listed_verbs(&run.stdout);
+    assert_eq!(
+        listed.iter().cloned().collect::<BTreeSet<String>>(),
+        required,
+        "--help lists exactly the required verb set:\n{}",
+        run.stdout
+    );
+    assert_eq!(
+        listed.len(),
+        required.len(),
+        "no verb is listed twice:\n{}",
+        run.stdout
+    );
 }
 
 #[test]

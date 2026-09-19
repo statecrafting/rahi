@@ -19,6 +19,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-cli/tests/cli.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-cli/tests/evolution.rs",
         "source": "spec-edge"
       },
@@ -139,6 +143,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/tests/cli.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/cli.rs"
         }
       },
       {
@@ -302,5 +319,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "2bd75193c1ec75e7fbefdd6fc14e0e38e1e8b09fd383bfc72700e8da77dc4a04"
+  "shardHash": "b4e2d69e6fbcddd818e104e6982800039f4a8f319972e55635d3945d577ad32d"
 }
