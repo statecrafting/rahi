@@ -14,7 +14,7 @@ use rahi_store::Store;
 use rahi_types::{Config, Error, Result};
 
 use crate::KeySet;
-use crate::archive::{self, APP_DIR, ArchiveManifest, KEYS_DIR, Part, RAUTHY_DIR};
+use crate::archive::{self, APP_DIR, ArchiveManifest, ArchiveSchema, KEYS_DIR, Part, RAUTHY_DIR};
 use crate::rauthy_api::RauthyApi;
 
 /// The scheme `--to` uses for a bucket.
@@ -125,7 +125,17 @@ pub async fn gather(
         parts.push(Part::new(KEYS_DIR, &name, bytes));
     }
 
-    let manifest = ArchiveManifest::over(&parts, created, manifest_hash.to_owned());
+    // Spec 036 B-9: the archive records what the store had applied, with each
+    // migration's own declaration, because a version above the restoring
+    // binary's last is one that binary knows nothing about.
+    let history = store.handle().recorded_migrations().await?;
+    let schema = Some(ArchiveSchema {
+        version: history
+            .last()
+            .map_or(rahi_store::migrate::BASELINE_VERSION, |row| row.version),
+        migrations: history,
+    });
+    let manifest = ArchiveManifest::over(&parts, created, manifest_hash.to_owned(), schema);
     manifest.check_complete()?;
     Ok((manifest, parts))
 }

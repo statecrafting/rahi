@@ -29,10 +29,14 @@ pub enum Verb {
     Serve,
     /// B-3.
     Preflight,
-    /// B-4; `backup` is `--backup`.
+    /// B-4; `backup` is `--backup`, `adopt_manifest` is
+    /// `--adopt-manifest` (spec 036 B-3).
     Migrate {
         /// Take a backup before applying anything.
         backup: bool,
+        /// Adopt the booted manifest: append a transition when it differs
+        /// from the chain's current one (spec 036 B-3).
+        adopt_manifest: bool,
     },
     /// B-5; `to` is `--to`, a directory or `s3://bucket/prefix`.
     Backup {
@@ -41,12 +45,16 @@ pub enum Verb {
         to: Option<String>,
     },
     /// B-6; `key` is `--key`, the backup identity file when the volume has
-    /// no key set yet.
+    /// no key set yet; `adopt` is `--adopt` (spec 036 B-9).
     Restore {
         /// The archive.
         archive: PathBuf,
         /// The identity file.
         key: Option<PathBuf>,
+        /// Restore an archive whose chain names a manifest this binary does
+        /// not, leaving the transition to the next deploy step (spec 036
+        /// B-9).
+        adopt: bool,
     },
     /// B-7; `full` is `--full`.
     LedgerVerify {
@@ -88,15 +96,15 @@ pub fn usage() -> String {
             "check the deployment by name; exit 1 on any failure; never mutates",
         ),
         (
-            "migrate [--backup]",
-            "apply the cell's migrations on the leader (a deploy step, never boot)",
+            "migrate [--backup] [--adopt-manifest]",
+            "apply the cell's migrations on the leader, and adopt its manifest (036)",
         ),
         (
             "backup [--to <dir|s3://bucket/prefix>]",
             "one encrypted archive: both stores, the keys, a manifest",
         ),
         (
-            "restore <archive> [--key <file>]",
+            "restore <archive> [--key <file>] [--adopt]",
             "a cluster reset from one archive; single-shot by marker",
         ),
         (
@@ -155,11 +163,7 @@ where
             ["--export"] => Ok(Verb::FirstBoot { export: true }),
             _ => Err(unexpected(verb, &rest)),
         },
-        "migrate" => match rest.as_slice() {
-            [] => Ok(Verb::Migrate { backup: false }),
-            ["--backup"] => Ok(Verb::Migrate { backup: true }),
-            _ => Err(unexpected(verb, &rest)),
-        },
+        "migrate" => migrate_flags(&rest),
         "backup" => match rest.as_slice() {
             [] => Ok(Verb::Backup { to: None }),
             ["--to", to] => Ok(Verb::Backup {
@@ -167,18 +171,7 @@ where
             }),
             _ => Err(unexpected(verb, &rest)),
         },
-        "restore" => match rest.as_slice() {
-            [archive] => Ok(Verb::Restore {
-                archive: PathBuf::from(archive),
-                key: None,
-            }),
-            [archive, "--key", key] => Ok(Verb::Restore {
-                archive: PathBuf::from(archive),
-                key: Some(PathBuf::from(key)),
-            }),
-            [] => Err(Error::Validation("restore needs an archive".to_owned())),
-            _ => Err(unexpected(verb, &rest)),
-        },
+        "restore" => restore_flags(&rest),
         "ledger" => match rest.as_slice() {
             ["verify"] => Ok(Verb::LedgerVerify { full: false }),
             ["verify", "--full"] => Ok(Verb::LedgerVerify { full: true }),
@@ -193,6 +186,53 @@ where
         },
         other => Err(Error::Validation(format!("unknown verb {other:?}"))),
     }
+}
+
+/// `migrate [--backup] [--adopt-manifest]`, in either order (spec 036 B-3).
+fn migrate_flags(rest: &[&str]) -> Result<Verb> {
+    let mut backup = false;
+    let mut adopt_manifest = false;
+    for arg in rest {
+        match *arg {
+            "--backup" if !backup => backup = true,
+            "--adopt-manifest" if !adopt_manifest => adopt_manifest = true,
+            _ => return Err(unexpected("migrate", rest)),
+        }
+    }
+    Ok(Verb::Migrate {
+        backup,
+        adopt_manifest,
+    })
+}
+
+/// `restore <archive> [--key <file>] [--adopt]` (spec 036 B-9).
+fn restore_flags(rest: &[&str]) -> Result<Verb> {
+    let Some((archive, flags)) = rest.split_first() else {
+        return Err(Error::Validation("restore needs an archive".to_owned()));
+    };
+    if archive.starts_with('-') {
+        return Err(Error::Validation("restore needs an archive".to_owned()));
+    }
+    let mut key = None;
+    let mut adopt = false;
+    let mut flags = flags.iter();
+    while let Some(flag) = flags.next() {
+        match *flag {
+            "--adopt" if !adopt => adopt = true,
+            "--key" if key.is_none() => {
+                let Some(path) = flags.next() else {
+                    return Err(Error::Validation("restore --key needs a file".to_owned()));
+                };
+                key = Some(PathBuf::from(*path));
+            }
+            _ => return Err(unexpected("restore", rest)),
+        }
+    }
+    Ok(Verb::Restore {
+        archive: PathBuf::from(*archive),
+        key,
+        adopt,
+    })
 }
 
 fn no_options(verb: &str, rest: &[&str], ok: Verb) -> Result<Verb> {

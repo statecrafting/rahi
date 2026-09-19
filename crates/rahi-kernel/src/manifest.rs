@@ -463,6 +463,26 @@ impl Manifest {
         Hash::parse(sha256_hex(format!("{model}\n{gate}").as_bytes()))
     }
 
+    /// Parse a manifest back from the canonical JSON [`Manifest::canonical_model`]
+    /// produced.
+    ///
+    /// The inverse of the model bytes, for a reader of a spec 036 transition
+    /// record: it recovers the ceiling the record retained, and it validates
+    /// it the way [`Manifest::parse`] does, so a model that would not be
+    /// accepted as a manifest is not accepted as one here either.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Validation`] when the JSON is not a manifest or the manifest
+    /// does not validate.
+    pub fn parse_model(model: &str) -> Result<Self, Error> {
+        let manifest: Self = serde_json::from_str(model).map_err(|e| {
+            Error::Validation(format!("the retained manifest model does not parse: {e}"))
+        })?;
+        manifest.validate()?;
+        Ok(manifest)
+    }
+
     /// The canonical (key-sorted) JSON of the parsed model.
     ///
     /// The first half of what [`Manifest::hash`] digests, and what spec 036

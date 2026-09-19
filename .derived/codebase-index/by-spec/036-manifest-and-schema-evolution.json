@@ -11,11 +11,19 @@
     ],
     "implementingPaths": [
       {
+        "path": "CHANGELOG.md",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-cli/src/lib.rs",
         "source": "spec-edge"
       },
       {
         "path": "crates/rahi-cli/src/serve.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/verbs.rs",
         "source": "spec-edge"
       },
       {
@@ -75,11 +83,35 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-ops/src/backup.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-ops/src/migrate.rs",
         "source": "spec-edge"
       },
       {
         "path": "crates/rahi-ops/src/restore.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/tests/backup.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/tests/common/mod.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/tests/evolution.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/tests/rauthy_restore.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/tests/restore.rs",
         "source": "spec-edge"
       },
       {
@@ -96,6 +128,10 @@
       },
       {
         "path": "crates/rahi-store/tests/migrate.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/README.md",
         "source": "spec-edge"
       },
       {
@@ -150,6 +186,32 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-ops/tests/evolution.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/evolution.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "CHANGELOG.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "CHANGELOG.md"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-cli/src/lib.rs"
           }
         ],
@@ -171,6 +233,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/verbs.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/verbs.rs"
         }
       },
       {
@@ -319,6 +394,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-ops/src/backup.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/backup.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-ops/src/migrate.rs"
           }
         ],
@@ -340,6 +428,58 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-ops/src/restore.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/tests/backup.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/backup.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/tests/common/mod.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/common/mod.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/tests/rauthy_restore.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/rauthy_restore.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/tests/restore.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/restore.rs"
         }
       },
       {
@@ -397,6 +537,19 @@
       {
         "locations": [
           {
+            "file": "deploy/README.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/README.md"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "deploy/k8s/migrate-job.yaml"
           }
         ],
@@ -438,5 +591,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "f6e6fd53457085e91581991dc7a7154a189d8f35dfcf46281b66c1056ee2d587"
+  "shardHash": "875987a120e3b202971603e721a5e8ccdaa2e54e42166843e15a69364595cf17"
 }

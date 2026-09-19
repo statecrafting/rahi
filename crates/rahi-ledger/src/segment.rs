@@ -98,7 +98,11 @@ pub struct SegmentHeader {
     /// recorded no manifest; every segment sealed since carries one, so the
     /// current manifest is answerable at [`crate::Depth::Resident`] after the
     /// transition that set it has been sealed away.
-    #[serde(default)]
+    ///
+    /// Absent from the serialized form when it is `None`, so a body archived
+    /// before this spec round-trips byte for byte and spec 036 AC-2 holds for
+    /// every segment written before it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_manifest: Option<Hash>,
 }
 

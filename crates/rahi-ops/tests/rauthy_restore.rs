@@ -95,6 +95,7 @@ async fn the_restored_snapshot_is_handed_to_rauthy_once() {
         &config,
         &archive,
         &KeySource::File(source_keys.path(rahi_ops::BACKUP_KEY_FILE)),
+        &common::compatibility(),
     )
     .await
     .expect("the archive restores into an empty volume");
@@ -274,6 +275,7 @@ async fn missing_pending_source_fails_closed_and_can_be_retried() {
         &config,
         &archive,
         &KeySource::File(keys.path(rahi_ops::BACKUP_KEY_FILE)),
+        &common::compatibility(),
     )
     .await
     .unwrap();

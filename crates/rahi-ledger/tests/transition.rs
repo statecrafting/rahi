@@ -321,3 +321,54 @@ async fn the_record_is_admitted_at_the_bound_and_refused_one_byte_over() {
 
     f.store.shutdown().await.unwrap();
 }
+
+/// AC-2: a chain with no transition is byte for byte what it was.
+///
+/// The records never gained a field, so the only thing this spec could have
+/// moved is the archived segment body, which flattens the header. A segment
+/// that names no manifest serializes without the field at all, so a body
+/// written before this spec round-trips unchanged and the committed fixture
+/// chains under `testdata/chains/` (which `tests/verify.rs` checks) keep
+/// verifying against the same bytes.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_chain_with_no_transition_is_unchanged_by_this_spec() {
+    let f = common::open().await;
+    let ledger = open_ledger(f.handle()).await;
+    let archive = FsArchive::open(f.dir.path().join("archive")).expect("the archive opens");
+    let policy = SealPolicy::new(4, 4).expect("a tiny window");
+
+    for i in 1..=8 {
+        ledger.append(decision(&format!("d-{i:02}"))).await.unwrap();
+        ledger.seal_if_needed(&archive, &policy).await.unwrap();
+    }
+
+    // Sealed under this spec, with no transition anywhere: the header names
+    // the genesis parent, which is what B-1 calls the current manifest until
+    // one exists.
+    let segments = ledger.segments().await.unwrap();
+    assert_eq!(segments[0].current_manifest, Some(common::root()));
+    assert_eq!(ledger.current_manifest().await.unwrap(), common::root());
+
+    // A header with no manifest at all, as a pre-036 seal wrote it, carries
+    // the field in neither direction.
+    let mut before = segments[0].clone();
+    before.current_manifest = None;
+    let json = serde_json::to_string(&before).expect("serializes");
+    assert!(
+        !json.contains("current_manifest"),
+        "a header that names no manifest is the shape it always was: {json}"
+    );
+    let back: rahi_ledger::SegmentHeader = serde_json::from_str(&json).expect("parses");
+    assert_eq!(back, before, "and it round-trips");
+
+    ledger
+        .verify_chain(Depth::Resident)
+        .await
+        .expect("resident");
+    ledger
+        .verify_chain(Depth::Full(&archive))
+        .await
+        .expect("full");
+
+    f.store.shutdown().await.unwrap();
+}

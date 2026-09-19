@@ -16,6 +16,8 @@ use serde::{Deserialize, Serialize};
 
 use rahi_types::{Config, Error, Result};
 
+use rahi_store::Migration;
+
 use crate::KeySet;
 use crate::archive::{self, APP_DIR, ArchiveManifest, KEYS_DIR, Part, RAUTHY_DIR};
 
@@ -185,6 +187,67 @@ pub enum Outcome {
     AlreadyRestored(Marker),
 }
 
+/// What the running cell is, for the checks spec 036 B-9 makes before a
+/// restore writes anything.
+#[derive(Clone, Copy, Debug)]
+pub struct Compatibility<'a> {
+    /// The booted manifest's hash, as text.
+    pub manifest_hash: &'a str,
+    /// The cell's migrations.
+    pub migrations: &'a [Migration],
+    /// Whether `--adopt` was given: the operator's statement that the
+    /// manifest difference is intended and the next deploy step will
+    /// ledger it.
+    pub adopt: bool,
+}
+
+/// The archive is one this binary can serve (spec 036 B-9).
+///
+/// Two refusals, both [`Error::Stale`] (exit 2), both before a byte is
+/// written. The schema one is the same question `serve` asks of a live store
+/// (B-8), asked of the archive's own recorded history, because a version
+/// above this binary's last is one this binary knows nothing about. The
+/// manifest one refuses an archive whose chain names a ceiling this binary
+/// does not, unless the operator said `--adopt`.
+///
+/// An archive written before spec 036 carries no history at all. That is
+/// reported rather than guessed at: the manifest check still applies, and
+/// the caller is told the schema could not be checked.
+///
+/// # Errors
+///
+/// [`Error::Stale`] naming what is incompatible and the flag or the forward
+/// fix that resolves it.
+pub fn check_compatible(archive: &ArchiveManifest, cell: &Compatibility<'_>) -> Result<()> {
+    if let Some(schema) = &archive.schema {
+        let expected = crate::migrate::expected_version(cell.migrations);
+        crate::migrate::check_ahead(&schema.migrations, expected).map_err(|err| {
+            Error::Stale(format!(
+                "the archive cannot be restored into this binary: {}",
+                err.message()
+            ))
+        })?;
+    }
+    if archive.manifest_hash != cell.manifest_hash && !cell.adopt {
+        return Err(Error::Stale(format!(
+            "the archive's chain names manifest {} and this binary's manifest hashes to {}: \
+             restoring it would put a chain under a ceiling it has never named; pass --adopt to \
+             restore anyway, and the next rahi migrate --adopt-manifest will ledger the change",
+            archive.manifest_hash, cell.manifest_hash
+        )));
+    }
+    Ok(())
+}
+
+/// Whether the archive recorded a migration history at all (spec 036 B-9).
+///
+/// `false` for an archive written before that spec; the verb says so rather
+/// than letting silence read as a passed check.
+#[must_use]
+pub fn schema_checked(archive: &ArchiveManifest) -> bool {
+    archive.schema.is_some()
+}
+
 /// Where the backup identity comes from.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum KeySource {
@@ -200,9 +263,16 @@ pub enum KeySource {
 ///
 /// [`Error::Conflict`] when a node is running or its lock file is present;
 /// [`Error::Unauthorized`], [`Error::Integrity`], or [`Error::Validation`]
-/// from opening the archive, before anything is written; [`Error::Io`] when
-/// the volume cannot be written.
-pub async fn run(config: &Config, archive_path: &Path, key: &KeySource) -> Result<Outcome> {
+/// from opening the archive, before anything is written; [`Error::Stale`]
+/// (exit 2) when the archive is not one this binary can serve (spec 036
+/// B-9), also before anything is written; [`Error::Io`] when the volume
+/// cannot be written.
+pub async fn run(
+    config: &Config,
+    archive_path: &Path,
+    key: &KeySource,
+    cell: &Compatibility<'_>,
+) -> Result<Outcome> {
     let name = archive_path
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
@@ -238,6 +308,10 @@ pub async fn run(config: &Config, archive_path: &Path, key: &KeySource) -> Resul
         KeySource::KeySet => KeySet::of(config).backup_identity()?,
     };
     let (manifest, parts) = archive::open(&sealed, &identity)?;
+    // Spec 036 B-9: the compatibility questions are asked here, after the
+    // archive has proved itself intact and before the first byte of the
+    // volume is touched.
+    check_compatible(&manifest, cell)?;
 
     let keys = KeySet::of(config);
     for part in parts.iter().filter(|p| p.dir() == KEYS_DIR) {

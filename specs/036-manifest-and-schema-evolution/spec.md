@@ -21,6 +21,7 @@ establishes:
   - "crates/rahi-ledger/src/transition.rs"
   - "crates/rahi-ledger/tests/transition.rs"
   - "crates/rahi-cli/tests/evolution.rs"
+  - "crates/rahi-ops/tests/evolution.rs"
 extends:
   - { spec: "013-ledger-decision-chain", unit: "crates/rahi-ledger/src/chain.rs", nature: additive }
   - { spec: "013-ledger-decision-chain", unit: "crates/rahi-ledger/src/verify.rs", nature: additive }
@@ -41,6 +42,14 @@ extends:
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/lib.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/serve.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/tests/cli.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/verbs.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/backup.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-ops/tests/common/mod.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-ops/tests/restore.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-ops/tests/backup.rs", nature: additive }
+  - { spec: "037-identity-recovery-and-live-proof", unit: "crates/rahi-ops/tests/rauthy_restore.rs", nature: additive }
+  - { spec: "032-cluster-topology", unit: "deploy/README.md", nature: additive }
+  - { spec: "039-release-and-out-of-tree-packaging", unit: "CHANGELOG.md", nature: additive }
   - { spec: "031-single-container-packaging", unit: "docker/entrypoint.sh", nature: additive }
   - { spec: "032-cluster-topology", unit: "deploy/k8s/migrate-job.yaml", nature: additive }
 references:
@@ -408,6 +417,32 @@ record shows what was asked as well as what was answered.
   permission (constitution) and never evidence. Alternative rejected:
   defaulting an undeclared migration to additive, which would make every
   pre-036 store look rollback-safe on no evidence at all.
+
+- **D-9 (2026-09-18, build session; two absences the record cannot invent).**
+  B-3 says the adoption step prints the grants added and removed, and B-9
+  makes `restore` check the archive's schema. Both need a fact an older
+  artefact may simply not carry, and in both cases the verb says so instead
+  of guessing.
+
+  The grant diff is against the manifest the chain previously named, whose
+  *text* lives only in the previous transition record's `model`. A chain
+  that has never transitioned holds no earlier manifest text (the genesis
+  record carries the hash, not the model), and one whose last transition has
+  been sealed away holds it in the archive, which a deploy step does not
+  fetch. `Adoption::diffed` is false in both cases and the verb prints
+  "grants added and removed: not shown; the chain holds no earlier manifest
+  to diff against" rather than an empty diff, which would read as "nothing
+  changed". Alternative rejected: fetching archived segment bodies from a
+  deploy step, which would make the cost of adopting a manifest depend on
+  how much history the cell has.
+
+  An archive written before this spec records no migration history at all.
+  `restore` still makes B-9's manifest check against it, because the
+  archive's `manifest_hash` predates this spec too, and reports that the
+  schema could not be checked (`restore::schema_checked`) rather than
+  letting silence read as a check that passed. Alternative rejected:
+  refusing every pre-036 archive, which would strand exactly the archives an
+  upgrading consumer has.
 
 ## Verification
 

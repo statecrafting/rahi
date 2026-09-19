@@ -717,63 +717,96 @@ with missing or wrong cell audiences are refused.*
 
 ## 7. Manifest evolution
 
-**Verified** (`crates/rahi-ledger/src/chain.rs`, `verify.rs`,
-`crates/rahi-kernel/src/lib.rs`, `manifest.rs`; spec 015 B-2, B-8), and
-reproduced with the scratch consumer of 2.2:
+**Implemented** by spec 036 (`crates/rahi-ledger/src/transition.rs`,
+`chain.rs`, `segment.rs`, `seal.rs`; `crates/rahi-kernel/src/lib.rs`,
+`manifest.rs`; `crates/rahi-store/src/migrate.rs`;
+`crates/rahi-ops/src/migrate.rs`, `restore.rs`, `archive.rs`). What follows
+is the procedure, not a recommendation: it replaces the note that stood here
+while a deployed cell's manifest was frozen at its first boot.
 
-- The manifest hash is sha256 over the canonical JSON of the whole parsed
-  model and the gate's config hash. Reordering keys or editing comments
-  does not move it; any semantic change does, including `otel`,
+### What changed
+
+- The manifest hash is unchanged: sha256 over the canonical JSON of the
+  whole parsed model and the gate's config hash. Reordering keys or editing
+  comments does not move it; any semantic change does, including `otel`,
   `contract.version`, and `operator_role`.
-- The chain's genesis record links to the manifest hash of the first boot.
-  `Ledger::open` checks the first resident record against the booted
-  manifest's hash on every open.
-- Adding one grant and rebuilding: `serve` and `ledger verify` exit 1 with
-  `integrity: ... record(s) unreachable from the genesis parent`, and
-  `migrate` exits 0. Reverting the manifest makes the volume boot again.
-  The error does not say the manifest changed; spec 015 B-8's clearer
-  message is never reached, because the ledger refuses first.
-- Spec 015 B-8 names "a deploy genesis record" as the missing step. No
-  spec defines one and no code writes one.
+- A manifest change is now a record. `rahi migrate --adopt-manifest` appends
+  a `manifest.transition` decision carrying the manifest it moved from, the
+  one it moved to, the adopted manifest's canonical JSON, the store's schema
+  version, the binary, and the actor. It is an ordinary signed record,
+  compare-and-swap protected like every other.
+- The chain's **current manifest** is its genesis parent until the first
+  transition, then the `to` of the latest one. `Kernel::boot` compares the
+  booted manifest against that, and a mismatch is `Error::Stale`, exit 2,
+  naming both hashes and `rahi migrate --adopt-manifest`. An unadopted
+  manifest is a missing deploy step, and the message says so.
+- Verification is anchored on the chain's own stored genesis record rather
+  than on the manifest the process is holding. A broken link, a bad
+  signature, or a fork is still `Error::Integrity`, exit 1, and still fatal
+  at boot.
+- `schema_version` records a `checksum` (sha256 over the migration's SQL)
+  and an `additive` flag per version. A recorded version whose SQL changed
+  is `Error::Integrity` naming the version, rather than being skipped as
+  applied. A migration declares itself additive with `Migration::additive()`;
+  one that does not declare it is not additive.
+- `serve` accepts a store ahead of the binary only when every applied
+  version above the binary's last is recorded additive, and otherwise exits
+  2 naming the first that is not.
+- `restore` reads the archive's `manifest.json`, whose `manifest_hash` is
+  the chain's current manifest at backup time and whose `schema` is the
+  store's migration history. It refuses, writing nothing, an archive whose
+  schema is ahead across a non-additive migration, and one whose manifest
+  differs from the binary's unless `--adopt` is given.
 
-So today **a deployed cell's manifest is frozen at its first boot.** There
-is no supported way to add a capability to a running cell without losing
-its chain.
+### The procedure
 
-Migrations, **Verified** (`crates/rahi-store/src/migrate.rs`,
-`crates/rahi-ops/src/migrate.rs`), and reproduced where marked:
+The deploy step is the same command in every topology; `docker/entrypoint.sh`
+and `deploy/k8s/migrate-job.yaml` both pass the flag, so an ordinary
+deployment adopts its manifest in the step that migrates it.
 
-- Forward-only; no down migrations.
-- `serve` refuses a store behind the cell's migrations (exit 2) and
-  accepts a store ahead of them. A rolled-back binary serves on a newer
-  schema without a warning.
-- `schema_version` keeps a version and a name, not a checksum. A
-  migration whose SQL changed under an applied version is skipped as
-  applied (reproduced: a version 1 with different SQL was never run).
-- The manifest and the migrations are independent: a release that changes
-  both can apply its migrations (the Job, spec 032) and then fail to serve
-  on the manifest.
+A cell ships v1 with manifest H1. v2 adds a grant and an additive migration
+2.
 
-Restore, **Verified**: no compatibility check at restore time (section 6).
-Mixed versions during an N=3 rolling update: nothing specified.
+```sh
+# Upgrade, N=1 (the entrypoint) or N=3 (the Job, then the rollout):
+rahi migrate --adopt-manifest   # applies 2, appends H1 -> H2, exit 0
+rahi supervise                  # boots: current manifest H2 == booted H2
 
-The consumer procedure today, **Verified** as the only one that keeps the
-chain:
+# Rollback to v1, run with the v1 image. Migration 2 is additive, so v1 may
+# serve a store at schema 2, and the ceiling returns through the same step:
+rahi migrate --adopt-manifest   # nothing to apply; appends H2 -> H1
+rahi supervise                  # boots on H1
 
-1. Treat the manifest as immutable for the life of a volume.
-2. Grant generously at first boot only if you accept the wider ceiling.
-3. To change the ceiling, stand up a new volume with the new manifest; the
-   old chain stays verifiable on the old volume with the old binary
-   (`ledger verify`, `ledger export`), and the app's data moves by the
-   consumer's own means. Both are losses this note does not recommend
-   living with.
+# Restore a v1 archive into a v2 deployment:
+rahi restore <archive>          # exit 2: the archive's chain names H1
+rahi restore <archive> --adopt  # restores
+rahi migrate --adopt-manifest   # applies 2 and appends H1 -> H2
+```
 
-**Recommendation** (draft spec 036): a manifest transition record appended
-by an explicit deploy verb, a boot check against the chain's current
-manifest instead of its genesis parent, migration checksums, a refusal of
-a store ahead of the binary unless the cell declares it compatible, and a
-restore that checks compatibility before it writes. Spec 036 carries the
-worked consumer example for an upgrade and a rollback.
+Had migration 2 not been additive, v1's `serve` would refuse with exit 2
+naming version 2. The rollback is then a forward fix; there are no down
+migrations.
+
+### What to hold to
+
+- **Declare `additive()` honestly.** It is the whole of what lets an older
+  binary serve a newer store, and nothing infers it. A migration that
+  rewrites or narrows anything is not additive.
+- **Keep the manifest inside `ledger.max_record_bytes`.** The transition
+  retains the manifest whole or adoption is refused with `Error::Validation`
+  naming the measured size and the bound, having applied no migration and
+  appended nothing. A cell that outgrows the bound raises it in its
+  manifest, which is itself a manifest change and is adopted the same way.
+- **One transition per deploy, on the leader.** At N=3 the migration Job
+  runs before the rollout. Replicas still on the old image keep serving and
+  keep stamping the old manifest hash on their decisions; one that restarts
+  on the old image after the transition refuses to boot rather than
+  adjudicate under a ceiling the chain no longer names. This is about
+  restarts, not about replicas already running: an old replica that stays up
+  finishes the rollout under the manifest its own decisions record.
+- **An older binary is not a pre-036 binary.** Everything above is enforced
+  by the binary that carries spec 036. A binary built before it has none of
+  these checks and cannot be given them from outside.
 
 ## 8. The identity contract for a hosted control plane and a CLI
 
