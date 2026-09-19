@@ -1,6 +1,7 @@
 {
   "mapping": {
     "dependsOn": [
+      "010-workspace-and-core-types",
       "011-store-hiqlite",
       "013-ledger-decision-chain",
       "014-ledger-sealing-and-archive",
@@ -12,6 +13,10 @@
     "implementingPaths": [
       {
         "path": "CHANGELOG.md",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Cargo.toml",
         "source": "spec-edge"
       },
       {
@@ -76,6 +81,10 @@
       },
       {
         "path": "crates/rahi-ledger/tests/transition.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/Cargo.toml",
         "source": "spec-edge"
       },
       {
@@ -207,6 +216,19 @@
         "unit": {
           "kind": "file",
           "path": "CHANGELOG.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
         }
       },
       {
@@ -376,6 +398,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-ledger/tests/append.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/Cargo.toml"
         }
       },
       {
@@ -591,5 +626,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "4026ffdd3d88e98c8df8701949f6fbc5f925eead3dfebb3f36019434b38aa2ec"
+  "shardHash": "2c7f3abcff072c66b732f3fb1ecc96b498bd1b691c08331588ed7450bc4cf1d4"
 }
