@@ -117,6 +117,12 @@ is neither registry availability nor evidence of consumer deployment.
   binary's is `Error::Integrity` naming the version, rather than being
   skipped as applied. A row written before this release carries no checksum;
   the first `migrate` under it records the binary's.
+- Legacy archives are supported exactly this far: an archived database with
+  no `schema_version` table restores on the baseline it proves, and one
+  whose `schema_version` table predates this release's `checksum` and
+  `additive` columns is refused with `Error::Stale`, exit 2, nothing
+  written. A pre-036 archive taken from a store that had applied a migration
+  is therefore refused rather than restored.
 - `restore` gains `--adopt` and refuses, writing nothing, an archive whose
   schema is ahead across a non-additive migration or whose chain names a
   manifest this binary does not. The Rust API is now
@@ -131,10 +137,14 @@ is neither registry availability nor evidence of consumer deployment.
   reported only as stale, and running the named command would have applied
   the pending migration on top of a history the binary cannot vouch for.
 - `Ledger::current_manifest` refuses rather than answering an older manifest
-  from a read that did not answer. Both reads carry their own row count from
-  one snapshot, and neither falls back past what `Ledger::open` verified, so
-  a replica cannot boot on a superseded ceiling because a read came back
-  empty. `Ledger::current_manifest_model` is the supported way to recover
+  from a read that did not answer. The sealed headers and the resident
+  records are read in one statement, each carrying its own row count from
+  that snapshot, and neither falls back past what `Ledger::open` verified,
+  so a replica cannot boot on a superseded ceiling because a read came back
+  empty or because a seal committed while the chain was being read. The
+  resident chain is ordered against the root the same snapshot names, so
+  evidence taken from two moments is `Error::Integrity` rather than an
+  answer. `Ledger::current_manifest_model` is the supported way to recover
   the previous ceiling's text; `migrate --adopt-manifest` reports the grant
   diff as unavailable only when the chain genuinely holds no earlier
   manifest text, never because a read failed.
