@@ -43,6 +43,17 @@ pub const APPEND_BACKOFF_BASE: Duration = Duration::from_millis(5);
 /// seconds, which is how long an append can spend losing before it stops.
 pub const APPEND_BACKOFF_CAP: Duration = Duration::from_millis(250);
 
+/// Whether a retry of the compare-and-swap re-consults the backstop of
+/// spec 042 B-11.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Gate {
+    /// The ordinary append: every attempt after the first asks the backstop
+    /// again, because this node's verdict can degrade mid-invocation (D-16).
+    Backstopped,
+    /// The genesis append, which neither gate may block (B-10).
+    Ungated,
+}
+
 /// What a failed insert turned out to mean.
 enum Attempt {
     /// The record is in the chain under this hash; the error was after the
@@ -161,7 +172,9 @@ impl Ledger {
     /// As [`Ledger::append`].
     pub(crate) async fn append_genesis(&self, decision: Decision) -> Result<Hash, Error> {
         let digest = identity_digest(&decision)?;
-        self.append_loop(decision, &digest).await.map(|(h, _)| h)
+        self.append_loop(decision, &digest, Gate::Ungated)
+            .await
+            .map(|(h, _)| h)
     }
 
     /// [`Ledger::append`], reporting whether this invocation's own
@@ -199,15 +212,37 @@ impl Ledger {
         if let Some(landed) = self.backstop(&decision.id, &digest).await? {
             return Ok((landed, false));
         }
-        self.append_loop(decision, &digest).await
+        self.append_loop(decision, &digest, Gate::Backstopped).await
     }
 
     /// The compare-and-swap loop itself, with neither gate in front of it.
-    async fn append_loop(&self, decision: Decision, digest: &Hash) -> Result<(Hash, bool), Error> {
+    ///
+    /// `gate` says whether a retry re-consults the backstop. Spec 042 D-16:
+    /// an invocation's first attempt is decided by the backstop
+    /// [`Ledger::append_reported`] ran, but the verdict this node holds can
+    /// go incomplete while that invocation is still losing compare-and-swaps,
+    /// and a later attempt is a *new* write. Once this node has observed
+    /// that it cannot prove the id free, writing it anyway would spend an id
+    /// over history the chain has just said it cannot vouch for, so every
+    /// attempt after the first asks again. It costs nothing on a covered
+    /// chain, where the backstop reads the cached verdict and returns
+    /// without touching the store (FR-018), and the genesis append is
+    /// [`Gate::Ungated`] because B-10 exempts it.
+    async fn append_loop(
+        &self,
+        decision: Decision,
+        digest: &Hash,
+        gate: Gate,
+    ) -> Result<(Hash, bool), Error> {
         let mut decision = decision;
         for attempt in 0..APPEND_ATTEMPTS {
             if attempt > 0 {
                 tokio::time::sleep(backoff(&decision.id, attempt)).await;
+                if gate == Gate::Backstopped
+                    && let Some(landed) = self.backstop(&decision.id, digest).await?
+                {
+                    return Ok((landed, false));
+                }
             }
             let parent = self.head().await?;
             decision.prev_hash = parent.clone();

@@ -1466,6 +1466,92 @@ sets.
   `genesis:<hash>` by spec 013's construction, so any faithful 0.1.0 chain
   has this key.
 
+- **D-14 (2026-09-19, build session; a negative coverage observation
+  degrades the verdict where it is computed).** B-11 says the cached verdict
+  "moves to incomplete without a leader read when this node observes the
+  evidence itself: a seal that had to create an identity row rather than
+  update one (B-5), or a resident record met without a row". The merged
+  implementation wired only the first of the two. `Ledger::coverage()`
+  computed `unstamped_resident` and the uncovered segment list and returned
+  them without touching the verdict, so on a handle whose `open` gate had
+  passed, a `coverage()` call that reported one unstamped resident record
+  and `is_complete() == false` left `lookup` answering `Presence::Absent`
+  for that record and the backstop admitting an id it could no longer prove
+  free. Reproduced against `9b38b34`: `lookup` answered `Absent` and the
+  append of a new id returned `Ok`.
+
+  That is after detection, not the pre-detection window B-13 accepts. The
+  window B-13 accepts is the one between an old writer's append and this
+  node noticing; once this node has computed the evidence, a cached
+  `complete` beside it is a wrong answer, not an eventual one. So
+  `coverage()` degrades the verdict it just computed, through a
+  `degrade_verdict` that is asymmetric on purpose: a negative observation is
+  adopted, a positive one is not. Only `recheck_coverage` restores
+  confidence, and `serve` still never calls it, so nothing about B-11's "a
+  degraded cell never talks itself back into confidence" is weakened; the
+  degrade consumes evidence already in hand and issues no read, so FR-018's
+  zero coverage reads on the ordinary append path are untouched.
+
+  The safety explanation in `CachedCoverage`'s documentation is corrected in
+  the same change: "this node has seen no evidence of incompleteness" was
+  describing a property the code did not have, because the one call that
+  computes that evidence discarded it.
+
+  Rejected: leaving `coverage()` pure and degrading only at its call sites.
+  It puts the obligation on every future caller of a read whose whole
+  purpose is to answer a refusal, and the merged code is the proof that the
+  obligation gets missed.
+- **D-15 (2026-09-19, build session; recovery across a legitimate seal).**
+  `Ledger::recover` reads the identity row first and the resident chain
+  second. A seal committing between the two archives the record and stamps
+  the same row, so the resident scan finds nothing and the merged code
+  returned `Error::Integrity` saying the record "is not in the resident
+  chain" for a record that was healthy, archived, and immediately
+  recoverable. Reproduced against `9b38b34` with a deterministic hook at that
+  crossing: `recover` returned `Integrity`, `lookup` then answered `Sealed`,
+  and an uninstrumented `recover` returned the original record with the
+  original hash.
+
+  Sealing is the only thing that legitimately moves a record out of the
+  resident chain, and it moves it *into* the row that was already read: an
+  identity row is never deleted and never redirected (B-12), so the row is
+  itself the coherent evidence about where the record went. The crossing is
+  therefore settled by asking the row once more. `recover_resident` performs
+  exactly one revalidation, which cannot re-enter that branch: a row that
+  still says resident is the genuine integrity failure and is reported as
+  one, a row that now says sealed under the **same** record hash takes the
+  archived path and is fetched and verified exactly as it would have been
+  had the lookup happened a moment later, an ambiguous row is the
+  `Error::Conflict` of B-12, and anything else is an error and never an
+  absence. Nothing retries an integrity failure, no error is converted into
+  absence, and no answer is produced from unavailable evidence, which is
+  what B-6 forbids.
+
+  The seam the regression drives is the `ReadInterleave` of spec 036 D-15,
+  reused at the one instant this read is vulnerable, so the crossing is
+  controlled rather than waited out on a clock (AC-5).
+
+  Rejected: a process-local lock between the row read and the record read.
+  It would be a lock on one replica of a replicated chain, so it would buy
+  nothing against a seal on another node while suggesting it had. Also
+  rejected: folding the row and the record into one statement, which
+  `recover` cannot do because the archived half is not in the store.
+- **D-16 (2026-09-19, build session; a retry asks the backstop again).**
+  B-11's backstop decides an append before its first compare-and-swap. An
+  invocation that loses the compare-and-swap retries, and this node's
+  verdict can go incomplete in between, on this handle or on a clone sharing
+  it. A later attempt is a new write, so `append_loop` re-consults the
+  backstop before every attempt after the first: once this node has observed
+  that it cannot prove the id free, writing it anyway would spend an id over
+  history the chain has just said it cannot vouch for. The verified retry is
+  still admitted by the same branch that admits it before the first attempt,
+  so nothing a recovery depends on is stranded.
+
+  This adds no read on a covered chain: the backstop reads the cached
+  verdict and returns without touching the store, which is what FR-018
+  measures. The genesis append of B-10 is explicitly ungated and reaches the
+  loop through the same call with the gate off.
+
 ## 8. Owner decisions, answered
 
 The four questions this draft raised are answered. Each named a requirement

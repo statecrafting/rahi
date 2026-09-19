@@ -574,6 +574,12 @@ impl ReindexReport {
 /// reading holds only where coverage is computed through the leader: at
 /// `open`, at [`Ledger::recheck_coverage`], and in `ledger verify` and
 /// `preflight` (B-13).
+///
+/// "Seen no evidence" is a claim about every observation this node makes,
+/// not only about the two writes that move it: [`Ledger::coverage`]
+/// degrades this verdict whenever it computes an incomplete one, so
+/// evidence computed on this handle can never sit beside a cached
+/// `complete` (D-14). Only [`Ledger::recheck_coverage`] restores it.
 #[derive(Clone, Debug)]
 pub(crate) struct CachedCoverage {
     pub(crate) complete: bool,
@@ -959,10 +965,21 @@ impl Ledger {
                 uncovered.push(Hash::parse(segment_hash)?);
             }
         }
-        Ok(Coverage {
+        let coverage = Coverage {
             uncovered,
             unstamped_resident: u64::try_from(unstamped_resident).unwrap_or(u64::MAX),
-        })
+        };
+        // B-11's second observation, made where the evidence is: a resident
+        // record met without a row, or a segment whose counter is below its
+        // header's count, is this node observing incompleteness itself. The
+        // verdict this handle carries has to move on it, because a verdict
+        // that stayed `complete` while this same call computed the evidence
+        // for the opposite would let `lookup` answer `Absent` and the
+        // backstop admit an unknown id over history this chain has just
+        // been told it cannot vouch for. Degrade only: a complete answer is
+        // adopted by `recheck_coverage` and never here.
+        self.degrade_verdict(&coverage);
+        Ok(coverage)
     }
 
     /// Recompute the verdict through the leader and adopt it (B-7, B-11).
@@ -1064,6 +1081,13 @@ impl Ledger {
     /// is verified the way spec 014 B-4 verifies a body at full depth before
     /// a record is taken out of it.
     ///
+    /// The identity row is read first and the record is read second, and a
+    /// seal may commit between them: a record that was resident when the row
+    /// was read is archived by the time the resident chain is. That
+    /// crossing is legitimate history moving, not damage, and D-15 records
+    /// why it is settled by asking the row once more rather than by a lock.
+    /// [`Ledger::recover_resident`] carries the bound.
+    ///
     /// # Errors
     ///
     /// [`Error::NotFound`] when the id is absent or the body is gone;
@@ -1076,7 +1100,12 @@ impl Ledger {
         id: &DecisionId,
         archive: &dyn Archive,
     ) -> Result<SignedRecord, Error> {
-        match self.lookup(id).await? {
+        let presence = self.lookup(id).await?;
+        // Spec 042 D-15's seam: the one instant this read is vulnerable to a
+        // seal, and the only place a regression can put one there without a
+        // clock. `None` on every ledger this crate builds (spec 036 D-15).
+        self.read_interleave().await;
+        match presence {
             Presence::Absent => Err(Error::NotFound(format!(
                 "decision {id} is not in the chain"
             ))),
@@ -1084,64 +1113,110 @@ impl Ledger {
                 "decision {id} cannot be looked up: {}",
                 self.cached_verdict().evidence
             ))),
-            Presence::Ambiguous { copies } => Err(Error::Conflict(format!(
-                "decision {id} names {} recorded copies and nothing here chooses between them: {}",
-                copies.len(),
-                copies
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<_>>()
-                    .join("; ")
-            ))),
+            Presence::Ambiguous { copies } => Err(ambiguous_copies(id, &copies)),
             Presence::Resident { record_hash } => {
-                for record in self.records().await? {
-                    if record.hash()? == record_hash {
-                        return Ok(record);
-                    }
-                }
-                Err(Error::Integrity(format!(
-                    "the identity row for decision {id} names resident record {record_hash}, \
-                     which is not in the resident chain"
-                )))
+                self.recover_resident(id, &record_hash, archive).await
             }
             Presence::Sealed {
                 record_hash,
                 segment_hash,
             } => {
-                let headers = self.segments().await?;
-                let at = headers
-                    .iter()
-                    .position(|h| h.segment_hash == segment_hash)
-                    .ok_or_else(|| {
-                        Error::Integrity(format!(
-                            "the identity row for decision {id} names segment {segment_hash}, \
-                             which the store does not hold a header for"
-                        ))
-                    })?;
-                let header = headers.get(at).ok_or_else(|| {
-                    Error::Integrity("the header list moved under this read".to_owned())
-                })?;
-                let segment = fetch_segment(archive, header).await?;
-                // Verified the way spec 014 B-4 verifies a body at full
-                // depth before a record is taken out of it: the parent is
-                // the genesis parent for the oldest segment and the previous
-                // segment's terminal record hash for every other (B-6).
-                let parent = match at.checked_sub(1).and_then(|before| headers.get(before)) {
-                    Some(before) => before.last_hash.clone(),
-                    None => self.genesis_parent().clone(),
-                };
-                crate::verify::verify_segment(&parent, &segment, &self.verifier())?;
-                for record in segment.records {
-                    if record.hash()? == record_hash {
-                        return Ok(record);
-                    }
-                }
-                Err(Error::Integrity(format!(
-                    "archived segment {segment_hash} does not hold record {record_hash}, which \
-                     the identity row for decision {id} names"
-                )))
+                self.recover_sealed(id, &record_hash, &segment_hash, archive)
+                    .await
             }
         }
+    }
+
+    /// The record an identity row named as resident (B-6).
+    ///
+    /// The resident chain answers first. When it does not hold the record,
+    /// exactly one thing legitimately explains it: a seal committed between
+    /// the row read and this one, which archives the record and stamps the
+    /// same row with the segment it went into (B-5). Sealing is the only
+    /// mover here, because an identity row is never deleted and never
+    /// redirected (B-12), so the row itself is the coherent evidence, and
+    /// asking it once more is what tells a moved record from a missing one.
+    ///
+    /// Bounded by construction, and D-15 states the bound: exactly one
+    /// revalidation, which never re-enters this branch. A row that still
+    /// says resident is the genuine integrity failure and is reported as
+    /// one; a row that now says sealed under the *same* record hash is the
+    /// crossing, and the archived body is fetched and verified exactly as it
+    /// would have been had the lookup happened a moment later; anything else
+    /// is history the row cannot account for and is an error, never an
+    /// absence. Nothing retries an integrity failure and nothing here takes
+    /// a lock: a lock would be process-local and this chain has replicas.
+    async fn recover_resident(
+        &self,
+        id: &DecisionId,
+        record_hash: &Hash,
+        archive: &dyn Archive,
+    ) -> Result<SignedRecord, Error> {
+        for record in self.records().await? {
+            if &record.hash()? == record_hash {
+                return Ok(record);
+            }
+        }
+        let missing = || {
+            Error::Integrity(format!(
+                "the identity row for decision {id} names resident record {record_hash}, \
+                 which is not in the resident chain"
+            ))
+        };
+        match self.lookup(id).await? {
+            Presence::Sealed {
+                record_hash: again,
+                segment_hash,
+            } if &again == record_hash => {
+                self.recover_sealed(id, record_hash, &segment_hash, archive)
+                    .await
+            }
+            Presence::Ambiguous { copies } => Err(ambiguous_copies(id, &copies)),
+            _ => Err(missing()),
+        }
+    }
+
+    /// The record an identity row named as archived, from the one body that
+    /// holds it (B-6).
+    async fn recover_sealed(
+        &self,
+        id: &DecisionId,
+        record_hash: &Hash,
+        segment_hash: &Hash,
+        archive: &dyn Archive,
+    ) -> Result<SignedRecord, Error> {
+        let headers = self.segments().await?;
+        let at = headers
+            .iter()
+            .position(|h| &h.segment_hash == segment_hash)
+            .ok_or_else(|| {
+                Error::Integrity(format!(
+                    "the identity row for decision {id} names segment {segment_hash}, \
+                     which the store does not hold a header for"
+                ))
+            })?;
+        let header = headers
+            .get(at)
+            .ok_or_else(|| Error::Integrity("the header list moved under this read".to_owned()))?;
+        let segment = fetch_segment(archive, header).await?;
+        // Verified the way spec 014 B-4 verifies a body at full
+        // depth before a record is taken out of it: the parent is
+        // the genesis parent for the oldest segment and the previous
+        // segment's terminal record hash for every other (B-6).
+        let parent = match at.checked_sub(1).and_then(|before| headers.get(before)) {
+            Some(before) => before.last_hash.clone(),
+            None => self.genesis_parent().clone(),
+        };
+        crate::verify::verify_segment(&parent, &segment, &self.verifier())?;
+        for record in segment.records {
+            if &record.hash()? == record_hash {
+                return Ok(record);
+            }
+        }
+        Err(Error::Integrity(format!(
+            "archived segment {segment_hash} does not hold record {record_hash}, which \
+             the identity row for decision {id} names"
+        )))
     }
 
     /// Rebuild the accounting of every uncovered segment from the archive
@@ -1337,6 +1412,20 @@ impl Ledger {
             _ => None,
         }
     }
+}
+
+/// The refusal `recover` gives a twice-spent id: every copy named, none
+/// chosen (B-12).
+fn ambiguous_copies(id: &DecisionId, copies: &[DecisionCopy]) -> Error {
+    Error::Conflict(format!(
+        "decision {id} names {} recorded copies and nothing here chooses between them: {}",
+        copies.len(),
+        copies
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("; ")
+    ))
 }
 
 fn copy_of(row: &IdRow) -> Result<DecisionCopy, Error> {

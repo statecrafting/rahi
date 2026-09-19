@@ -196,6 +196,20 @@ is neither registry availability nor evidence of consumer deployment.
   exactly-once **append**, never exactly-once **delivery**: a caller that
   needs a side effect exactly once still records its intent in its own
   transaction.
+- A negative coverage observation degrades this node's cached verdict where
+  it is computed: `Ledger::coverage()` reporting an unstamped resident record
+  or an uncovered segment moves the verdict to incomplete, so `lookup` stops
+  answering `Absent` and `append` stops admitting an id the chain can no
+  longer prove free, on that handle and on every clone sharing it. An append
+  already in flight re-consults the backstop before each retry. Only
+  `Ledger::recheck_coverage()` restores confidence, and `serve` never calls
+  it.
+- `Ledger::recover(id, archive)` spans a legitimate seal. A record archived
+  between the identity-row read and the resident-chain read is recovered from
+  the archive under its original hash rather than reported as an integrity
+  failure, by revalidating the same row exactly once. A record no seal
+  archived and the resident chain does not hold is still `Error::Integrity`,
+  and no archive failure is converted into an absence.
 - A chain that already spent an id more than once is recorded in
   `kernel_decision_collisions` and never resolved: lookup of such an id
   answers `Ambiguous` with every copy, appends under it are refused, no copy
