@@ -24,7 +24,7 @@ use async_trait::async_trait;
 use rahi_ledger::{
     AppendSeam, AppendStage, Archive, Decision, DecisionId, DecisionKind, Depth, FsArchive, Hash,
     Ledger, Outcome, Presence, ReadInterleave, ReindexCause, SealPolicy, SegmentHeader,
-    SignedRecord, identity_digest,
+    SignedRecord, SnapshotInterleave, identity_digest,
 };
 use rahi_store::{StoreHandle, Value};
 use rahi_types::{Error, Revision, Sub};
@@ -752,6 +752,182 @@ async fn recovery_survives_a_seal_that_lands_between_the_row_and_the_record() {
         ),
         "and the answer is never converted into an absence"
     );
+
+    f.store.shutdown().await.unwrap();
+}
+
+/// B-6, D-15, D-17, AC-5. Recovery spans a legitimate seal that lands
+/// *inside* the resident chain read, not merely before it.
+///
+/// D-15's revalidation settles the crossing between the identity row and
+/// the chain read. It never ran for the crossing one level down: the chain
+/// read itself took the resident records in one statement and the hash they
+/// are rooted at in a second, and a seal committing between those two
+/// deletes the sealed records and writes the segment that becomes the new
+/// root in one transaction. Ordering records from before the seal against a
+/// root from after it is an integrity failure reported over an intact
+/// chain, and `recover_resident` propagated it out of `self.records()?`
+/// before the revalidation could be reached. Reproduced against `718d3dc`
+/// with a hook at that crossing: `recover` returned `Integrity` saying two
+/// records were "unreachable from the genesis parent", and an uninstrumented
+/// `recover` a moment later returned the original record with the original
+/// hash.
+///
+/// D-17 removes the crossing rather than compensating for it: the records,
+/// their census, and the segments the root is decided from are one
+/// statement, so the answer is coherent by construction and a seal can only
+/// land wholly before or wholly after it. The seam below therefore commits a
+/// real seal at the instant the read used to be vulnerable and the read is
+/// required to be unaffected, which is a stronger claim than "it recovers
+/// anyway": no revalidation is consumed, so the bound D-15 states is still
+/// exactly one.
+///
+/// Genuine damage is unchanged and is asserted by the boot tests over the
+/// committed fixtures (a broken link, a tampered payload, a forged
+/// signature, a fork that predates the boot, all in `tests/verify.rs`),
+/// which read the resident chain through this same snapshot.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn recovery_survives_a_seal_that_lands_inside_the_resident_chain_read() {
+    let f = common::open().await;
+    let dir = tempfile::tempdir().unwrap();
+    let archive = FsArchive::open(dir.path().join("archive")).unwrap();
+    let ledger = open_ledger(f.handle()).await;
+
+    let expected = ledger.append(decision("target")).await.unwrap();
+    for i in 0..4 {
+        ledger
+            .append(decision(&format!("filler-{i}")))
+            .await
+            .unwrap();
+    }
+
+    // The crossing: a real seal through the production path, committed
+    // after the snapshot statement has answered and before its answer is
+    // ordered.
+    let sealer = ledger.clone();
+    let seal_archive = archive.clone();
+    let seals = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let counted = std::sync::Arc::clone(&seals);
+    let reader = ledger
+        .clone()
+        .with_snapshot_interleave(SnapshotInterleave::new(move || {
+            let sealer = sealer.clone();
+            let archive = seal_archive.clone();
+            let counted = std::sync::Arc::clone(&counted);
+            async move {
+                if counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 0 {
+                    sealer
+                        .seal_if_needed(&archive, &eager())
+                        .await
+                        .expect("the seal lands")
+                        .expect("a real seal, not a no-op");
+                }
+            }
+        }));
+    let across = reader
+        .recover(&DecisionId::new("target"), &archive)
+        .await
+        .expect("a healthy record stays recoverable across a legitimate seal");
+    assert_eq!(
+        across.hash().unwrap(),
+        expected,
+        "and it is the original verified record, not a substitute"
+    );
+    assert_eq!(across.record.id, "target");
+    assert_eq!(
+        seals.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "the crossing was driven exactly once: the snapshot is read once per \
+         recovery, so no revalidation was spent on it"
+    );
+
+    // The seal really did commit, so the read really did span it.
+    assert!(matches!(
+        ledger.lookup(&DecisionId::new("target")).await.unwrap(),
+        Presence::Sealed { .. }
+    ));
+
+    // And ordinary recovery, uninstrumented, answers the same record from
+    // the archive it now lives in, fetching exactly the one body its row
+    // names.
+    let counting = Counting::open(dir.path().join("archive"));
+    let after = ledger
+        .recover(&DecisionId::new("target"), &counting)
+        .await
+        .unwrap();
+    assert_eq!(after.hash().unwrap(), expected);
+    assert_eq!(
+        counting.gets(),
+        1,
+        "exactly one body, the one the row names"
+    );
+
+    f.store.shutdown().await.unwrap();
+}
+
+/// D-17. A seal inside the chain read is invisible to every reader of the
+/// resident chain, not only to `recover`.
+///
+/// `records` is the boot check, the export the published verifier reads, and
+/// what `rahi ledger verify` writes. A crossing that only `recover` survived
+/// would leave those three failing on an intact chain, so the coherence is
+/// asserted where it is implemented rather than only where it was found.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_seal_inside_the_chain_read_leaves_the_export_coherent() {
+    let f = common::open().await;
+    let dir = tempfile::tempdir().unwrap();
+    let archive = FsArchive::open(dir.path().join("archive")).unwrap();
+    let ledger = open_ledger(f.handle()).await;
+
+    for i in 0..5 {
+        ledger
+            .append(decision(&format!("record-{i}")))
+            .await
+            .unwrap();
+    }
+    let before = ledger.records().await.unwrap().len();
+    assert!(before >= 5, "the five appends are resident: {before}");
+
+    let sealer = ledger.clone();
+    let seal_archive = archive.clone();
+    let seals = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let counted = std::sync::Arc::clone(&seals);
+    let reader = ledger
+        .clone()
+        .with_snapshot_interleave(SnapshotInterleave::new(move || {
+            let sealer = sealer.clone();
+            let archive = seal_archive.clone();
+            let counted = std::sync::Arc::clone(&counted);
+            async move {
+                if counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 0 {
+                    sealer
+                        .seal_if_needed(&archive, &eager())
+                        .await
+                        .expect("the seal lands")
+                        .expect("a real seal, not a no-op");
+                }
+            }
+        }));
+
+    let exported = reader
+        .export_jsonl()
+        .await
+        .expect("the export is taken from one snapshot, so a seal cannot break it");
+    assert_eq!(
+        exported.lines().count(),
+        before,
+        "the export is the chain as it stood when the statement answered"
+    );
+    assert_eq!(seals.load(std::sync::atomic::Ordering::SeqCst), 1);
+
+    // The seal did commit, and the next read sees the chain it left behind,
+    // rooted at the segment rather than at the genesis parent.
+    assert!(!ledger.segments().await.unwrap().is_empty());
+    let after = ledger
+        .records()
+        .await
+        .expect("and the post-seal chain verifies against its new root");
+    assert!(after.len() < before, "history moved out of the hot window");
 
     f.store.shutdown().await.unwrap();
 }

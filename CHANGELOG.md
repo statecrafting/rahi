@@ -204,11 +204,21 @@ is neither registry availability nor evidence of consumer deployment.
   already in flight re-consults the backstop before each retry. Only
   `Ledger::recheck_coverage()` restores confidence, and `serve` never calls
   it.
-- `Ledger::recover(id, archive)` spans a legitimate seal. A record archived
-  between the identity-row read and the resident-chain read is recovered from
-  the archive under its original hash rather than reported as an integrity
-  failure, by revalidating the same row exactly once. A record no seal
-  archived and the resident chain does not hold is still `Error::Integrity`,
+- `Ledger::recover(id, archive)` spans a legitimate seal, wherever the seal
+  lands. A record archived between the identity-row read and the
+  resident-chain read is recovered from the archive under its original hash
+  rather than reported as an integrity failure, by revalidating the same row
+  exactly once. A seal landing *inside* the resident-chain read is settled
+  differently and needs no revalidation: `Ledger::records()` now takes the
+  resident records, their completeness census, and the segments its root is
+  decided from in one statement, so the answer comes from one snapshot and a
+  seal can only land wholly before or wholly after it. `Ledger::resident_root()`
+  takes its unclaimed segments and the archive's size in the same way, and a
+  read of either that carries no witness row is refused rather than read as
+  an empty archive. Every reader of the resident chain gains this, so
+  `ledger verify` and `ledger export` no longer fail on an intact chain that
+  a concurrent seal crossed. A record no seal archived and the resident chain
+  does not hold is still `Error::Integrity`, no integrity error is retried,
   and no archive failure is converted into an absence.
 - A chain that already spent an id more than once is recorded in
   `kernel_decision_collisions` and never resolved: lookup of such an id

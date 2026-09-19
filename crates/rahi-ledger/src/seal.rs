@@ -52,12 +52,69 @@ const SEGMENTS_CENSUS_SQL: &str = "SELECT 0 AS witness, \
      SELECT 1 AS witness, 0 AS total, first_id, last_id, count, segment_hash, \
      prev_segment_hash, last_hash, current_manifest FROM kernel_segments";
 
-/// The last segment: the one no other segment claims as its predecessor.
-const SEGMENT_HEAD_SQL: &str = "SELECT first_id, last_id, count, segment_hash, \
-     prev_segment_hash, last_hash, current_manifest FROM kernel_segments \
+/// The last segment: the one no other segment claims as its predecessor,
+/// and the count of all of them, in one statement
+/// (spec 042 D-17).
+///
+/// The two are a pair: no unclaimed segment means the genesis parent when
+/// the archive is empty and a cycle when it is not, so reading them in two
+/// statements lets a seal landing between them turn an empty archive into a
+/// reported cycle. The witness branch has no `FROM`, so it is yielded
+/// whatever `kernel_segments` holds, and its `total` is a scalar subquery
+/// inside this same statement.
+const SEGMENT_ROOT_CENSUS_SQL: &str = "SELECT 0 AS witness, \
+     (SELECT COUNT(*) FROM kernel_segments) AS total, \
+     '' AS segment_hash, '' AS last_hash \
+     UNION ALL \
+     SELECT 1 AS witness, 0 AS total, segment_hash, last_hash FROM kernel_segments \
      WHERE segment_hash NOT IN (SELECT prev_segment_hash FROM kernel_segments)";
 
 const SEGMENT_COUNT_SQL: &str = "SELECT COUNT(*) AS total FROM kernel_segments";
+
+/// One row of [`SEGMENT_ROOT_CENSUS_SQL`].
+#[derive(Debug, Deserialize)]
+struct SegmentRootRow {
+    witness: i64,
+    #[serde(default)]
+    total: i64,
+    #[serde(default)]
+    segment_hash: String,
+    #[serde(default)]
+    last_hash: String,
+}
+
+/// The hash the oldest resident record links to, decided from the unclaimed
+/// segments and the archive's size (spec 014 B-4, spec 042 D-17).
+///
+/// The one place that decision is made, so [`Ledger::resident_root`] and the
+/// resident snapshot of [`Ledger::records`] cannot drift apart in what they
+/// call a fork, a cycle, or an empty archive.
+///
+/// # Errors
+///
+/// [`Error::Integrity`] when more than one segment is unclaimed (the archive
+/// forked) or when segments exist and none is last (the links form a cycle).
+pub(crate) fn root_of_segment_heads(
+    heads: &[(String, String)],
+    segment_count: i64,
+    genesis_parent: &Hash,
+) -> Result<Hash, Error> {
+    match heads {
+        [] => {
+            if segment_count == 0 {
+                Ok(genesis_parent.clone())
+            } else {
+                Err(Error::Integrity(
+                    "the archive has segments but no last one: its links form a cycle".to_owned(),
+                ))
+            }
+        }
+        [(_, last_hash)] => Hash::parse(last_hash.clone()),
+        [(head, _), (rival, _), ..] => Err(Error::Integrity(format!(
+            "the archive forked: both {head} and {rival} are unclaimed segments"
+        ))),
+    }
+}
 
 /// How much history stays resident and how much is sealed at a time
 /// (spec 014 B-1).
@@ -215,31 +272,37 @@ impl Ledger {
     /// # Errors
     ///
     /// [`Error::Integrity`] when more than one segment is unclaimed (the
-    /// archive forked) or when segments exist and none is last (the links
-    /// form a cycle); the store's own error when the leader cannot be
-    /// reached.
+    /// archive forked), when segments exist and none is last (the links
+    /// form a cycle), or when the read did not answer at all; the store's
+    /// own error when the leader cannot be reached.
     pub async fn resident_root(&self) -> Result<Hash, Error> {
-        let rows: Vec<SegmentRow> = self
+        let rows: Vec<SegmentRootRow> = self
             .store()
-            .query_consistent(SEGMENT_HEAD_SQL, vec![])
+            .query_consistent(SEGMENT_ROOT_CENSUS_SQL, vec![])
             .await?;
-        let mut last = rows.into_iter();
-        let Some(head) = last.next() else {
-            return if self.segment_count().await? == 0 {
-                Ok(self.genesis_parent().clone())
+        let mut witnessed = None;
+        let mut heads = Vec::new();
+        for row in rows {
+            if row.witness == 0 {
+                witnessed = Some(row.total);
             } else {
-                Err(Error::Integrity(
-                    "the archive has segments but no last one: its links form a cycle".to_owned(),
-                ))
-            };
-        };
-        if let Some(rival) = last.next() {
-            return Err(Error::Integrity(format!(
-                "the archive forked: both {} and {} are unclaimed segments",
-                head.segment_hash, rival.segment_hash
-            )));
+                heads.push((row.segment_hash, row.last_hash));
+            }
         }
-        Hash::parse(head.last_hash)
+        // The witness branch has no `FROM`, so a read that answered always
+        // carries it. Its absence is a read that did not answer, and an
+        // empty archive is exactly what that would otherwise be mistaken
+        // for: the root would come back as the genesis parent over a chain
+        // whose history has been sealed away (spec 036 D-11).
+        let Some(total) = witnessed else {
+            return Err(Error::Integrity(
+                "the read of kernel_segments carried no witness row, so it did not answer: an \
+                 empty result is not evidence that the archive is empty, and the resident root \
+                 may not be concluded from it"
+                    .to_owned(),
+            ));
+        };
+        root_of_segment_heads(&heads, total, self.genesis_parent())
     }
 
     /// Every sealed segment's header, oldest first.

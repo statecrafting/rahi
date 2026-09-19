@@ -1536,6 +1536,17 @@ sets.
   nothing against a seal on another node while suggesting it had. Also
   rejected: folding the row and the record into one statement, which
   `recover` cannot do because the archived half is not in the store.
+
+  **Corrected 2026-09-19 (build session), see D-17.** This entry said "the
+  resident scan finds nothing", which named only the outer crossing and
+  treated `self.records()` as an operation a seal either precedes or
+  follows. It is not: the chain read was itself two statements, and a seal
+  landing between them made `records` fail rather than answer, so
+  `recover_resident` never reached the revalidation described above. The
+  revalidation is correct and unchanged; what was wrong here was the
+  premise that the resident read is atomic. D-17 makes it so, and the bound
+  stated above (exactly one revalidation, never re-entering that branch)
+  holds unchanged because the inner crossing consumes none of it.
 - **D-16 (2026-09-19, build session; a retry asks the backstop again).**
   B-11's backstop decides an append before its first compare-and-swap. An
   invocation that loses the compare-and-swap retries, and this node's
@@ -1551,6 +1562,54 @@ sets.
   verdict and returns without touching the store, which is what FR-018
   measures. The genesis append of B-10 is explicitly ungated and reaches the
   loop through the same call with the gate off.
+- **D-17 (2026-09-19, build session; the resident read is one snapshot).**
+  D-15 settled the crossing between the identity row and the chain read and
+  left a second crossing inside the chain read itself. `Ledger::records`
+  took the resident records in one statement and `Ledger::resident_root` in
+  another, and a seal is one transaction that deletes the sealed records and
+  writes the segment that becomes the new root. A seal committing between
+  those two statements therefore left records from before it ordered against
+  a root from after it, which `order_chain` reports as records "unreachable
+  from the genesis parent": an integrity failure over an intact chain.
+  `recover_resident` propagated it out of `self.records().await?` before
+  reaching D-15's revalidation. Reproduced against `718d3dc` with a
+  deterministic hook at that crossing, no clock involved: `recover` returned
+  `Integrity`, and an uninstrumented `recover` immediately afterwards
+  returned the original record with the original hash from the archive.
+
+  The mechanism is coherent evidence, not a second revalidation. The
+  resident records, the census that witnesses their completeness (spec 036
+  D-11), and the unclaimed segments the root is decided from are read in one
+  statement, so they come from one snapshot and a seal can only land wholly
+  before it or wholly after it. `Ledger::resident_root` takes its unclaimed
+  segments and the archive's size in one statement for the same reason: read
+  separately, a seal between them turns an empty archive into a reported
+  cycle. Both then decide the root through one shared function, so the two
+  call sites cannot drift apart in what they call a fork, a cycle, or an
+  empty archive.
+
+  Nothing about genuine damage changes. The census is still exact, so a read
+  that did not answer or that dropped rows is still refused and is never
+  read as an empty chain; `order_chain` still verifies every link and every
+  signature over whatever the snapshot carried; a broken link, a tampered
+  payload, a forged signature, a fork at the root and a missing record are
+  the same errors they were, and the boot tests over the committed fixtures
+  assert them through this same read. No error is matched on its message, no
+  `Integrity` is retried, and D-15's bound is untouched: the inner crossing
+  consumes no revalidation because there is no longer a crossing to consume
+  one.
+
+  Rejected: revalidating inside `records`, which would retry an integrity
+  failure without being able to tell legitimate movement from corruption
+  except by its message. Rejected: a process-local lock, for the reason
+  D-15 already gives, which a replicated chain does not stop being here.
+  Rejected: ordering against the root read *first*, which only moves the
+  crossing rather than removing it.
+
+  The seam the regression drives is a `SnapshotInterleave` of its own rather
+  than a second call of spec 036 D-15's `ReadInterleave`, so the two
+  crossings can be driven one at a time and each test states which one it
+  covers (AC-5).
 
 ## 8. Owner decisions, answered
 
