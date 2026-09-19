@@ -6,7 +6,7 @@ kind: kernel
 domain: kernel
 created: "2026-09-11"
 authors: ["Bartek Kus"]
-implementation: in-progress
+implementation: complete
 risk: critical
 wave: 3
 depends_on:
@@ -443,6 +443,43 @@ record shows what was asked as well as what was answered.
   letting silence read as a check that passed. Alternative rejected:
   refusing every pre-036 archive, which would strand exactly the archives an
   upgrading consumer has.
+
+## 8. Status
+
+- **2026-09-18.** B-1 to B-10, FR-001 to FR-006, and AC-1 to AC-4 hold.
+  `spec-spine verify 036-manifest-and-schema-evolution` passes all four
+  declared commands, and `make ci` is green (gate, k8s, build, the whole
+  workspace suite, clippy with warnings denied, fmt, and cargo-deny).
+
+  AC-2's two halves, checked rather than assumed: `cargo tree -p rahi-kernel`
+  still shows only `rahi-ledger`, `rahi-store`, and `rahi-types` as workspace
+  dependencies (spec 015 AC-2), and a chain with no transition is byte for
+  byte what it was. No record gained a field; the only shape this spec could
+  have moved is the archived segment body, and a header that names no
+  manifest is absent from the serialized form, so a pre-036 body round-trips
+  unchanged and the committed fixture chains under
+  `crates/rahi-ledger/testdata/chains/` keep verifying against the same
+  bytes (`tests/transition.rs`,
+  `a_chain_with_no_transition_is_unchanged_by_this_spec`).
+
+  Three tests that asserted the behavior this spec replaces were rewritten
+  to assert the new one, each keeping a note of what it used to say:
+  the ledger's `a_ledger_booted_against_another_manifest_refuses_the_chain`
+  (now reports the chain's own root), the kernel's
+  `a_ledger_rooted_at_another_manifest_will_not_boot` (now `Error::Stale`
+  naming the deploy step), and the store's
+  `recorded_versions_are_skipped_even_when_their_sql_changed` (now the
+  checksum refusal, still asserting that an unchanged applied version is
+  skipped). Each is one of the three defects section 1 reproduces.
+
+  Two things are deliberately unchanged and named so no reader infers them.
+  `preflight` reports no unadopted manifest: this spec's Territory does not
+  name it and spec 030 B-3's check list does not ask for it, so `serve` and
+  `migrate --adopt-manifest` remain where that question is answered. And
+  every check here lives in a binary that carries this spec: an older binary
+  that carries it honors the additive rule, a binary built before it has no
+  such check and cannot be given one, and a replica already running
+  re-evaluates nothing after boot (B-10, D-4).
 
 ## Verification
 
