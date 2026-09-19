@@ -140,3 +140,130 @@ pub async fn seed_chain(store: &StoreHandle, records: &[SignedRecord]) {
             .unwrap();
     }
 }
+
+/// The `kernel_segments` table exactly as the published 0.1.0 crates created
+/// it: no `current_manifest` column, because spec 036 had not landed.
+///
+/// A fixture seeded through this is a pre-036 volume, so `Ledger::open` has
+/// to add the column the way it does on a real one (spec 036 B-5).
+pub const SEGMENTS_TABLE_V010_SQL: &str = "CREATE TABLE IF NOT EXISTS kernel_segments (\
+    segment_hash TEXT PRIMARY KEY, \
+    prev_segment_hash TEXT NOT NULL, \
+    last_hash TEXT NOT NULL, \
+    first_id TEXT NOT NULL, \
+    last_id TEXT NOT NULL, \
+    count INTEGER NOT NULL)";
+
+/// The committed fixture of spec 042 FR-014: a chain written by the
+/// published 0.1.0 crates, with its archive beside it.
+///
+/// Its absence is a **failure**, never a skip: the fixture is committed and
+/// its absence is a broken checkout rather than a missing optional tool. A
+/// skip here would let AC-3, the whole migration proof, pass on a tree that
+/// proves nothing.
+pub fn v010_dir() -> PathBuf {
+    let dir = chains_dir().join("v0.1.0-sealed");
+    assert!(
+        dir.is_dir(),
+        "the committed fixture {} is missing: this is a broken checkout, not a missing optional \
+         tool. Rebuild it with {}/write.sh, which pulls rahi-ledger = \"=0.1.0\" from crates.io.",
+        dir.display(),
+        dir.display()
+    );
+    dir
+}
+
+fn v010_file(name: &str) -> String {
+    let path = v010_dir().join(name);
+    std::fs::read_to_string(&path).unwrap_or_else(|e| {
+        panic!(
+            "the committed fixture file {} is missing or unreadable ({e}): rebuild the fixture \
+             with write.sh",
+            path.display()
+        )
+    })
+}
+
+/// The 0.1.0 fixture's signing key.
+pub fn v010_signer() -> LedgerSigner {
+    LedgerSigner::load(&v010_dir().join(KEY_FILE)).expect("the 0.1.0 fixture key loads")
+}
+
+/// The 0.1.0 fixture's genesis parent.
+pub fn v010_root() -> Hash {
+    Hash::parse(v010_file(ROOT_FILE).trim()).expect("the 0.1.0 fixture root is a hash")
+}
+
+/// The 0.1.0 fixture's resident records.
+pub fn v010_resident() -> Vec<SignedRecord> {
+    v010_file("resident.jsonl")
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| SignedRecord::from_bytes(l.as_bytes()).expect("a fixture record"))
+        .collect()
+}
+
+/// The 0.1.0 fixture's sealed segment headers.
+pub fn v010_segments() -> Vec<rahi_ledger::SegmentHeader> {
+    v010_file("segments.jsonl")
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| serde_json::from_str(l).expect("a fixture segment header"))
+        .collect()
+}
+
+/// A copy of the 0.1.0 fixture's archive, so a test may damage it without
+/// touching the committed bytes.
+pub fn v010_archive_copy(into: &Path) -> PathBuf {
+    let root = into.join("archive");
+    copy_tree(&v010_dir().join("archive"), &root);
+    root
+}
+
+fn copy_tree(from: &Path, to: &Path) {
+    std::fs::create_dir_all(to).unwrap();
+    for entry in std::fs::read_dir(from).unwrap() {
+        let entry = entry.unwrap();
+        let target = to.join(entry.file_name());
+        if entry.file_type().unwrap().is_dir() {
+            copy_tree(&entry.path(), &target);
+        } else {
+            std::fs::copy(entry.path(), &target).unwrap();
+        }
+    }
+}
+
+/// Seed segment header rows into a **pre-036** `kernel_segments` table, the
+/// way a volume written by 0.1.0 holds them.
+pub async fn seed_segments_v010(store: &StoreHandle, headers: &[rahi_ledger::SegmentHeader]) {
+    store
+        .execute(SEGMENTS_TABLE_V010_SQL, vec![])
+        .await
+        .unwrap();
+    for header in headers {
+        store
+            .execute(
+                "INSERT INTO kernel_segments \
+                 (segment_hash, prev_segment_hash, last_hash, first_id, last_id, count) \
+                 VALUES ($1, $2, $3, $4, $5, $6)",
+                vec![
+                    Value::from(header.segment_hash.as_str()),
+                    Value::from(header.prev_segment_hash.as_str()),
+                    Value::from(header.last_hash.as_str()),
+                    Value::from(header.first_id.as_str()),
+                    Value::from(header.last_id.as_str()),
+                    Value::from(header.count),
+                ],
+            )
+            .await
+            .unwrap();
+    }
+}
+
+/// The whole 0.1.0 fixture in a store: its resident rows and its pre-036
+/// segment headers, and no identity row anywhere, because 0.1.0 had no such
+/// table.
+pub async fn seed_v010(store: &StoreHandle) {
+    seed_chain(store, &v010_resident()).await;
+    seed_segments_v010(store, &v010_segments()).await;
+}

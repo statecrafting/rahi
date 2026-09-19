@@ -25,7 +25,10 @@ use std::time::Duration;
 
 use rahi_types::Error;
 
-use crate::chain::{Ledger, hash_of, insert_statement};
+use crate::chain::{AppendStage, Ledger, insert_statement};
+use crate::identity::{
+    Accounted, DecisionCopy, Presence, REINDEX_COMMAND, identity_digest, identity_insert,
+};
 use crate::record::{Decision, DecisionId, Hash, SignedRecord};
 
 /// How many times an append chains onto the head before it gives up
@@ -49,6 +52,45 @@ enum Attempt {
     Retry,
 }
 
+/// Where a decision ended up, and what this invocation knows about how it
+/// got there (spec 042 B-14).
+///
+/// The three fields answer different questions and only the first is a total
+/// guarantee.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Landing {
+    /// **Durable presence.** After any successful return the decision is in
+    /// the chain exactly once and this names it. It holds across lost
+    /// acknowledgements, retries, process restarts, and replicas, and it is
+    /// the whole of what this crate guarantees to a caller.
+    pub hash: Hash,
+    /// **Knowledge about this invocation**, not about the decision.
+    ///
+    /// `true` only when this invocation's own transaction was acknowledged
+    /// as committed to this invocation. Every ambiguous commit outcome (a
+    /// timeout, a dropped connection, a leader change, a shutdown between
+    /// the send and the acknowledgement) returns an error, or a `false`
+    /// reached by re-reading; none of them returns `true`.
+    ///
+    /// So the field is sound and deliberately incomplete: `false` means
+    /// only that the decision was already present when this invocation
+    /// looked, and an earlier invocation *by the same caller* whose
+    /// acknowledgement was lost is one of the ways that happens. There is no
+    /// author, no attempt count and no "probably yours" hint, because a lost
+    /// acknowledgement destroys the knowledge of who appended permanently
+    /// and no interface can return what was never recorded.
+    ///
+    /// This is exactly-once **append**, never exactly-once **delivery**. A
+    /// caller that fires a side effect on `true` will skip that side effect
+    /// after a lost acknowledgement, because its retry sees `false`. The
+    /// field is a diagnostic and must not be a delivery trigger: a caller
+    /// that needs a side effect to happen exactly once records its intent in
+    /// its own transaction and drives the effect from that durable row.
+    pub appended_now: bool,
+    /// The segment holding the decision when it is already archived.
+    pub sealed_in: Option<Hash>,
+}
+
 impl Ledger {
     /// Append `decision` to the chain and return the hash it landed under.
     ///
@@ -66,7 +108,65 @@ impl Ledger {
     /// lose; the store's own error otherwise. Spec 015's denial path logs the
     /// error with the decision id and never swallows it.
     pub async fn append(&self, decision: Decision) -> Result<Hash, Error> {
-        let mut decision = decision;
+        self.append_reported(decision).await.map(|(hash, _)| hash)
+    }
+
+    /// Append `decision` exactly once, reporting what this invocation knows
+    /// (spec 042 B-14).
+    ///
+    /// The append itself is unchanged: the same compare-and-swap, the same
+    /// identity insert committing with it. What [`Landing`] adds is the
+    /// separation between the decision's durable presence, which is total,
+    /// and this invocation's knowledge of its own commit, which is not.
+    ///
+    /// # Errors
+    ///
+    /// As [`Ledger::append`], and [`Error::Conflict`] on a handle opened by
+    /// [`Ledger::open_for_repair`] (B-15).
+    pub async fn append_once(&self, decision: Decision) -> Result<Landing, Error> {
+        let id = decision.id.clone();
+        let (hash, appended_now) = self.append_reported(decision).await?;
+        if appended_now {
+            // This invocation's own transaction committed, so the record is
+            // resident: nothing has had the chance to seal it away.
+            return Ok(Landing {
+                hash,
+                appended_now,
+                sealed_in: None,
+            });
+        }
+        let sealed_in = match self.lookup(&id).await? {
+            Presence::Sealed { segment_hash, .. } => Some(segment_hash),
+            _ => None,
+        };
+        Ok(Landing {
+            hash,
+            appended_now,
+            sealed_in,
+        })
+    }
+
+    /// The chain's first record, which neither gate may block
+    /// (spec 042 B-10).
+    ///
+    /// `Ledger::open` writes it only when nothing is resident and nothing is
+    /// sealed, a state [`Ledger`]'s own second-genesis refusal establishes
+    /// before this is reached. Such a chain has no uncovered segment and no
+    /// unaccounted record by construction, so neither B-10's boot gate nor
+    /// B-11's backstop has anything to say about it, and a repair handle has
+    /// to be able to create the chain it was asked to diagnose.
+    ///
+    /// # Errors
+    ///
+    /// As [`Ledger::append`].
+    pub(crate) async fn append_genesis(&self, decision: Decision) -> Result<Hash, Error> {
+        let digest = identity_digest(&decision)?;
+        self.append_loop(decision, &digest).await.map(|(h, _)| h)
+    }
+
+    /// [`Ledger::append`], reporting whether this invocation's own
+    /// transaction was acknowledged as committed to it (spec 042 B-14).
+    async fn append_reported(&self, decision: Decision) -> Result<(Hash, bool), Error> {
         if decision.id.as_str().is_empty() {
             return Err(Error::Validation(
                 "a decision needs an id: it is the row's primary key and the name spec 015 \
@@ -74,7 +174,37 @@ impl Ledger {
                     .to_owned(),
             ));
         }
+        // Spec 042 B-15: the refusal is a property of the handle, whatever
+        // coverage says, so nothing can forget to check it.
+        if self.is_repair() {
+            return Err(Error::Conflict(format!(
+                "decision {} was offered to a ledger opened for repair, which never appends: \
+                 the repair handle exists so that diagnosis, export and `{REINDEX_COMMAND}` \
+                 work on a chain whose coverage is incomplete, and normal service opens the \
+                 chain the ordinary way",
+                decision.id
+            )));
+        }
+        // The digest does not cover the parent (B-2), so it is computable
+        // before the head is read and before any record is built.
+        let digest = identity_digest(&decision)?;
+        // Spec 042 B-11, the backstop: a replica on a binary that does not
+        // stamp can append an unstamped record after this node booted, so a
+        // verdict this node has seen move to incomplete refuses every id it
+        // cannot prove free. The verified retry is still admitted, because
+        // refusing the unknown and admitting the verified is what keeps a
+        // recovery working through an incident a full refusal would strand.
+        // This reads nothing to *establish* uniqueness; it reads only to
+        // refuse, and on a covered chain it does not read at all.
+        if let Some(landed) = self.backstop(&decision.id, &digest).await? {
+            return Ok((landed, false));
+        }
+        self.append_loop(decision, &digest).await
+    }
 
+    /// The compare-and-swap loop itself, with neither gate in front of it.
+    async fn append_loop(&self, decision: Decision, digest: &Hash) -> Result<(Hash, bool), Error> {
+        let mut decision = decision;
         for attempt in 0..APPEND_ATTEMPTS {
             if attempt > 0 {
                 tokio::time::sleep(backoff(&decision.id, attempt)).await;
@@ -83,20 +213,47 @@ impl Ledger {
             decision.prev_hash = parent.clone();
             let record = SignedRecord::build(&decision, self.signer())?;
             let hash = record.hash()?;
+            let accounted = Accounted::of(&record)?;
+            debug_assert_eq!(&accounted.identity_digest, digest);
 
-            match self.store().txn(vec![insert_statement(&record)?]).await {
+            if let Some(injected) = self.append_seam(AppendStage::BeforeInsert).await {
+                return Err(injected);
+            }
+            // Spec 042 B-3: the record and its identity row commit in one
+            // `txn`, which is one Raft log operation inside one SQLite
+            // transaction, so the pair is atomic and the identity table's
+            // primary key is the arbitration for a duplicate id exactly as
+            // the unique parent index is the arbitration for a lost
+            // compare-and-swap. Neither statement can land alone.
+            let sent = self
+                .store()
+                .txn(vec![
+                    insert_statement(&record)?,
+                    identity_insert(&accounted),
+                ])
+                .await;
+            let sent = match self.append_seam(AppendStage::AfterCommit).await {
+                // The acknowledgement of a commit that may well have
+                // happened, dropped: this invocation did not observe its own
+                // commit, so it may not claim one (B-14).
+                Some(injected) => Err(injected),
+                None => sent,
+            };
+
+            match sent {
                 Ok(results) => {
                     let landed = results.first().is_some_and(|r| r.rows_affected == 1);
-                    if !landed {
+                    let stamped = results.get(1).is_some_and(|r| r.rows_affected == 1);
+                    if !landed || !stamped {
                         return Err(Error::Integrity(format!(
                             "the append of decision {} committed without inserting a row",
                             decision.id
                         )));
                     }
-                    return Ok(hash);
+                    return Ok((hash, true));
                 }
-                Err(err) => match self.classify(&decision.id, &hash, &parent, err).await? {
-                    Attempt::Landed(hash) => return Ok(hash),
+                Err(err) => match self.classify(&decision.id, digest, &parent, err).await? {
+                    Attempt::Landed(hash) => return Ok((hash, false)),
                     Attempt::Retry => {}
                 },
             }
@@ -107,6 +264,46 @@ impl Ledger {
              the ledger stops rather than fork the chain",
             decision.id
         )))
+    }
+
+    /// The append backstop of spec 042 B-11.
+    ///
+    /// Reached only on a handle that opened successfully and then observed
+    /// degradation: on a cluster upgraded the way B-13 requires it is never
+    /// reached at all, and on a covered chain it issues no read. When the
+    /// cached verdict is incomplete it is the chain's inability to prove an
+    /// id free that decides:
+    ///
+    /// - an id with no identity row is refused, because the chain cannot
+    ///   prove it is free;
+    /// - an id whose row's digest matches is the verified retry of B-4, and
+    ///   its stored hash is returned;
+    /// - an id whose row's digest differs, or that carries any collision
+    ///   row, is refused.
+    ///
+    /// Only [`Ledger::recheck_coverage`] moves the verdict back to complete,
+    /// and `serve` never calls it, so a degraded cell never talks itself
+    /// back into confidence.
+    async fn backstop(&self, id: &DecisionId, digest: &Hash) -> Result<Option<Hash>, Error> {
+        let verdict = self.cached_verdict();
+        if verdict.complete {
+            return Ok(None);
+        }
+        let (identity, collisions) = self.identity_rows_of(id).await?;
+        if !collisions.is_empty() {
+            return Err(ambiguous(id, identity.as_ref(), &collisions));
+        }
+        let Some(row) = identity else {
+            return Err(Error::Conflict(format!(
+                "decision {id} cannot be appended: {}, so the chain cannot prove this id is \
+                 free, and an id that cannot be proven free is not spent",
+                verdict.evidence
+            )));
+        };
+        if &row.identity_digest != digest {
+            return Err(reused(id, &row));
+        }
+        Ok(Some(row.record_hash))
     }
 
     /// Decide what a failed insert was: our own write landing late, a
@@ -121,24 +318,68 @@ impl Ledger {
     async fn classify(
         &self,
         id: &DecisionId,
-        ours: &Hash,
+        digest: &Hash,
         parent: &Hash,
         err: Error,
     ) -> Result<Attempt, Error> {
-        if let Some(resident) = hash_of(self.store(), id).await? {
-            if &resident == ours {
-                return Ok(Attempt::Landed(resident));
-            }
-            return Err(Error::Conflict(format!(
-                "decision {id} is already in the chain under {resident}: an id names one \
-                 decision for the life of the chain"
-            )));
+        // Spec 042 B-4: classification is lifetime-scoped. The identity row
+        // and that id's collision rows come from one statement, and the row
+        // survives sealing, so "appended and archived" is no longer the same
+        // answer as "never appended".
+        let (identity, collisions) = self.identity_rows_of(id).await?;
+        if !collisions.is_empty() {
+            // On a twice-spent id, a digest that matches one copy proves
+            // nothing about which copy a retry meant (B-12).
+            return Err(ambiguous(id, identity.as_ref(), &collisions));
         }
+        if let Some(row) = identity {
+            // A row whose digest equals this decision's means the decision
+            // is already in the chain: return the stored record hash,
+            // whether the record is resident or sealed.
+            if &row.identity_digest == digest {
+                return Ok(Attempt::Landed(row.record_hash));
+            }
+            return Err(reused(id, &row));
+        }
+        // No row of either kind: either the insert failed for the reason
+        // spec 013 B-3 handles, which the head question decides, or coverage
+        // is incomplete, which the backstop decided before the first
+        // attempt.
         if &self.head().await? == parent {
             return Err(err);
         }
         Ok(Attempt::Retry)
     }
+}
+
+/// The refusal a reused id gets, naming the record the chain already holds
+/// under it (spec 042 B-4, and spec 013's contract unchanged).
+fn reused(id: &DecisionId, row: &DecisionCopy) -> Error {
+    Error::Conflict(format!(
+        "decision {id} is already in the chain under {}: an id names one decision for the life \
+         of the chain",
+        row.record_hash
+    ))
+}
+
+/// The refusal a twice-spent id always gets, naming every recorded copy and
+/// choosing between none of them (spec 042 B-12).
+fn ambiguous(
+    id: &DecisionId,
+    identity: Option<&DecisionCopy>,
+    collisions: &[DecisionCopy],
+) -> Error {
+    let mut copies: Vec<String> = Vec::with_capacity(collisions.len() + 1);
+    if let Some(row) = identity {
+        copies.push(row.to_string());
+    }
+    copies.extend(collisions.iter().map(ToString::to_string));
+    Error::Conflict(format!(
+        "decision {id} names {} recorded copies, so no retry of it can be verified against a \
+         history that spent the id more than once: {}",
+        copies.len(),
+        copies.join("; ")
+    ))
 }
 
 /// The wait before attempt `attempt` (counted from zero) of the append of

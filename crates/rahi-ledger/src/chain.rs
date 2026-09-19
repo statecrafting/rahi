@@ -153,6 +153,62 @@ impl std::fmt::Debug for ReadInterleave {
     }
 }
 
+/// Where an append can be interrupted, so a test can reproduce a race or a
+/// lost acknowledgement deterministically (spec 042 FR-002, FR-021).
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AppendStage {
+    /// After the head has been read and the record built, before the
+    /// transaction is sent: where another task's append and seal can be made
+    /// to land.
+    BeforeInsert,
+    /// After the transaction returned, so a test can drop the
+    /// acknowledgement of a commit that did happen.
+    AfterCommit,
+}
+
+/// A hook run at an [`AppendStage`], returning an error to substitute for
+/// the stage's own outcome.
+///
+/// Test scaffolding, carried deliberately and named as such, in the shape
+/// [`ReadInterleave`] already established for spec 036 D-15: `None` on every
+/// ledger this crate builds, and `#[doc(hidden)]` rather than feature-gated
+/// because the feature that would hide it can only be turned on for this
+/// crate's own tests by a dependency on itself, which `cargo package` cannot
+/// resolve.
+#[doc(hidden)]
+#[derive(Clone)]
+pub struct AppendSeam(std::sync::Arc<SeamHook>);
+
+/// The boxed hook [`AppendSeam`] carries, named so the type stays readable.
+type SeamHook = dyn Fn(AppendStage) -> std::pin::Pin<Box<SeamFuture>> + Send + Sync;
+
+/// What one run of the hook resolves to: an error to substitute for the
+/// stage's own outcome, or nothing.
+type SeamFuture = dyn std::future::Future<Output = Option<Error>> + Send;
+
+impl AppendSeam {
+    /// Install `hook` at every append stage.
+    #[doc(hidden)]
+    pub fn new<F, Fut>(hook: F) -> Self
+    where
+        F: Fn(AppendStage) -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = Option<Error>> + Send + 'static,
+    {
+        Self(std::sync::Arc::new(move |stage| Box::pin(hook(stage))))
+    }
+
+    pub(crate) async fn run(&self, stage: AppendStage) -> Option<Error> {
+        (self.0)(stage).await
+    }
+}
+
+impl std::fmt::Debug for AppendSeam {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("AppendSeam")
+    }
+}
+
 /// The cell's decision ledger.
 ///
 /// Cheap to clone: it holds the store handle, the ledger key, and the hash
@@ -167,6 +223,58 @@ pub struct Ledger {
     /// Spec 036 D-15's test seam: `None` everywhere but this crate's own
     /// regressions.
     interleave: Option<ReadInterleave>,
+    /// Spec 042 B-15: a handle opened for repair, which never appends.
+    repair: bool,
+    /// Spec 042 B-11: what this node has observed about coverage since its
+    /// last leader read. Shared across clones, because spec 015 clones this
+    /// handle into the appender task that drains its denial channel and a
+    /// verdict one clone moved has to be the verdict the other reads.
+    verdict: std::sync::Arc<std::sync::Mutex<crate::identity::CachedCoverage>>,
+    /// Spec 042 FR-002 and FR-021's test seam: `None` everywhere but this
+    /// crate's own regressions.
+    append_seam: Option<AppendSeam>,
+    /// Spec 042 FR-018 and AC-10's instrument: how many leader reads this
+    /// handle has issued, by the category the criteria are stated in.
+    tally: std::sync::Arc<ReadTally>,
+}
+
+/// Leader reads this handle has issued, counted by the category spec 042
+/// FR-018 and AC-10 are stated in.
+///
+/// Carried in the shipped code rather than in a test because the quantity
+/// under test is a property of the call sites, and a test that counted
+/// something else (total statements, say, or wall time) would assert
+/// something the criteria do not say. Three counters and nothing more: the
+/// head read spec 013 B-3 has always made, the reads this spec's coverage
+/// answer issues, and the rows those reads carried.
+#[derive(Debug, Default)]
+pub(crate) struct ReadTally {
+    /// The compare-and-swap's own head read (spec 013 B-3), unchanged by
+    /// this spec in count and in kind.
+    pub(crate) head: std::sync::atomic::AtomicU64,
+    /// Reads against `kernel_decision_coverage`,
+    /// `kernel_decision_identity`, `kernel_decision_collisions` and
+    /// `kernel_segments` issued to answer coverage (FR-018).
+    pub(crate) coverage: std::sync::atomic::AtomicU64,
+    /// How many rows those reads carried (AC-10).
+    pub(crate) coverage_rows: std::sync::atomic::AtomicU64,
+    /// Full verdict reads (`Ledger::coverage`) alone, which is the quantity
+    /// B-11 means when it says a verdict moved "without a leader read".
+    pub(crate) census: std::sync::atomic::AtomicU64,
+}
+
+/// A snapshot of [`ReadTally`], as a test reads it.
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ReadCounts {
+    /// Head reads.
+    pub head: u64,
+    /// Coverage-attributable leader reads.
+    pub coverage: u64,
+    /// Rows those reads carried.
+    pub coverage_rows: u64,
+    /// Full verdict reads.
+    pub census: u64,
 }
 
 /// What [`Ledger::open`] established about the chain it verified (spec 036
@@ -219,12 +327,55 @@ impl Ledger {
         signer: LedgerSigner,
         genesis_parent: Hash,
     ) -> Result<Self, Error> {
+        Self::open_inner(store, signer, genesis_parent, false).await
+    }
+
+    /// Open the chain for repair: no coverage gate, and no appends
+    /// (spec 042 B-15).
+    ///
+    /// The repair cannot be gated on the state it repairs, so `ledger
+    /// reindex` needs a handle that opens on an uncovered chain, and `ledger
+    /// verify` and `ledger export` need one so that an operator working the
+    /// incident keeps diagnosis and export. It is narrow so that it cannot
+    /// become a way to serve an unproven chain: [`Ledger::append`] and
+    /// [`Ledger::append_once`] on such a handle are [`Error::Conflict`]
+    /// whatever coverage says, which makes the refusal a property of the
+    /// handle rather than a check someone can forget, and `serve` has no
+    /// flag, argument or environment variable that reaches it.
+    ///
+    /// The backfill of FR-008 still runs, and every read still reports
+    /// coverage alongside its answer.
+    ///
+    /// # Errors
+    ///
+    /// As [`Ledger::open`], except that incomplete coverage is not one of
+    /// them.
+    pub async fn open_for_repair(
+        store: StoreHandle,
+        signer: LedgerSigner,
+        genesis_parent: Hash,
+    ) -> Result<Self, Error> {
+        Self::open_inner(store, signer, genesis_parent, true).await
+    }
+
+    async fn open_inner(
+        store: StoreHandle,
+        signer: LedgerSigner,
+        genesis_parent: Hash,
+        repair: bool,
+    ) -> Result<Self, Error> {
         let mut ledger = Self {
             store,
             signer,
             genesis_parent,
             opened: OpenedChain::default(),
             interleave: None,
+            repair,
+            verdict: std::sync::Arc::new(std::sync::Mutex::new(
+                crate::identity::CachedCoverage::default(),
+            )),
+            append_seam: None,
+            tally: std::sync::Arc::new(ReadTally::default()),
         };
         ledger.create_schema().await?;
 
@@ -236,7 +387,7 @@ impl Ledger {
             Some(stored) => ledger.genesis_parent = stored,
             None => {
                 ledger.refuse_a_second_genesis().await?;
-                ledger.append(ledger.genesis_decision()).await?;
+                ledger.append_genesis(ledger.genesis_decision()).await?;
             }
         }
         // Spec 036 D-11: verification reads the whole resident chain and every
@@ -244,7 +395,92 @@ impl Ledger {
         // Both facts only ever become more true, and `current_manifest`
         // refuses to walk back past either of them.
         ledger.opened = ledger.verify_chain_witnessed(Depth::Resident).await?;
+
+        // Spec 042 FR-008: a store restored from a snapshot taken before
+        // this spec has records and no rows for them, and the rows are
+        // recomputable from what is resident. This runs before the gate
+        // because a chain with nothing sealed is closed by it entirely.
+        ledger.backfill_identity().await?;
+
+        // Spec 042 B-10, and D-8's precedence: verification has already run
+        // and an integrity failure has already been returned, so a chain
+        // that reaches here is intact and the only question left is whether
+        // this binary can vouch for the uniqueness of the ids in it. That is
+        // a missing upgrade step rather than damage, so it is
+        // `Error::Stale` naming `rahi ledger reindex`, never
+        // `Error::Integrity`, and an operator is never sent to reindex a
+        // chain whose real problem is that it has been tampered with.
+        let coverage = ledger.recheck_coverage().await?;
+        if !coverage.is_complete() && !repair {
+            return Err(Error::Stale(coverage.why()));
+        }
         Ok(ledger)
+    }
+
+    /// Whether this handle was opened for repair (spec 042 B-15).
+    #[must_use]
+    pub fn is_repair(&self) -> bool {
+        self.repair
+    }
+
+    /// The coverage verdict this node currently holds (spec 042 B-11).
+    pub(crate) fn cached_verdict(&self) -> crate::identity::CachedCoverage {
+        self.verdict
+            .lock()
+            .map_or_else(|poisoned| poisoned.into_inner().clone(), |v| v.clone())
+    }
+
+    /// The segments the last leader read found uncovered.
+    pub(crate) fn cached_uncovered(&self) -> Vec<Hash> {
+        self.cached_verdict().uncovered
+    }
+
+    /// Adopt a verdict computed through the leader (spec 042 B-7).
+    pub(crate) fn adopt_verdict(&self, coverage: &crate::identity::Coverage) {
+        let next = crate::identity::CachedCoverage::of(coverage);
+        match self.verdict.lock() {
+            Ok(mut held) => *held = next,
+            Err(poisoned) => *poisoned.into_inner() = next,
+        }
+    }
+
+    /// Move the verdict to incomplete on this node's own observation, with
+    /// no leader read (spec 042 B-11, B-13).
+    ///
+    /// A seal that had to **create** an identity row rather than stamp one
+    /// is a record an old writer appended without stamping. The observation
+    /// is late and eventual, never preventive: in the window between that
+    /// append and this observation the cached verdict still said complete.
+    /// What it buys is that the duplicate is discovered rather than silent.
+    pub(crate) fn note_unstamped_writer(&self, outcome: &crate::identity::AccountingOutcome) {
+        if outcome.created.is_empty() {
+            return;
+        }
+        for id in &outcome.created {
+            tracing::warn!(
+                decision_id = %id,
+                "sealing had to create the identity row for this decision: it was appended by a \
+                 writer that does not stamp, so this chain's coverage is no longer proven"
+            );
+        }
+        let evidence = format!(
+            "sealing had to create {} identity row(s) for records appended without one, which is \
+             a replica on a binary that does not stamp: run `{}` against this cell's archive \
+             while nothing appends",
+            outcome.created.len(),
+            crate::identity::REINDEX_COMMAND
+        );
+        match self.verdict.lock() {
+            Ok(mut held) => {
+                held.complete = false;
+                held.evidence = evidence;
+            }
+            Err(poisoned) => {
+                let mut held = poisoned.into_inner();
+                held.complete = false;
+                held.evidence = evidence;
+            }
+        }
     }
 
     /// What [`Ledger::open`] established about this chain (spec 036 D-11).
@@ -258,6 +494,50 @@ impl Ledger {
     pub fn with_read_interleave(mut self, hook: ReadInterleave) -> Self {
         self.interleave = Some(hook);
         self
+    }
+
+    /// The leader reads this handle has issued, by category (spec 042
+    /// FR-018, AC-10).
+    #[doc(hidden)]
+    #[must_use]
+    pub fn read_counts(&self) -> ReadCounts {
+        use std::sync::atomic::Ordering;
+        ReadCounts {
+            head: self.tally.head.load(Ordering::Relaxed),
+            coverage: self.tally.coverage.load(Ordering::Relaxed),
+            coverage_rows: self.tally.coverage_rows.load(Ordering::Relaxed),
+            census: self.tally.census.load(Ordering::Relaxed),
+        }
+    }
+
+    /// Count one full verdict read (spec 042 B-11).
+    pub(crate) fn tally_census(&self) {
+        self.tally
+            .census
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Count one coverage-attributable leader read and the rows it carried.
+    pub(crate) fn tally_coverage_read(&self, rows: usize) {
+        use std::sync::atomic::Ordering;
+        self.tally.coverage.fetch_add(1, Ordering::Relaxed);
+        self.tally
+            .coverage_rows
+            .fetch_add(u64::try_from(rows).unwrap_or(0), Ordering::Relaxed);
+    }
+
+    /// Install the append test seam (spec 042 FR-002, FR-021).
+    #[doc(hidden)]
+    #[must_use]
+    pub fn with_append_seam(mut self, seam: AppendSeam) -> Self {
+        self.append_seam = Some(seam);
+        self
+    }
+
+    /// Run the append seam at `stage`, if one is installed.
+    pub(crate) async fn append_seam(&self, stage: AppendStage) -> Option<Error> {
+        let seam = self.append_seam.clone()?;
+        seam.run(stage).await
     }
 
     /// Run the installed seam, if any.
@@ -364,6 +644,9 @@ impl Ledger {
     /// links form a cycle); the store's own error when the leader cannot be
     /// reached.
     pub async fn head(&self) -> Result<Hash, Error> {
+        self.tally
+            .head
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let rows: Vec<HashRow> = self.store.query_consistent(HEAD_SQL, vec![]).await?;
         let mut heads = rows.into_iter();
         let Some(head) = heads.next() else {
@@ -499,6 +782,10 @@ impl Ledger {
             ])
             .await?;
         self.add_segment_manifest_column().await?;
+        // Spec 042 B-1 and D-6: the identity, collision and coverage tables
+        // are chassis baseline DDL for the same reason `kernel_decisions`
+        // is, and they record nothing in `schema_version`.
+        self.create_identity_schema().await?;
         Ok(())
     }
 
@@ -645,6 +932,14 @@ pub(crate) fn insert_statement(record: &SignedRecord) -> Result<Statement, Error
 }
 
 /// Whether a record with `id` is already in the chain, and under which hash.
+///
+/// No longer on the append path: spec 042 B-4 makes classification
+/// lifetime-scoped, reading the identity row rather than `kernel_decisions`,
+/// because the resident table answers "never appended" and "appended and
+/// archived" identically. Kept because it is spec 013's own statement of
+/// what the resident table holds for an id, and removing a helper from a
+/// `complete` spec's module is not this spec's to do.
+#[allow(dead_code)]
 pub(crate) async fn hash_of(store: &StoreHandle, id: &DecisionId) -> Result<Option<Hash>, Error> {
     let rows: Vec<HashRow> = store
         .query_consistent(

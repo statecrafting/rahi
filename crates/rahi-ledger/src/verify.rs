@@ -130,6 +130,33 @@ pub fn verify_chain(
     Ok(())
 }
 
+/// Verify one archived segment on its own, at the depth a full-depth boot
+/// verifies it (spec 042 B-8, spec 014 B-4).
+///
+/// The body is checked against the header it carries (its recomputed content
+/// digest, its record count, its terminal record hash) and then its records
+/// are verified as a chain linking `parent`, which is the genesis parent for
+/// the oldest segment and the previous segment's `last_hash` for every other.
+///
+/// This is the seam a reindex needs: it must not write identity rows out of
+/// a body it has not verified, and it must verify exactly what the boot path
+/// verifies rather than a second, weaker version of it.
+///
+/// # Errors
+///
+/// [`Error::Integrity`], naming the segment by its archive key and how it
+/// failed.
+pub fn verify_segment(
+    parent: &Hash,
+    segment: &crate::segment::Segment,
+    verifier: &LedgerVerifier,
+) -> Result<(), Error> {
+    let key = segment.key();
+    segment.verify()?;
+    verify_chain(parent, &segment.records, verifier)
+        .map_err(|e| Error::Integrity(format!("archived segment {key}: {}", e.message())))
+}
+
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::indexing_slicing)]
 mod tests {

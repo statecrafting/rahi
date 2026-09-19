@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use rahi_types::{Error, Result};
 
 /// The verbs, in the order `--help` lists them.
-pub const VERBS: [&str; 9] = [
+pub const VERBS: [&str; 10] = [
     "serve",
     "preflight",
     "migrate",
@@ -14,6 +14,7 @@ pub const VERBS: [&str; 9] = [
     "restore",
     "ledger verify",
     "ledger export",
+    "ledger reindex",
     "supervise",
     "first-boot",
 ];
@@ -66,6 +67,15 @@ pub enum Verb {
         /// Where the JSON lines go.
         path: PathBuf,
     },
+    /// Spec 042 B-8, annotated `(042)` in spec 030 B-1 by that spec's D-9.
+    ///
+    /// The only mutating verb under `ledger`: it writes identity rows
+    /// rebuilt from archived bodies, which is why it is a verb of its own
+    /// rather than a flag on the read-only `ledger verify` (042 D-1).
+    LedgerReindex {
+        /// The archive holding the sealed segment bodies.
+        archive: PathBuf,
+    },
     /// Spec 031.
     Supervise,
     /// Spec 031; `export` is `--export` (spec 032 B-2).
@@ -114,6 +124,10 @@ pub fn usage() -> String {
         (
             "ledger export <path>",
             "write the resident chain as attest-ledger JSON lines",
+        ),
+        (
+            "ledger reindex <archive>",
+            "MUTATES: rebuild the lifetime identity index from archived segments",
         ),
         ("supervise", "run rauthy and serve as one unit (spec 031)"),
         (
@@ -179,8 +193,14 @@ where
                 path: PathBuf::from(path),
             }),
             ["export"] => Err(Error::Validation("ledger export needs a path".to_owned())),
+            ["reindex", archive] => Ok(Verb::LedgerReindex {
+                archive: PathBuf::from(archive),
+            }),
+            ["reindex"] => Err(Error::Validation(
+                "ledger reindex needs an archive".to_owned(),
+            )),
             [] => Err(Error::Validation(
-                "ledger needs a subverb: verify or export".to_owned(),
+                "ledger needs a subverb: verify, export or reindex".to_owned(),
             )),
             _ => Err(unexpected("ledger", &rest)),
         },

@@ -67,6 +67,7 @@
 pub mod append;
 pub mod archive;
 pub mod chain;
+pub mod identity;
 pub mod record;
 pub mod seal;
 pub mod segment;
@@ -74,11 +75,16 @@ pub mod signer;
 pub mod transition;
 pub mod verify;
 
-pub use append::APPEND_ATTEMPTS;
+pub use append::{APPEND_ATTEMPTS, Landing};
 pub use archive::{Archive, FsArchive, S3Archive, S3Config};
 #[doc(hidden)]
-pub use chain::ReadInterleave;
+pub use chain::{AppendSeam, AppendStage, ReadCounts, ReadInterleave};
 pub use chain::{DECISIONS_INDEX_SQL, DECISIONS_TABLE_SQL, Ledger};
+pub use identity::{
+    COLLISIONS_INDEX_SQL, COLLISIONS_TABLE_SQL, COVERAGE_TABLE_SQL, Coverage, DecisionCopy,
+    IDENTITY_INDEX_SQL, IDENTITY_SCHEMA_SQL, IDENTITY_TABLE_SQL, IdentityTotals, Presence,
+    REINDEX_COMMAND, ReindexCause, ReindexReport, SegmentReindex, identity_digest,
+};
 pub use record::{
     CanonicalJson, CapabilityId, Decision, DecisionId, DecisionKind, Hash, Outcome, SignedRecord,
     revision_stamp,
@@ -86,11 +92,11 @@ pub use record::{
 pub use seal::{Depth, SealPolicy};
 pub use segment::{
     SEGMENT_PREFIX, SEGMENTS_ADD_MANIFEST_SQL, SEGMENTS_COLUMNS_SQL, SEGMENTS_INDEX_SQL,
-    SEGMENTS_MANIFEST_COLUMN, SEGMENTS_TABLE_SQL, Segment, SegmentHeader, order_segments,
-    segment_hash,
+    SEGMENTS_MANIFEST_COLUMN, SEGMENTS_TABLE_SQL, Segment, SegmentHeader, fetch_segment,
+    order_segments, segment_hash,
 };
 pub use signer::{DEFAULT_KEY_PATH, LedgerSigner, LedgerVerifier};
 pub use transition::{
     BinaryVersions, ManifestTransition, SYSTEM_DEPLOY, TRANSITION_KIND, check_fits,
 };
-pub use verify::{order_chain, verify_chain};
+pub use verify::{order_chain, verify_chain, verify_segment};

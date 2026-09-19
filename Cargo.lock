@@ -3240,11 +3240,13 @@ dependencies = [
  "ed25519-dalek",
  "rahi-store",
  "rahi-types",
+ "rusqlite",
  "s3-simple",
  "serde",
  "serde_json",
  "tempfile",
  "tokio",
+ "tracing",
  "url",
 ]
 

@@ -6,7 +6,7 @@ kind: kernel
 domain: ledger
 created: "2026-09-17"
 authors: ["Bartek Kus"]
-implementation: in-progress
+implementation: complete
 risk: critical
 wave: 3
 depends_on:
@@ -22,6 +22,7 @@ extends:
   - { spec: "013-ledger-decision-chain", unit: "crates/rahi-ledger/src/record.rs", nature: additive }
   - { spec: "013-ledger-decision-chain", unit: "crates/rahi-ledger/src/verify.rs", nature: additive }
   - { spec: "013-ledger-decision-chain", unit: "crates/rahi-ledger/src/lib.rs", nature: additive }
+  - { spec: "013-ledger-decision-chain", unit: "crates/rahi-ledger/Cargo.toml", nature: additive }
   - { spec: "013-ledger-decision-chain", unit: "crates/rahi-ledger/tests/append.rs", nature: additive }
   - { spec: "013-ledger-decision-chain", unit: "crates/rahi-ledger/tests/common/", nature: additive }
   - { spec: "013-ledger-decision-chain", unit: "crates/rahi-ledger/testdata/chains/", nature: additive }
@@ -31,6 +32,8 @@ extends:
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/lib.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/verbs.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/tests/cli.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/preflight.rs", nature: additive }
+  - { spec: "039-release-and-out-of-tree-packaging", unit: "CHANGELOG.md", nature: additive }
 constrains:
   - { flavor: invariant-freeze, unit: "crates/rahi-ledger/src/identity.rs", note: "one id names one decision for the life of the chain; absence is never inferred from unavailable history" }
 references:
@@ -1371,6 +1374,97 @@ sets.
   is also incomplete, so the operator is never told to run `ledger reindex`
   on a chain whose real problem is that it has been tampered with. Where
   both answers are available, integrity is the one reported.
+
+- **D-9 (2026-09-19, build session; how B-13's creation counter is
+  observed).** B-5 prescribes three statements per archived record and B-8
+  requires a seal and a reindex to run exactly those three, in that order.
+  B-13 and FR-020 additionally require this node to tell a row it had to
+  **create** from a row it merely stamped, *without a leader read*, because
+  that is the observation that moves the cached verdict. The prescribed
+  upsert cannot supply it: `rows_affected` is 1 whether the `ON CONFLICT`
+  branch inserted or updated, and hiqlite's `ExecuteResult` carries nothing
+  else.
+
+  The accounting therefore runs the three prescribed statements preceded, per
+  record, by a stamp-only `UPDATE` whose `WHERE` is the upsert's own
+  `DO UPDATE` guard (`record_hash` matches and `segment_hash IS NULL`). Its
+  effect is a strict subset of the upsert's, so the committed state is
+  identical whether it runs or not, and no redirect becomes possible; what it
+  buys is that the upsert that follows it can only ever insert, so its
+  `rows_affected` *is* the creation counter. Seal and reindex run the same
+  four statements in the same order, so B-8's "one accounting rather than
+  two" is preserved, and B-5's prescribed SQL is unchanged.
+
+  Two alternatives were rejected. A read before the accounting, which is what
+  B-5 forbids in terms ("it cannot decide anything by reading first") and
+  which would not be atomic against another node. And a post-commit read,
+  which can tell a covered segment from an uncovered one but cannot tell a
+  created row from a stamped one at all, and which FR-020 rules out by
+  requiring the observation without a leader read.
+- **D-10 (2026-09-19, build session; the name of B-6's copy type).** B-6
+  sketches `Ambiguous { copies: Vec<Copy> }`. The type ships as
+  `DecisionCopy`. A public type named `Copy` exported from this crate
+  occupies the type namespace, so any module that glob-imports `rahi_ledger`
+  loses the `Copy` marker trait: `T: Copy` bounds and `impl Copy for _` stop
+  resolving there. Nothing else about the type differs from B-6's sketch, and
+  the rename changes no behavior, no answer and no field. The alternative,
+  shipping the name as written, was rejected because it would make a
+  consuming crate's unrelated code fail to compile for a reason no reader
+  would connect to this spec.
+- **D-11 (2026-09-19, build session; where `preflight` reads coverage).**
+  B-10 requires `preflight` to report coverage as a named check and fail on
+  it, and B-7 has it call `identity_totals()`. B-15 lists the three verbs
+  that construct a repair handle and `preflight` is deliberately not among
+  them. `preflight` therefore opens the chain the ordinary way and reads
+  B-10's refusal for what it is: because that refusal is raised only after
+  verification has already passed, an `Error::Stale` from `Ledger::open` is
+  itself the evidence that the chain verified, so the `ledger` check reports
+  that it verified and the new `coverage` check carries the refusal, its
+  count and the reindex command. On a covered chain both checks pass and
+  `coverage` prints all four numbers. A recorded collision is reported and
+  not failed on, because `serve` starts on a fully accounted-for ambiguous
+  chain (D-4) and `preflight` answers whether `serve` would start.
+
+  The alternative, giving `preflight` a repair handle, was rejected as
+  widening B-15's deliberately narrow list for a verb that never appends and
+  does not need one.
+- **D-12 (2026-09-19, build session; what "100,000 decisions" counts in
+  AC-9).** AC-9 fixes four numbers that must hold together: 100,000
+  decisions appended, exactly 10,000 records resident, 90,000 archived, and
+  90 sealed segments at `segment_size` 1,000. A chain also holds its genesis
+  record, which B-9 counts explicitly among the rows a cell pays for. The
+  measurement therefore builds a chain of exactly 100,000 decisions **of
+  which the genesis record is one**: it is the only reading under which all
+  four of AC-9's numbers are simultaneously true. The genesis id is longer
+  than the 36 bytes B-9 prices, so its row costs more than the figure and the
+  measurement is conservative by that much. The fixture is not otherwise
+  reduced, and D-7's ceiling of 800 bytes per decision is applied to the
+  100,000 denominator unchanged.
+
+- **D-13 (2026-09-19, build session; the fixture archive and `cargo
+  package`).** FR-014's fixture is a chain the published 0.1.0 crates wrote,
+  and spec 014 B-3 derives each archived body's key from the ids it holds, so
+  the first segment's body is the file
+  `ledger/segments/genesis:sha256:<hash>-d-0001.json`. `cargo package`
+  refuses a colon in a packaged filename, which spec 039's release job runs
+  on every pull request, so the fixture as written cannot ship inside the
+  `rahi-ledger` crate.
+
+  `rahi-ledger`'s manifest therefore excludes
+  `testdata/chains/v0.1.0-sealed/archive/**` from the package. The fixture
+  itself is unchanged and stays committed, where it is auditable beside the
+  chains it joins and where the tests that consume it run; what is dropped is
+  its presence inside a published artifact that never runs an integration
+  test. FR-014's "absence is a failure, never a skip" is unaffected: it binds
+  a checkout of this repository, which always has the directory.
+
+  Two alternatives were rejected. Renaming the bodies and mapping keys to
+  sanitized filenames behind a test-only `Archive`, which would put a layer
+  between the test and `FsArchive` that AC-3 does not ask for and would make
+  the committed archive no longer the thing 0.1.0 wrote. And regenerating the
+  fixture without a colon, which is not available: the genesis id is
+  `genesis:<hash>` by spec 013's construction, so any faithful 0.1.0 chain
+  has this key.
 
 ## 8. Owner decisions, answered
 
