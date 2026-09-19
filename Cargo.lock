@@ -3238,6 +3238,7 @@ dependencies = [
  "base64 0.22.1",
  "canonical-keysort-json",
  "ed25519-dalek",
+ "rahi-ledger",
  "rahi-store",
  "rahi-types",
  "s3-simple",

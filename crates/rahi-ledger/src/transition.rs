@@ -24,19 +24,75 @@
 //!   the transition has been sealed away, the last sealed segment's header
 //!   carries the manifest current at its tail (B-5), so the answer survives
 //!   the hot window without fetching an archived body.
-//! - **An answer that did not arrive is never an older manifest.** Both
-//!   reads account for their own rows, and neither falls back past what
+//! - **An answer that did not arrive is never an older manifest.** The read
+//!   accounts for its own rows, and never falls back past what
 //!   `Ledger::open` established, because an older answer an old image
 //!   matches is what lets that image boot (D-11).
+//! - **The sealed and the resident evidence come from one snapshot.** A
+//!   seal moves a transition from the hot table into a segment in one
+//!   transaction, so two reads taken either side of it can miss it in both
+//!   places while each accounts for its own rows. Both relations are read
+//!   in one statement and the resident chain is ordered against the root
+//!   that same snapshot names, so the seam between them is checked rather
+//!   than assumed (D-15).
 
 use rahi_types::{Error, Revision, Sub};
 use serde::{Deserialize, Serialize};
 
-use crate::chain::Ledger;
+use crate::chain::{Ledger, check_census};
 use crate::record::{
     Decision, DecisionId, DecisionKind, Hash, Outcome, SignedRecord, revision_stamp,
 };
-use crate::segment::SegmentHeader;
+use crate::seal::SegmentRow;
+use crate::segment::{SegmentHeader, order_segments};
+use crate::verify::order_chain;
+
+/// Every sealed header and every resident record, each relation with the
+/// `COUNT(*)` of it, all in one statement (spec 036 D-15).
+///
+/// Spec 036 D-11 gave each relation a witness of its own so that a read that
+/// did not answer could not be read as an absence. That is necessary and it
+/// is not sufficient: a seal commits the new segment and the deletion of the
+/// records it archived in one transaction (spec 014 B-2), so a segment read
+/// taken before it and a resident read taken after it can both account for
+/// every row they carry and still, between them, hold no trace of a
+/// transition that is in fact the chain's current manifest.
+///
+/// One statement is one snapshot. The two witness rows have no `FROM`, so
+/// SQLite yields them whatever the tables hold, and both `COUNT(*)`
+/// subqueries are evaluated in the same snapshot as the rows they count.
+/// `kind` says which of the four kinds of row this is; the columns a kind
+/// does not use are filled with values of the right type so the branches
+/// line up.
+const CHAIN_CENSUS_SQL: &str = "SELECT 0 AS kind, \
+     (SELECT COUNT(*) FROM kernel_decisions) AS total, X'' AS record, \
+     '' AS first_id, '' AS last_id, 0 AS count, '' AS segment_hash, \
+     '' AS prev_segment_hash, '' AS last_hash, NULL AS current_manifest \
+     UNION ALL \
+     SELECT 1, (SELECT COUNT(*) FROM kernel_segments), X'', \
+     '', '', 0, '', '', '', NULL \
+     UNION ALL \
+     SELECT 2, 0, record, '', '', 0, '', '', '', NULL FROM kernel_decisions \
+     UNION ALL \
+     SELECT 3, 0, X'', first_id, last_id, count, segment_hash, \
+     prev_segment_hash, last_hash, current_manifest FROM kernel_segments";
+
+/// Which kind of row [`CHAIN_CENSUS_SQL`] yielded.
+const RESIDENT_WITNESS: i64 = 0;
+const SEALED_WITNESS: i64 = 1;
+const RESIDENT_ROW: i64 = 2;
+const SEALED_ROW: i64 = 3;
+
+#[derive(Debug, Deserialize)]
+struct ChainCensusRow {
+    kind: i64,
+    #[serde(default)]
+    total: i64,
+    #[serde(default)]
+    record: Vec<u8>,
+    #[serde(flatten)]
+    segment: SegmentRow,
+}
 
 /// The decision kind a manifest transition carries (B-2).
 pub const TRANSITION_KIND: &str = "manifest.transition";
@@ -200,7 +256,9 @@ impl Ledger {
     /// has always named.
     ///
     /// This read fails closed under spec 016 D-2's hazard, and spec 036 D-11
-    /// corrects how. D-10 recorded that walking back to an older answer could
+    /// corrects how; D-15 then corrects what "its own census" was taken to
+    /// prove, since two censuses are two snapshots and a seal commits
+    /// between them. D-10 recorded that walking back to an older answer could
     /// only make `Kernel::boot` refuse a manifest that was in fact adopted.
     /// That is wrong: on a chain that has gone H1 to H2, the genesis parent
     /// *is* H1, so an H1 replica restarting on the old image agrees with the
@@ -208,10 +266,13 @@ impl Ledger {
     /// which is exactly what spec 036 B-10 and D-4 refuse. The sealed case
     /// has the same shape through the segment headers.
     ///
-    /// So nothing here walks back past evidence that contradicts it. Both
-    /// reads carry their own census from one snapshot
+    /// So nothing here walks back past evidence that contradicts it. The
+    /// sealed headers and the resident records are read in one statement,
+    /// each carrying its own census from that one snapshot
     /// ([`crate::chain::check_census`]), so an answer that did not arrive or
-    /// that lost rows is [`Error::Integrity`] rather than an absence. And
+    /// that lost rows is [`Error::Integrity`] rather than an absence, and a
+    /// seal that commits while this read runs is on one side of it or the
+    /// other rather than hidden by both halves (D-15). And
     /// what `Ledger::open` saw is carried forward, because records are only
     /// appended and segments only added: an empty resident answer on a chain
     /// `open` found records in, or an empty segment answer on one it found
@@ -267,19 +328,60 @@ impl Ledger {
         Ok(None)
     }
 
-    /// The sealed headers and the resident records, each having accounted for
-    /// its own rows and neither contradicting what `open` established
-    /// (spec 036 D-11).
+    /// The sealed headers and the resident records, from one snapshot, each
+    /// having accounted for its own rows, neither contradicting what `open`
+    /// established, and the seam between them checked (spec 036 D-11, D-15).
+    ///
+    /// One `query_consistent` carries the whole read, so there is no instant
+    /// between the two relations for a seal to commit in. The resident chain
+    /// is then ordered against the root *this* snapshot names, which is the
+    /// last segment's terminal hash or the genesis parent (spec 014 B-4):
+    /// evidence from two different moments cannot satisfy that link, so an
+    /// incoherent pair is [`Error::Integrity`] rather than an answer. There
+    /// is no retry: a single atomic read has nothing to re-establish, and a
+    /// snapshot that does not cohere is a store that is not answering
+    /// coherently, which is the bound D-11 states and not something a second
+    /// read of the same store could settle.
     async fn witnessed_chain(&self) -> Result<(Vec<SegmentHeader>, Vec<SignedRecord>), Error> {
         let opened = self.opened();
+        let rows: Vec<ChainCensusRow> = self
+            .store()
+            .query_consistent(CHAIN_CENSUS_SQL, vec![])
+            .await?;
 
-        // Both readings are taken, and both are checked against what `open`
-        // established, before either is used. Taking the sealed evidence
-        // first is deliberate: the resident chain is rooted at the last
-        // segment's terminal hash once anything has been sealed, so a segment
-        // read that did not answer would otherwise surface as an unrelated
-        // complaint about the resident chain's root.
-        let segments = self.segments().await?;
+        let mut resident_witness = None;
+        let mut sealed_witness = None;
+        let mut carried_records = Vec::new();
+        let mut carried_segments = Vec::new();
+        for row in rows {
+            match row.kind {
+                RESIDENT_WITNESS => resident_witness = Some(row.total),
+                SEALED_WITNESS => sealed_witness = Some(row.total),
+                RESIDENT_ROW => carried_records.push(row.record),
+                SEALED_ROW => carried_segments.push(row.segment),
+                // The statement yields four kinds and nothing else, so a
+                // fifth is the store answering something this code did not
+                // ask, which is not a row to guess the meaning of.
+                other => {
+                    return Err(Error::Integrity(format!(
+                        "the chain read carried a row of kind {other}, which this statement does \
+                         not ask for, so nothing may be concluded from the answer"
+                    )));
+                }
+            }
+        }
+        check_census("kernel_decisions", resident_witness, carried_records.len())?;
+        check_census("kernel_segments", sealed_witness, carried_segments.len())?;
+
+        self.read_interleave().await;
+
+        let segments = order_segments(
+            self.genesis_parent(),
+            carried_segments
+                .into_iter()
+                .map(SegmentRow::into_header)
+                .collect::<Result<Vec<_>, Error>>()?,
+        )?;
         if segments.is_empty() && opened.sealed {
             return Err(Error::Integrity(
                 "the segment headers read back empty, and this ledger verified segments when it \
@@ -290,7 +392,10 @@ impl Ledger {
             ));
         }
 
-        let records = self.records().await?;
+        let records = carried_records
+            .iter()
+            .map(|bytes| SignedRecord::from_bytes(bytes))
+            .collect::<Result<Vec<_>, Error>>()?;
         if records.is_empty() && opened.resident {
             return Err(Error::Integrity(
                 "the resident chain reads back empty, and this ledger verified records in it when \
@@ -300,6 +405,15 @@ impl Ledger {
                     .to_owned(),
             ));
         }
+
+        // The seam (spec 014 B-4): the oldest resident record links the last
+        // sealed segment, or the genesis parent when nothing is sealed. Both
+        // sides of that link come from this one snapshot, so a pair that
+        // straddles a seal cannot satisfy it.
+        let root = segments
+            .last()
+            .map_or_else(|| self.genesis_parent().clone(), |h| h.last_hash.clone());
+        let records = order_chain(&root, records)?;
 
         Ok((segments, records))
     }

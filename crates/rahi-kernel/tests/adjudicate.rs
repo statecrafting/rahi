@@ -18,7 +18,9 @@ use rahi_kernel::{
     CapabilityKind, Egress, GateOutcome, Governed, Kernel, KernelOptions, Manifest, Request,
     Secrets, ServiceName, Verdict, observe,
 };
-use rahi_ledger::{Decision, Ledger, LedgerSigner, Outcome};
+use rahi_ledger::{
+    BinaryVersions, Decision, Ledger, LedgerSigner, ManifestTransition, Outcome, SYSTEM_DEPLOY,
+};
 use rahi_store::{EncKey, EncKeys, Store, StoreConfig, StoreHandle, StoreSecrets};
 use rahi_types::{Revision, Sub};
 
@@ -403,6 +405,68 @@ async fn a_manifest_the_chain_has_not_adopted_is_stale_not_damage() {
         ours.as_str(),
         "rahi migrate --adopt-manifest",
     ] {
+        assert!(
+            err.message().contains(fragment),
+            "{fragment}: {}",
+            err.message()
+        );
+    }
+}
+
+/// Spec 036 B-10 and D-4, held after a real transition (spec 036 D-15).
+///
+/// The chain adopts H1 -> H2. A replica that restarts on the H1 image must
+/// refuse rather than serve a ceiling the chain no longer names, and it is
+/// `Ledger::current_manifest` that has to say so: every way that read can be
+/// made to answer an older manifest (an unread relation, D-11; a seal
+/// crossing between two reads, D-15) lands here, as an old image booting.
+#[tokio::test]
+async fn an_old_image_refuses_to_boot_after_the_chain_adopted_a_new_manifest() {
+    let dir = tempfile::tempdir().expect("a temp dir");
+    let node = Store::open(&store_config(&dir.path().join("hiqlite")))
+        .await
+        .expect("a node opens");
+    let h1 = manifest().hash().expect("hashes");
+    let adopted = Manifest::parse(CHANGED_GRANT).expect("parses");
+    let h2 = adopted.hash().expect("hashes");
+
+    let ledger = Ledger::open(
+        node.handle(),
+        LedgerSigner::from_seed([9u8; 32]),
+        h1.clone(),
+    )
+    .await
+    .expect("the chain opens on H1");
+    ledger
+        .append_transition(
+            &ManifestTransition::new(
+                h1.clone(),
+                h2.clone(),
+                CHANGED_GRANT,
+                1,
+                BinaryVersions {
+                    rahi: "0.2.0".to_owned(),
+                    contract: "1.0.0".to_owned(),
+                },
+                Sub::new(SYSTEM_DEPLOY),
+            ),
+            65_536,
+        )
+        .await
+        .expect("the deploy step adopts H2");
+    assert_eq!(
+        ledger.current_manifest().await.expect("the chain answers"),
+        h2,
+        "the chain names H2 and the genesis parent is still H1"
+    );
+
+    // The old image: same volume, same chain, the H1 manifest.
+    let err = Kernel::boot(manifest(), node.handle(), ledger)
+        .await
+        .expect_err("B-10, D-4: the H1 image does not boot after the transition");
+    assert_eq!(err.kind(), "stale", "{}", err.message());
+    assert_eq!(err.exit_code(), 2, "{}", err.message());
+    for fragment in [h1.as_str(), h2.as_str(), "rahi migrate --adopt-manifest"] {
         assert!(
             err.message().contains(fragment),
             "{fragment}: {}",

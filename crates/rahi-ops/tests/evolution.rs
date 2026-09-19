@@ -293,6 +293,36 @@ fn archived_db(rows: Option<&[(u32, &str, Option<bool>)]>) -> Vec<u8> {
     std::fs::read(&path).unwrap()
 }
 
+/// An app part whose `schema_version` table has the **pre-036 shape**: the
+/// two columns spec 011 created, with neither `checksum` nor `additive`
+/// (spec 036 B-7, B-8 added those).
+///
+/// This is what a database backed up before spec 036, by a cell that had
+/// applied a migration, actually looks like. It is a separate fixture from
+/// [`archived_db`] because that one writes the four-column table a store
+/// running this binary has, which is not evidence about a legacy archive.
+fn pre_036_archived_db(rows: &[(u32, &str)]) -> Vec<u8> {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("hiqlite.db");
+    {
+        let db = rusqlite::Connection::open(&path).unwrap();
+        db.execute_batch("CREATE TABLE notes (id TEXT PRIMARY KEY)")
+            .unwrap();
+        db.execute_batch(
+            "CREATE TABLE schema_version (version INTEGER PRIMARY KEY, name TEXT NOT NULL)",
+        )
+        .unwrap();
+        for (version, name) in rows {
+            db.execute(
+                "INSERT INTO schema_version (version, name) VALUES (?1, ?2)",
+                rusqlite::params![i64::from(*version), *name],
+            )
+            .unwrap();
+        }
+    }
+    std::fs::read(&path).unwrap()
+}
+
 /// A pre-036 archive: its manifest records no schema, and its app part is
 /// the database the evidence has to come out of.
 fn legacy_archive(manifest_hash: &str, app: Vec<u8>) -> (ArchiveManifest, Vec<Part>) {
@@ -377,6 +407,58 @@ fn a_legacy_archive_is_judged_on_the_database_it_carries_or_refused() {
         let (manifest, _) = legacy_archive(ours, archived_db(None));
         let err = restore::check_compatible(&manifest, &[], &cell(adopt))
             .expect_err("nothing to read the history out of");
+        assert!(matches!(err, Error::Stale(_)), "{err}");
+    }
+}
+
+/// Spec 036 FR-012, D-16: what legacy support actually reaches.
+///
+/// D-12 says a legacy archive is judged on the history in its own payload.
+/// That holds for an archive whose database has applied nothing, which is
+/// the baseline read out of the file's catalogue. It does **not** reach an
+/// archive whose database has applied migrations under the pre-036 table
+/// shape: the history read selects `checksum` and `additive`, which that
+/// table does not have, so the read fails and the archive is refused with
+/// `Error::Stale`, exit 2, destination untouched.
+///
+/// The boundary is the table's shape, not its contents: an empty pre-036
+/// table is refused too, because the read that fails is the `SELECT`. The
+/// only legacy shape that restores is a database with no `schema_version`
+/// table, which has provably applied nothing.
+///
+/// That refusal is the authorized direction (constitution: absence is never
+/// permission) and this test fixes it as the behavior rather than leaving
+/// the wider claim standing untested.
+#[test]
+fn a_pre_036_archive_that_applied_migrations_is_refused_not_restored() {
+    let ours = common::manifest_hash_text();
+    let list = migrations();
+    let cell = |adopt: bool| Compatibility {
+        manifest_hash: ours,
+        migrations: &list,
+        adopt,
+    };
+
+    for adopt in [false, true] {
+        // Applied migrations, recorded the way spec 011 recorded them.
+        let (manifest, parts) = legacy_archive(ours, pre_036_archived_db(&[(1, "notes")]));
+        let err = restore::check_compatible(&manifest, &parts, &cell(adopt))
+            .expect_err("D-16: this evidence cannot be read, so it is not a restore");
+        assert!(matches!(err, Error::Stale(_)), "{err}");
+        assert_eq!(err.exit_code(), 2, "{err}");
+        assert!(
+            err.message().contains("schema_version"),
+            "the message names the evidence it could not read: {err}"
+        );
+
+        // And the boundary is the table's shape, not its contents: a
+        // pre-036 table with no rows in it is refused for the same reason.
+        // The one legacy shape that restores is a database with no
+        // `schema_version` table at all, which is the baseline read out of
+        // the file's own catalogue and is covered above.
+        let (manifest, parts) = legacy_archive(ours, pre_036_archived_db(&[]));
+        let err = restore::check_compatible(&manifest, &parts, &cell(adopt))
+            .expect_err("the column the read needs is absent whether or not rows exist");
         assert!(matches!(err, Error::Stale(_)), "{err}");
     }
 }

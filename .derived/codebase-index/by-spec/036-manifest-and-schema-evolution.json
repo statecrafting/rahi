@@ -52,6 +52,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-ledger/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-ledger/src/chain.rs",
         "source": "spec-edge"
       },
@@ -320,6 +324,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-kernel/tests/adjudicate.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ledger/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/Cargo.toml"
         }
       },
       {
@@ -626,5 +643,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "b72e3c0a0159cc9875c698888a6ee29c72130e3e658bb327d0f0406644eb297b"
+  "shardHash": "c7fd0202b8a425da5ae9f624952a5f38a379d893565ea45aed1c10abdbc4980c"
 }

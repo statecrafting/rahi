@@ -11,6 +11,13 @@ authors.workspace = true
 [package.metadata.spec-spine]
 spec = "013-ledger-decision-chain"
 
+[features]
+# A read seam that exists only for this crate's own tests (spec 036 D-15).
+# No consumer enables it: it is turned on by the self dev-dependency below,
+# so `cargo test -p rahi-ledger` exercises it and every production build of
+# this crate compiles without it.
+read-interleave = []
+
 [dependencies]
 rahi-types = { workspace = true }
 rahi-store = { workspace = true }
@@ -29,6 +36,7 @@ url = { workspace = true }
 tokio = { workspace = true, features = ["time"] }
 
 [dev-dependencies]
+rahi-ledger = { workspace = true, features = ["read-interleave"] }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
 

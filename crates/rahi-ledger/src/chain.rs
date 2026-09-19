@@ -114,6 +114,43 @@ struct CountRow {
     total: i64,
 }
 
+/// A hook run inside the chain read, so a test can commit a seal at the one
+/// instant the read is vulnerable to it (spec 036 D-15).
+///
+/// Compiled only under the `read-interleave` feature, which nothing but this
+/// crate's own dev-dependency enables: a production build of `rahi-ledger`
+/// has no such field, no such call, and no way to install one.
+#[cfg(feature = "read-interleave")]
+#[derive(Clone)]
+pub struct ReadInterleave(
+    std::sync::Arc<
+        dyn Fn() -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> + Send + Sync,
+    >,
+);
+
+#[cfg(feature = "read-interleave")]
+impl ReadInterleave {
+    /// Install `hook` as the interleave point of the chain read.
+    pub fn new<F, Fut>(hook: F) -> Self
+    where
+        F: Fn() -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = ()> + Send + 'static,
+    {
+        Self(std::sync::Arc::new(move || Box::pin(hook())))
+    }
+
+    pub(crate) async fn run(&self) {
+        (self.0)().await;
+    }
+}
+
+#[cfg(feature = "read-interleave")]
+impl std::fmt::Debug for ReadInterleave {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ReadInterleave")
+    }
+}
+
 /// The cell's decision ledger.
 ///
 /// Cheap to clone: it holds the store handle, the ledger key, and the hash
@@ -125,6 +162,8 @@ pub struct Ledger {
     signer: LedgerSigner,
     genesis_parent: Hash,
     opened: OpenedChain,
+    #[cfg(feature = "read-interleave")]
+    interleave: Option<ReadInterleave>,
 }
 
 /// What [`Ledger::open`] established about the chain it verified (spec 036
@@ -182,6 +221,8 @@ impl Ledger {
             signer,
             genesis_parent,
             opened: OpenedChain::default(),
+            #[cfg(feature = "read-interleave")]
+            interleave: None,
         };
         ledger.create_schema().await?;
 
@@ -207,6 +248,22 @@ impl Ledger {
     /// What [`Ledger::open`] established about this chain (spec 036 D-11).
     pub(crate) fn opened(&self) -> OpenedChain {
         self.opened
+    }
+
+    /// Install the test seam (spec 036 D-15).
+    #[cfg(feature = "read-interleave")]
+    #[must_use]
+    pub fn with_read_interleave(mut self, hook: ReadInterleave) -> Self {
+        self.interleave = Some(hook);
+        self
+    }
+
+    /// Run the installed seam, if any.
+    pub(crate) async fn read_interleave(&self) {
+        #[cfg(feature = "read-interleave")]
+        if let Some(hook) = self.interleave.clone() {
+            hook.run().await;
+        }
     }
 
     /// The genesis parent the stored chain itself names, or `None` when

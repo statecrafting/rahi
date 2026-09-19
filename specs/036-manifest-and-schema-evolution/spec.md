@@ -6,7 +6,7 @@ kind: kernel
 domain: kernel
 created: "2026-09-11"
 authors: ["Bartek Kus"]
-implementation: complete
+implementation: in-progress
 risk: critical
 wave: 3
 depends_on:
@@ -47,6 +47,7 @@ extends:
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/backup.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/Cargo.toml", nature: additive }
   - { spec: "010-workspace-and-core-types", unit: "Cargo.toml", nature: additive }
+  - { spec: "013-ledger-decision-chain", unit: "crates/rahi-ledger/Cargo.toml", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/tests/common/mod.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/tests/restore.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/tests/backup.rs", nature: additive }
@@ -249,6 +250,20 @@ entrypoint (031), and the migration Job (032). Two new test files.
   model cannot be recovered reports the diff unavailable, and that a
   recovery path whose read does not answer is an error rather than an
   unavailable diff.
+- **FR-011 (D-15).** Ledger tests commit a real seal at the one instant the
+  chain read is vulnerable to it, through the production read path and with
+  no reliance on timing, and assert that `current_manifest` and
+  `current_manifest_model` answer from evidence on one side of it: once
+  where the crossing is from nothing sealed to a first segment, once where it
+  is from a segment naming an older manifest to a newer one, and once for the
+  model, which must not report a chain's retained manifest text as absent. A
+  kernel test asserts the consequence the reads exist to prevent: after a
+  chain adopts H1 to H2, a boot on the H1 image is refused with
+  `Error::Stale` naming both hashes and the deploy step.
+- **FR-012 (D-16).** An ops test builds an archive whose database carries a
+  `schema_version` table in the shape spec 011 created, with neither checksum
+  nor additive column, and asserts it is refused with `Error::Stale`, exit 2,
+  naming the evidence that could not be read, with and without `--adopt`.
 
 ## 5. Acceptance criteria
 
@@ -274,6 +289,16 @@ entrypoint (031), and the migration Job (032). Two new test files.
   `Error::Integrity` even when the store is also behind; and an adoption
   reports an unavailable grant diff only when the chain genuinely holds no
   earlier manifest text. FR-007 to FR-010 are the tests that hold these.
+
+- **AC-6 (the concurrency correction and the legacy boundary, D-15, D-16).**
+  The manifest hash and the manifest model are answered from sealed and
+  resident evidence taken together, so a seal committing while the chain is
+  read cannot produce an answer older than the chain's, and an incoherent
+  pair is refused rather than answered. The support a legacy archive actually
+  has is stated as what the code does: an archived database with no
+  `schema_version` table restores on the baseline it proves, and one whose
+  table predates spec 036's columns is refused. FR-011 and FR-012 are the
+  tests that hold these, and no criterion above is relaxed to make them pass.
 
 ### The worked consumer example
 
@@ -556,7 +581,11 @@ record shows what was asked as well as what was answered.
 
   What this does not claim: a store that answers every statement
   consistently wrong is outside what reading that store can detect, and the
-  guarantee is stated at that bound rather than beyond it. What is preserved:
+  guarantee is stated at that bound rather than beyond it. **D-15 corrects
+  one thing this entry did claim.** "Each read carries its own census, from
+  one snapshot" is true of each read and was taken to make the pair of them
+  sound, which it does not: two statements are two snapshots of each other
+  even when neither loses a row. What is preserved:
   a fresh chain with no transition still answers its genesis parent, a
   segment sealed before this spec still names no manifest and still falls
   through (D-8), and nothing on either path writes.
@@ -630,6 +659,79 @@ record shows what was asked as well as what was answered.
   Alternative rejected: treating any `None` from the recovery path as an
   unavailable diff, which is what turned a failed read into an ordinary
   report.
+
+- **D-15 (2026-09-19, owner-authorized correction; D-11's census is per
+  read, and the answer is not).** D-11 made each of the two reads account for its own
+  rows and called the pair sound. It is not. A seal commits the new segment
+  and the deletion of the records it archived in one transaction (spec 014
+  B-2), so the two reads can straddle it:
+
+  1. the segment headers are read, and the newest one names H1;
+  2. a seal moves the resident H1 to H2 transition into a new segment,
+     adding that header and deleting those records atomically;
+  3. the resident records are read, and no longer hold the transition;
+  4. the answer combines the older headers with the newer records and is H1.
+
+  Every guard D-11 added passes: each census accounts for its own rows,
+  neither relation reads back empty, and `OpenedChain`'s two booleans are
+  both still true. The result is the failure D-11 exists to prevent, reached
+  by a different route: H1 is what an old image carries, so that image boots
+  under a ceiling the chain no longer names (B-10, D-4). Reproduced on
+  2026-09-19 against `757f647`, deterministically, by committing a real seal
+  at that instant through the production read path;
+  `crates/rahi-ledger/tests/transition.rs` holds the three regressions and
+  all three fail without the fix below.
+
+  **The mechanism.** Both relations are read in **one** statement, with both
+  `COUNT(*)` witnesses evaluated in it, so one snapshot carries the whole
+  answer and there is no instant between them for a seal to occupy. The
+  snapshot is then made to check itself: the resident chain is ordered
+  against the root *it* names, which is the last sealed segment's terminal
+  hash or the genesis parent (spec 014 B-4), so evidence from two moments
+  cannot satisfy the seam and an incoherent pair is `Error::Integrity`
+  rather than an answer. There is no retry, bounded or otherwise: one atomic
+  read has nothing to re-establish, and a store answering incoherently is the
+  bound D-11 already states rather than something a second read of that store
+  could settle. Nothing process-local is relied on, which matters because a
+  seal runs on whichever replica is leading and a lock in this process would
+  say nothing about that. Alternatives rejected: re-reading the segments
+  after the records and comparing, which turns a legitimate concurrent seal
+  into either a retry loop or a refusal and still leaves a window; and a
+  process-local lock around the pair, which cannot see another replica's
+  seal at all.
+
+  **The seam this needs, and its cost.** A deterministic test has to commit
+  the seal at exactly that instant, and the reads are inside one private
+  function, so `rahi-ledger` gains a `read-interleave` feature carrying a
+  hook that is run once inside the chain read. Nothing enables the feature
+  but this crate's own dev-dependency on itself, so `cargo test -p
+  rahi-ledger` exercises it and no build a consumer makes contains the
+  field, the call, or any way to install one. The alternative was a
+  timing-dependent race, which is not a regression.
+
+- **D-16 (2026-09-19, owner-authorized correction; what legacy restore
+  actually supports).** D-12 says a legacy archive "is not stranded, because the
+  evidence it lacks in its metadata it still carries in its payload". That
+  is true of an archived database that has applied nothing and false of one
+  that has applied something: `restore::read_schema_version` selects
+  `version, name, checksum, additive`, and a `schema_version` table written
+  before this spec has only the first two (B-7 and B-8 added the others), so
+  the read fails and the archive is refused with `Error::Stale`, exit 2,
+  nothing written. The boundary is the table's shape rather than its
+  contents: an empty pre-036 table is refused for the same reason.
+
+  The refusal stands. It is the authorized direction under the constitution:
+  the evidence cannot be read, so compatibility is not established, so the
+  destination is not replaced (D-12). What is corrected here is the claim,
+  not the code, and FR-012 is the representative fixture that holds it, so
+  the supported set is what a test demonstrates rather than what a sentence
+  asserts. Widening it (reading the two columns a pre-036 table does have,
+  and treating every recorded version as neither checksummed nor additive)
+  is a change to what `restore` accepts and belongs to a spec that states
+  it, not to a correction of this one. Alternative rejected: leaving D-12's
+  sentence standing, which reads as support that the only legacy fixture in
+  the corpus, a four-column table no pre-036 store ever wrote, does not
+  demonstrate.
 
 ## 8. Status
 
@@ -707,6 +809,36 @@ record shows what was asked as well as what was answered.
   shape, the fresh-chain and pre-036 fallbacks (D-8), and every existing
   integrity guarantee. Consumer-visible API movement is recorded in
   `CHANGELOG.md` under the unreleased 0.2.0 section.
+
+- **2026-09-19 (the concurrency correction).** A fifth finding was reproduced
+  against `757f647` and fixed. `Ledger::witnessed_chain` read the sealed
+  headers and the resident records as two statements, so a seal committing
+  between them could leave the transition in neither answer while both
+  accounted for their own rows: `current_manifest` then named H1 on a chain
+  that names H2, which is the manifest an old image carries (B-10, D-4), and
+  `current_manifest_model` reported the retained text absent, which D-14
+  reserves for a chain that genuinely holds none. Both relations now come
+  from one statement and the snapshot is ordered against the root it names,
+  so the seam between resident and sealed history is checked rather than
+  assumed (D-15). The three regressions in
+  `crates/rahi-ledger/tests/transition.rs` commit a real seal at that instant
+  through the production read path, with no sleep and no race, and all three
+  fail without the fix; `crates/rahi-kernel/tests/adjudicate.rs` holds the
+  consequence, an H1 image refused after the chain adopted H2.
+
+  D-16 records the second half: the legacy-restore support D-12 described is
+  narrower than its sentence, because the archived history read selects two
+  columns a pre-036 `schema_version` table does not have. The behavior is
+  unchanged and correct (`Error::Stale`, exit 2, nothing written); the claim
+  is corrected and FR-012 is the representative pre-036 fixture that holds
+  it.
+
+  Preserved and re-checked rather than assumed: the same-statement witness
+  checks and the `OpenedChain` guards (D-11, FR-007), checksum precedence
+  (D-13), the restore compatibility policy (D-12), the oversized-manifest
+  policy (D-6, AC-4), spec 030's independent command-set test, the
+  fresh-chain and pre-036 fallbacks (D-8), and the missing-row regressions.
+  No acceptance criterion was relaxed; AC-6 adds to them.
 
 ## Verification
 
