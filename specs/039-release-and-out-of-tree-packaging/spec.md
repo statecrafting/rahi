@@ -526,6 +526,32 @@ RH-05 and RH-06 of the revision-3 register), and approved the spec on
   `image` run is evidence that the published bytes are correct, never that
   they are public.
 
+- **D-16 (2026-09-20, release coordination under B-1 and B-2).** The 0.2.0
+  CHANGELOG section carried an instruction rather than a fact: the
+  coordinator "must record the final tested main revision and release date
+  when creating the annotated `v0.2.0` tag". Both are now known, so the
+  instruction is replaced by what it asked for. The revision recorded is
+  `8d686bdf7b10d4ee24357a31b4de25ae87cc5b2a`, the merge of this spec's
+  reconciliation, chosen because it is the last revision on `main` whose
+  `ci` and `image` runs both passed and whose tree the live suite had
+  already run against as pull request #71. The release-revision commit adds
+  only that record on top of it and is what the tag names, so the tagged
+  tree and the tested tree differ by this paragraph alone.
+
+  Two alternatives were rejected. Tagging `8d686bd` directly would leave
+  the released tree saying "release candidate (not published)", which the
+  tag falsifies. Recording the revision after the tag would put the fact in
+  a commit no release artifact contains.
+
+  The paragraph denying registry availability and consumer deployment is
+  kept rather than deleted with the heading, because at the moment that
+  commit is written neither is true: the nine crates reach crates.io only
+  when the tag's `release` run publishes them and its registry consumer
+  stanza passes (AC-4), and the three images pull anonymously only after an
+  owner changes package visibility (AC-2, D-12), which no workflow can do.
+  A release heading is not evidence of either; the release notes record
+  those outcomes when they occur.
+
 ## Verification
 
 ```verify:cli
