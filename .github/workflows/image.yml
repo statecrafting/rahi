@@ -146,10 +146,77 @@ jobs:
             RAHI_STATIC_SRC=apps/hello-cell/web
           cache-from: type=gha,scope=${{ matrix.arch }}
 
+      # Spec 039 AC-2, AC-3 and D-15. Everything above this point smokes a
+      # locally loaded build; the push steps build again. Two builds of one
+      # recipe are very probably identical and that is not the property the
+      # criteria name, so each published artifact is now pulled back by its
+      # digest and exercised as itself. These steps run in the matrix job,
+      # which is a native runner for its architecture, so the evidence is
+      # native execution bound to one platform digest and says nothing
+      # about the other.
+      - name: Smoke the published cell digest
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          ref="${IMAGE}@${{ steps.push.outputs.digest }}"
+          docker pull "$ref"
+          docker tag "$ref" rahi:published
+          echo "::notice::cell ${{ matrix.arch }} digest ${{ steps.push.outputs.digest }}"
+          docker/smoke.sh rahi:published 18446
+
+      # B-4: the runtime carries no cell, so it cannot boot alone and a
+      # boot check would be the wrong instrument. What it claims is its
+      # contents and that a consumer can build on it, so both are asserted
+      # against the pushed digest.
+      - name: Verify the published runtime digest
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          ref="${RUNTIME_IMAGE}@${{ steps.push_runtime.outputs.digest }}"
+          docker pull "$ref"
+          echo "::notice::runtime ${{ matrix.arch }} digest ${{ steps.push_runtime.outputs.digest }}"
+
+          # No cell: the runtime is the stage without one.
+          if docker run --rm --entrypoint sh "$ref" -c 'test -e /usr/local/bin/rahi'; then
+            echo "the runtime image carries a cell binary" >&2; exit 1
+          fi
+          # The pinned rauthy, the static slot, and the entrypoint.
+          docker run --rm --entrypoint sh "$ref" -c 'test -x /usr/local/bin/rauthy'
+          docker run --rm --entrypoint sh "$ref" -c 'test -d /usr/local/share/rahi/static'
+          docker run --rm --entrypoint sh "$ref" -c \
+            '[ -z "$(ls -A /usr/local/share/rahi/static)" ]'
+          docker run --rm --entrypoint sh "$ref" -c 'test -x /usr/local/bin/entrypoint.sh'
+          # Non-root, and the environment a consumer inherits.
+          [ "$(docker run --rm --entrypoint sh "$ref" -c 'id -u')" = "10001" ]
+          docker run --rm --entrypoint sh "$ref" -c \
+            '[ "$RAHI_STATIC_DIR" = /usr/local/share/rahi/static ]'
+          docker run --rm --entrypoint sh "$ref" -c \
+            '[ "$RAHI_RAUTHY_BIN" = /usr/local/bin/rauthy ]'
+          docker run --rm --entrypoint sh "$ref" -c '[ "$RAHI_DATA_DIR" = /data ]'
+
+      # B-4's actual claim: a cell in another repository adds its binary at
+      # /usr/local/bin/rahi and its page at the static dir, and the result
+      # runs. Composed here from the two published digests, so the runtime
+      # is proven by use and not only by inspection.
+      - name: Compose a consumer on the published runtime digest
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          SMOKE_PAGE: "1"
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/consumer-image/web
+          echo '<!doctype html><title>consumer</title>ok' > /tmp/consumer-image/web/index.html
+          {
+            echo "FROM ${RUNTIME_IMAGE}@${{ steps.push_runtime.outputs.digest }}"
+            echo "COPY --from=${IMAGE}@${{ steps.push.outputs.digest }} /usr/local/bin/rahi /usr/local/bin/rahi"
+            echo "COPY web/ /usr/local/share/rahi/static/"
+          } > /tmp/consumer-image/Dockerfile
+          cat /tmp/consumer-image/Dockerfile
+          docker buildx build --load -t consumer-on-runtime:published /tmp/consumer-image
+          docker/smoke.sh consumer-on-runtime:published 18447
+
       # The artifact AC-3 is run against must be the artifact that was
-      # tested, not a second build of the same recipe. The smoke above runs
-      # on a locally loaded image; this pulls back the manifest that was
-      # actually pushed and smokes those bytes, page included.
+      # tested, not a second build of the same recipe.
       - name: Smoke the published hello-cell digest
         if: startsWith(github.ref, 'refs/tags/v')
         env:
@@ -159,6 +226,7 @@ jobs:
           ref="${HELLO_IMAGE}@${{ steps.push_hello.outputs.digest }}"
           docker pull "$ref"
           docker tag "$ref" hello-cell:published
+          echo "::notice::hello-cell ${{ matrix.arch }} digest ${{ steps.push_hello.outputs.digest }}"
           docker/smoke.sh hello-cell:published 18445
 
       - name: Record the digest
@@ -270,3 +338,23 @@ jobs:
             -t "${HELLO_IMAGE}:${tag#v}" \
             $hello_refs
           docker buildx imagetools inspect "${HELLO_IMAGE}:${tag#v}"
+
+      # Spec 039 B-3 and D-15: "both architectures" is a property of the
+      # manifest list, and each platform digest was verified natively in its
+      # own matrix job. Assert the list actually carries both, so a tag that
+      # silently published one architecture fails here rather than being
+      # discovered by a consumer on the other.
+      - name: Each tag carries both architectures
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          for image in "${IMAGE}" "${RUNTIME_IMAGE}" "${HELLO_IMAGE}"; do
+            platforms="$(docker buildx imagetools inspect "${image}:${tag}" --raw \
+              | jq -r '.manifests[] | select(.platform.os == "linux")
+                       | "\(.platform.os)/\(.platform.architecture)"' | sort -u)"
+            echo "${image}:${tag} -> $(echo "$platforms" | tr '\n' ' ')"
+            echo "$platforms" | grep -qx 'linux/amd64' \
+              || { echo "${image}:${tag} has no linux/amd64" >&2; exit 1; }
+            echo "$platforms" | grep -qx 'linux/arm64' \
+              || { echo "${image}:${tag} has no linux/arm64" >&2; exit 1; }
+          done

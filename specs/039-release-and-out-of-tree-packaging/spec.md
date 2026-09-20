@@ -483,6 +483,49 @@ RH-05 and RH-06 of the revision-3 register), and approved the spec on
   made public, which is an owner action in GitHub's package settings that
   no workflow can take (D-12).
 
+- **D-15 (2026-09-20, correction session; reads AC-2 and B-3 against what
+  the workflow actually tested).** The same build-versus-published gap
+  D-14 closed for hello-cell was open for the cell and runtime images, and
+  had been since `v0.1.0`. `image.yml` smoked `rahi:smoke`, a locally
+  loaded build, and then *built again* for the push. Two builds of one
+  recipe from one cache are very probably identical bytes, and "very
+  probably identical" is not what AC-2 claims. Every published artifact is
+  now pulled back by the digest that was pushed and exercised as itself.
+
+  The instrument differs by artifact, because the artifacts differ. The
+  cell image is a cell, so it is smoked: temp volume, `/readyz`, discovery
+  through the proxy, the issuer asserted, clean exit on SIGTERM. The
+  runtime image **has no cell and cannot boot alone** (B-4), so expecting
+  a boot from it would be the wrong instrument and a failure there would
+  mean nothing. What B-4 claims of it is its contents and that a consumer
+  can build on it, so both are checked against the pushed digest: that it
+  carries no `/usr/local/bin/rahi`, that the pinned rauthy, the entrypoint
+  and an empty static slot are present, that it runs as uid 10001, and
+  that `RAHI_DATA_DIR`, `RAHI_RAUTHY_BIN` and `RAHI_STATIC_DIR` are the
+  values a consumer inherits; and then a consumer is composed on it from
+  the two published digests, adding a binary at `/usr/local/bin/rahi` and
+  a page at the static directory exactly as B-4 describes, and that is
+  smoked. The runtime is therefore proven by use, not only by inspection.
+
+  **Architecture.** These steps run inside the `build` matrix, whose two
+  jobs are native runners (`ubuntu-latest` for amd64,
+  `ubuntu-24.04-arm` for arm64), and each asserts against
+  `steps.*.outputs.digest` for its own platform. The evidence is native
+  execution bound to one platform digest and establishes nothing about the
+  other; nothing here runs under emulation, and no claim about one
+  architecture is derived from a run on the other. B-3's "both
+  architectures" is a property of the manifest list rather than of either
+  job, so the `manifest` job asserts that each of the three published tags
+  resolves to both `linux/amd64` and `linux/arm64`. A tag that silently
+  published one architecture now fails there instead of being found by a
+  consumer on the other.
+
+  What this does not reach: AC-2 also requires the images to **pull
+  anonymously**, which is a package visibility setting and an owner action
+  (D-12), and these checks run authenticated inside the workflow. A green
+  `image` run is evidence that the published bytes are correct, never that
+  they are public.
+
 ## Verification
 
 ```verify:cli
