@@ -76,6 +76,6 @@
     "summary": "Two things a contributor needs: a compose file that runs the N=1 topology (the image with a bind-mounted volume, watched rebuilds) and a harness crate that boots a built cell binary under a throwaway data directory with fresh keys and OS-allocated ports, starts a rauthy on loopback when one is available, waits on /readyz and never on /healthz, and hands back an HTTP client with a cookie jar so authenticated flows are testable. One instance per test file, never per test. Carries enrahitu://033.\n",
     "title": "The dev substrate and the harness: compose for N=1, boot the real binary, wait on /readyz, a cookie jar"
   },
-  "shardHash": "52b09f571938ad1de083a2fb52f45dd1dfbc5f5c089703467c09a79da8f049bb",
+  "shardHash": "31a3ca79a5688adf9604c25d1a770ed56b34f91562784c05cc474f292f83357f",
   "specVersion": "1.3.0"
 }
