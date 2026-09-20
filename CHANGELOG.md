@@ -282,6 +282,19 @@ is neither registry availability nor evidence of consumer deployment.
   other direction: it appends unstamped records, coverage breaks again, and
   returning requires another stop and another reindex.
 
+### Streaming metrics (spec 026)
+
+- `rahi_streams_open` is paired with the stream's attachment rather than
+  with the process-global observability context. A stream that opened
+  before `rahi_edge::obs::init` installed that context and closed after it
+  decremented a gauge it had never incremented, so the gauge could go
+  negative and `rahi_streams_closed_total` could count a close whose open
+  was never counted. A stream is now counted open and counted closed, or
+  neither. No metric name, label, or type changed, and the composer, which
+  installs observability before the listener accepts, was never exposed to
+  the ordering; a library consumer that serves an `Edge` before calling
+  `obs::init` was.
+
 ### Evidence and release tooling since 0.1.0
 
 - The digest-pinned rauthy 0.36.2 live suite refuses missing fixtures with
