@@ -12,14 +12,27 @@ change the consumer contract and a patch bump may not.
 
 ## 0.2.0, release candidate (not published)
 
-Prepared from the completed spec 037 merge
-`ea6d0da125aaafe0927570410a8a1b0ee9d1286e`, including every change since
-`v0.1.0` (`6e06c042df4e9f5b47dc86ee8d40167c2e668b5e`). All nine chassis
-crates move together. The minor bump follows spec 039 B-1 because key-set,
-backup authentication, recovery, and the export API change compatibility.
-The coordinator must record the final tested main revision and release date
-when creating the annotated `v0.2.0` tag and forge release. This candidate
-is neither registry availability nor evidence of consumer deployment.
+Every change since `v0.1.0` (`6e06c042df4e9f5b47dc86ee8d40167c2e668b5e`).
+All nine chassis crates move together. The minor bump follows spec 039 B-1
+because key-set, backup authentication, recovery, and the export API change
+compatibility. The coordinator must record the final tested main revision
+and release date when creating the annotated `v0.2.0` tag and forge
+release. This candidate is neither registry availability nor evidence of
+consumer deployment.
+
+**Provenance, reconciled 2026-09-20.** This section was first prepared on
+2026-09-17 from the spec 037 merge
+`ea6d0da125aaafe0927570410a8a1b0ee9d1286e` and described a tree that no
+longer matches `main`. The candidate now carries, in the order they
+landed: **037** identity recovery and the live proof; **036** manifest and
+schema evolution, with the four fail-open repairs of PR #62 and the
+one-snapshot manifest read of PR #64; **042** lifetime identity for
+decisions, with the coverage, recovery, single-snapshot and
+resident-verification corrections of PRs #66, #67 and #68; and the two
+corrections of 2026-09-20, **026**'s stream gauge pairing and **033**'s
+boot-budget measurement. The 2026-09-17 preparation text is kept where it
+records what was decided then; where it described the release's contents,
+it is corrected here.
 
 ### Recovery and authentication (spec 037)
 
@@ -295,6 +308,21 @@ is neither registry availability nor evidence of consumer deployment.
   the ordering; a library consumer that serves an `Edge` before calling
   `obs::init` was.
 
+### Test and packaging corrections (specs 033, 039)
+
+- The harness's boot-budget test measured a compilation against a boot
+  deadline: it opened its measured window before `binary()`, which shells
+  out to `cargo build -p rahi-cli`. The budget, the refused configuration
+  and the stderr assertion are unchanged; the window now opens after the
+  binary is built (033 D-6). No chassis behaviour changes, and no consumer
+  surface is affected.
+- A tag now publishes `ghcr.io/statecrafting/rahi-hello-cell:X.Y.Z`
+  alongside the cell and runtime images, both architectures, never
+  `latest`, and smokes the pushed digest rather than a second local build
+  (039 D-14). The hello-cell **crate** stays `publish = false`; this is the
+  reference app's image, which 039 AC-3 runs spec 034's AC-2 procedure
+  against and which no release had ever published.
+
 ### Evidence and release tooling since 0.1.0
 
 - The digest-pinned rauthy 0.36.2 live suite refuses missing fixtures with
@@ -320,23 +348,53 @@ is neither registry availability nor evidence of consumer deployment.
 
 ### Independent limitations, not fixed by this release
 
-- **Lease release:** the locked, published hiqlite 0.14.0 can fail after a
-  stale lease is released following TTL takeover. Full-node restart followed
-  by a second lease is also unverified. This release changes neither lease
-  implementation nor the published dependency pin; no git, vendor, or patch
-  substitute is introduced. See the upstream
-  [repair](https://github.com/sebadob/hiqlite/pull/352) for context, not proof
-  that the locked package contains it.
-- **Ledger retry identity:** ID/content classification covers resident
-  records. Sealing removes those rows, so a retry after sealing can append a
-  duplicate decision ID while chain verification still passes. Lifetime
-  idempotence, atomic retry versus sealing, unavailable-history handling,
-  and migration/backfill require a separately governed design. An archive
-  scan alone cannot establish atomic absence.
+- **Lease release:** published hiqlite 0.14.0 can fail after a stale lease
+  is released following TTL takeover, and this release does not repair it
+  for a consumer. Corrected 2026-09-20: the sentence that stood here said
+  "no git, vendor, or patch substitute is introduced", which was true when
+  written on 2026-09-17 and was falsified the same day. rahi's workspace
+  root now carries a temporary, scoped `[patch.crates-io]` pinning
+  `hiqlite` and `hiqlite-wal` to the merge commit of upstream PR #352
+  (spec 011 D-12), and `Cargo.lock` resolves them from that git source.
+  **A consumer does not inherit it.** `[patch]` is root-workspace metadata,
+  carried neither by `cargo publish` nor along a dependency edge, so every
+  published crate still declares `hiqlite = "0.14"` and a registry or git
+  consumer resolves 0.14.0 without the fix; a consumer that wants it
+  declares the same patch in its own workspace root. Rahi's own green test
+  runs are therefore evidence about rahi's builds and about nothing a
+  downstream consumer executes. Re-checked 2026-09-20: the newest published
+  hiqlite is still 0.14.0 of 2026-07-06 and the release request
+  [#366](https://github.com/sebadob/hiqlite/issues/366) is still open, so
+  011 D-12's removal condition is unmet and the exception stands. See the
+  upstream [repair](https://github.com/sebadob/hiqlite/pull/352) for
+  context, not as proof that any published package contains it.
+- **Full-node restart and a second lease:** stopping a whole node while a
+  lease is held, restarting it, and acquiring on that key again within a
+  bounded time is **unverified**. No approved spec carries that acceptance.
+  It is a different property from the restart 037 proves, which is a reboot
+  on a restored volume with the chain verified, and passing that does not
+  establish this.
+- **Ledger retry identity: closed by spec 042, and carried by this
+  release.** Corrected 2026-09-20. This entry previously said lifetime
+  idempotence "require[s] a separately governed design", contradicting the
+  042 section above, and it predated 042 landing on `main`. The governed
+  design exists and shipped: every decision carries a resident identity row
+  that survives sealing, the identity table's primary key arbitrates a
+  duplicate id inside the append transaction, `lookup` answers presence,
+  proven absence, unproven history and proven ambiguity as different
+  answers, and `rahi ledger reindex` rebuilds the accounting of a chain
+  sealed before it. The limitation as written remains true of **0.1.0 and
+  of any artifact built before 042 landed**, and the upgrade is not free:
+  see "Upgrade limits (spec 042)" above for the stop-the-world reindex, the
+  absence of a mixed-version guarantee, and the permanent per-decision
+  resident cost.
 
-Statecraft can evaluate 037's N=1 recovery once 0.2.0 is published. Aicortex
-must not adopt this release as a fix for either independent limitation.
-Publishing new artifacts changes no consumer dependency or rollout target.
+Statecraft can evaluate 037's N=1 recovery once 0.2.0 is published, at N=1
+only: this release establishes nothing about Kubernetes N=3, which has never
+run. Aicortex gains the ledger identity repair from this release and does
+**not** gain the hiqlite lease repair or full-node second-lease evidence
+from it. Publishing new artifacts changes no consumer dependency or rollout
+target.
 
 ## 0.1.0, 2026-09-16
 

@@ -150,6 +150,27 @@ The image spec 031 builds takes the package and binary as build
 arguments; the compose file of spec 033 runs it as the N=1 topology with
 the volume bind-mounted at `docker/.data`.
 
+### Against the published image (spec 039 AC-3)
+
+From `v0.2.0` a release publishes this cell's image, so the procedure below
+can be run without a checkout or a local build (spec 039 D-14). Pull it by
+version, or by digest to pin exactly what you ran:
+
+```sh
+docker pull ghcr.io/statecrafting/rahi-hello-cell:0.2.0
+docker run --rm -e RAHI_PUBLIC_URL=http://localhost:8080 \
+  -p 8080:8080 -v hello-cell-data:/data \
+  ghcr.io/statecrafting/rahi-hello-cell:0.2.0
+```
+
+The image carries the page at `/usr/local/share/rahi/static`, the pinned
+rauthy, the non-root user, `/data`, and the entrypoint, so steps 2 onward
+read the same. Substituting a locally built image is **not** this
+criterion: AC-3 is about the artifact a consumer can pull. The crate
+itself stays unpublished (`publish = false`); only the image is released.
+
+### From a checkout
+
 1. Build the image for this cell and start it:
 
    ```sh
