@@ -16,6 +16,7 @@ depends_on:
 establishes:
   - "crates/rahi-edge/src/stream.rs"
   - "crates/rahi-edge/tests/stream.rs"
+  - "crates/rahi-edge/tests/stream_gauge.rs"
 extends:
   - { spec: "020-edge-server", unit: "crates/rahi-edge/src/router.rs", nature: additive }
   - { spec: "020-edge-server", unit: "crates/rahi-edge/src/lib.rs", nature: additive }
@@ -23,6 +24,7 @@ extends:
   - { spec: "020-edge-server", unit: "crates/rahi-edge/Cargo.toml", nature: additive }
   - { spec: "023-observability", unit: "crates/rahi-edge/src/obs/metrics.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/serve.rs", nature: additive }
+  - { spec: "039-release-and-out-of-tree-packaging", unit: "CHANGELOG.md", nature: additive }
 summary: >
   A response that is produced over seconds rather than milliseconds breaks
   every default the edge holds: compression buffers it, the request timeout
@@ -227,6 +229,35 @@ which is a notification concern and does not exist in this chassis.
   first-byte budget, and the drain. No crate enters the tree that was not
   already in it; the Territory's sentence was about that, and it holds.
 
+- **D-9 (2026-09-20, correction session; reads B-9 and AC-2).** The open
+  gauge is paired with the attachment, not with the process-global
+  observability context. `attach` read `crate::obs::current()` to decide
+  whether to increment and `close` read it again to decide whether to
+  decrement, so a context installed between those two points decremented a
+  stream it had never counted open. `rahi_streams_open` is an `IntGauge`,
+  a negative value is representable, and the gauge went to -1. The
+  scheduled live run of 2026-09-20 on `50f3ef2` caught it as AC-2's
+  `streams_open() >= 0` in `tests/stream.rs`, where the ac2 test installs
+  the context partway through a binary whose other ten tests hold streams
+  open concurrently; the same ten tests passed, and the pull-request run on
+  `63fdb28` was green, because the failure needs one stream to span the
+  install. `attach` now decides once and the `Attachment` carries the
+  answer, so the decrement happens if and only if the matching increment
+  did, and a stream opened before the context exists is neither counted
+  open nor counted closed. Clamping the gauge at zero was rejected: it
+  would hide an unmatched decrement rather than remove it, and the
+  unmatched decrement is also an unmatched `rahi_streams_closed_total`,
+  which no clamp reaches. Serialising `tests/stream.rs` was rejected for
+  the same reason: the ordering is a property of the library, and an
+  application that builds an `Edge` and serves before calling
+  `rahi_edge::obs::init` reaches it without any test harness. The
+  regression is `tests/stream_gauge.rs`, its own binary because the
+  context is a `OnceLock` that `tests/stream.rs` has already installed; it
+  drives the ordering deterministically rather than waiting for the
+  interleaving, and fails at -1 against the mechanism it replaces. The
+  composer of D-7 is unaffected: it installs observability during
+  composition, before the listener accepts.
+
 ## 8. Status
 
 - **2026-09-10.** B-1 to B-10, FR-001 to FR-006, AC-1, and AC-2 hold:
@@ -234,9 +265,19 @@ which is a notification concern and does not exist in this chassis.
   reading its response body event by event; `/metrics` exposes the gauge
   and the closed counter with all four outcomes. D-2 records that three of
   B-4's exemptions exempt from layers spec 020's edge does not yet carry.
+- **2026-09-20.** AC-2's non-negative bound was broken by the gauge
+  pairing D-9 corrects, and is reasserted: `cargo test -p rahi-edge
+  --locked` passes every binary, `--test stream` passes 11 tests, and
+  `--test stream_gauge` holds the ordering the scheduled run hit. The
+  correction is confined to `src/stream.rs`; no acceptance criterion, no
+  behavior text, and no metric name changed.
 
 ## Verification
 
 ```verify:cli
 cargo test -p rahi-edge --locked --test stream
+```
+
+```verify:cli
+cargo test -p rahi-edge --locked --test stream_gauge
 ```

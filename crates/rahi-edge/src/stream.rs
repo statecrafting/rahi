@@ -216,6 +216,12 @@ struct Attachment {
     route: String,
     started: Instant,
     span: tracing::Span,
+    /// The observability context that counted this stream open, if one was
+    /// installed when it attached. Held rather than re-read at close: the
+    /// gauge is a pair of one increment and one decrement, and reading the
+    /// process-global context a second time lets a context installed in
+    /// between decrement what it never incremented (D-9).
+    obs: Option<&'static crate::obs::Obs>,
 }
 
 impl Shared {
@@ -273,7 +279,7 @@ impl Shared {
             attachment.span.record("outcome", outcome.as_str());
             attachment.span.record("events", events);
             attachment.hub.release(&attachment.identity);
-            if let Some(obs) = crate::obs::current() {
+            if let Some(obs) = attachment.obs {
                 obs.metrics().record_stream_closed(outcome, elapsed, events);
             }
             tracing::info!(
@@ -635,7 +641,11 @@ impl StreamHub {
             outcome = tracing::field::Empty,
             events = tracing::field::Empty,
         );
-        if let Some(obs) = crate::obs::current() {
+        // Decide once, here, whether this stream is observed at all, and
+        // carry the answer to the close so the two halves cannot disagree
+        // about a context installed between them (D-9).
+        let obs = crate::obs::current();
+        if let Some(obs) = obs {
             obs.metrics().record_stream_open();
         }
         shared.lock().attachment = Some(Attachment {
@@ -644,6 +654,7 @@ impl StreamHub {
             route,
             started: Instant::now(),
             span,
+            obs,
         });
     }
 

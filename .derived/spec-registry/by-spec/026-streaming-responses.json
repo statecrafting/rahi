@@ -18,6 +18,10 @@
       {
         "kind": "file",
         "path": "crates/rahi-edge/tests/stream.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-edge/tests/stream_gauge.rs"
       }
     ],
     "extends": [
@@ -68,6 +72,14 @@
           "kind": "file",
           "path": "crates/rahi-cli/src/serve.rs"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "039-release-and-out-of-tree-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "CHANGELOG.md"
+        }
       }
     ],
     "extraFrontmatter": {
@@ -94,6 +106,6 @@
     "summary": "A response that is produced over seconds rather than milliseconds breaks every default the edge holds: compression buffers it, the request timeout kills it, the rate limiter counts it once and forgets it, and graceful shutdown drops it mid-sentence. This spec adds one streaming mechanism, server-sent events, and makes a streaming route declare itself so those four defaults are turned off deliberately rather than discovered in production. Streams are bounded by a per-stream channel and a per-client concurrency limit, are cancellation-aware, close cleanly on shutdown, and are one span each in the tracer.\n",
     "title": "Streaming responses: server-sent events as the one mechanism, declared per route, bounded and cancellable"
   },
-  "shardHash": "ce9b6672b576cba74e3570abdfcc4292ce4fc3ced928197857077ba82e0bd67b",
+  "shardHash": "89fe166f56952a18f305f1f67fb895136c41fe6e40c80307a5dfaa7bd769c5b9",
   "specVersion": "1.3.0"
 }
