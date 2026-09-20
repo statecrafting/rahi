@@ -27,7 +27,7 @@ use crate::record::{Decision, DecisionId, DecisionKind, Hash, Outcome, SignedRec
 use crate::seal::Depth;
 use crate::segment::{
     SEGMENTS_ADD_MANIFEST_SQL, SEGMENTS_COLUMNS_SQL, SEGMENTS_INDEX_SQL, SEGMENTS_MANIFEST_COLUMN,
-    SEGMENTS_TABLE_SQL,
+    SEGMENTS_TABLE_SQL, SegmentHeader, order_segments,
 };
 use crate::signer::{LedgerSigner, LedgerVerifier};
 use crate::verify::order_chain;
@@ -53,37 +53,45 @@ pub const DECISIONS_INDEX_SQL: &str =
 const HEAD_SQL: &str = "SELECT hash FROM kernel_decisions \
      WHERE hash NOT IN (SELECT prev_hash FROM kernel_decisions)";
 
-/// The whole resident answer in one statement: the records, the count of
-/// them, and the hash they are rooted at (spec 036 D-11, spec 042 D-17).
+/// The whole chain as the store holds it, in one statement: every resident
+/// record, every sealed header, and a census of each relation taken in that
+/// same snapshot (spec 036 D-11, D-15, spec 042 D-17, D-18).
 ///
-/// The first branch has no `FROM`, so SQLite yields it whatever the tables
-/// hold: it is the witness that the read answered at all. Its `total` is a
-/// scalar subquery evaluated inside this one statement, so it is the same
-/// snapshot the rows come from, which a second `COUNT(*)` statement would
-/// not be. A missing witness row or a row count below the witnessed total is
-/// a read that did not answer or that dropped rows, and neither may be read
-/// as "the chain holds nothing".
+/// The two witness branches have no `FROM`, so SQLite yields them whatever
+/// the tables hold: they are the evidence that the read answered at all, and
+/// each `COUNT(*)` is a scalar subquery evaluated in the same snapshot as the
+/// rows it counts, which a second statement would not be. A missing witness
+/// row, or a carried count below the witnessed total, is a read that did not
+/// answer or that dropped rows, and neither may be read as "the chain holds
+/// nothing".
 ///
-/// The third branch carries the unclaimed segments, which is what
-/// [`Ledger::resident_root`] decides the root from, and the witness row
-/// carries `segments`, the count that tells an archive with no last segment
-/// from an archive with no segments at all. Taking them here rather than in
-/// a second statement is the whole of spec 042 D-17: a seal commits the
-/// archived rows and the resident deletions in one transaction, so a root
-/// read after the records is a root from *after* a seal the records are from
-/// *before*, and ordering the older records against the newer root reports
-/// an integrity failure for a chain that is intact.
-const RESIDENT_SNAPSHOT_SQL: &str = "SELECT 0 AS witness, \
-     (SELECT COUNT(*) FROM kernel_decisions) AS total, \
-     (SELECT COUNT(*) FROM kernel_segments) AS segments, \
-     X'' AS record, '' AS segment_hash, '' AS last_hash \
+/// One statement is one snapshot, and that is the whole of why the records
+/// and the headers are taken together. A seal commits the new segment header
+/// and the deletion of the records it archived in one transaction (spec 014
+/// B-2), so a header read and a record read taken on opposite sides of it
+/// disagree about what the chain is: the records are rooted at a hash the
+/// headers do not name yet, or the headers name a manifest the records no
+/// longer carry. Spec 042 D-17 removed that crossing inside `records` and
+/// D-18 removes the last of it from verification, whose evidence is all
+/// three of the headers, the root, and the records.
+const CHAIN_SNAPSHOT_SQL: &str = "SELECT 0 AS kind, \
+     (SELECT COUNT(*) FROM kernel_decisions) AS total, X'' AS record, \
+     '' AS first_id, '' AS last_id, 0 AS count, '' AS segment_hash, \
+     '' AS prev_segment_hash, '' AS last_hash, NULL AS current_manifest \
      UNION ALL \
-     SELECT 1 AS witness, 0 AS total, 0 AS segments, \
-     record, '' AS segment_hash, '' AS last_hash FROM kernel_decisions \
+     SELECT 1, (SELECT COUNT(*) FROM kernel_segments), X'', \
+     '', '', 0, '', '', '', NULL \
      UNION ALL \
-     SELECT 2 AS witness, 0 AS total, 0 AS segments, \
-     X'' AS record, segment_hash, last_hash FROM kernel_segments \
-     WHERE segment_hash NOT IN (SELECT prev_segment_hash FROM kernel_segments)";
+     SELECT 2, 0, record, '', '', 0, '', '', '', NULL FROM kernel_decisions \
+     UNION ALL \
+     SELECT 3, 0, X'', first_id, last_id, count, segment_hash, \
+     prev_segment_hash, last_hash, current_manifest FROM kernel_segments";
+
+/// Which kind of row [`CHAIN_SNAPSHOT_SQL`] yielded.
+const RESIDENT_WITNESS: i64 = 0;
+const SEALED_WITNESS: i64 = 1;
+const RESIDENT_ROW: i64 = 2;
+const SEALED_ROW: i64 = 3;
 
 const COUNT_SQL: &str = "SELECT COUNT(*) AS total FROM kernel_decisions";
 
@@ -118,21 +126,52 @@ struct ColumnRow {
     name: String,
 }
 
-/// One row of [`RESIDENT_SNAPSHOT_SQL`]: the witness, a record, or an
-/// unclaimed segment, told apart by `witness`.
+/// One row of [`CHAIN_SNAPSHOT_SQL`]: a witness, a record, or a segment
+/// header, told apart by `kind`.
 #[derive(Debug, Deserialize)]
-struct ResidentSnapshotRow {
-    witness: i64,
+struct ChainSnapshotRow {
+    kind: i64,
     #[serde(default)]
     total: i64,
     #[serde(default)]
-    segments: i64,
-    #[serde(default)]
     record: Vec<u8>,
-    #[serde(default)]
-    segment_hash: String,
-    #[serde(default)]
-    last_hash: String,
+    #[serde(flatten)]
+    segment: crate::seal::SegmentRow,
+}
+
+/// The whole chain, from one snapshot: the sealed headers oldest first, the
+/// hash the oldest resident record links to, and the resident records in
+/// chain order (spec 042 D-18).
+///
+/// The three are one piece of evidence rather than three answers that happen
+/// to have been read nearby. Verification needs all of them, and a seal
+/// landing between two of them is what spec 042 D-17 and D-18 were: an
+/// integrity failure reported over an intact chain.
+#[derive(Debug)]
+pub(crate) struct ChainSnapshot {
+    /// Every sealed segment's header, oldest first.
+    pub(crate) segments: Vec<SegmentHeader>,
+    /// The hash the oldest resident record links to.
+    pub(crate) root: Hash,
+    /// Every resident record, in chain order from `root`.
+    pub(crate) records: Vec<SignedRecord>,
+}
+
+/// Which test seam a chain snapshot runs inside itself (spec 036 D-15,
+/// spec 042 D-17).
+///
+/// Two crossings were found at different altitudes and each has a regression
+/// that drives it, so the one reader states which seam it is standing in
+/// rather than firing both. `None` on every ledger this crate builds, so the
+/// choice costs a matched branch and nothing else.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum SnapshotSeam {
+    /// Spec 036 D-15's [`ReadInterleave`]: the seam the manifest read's
+    /// crossing is driven at.
+    Read,
+    /// Spec 042 D-17's [`SnapshotInterleave`]: the seam the chain read's own
+    /// crossing is driven at.
+    Snapshot,
 }
 
 #[derive(Debug, Deserialize)]
@@ -328,6 +367,16 @@ pub(crate) struct ReadTally {
     /// Full verdict reads (`Ledger::coverage`) alone, which is the quantity
     /// B-11 means when it says a verdict moved "without a leader read".
     pub(crate) census: std::sync::atomic::AtomicU64,
+    /// Reads of the chain itself: the one statement that carries the
+    /// resident records, the segment headers and their censuses (spec 042
+    /// D-18).
+    ///
+    /// Carried for the same reason the three above are: the quantity D-18
+    /// fixes is *how many snapshots the evidence comes from*, and a
+    /// regression that asserted anything else (an error that did not occur,
+    /// a message, a wall time) would assert something the decision does not
+    /// say. One verification is one of these, whatever its depth.
+    pub(crate) chain: std::sync::atomic::AtomicU64,
 }
 
 /// A snapshot of [`ReadTally`], as a test reads it.
@@ -342,6 +391,8 @@ pub struct ReadCounts {
     pub coverage_rows: u64,
     /// Full verdict reads.
     pub census: u64,
+    /// Reads of the chain snapshot (spec 042 D-18).
+    pub chain: u64,
 }
 
 /// What [`Ledger::open`] established about the chain it verified (spec 036
@@ -599,6 +650,7 @@ impl Ledger {
             coverage: self.tally.coverage.load(Ordering::Relaxed),
             coverage_rows: self.tally.coverage_rows.load(Ordering::Relaxed),
             census: self.tally.census.load(Ordering::Relaxed),
+            chain: self.tally.chain.load(Ordering::Relaxed),
         }
     }
 
@@ -785,64 +837,148 @@ impl Ledger {
     /// records do not form one list rooted at [`Ledger::resident_root`]; the
     /// store's own error when the read fails.
     pub async fn records(&self) -> Result<Vec<SignedRecord>, Error> {
-        let (records, root) = self.resident_snapshot().await?;
-        order_chain(&root, records)
+        Ok(self.chain_snapshot().await?.records)
     }
 
-    /// The resident records and the hash they are rooted at, read in one
-    /// statement (spec 042 D-17).
+    /// The whole chain in one statement: the sealed headers, the hash the
+    /// oldest resident record links to, and the resident records in chain
+    /// order (spec 036 D-11, D-15, spec 042 D-17, D-18).
     ///
-    /// The pair is the unit of coherence. A seal is one transaction that
-    /// deletes the sealed records and writes the segment that becomes the
-    /// new root, so the two halves are only ever consistent with each other
-    /// when they come from the same snapshot. Read in two statements they
-    /// are not: a seal landing between them leaves records from before it
-    /// ordered against a root from after it, which is an integrity failure
-    /// reported over an intact chain.
+    /// The snapshot is the unit of coherence. A seal is one transaction that
+    /// writes a segment header, deletes the records it archived, and thereby
+    /// changes what the resident chain is rooted at, so records, headers and
+    /// root are only ever consistent with each other when they come from the
+    /// same snapshot. Read in two statements they are not: a seal landing
+    /// between them leaves records from before it ordered against a root from
+    /// after it, or a header list that does not name the root the records are
+    /// ordered from, both of which are integrity failures reported over an
+    /// intact chain.
     ///
-    /// Completeness is witnessed exactly as spec 036 D-11 requires: the
-    /// census row is the evidence the read answered at all, and a carried
-    /// count that does not match it is refused rather than read as an empty
-    /// chain.
+    /// Completeness is witnessed exactly as spec 036 D-11 requires, now for
+    /// both relations: each census row is the evidence that its half of the
+    /// read answered at all, and a carried count that does not match it is
+    /// refused rather than read as an empty chain or an empty archive. What
+    /// [`Ledger::open`] verified is carried forward on top of that, because
+    /// records are only appended and segments only added: an empty answer
+    /// from a relation `open` found rows in is the read failing rather than
+    /// the chain shrinking (spec 036 D-15).
+    ///
+    /// The root is decided by [`crate::seal::root_of_segment_heads`], the
+    /// same function [`Ledger::resident_root`] uses, from the headers no other
+    /// header claims as a predecessor; the header list is independently
+    /// ordered by [`order_segments`]. Neither is derived from the other, so
+    /// the two cannot drift apart in what they call a fork, a cycle, or an
+    /// empty archive.
     ///
     /// # Errors
     ///
-    /// [`Error::Integrity`] when the read did not account for itself, when a
-    /// stored row does not parse, or when the archive has forked at its head
-    /// or lost its last segment; the store's own error when the read fails.
-    pub(crate) async fn resident_snapshot(&self) -> Result<(Vec<SignedRecord>, Hash), Error> {
-        let rows: Vec<ResidentSnapshotRow> = self
+    /// [`Error::Integrity`] when the read did not account for itself, when it
+    /// contradicts what `open` established, when a stored row does not parse,
+    /// when the archive has forked at its head or lost its last segment, or
+    /// when the records do not form one list rooted at the root; the store's
+    /// own error when the read fails.
+    pub(crate) async fn chain_snapshot(&self) -> Result<ChainSnapshot, Error> {
+        self.chain_snapshot_at(SnapshotSeam::Snapshot).await
+    }
+
+    /// [`Ledger::chain_snapshot`], standing in the named test seam.
+    pub(crate) async fn chain_snapshot_at(
+        &self,
+        seam: SnapshotSeam,
+    ) -> Result<ChainSnapshot, Error> {
+        let opened = self.opened();
+        self.tally
+            .chain
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let rows: Vec<ChainSnapshotRow> = self
             .store
-            .query_consistent(RESIDENT_SNAPSHOT_SQL, vec![])
+            .query_consistent(CHAIN_SNAPSHOT_SQL, vec![])
             .await?;
-        let mut witnessed = None;
-        let mut segments = 0;
-        let mut carried = Vec::new();
-        let mut heads = Vec::new();
+
+        let mut resident_witness = None;
+        let mut sealed_witness = None;
+        let mut carried_records = Vec::new();
+        let mut carried_segments = Vec::new();
         for row in rows {
-            match row.witness {
-                0 => {
-                    witnessed = Some(row.total);
-                    segments = row.segments;
+            match row.kind {
+                RESIDENT_WITNESS => resident_witness = Some(row.total),
+                SEALED_WITNESS => sealed_witness = Some(row.total),
+                RESIDENT_ROW => carried_records.push(row.record),
+                SEALED_ROW => carried_segments.push(row.segment),
+                // The statement yields four kinds and nothing else, so a
+                // fifth is the store answering something this code did not
+                // ask, which is not a row to guess the meaning of.
+                other => {
+                    return Err(Error::Integrity(format!(
+                        "the chain read carried a row of kind {other}, which this statement does \
+                         not ask for, so nothing may be concluded from the answer"
+                    )));
                 }
-                1 => carried.push(row.record),
-                _ => heads.push((row.segment_hash, row.last_hash)),
             }
         }
-        check_census("kernel_decisions", witnessed, carried.len())?;
-        let records = carried
+        check_census("kernel_decisions", resident_witness, carried_records.len())?;
+        check_census("kernel_segments", sealed_witness, carried_segments.len())?;
+        let sealed_total = sealed_witness.unwrap_or_default();
+
+        let headers = carried_segments
+            .into_iter()
+            .map(crate::seal::SegmentRow::into_header)
+            .collect::<Result<Vec<_>, Error>>()?;
+        if headers.is_empty() && opened.sealed {
+            return Err(Error::Integrity(
+                "the segment headers read back empty, and this ledger verified segments when it \
+                 opened: segments are only ever added, so this is the read failing rather than \
+                 the archive emptying, and nothing may be concluded from it"
+                    .to_owned(),
+            ));
+        }
+
+        let records = carried_records
             .iter()
             .map(|bytes| SignedRecord::from_bytes(bytes))
             .collect::<Result<Vec<_>, Error>>()?;
-        // Spec 042 D-17's seam: a seal committed here is a seal committed
-        // after the snapshot this read answers from, and must change
-        // nothing about the answer. Its own hook rather than the
-        // [`ReadInterleave`] of spec 036 D-15, so a regression can drive
-        // this crossing and that one independently. `None` on every ledger
-        // this crate builds.
-        self.snapshot_interleave().await;
-        let root = crate::seal::root_of_segment_heads(&heads, segments, self.genesis_parent())?;
-        Ok((records, root))
+        if records.is_empty() && opened.resident {
+            return Err(Error::Integrity(
+                "the resident chain reads back empty, and this ledger verified records in it when \
+                 it opened: records are only ever appended, so this is the read failing rather \
+                 than the chain emptying, and nothing may be concluded from it"
+                    .to_owned(),
+            ));
+        }
+
+        // Spec 042 D-17's seam, and spec 036 D-15's: a seal committed here is
+        // a seal committed after the snapshot this read answers from, and
+        // must change nothing about the answer. `None` on every ledger this
+        // crate builds.
+        match seam {
+            SnapshotSeam::Read => self.read_interleave().await,
+            SnapshotSeam::Snapshot => self.snapshot_interleave().await,
+        }
+
+        // The unclaimed heads, taken from the carried headers rather than
+        // from a second statement's `NOT IN`: the same decision
+        // `resident_root` makes, from this snapshot.
+        let claimed: std::collections::HashSet<&Hash> =
+            headers.iter().map(|h| &h.prev_segment_hash).collect();
+        let heads: Vec<(String, String)> = headers
+            .iter()
+            .filter(|h| !claimed.contains(&h.segment_hash))
+            .map(|h| {
+                (
+                    h.segment_hash.as_str().to_owned(),
+                    h.last_hash.as_str().to_owned(),
+                )
+            })
+            .collect();
+        let root = crate::seal::root_of_segment_heads(&heads, sealed_total, self.genesis_parent())?;
+        let segments = order_segments(self.genesis_parent(), headers)?;
+        let records = order_chain(&root, records)?;
+
+        Ok(ChainSnapshot {
+            segments,
+            root,
+            records,
+        })
     }
 
     /// How many records are resident.

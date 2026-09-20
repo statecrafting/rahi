@@ -478,29 +478,46 @@ impl Ledger {
         self.verify_chain_witnessed(depth).await.map(|_| ())
     }
 
-    /// [`Ledger::verify_chain`], reporting what it saw (spec 036 D-11).
+    /// [`Ledger::verify_chain`], reporting what it saw (spec 036 D-11,
+    /// spec 042 D-18).
     ///
-    /// `open` keeps the answer, because verification has already paid for
-    /// both reads and because neither fact it records can become false
-    /// afterwards.
+    /// `open` keeps the answer, because verification has already paid for the
+    /// read and because neither fact it records can become false afterwards.
+    ///
+    /// The whole evidence is one snapshot ([`Ledger::chain_snapshot`]): the
+    /// segment headers, the hash the oldest resident record links to, and the
+    /// resident records. Read separately they were three answers from three
+    /// moments, and a seal between any two of them made an intact chain
+    /// report an integrity failure, because a seal writes the header that
+    /// becomes the new root and deletes the records it archived in one
+    /// transaction (spec 014 B-2). What is witnessed is unchanged and now
+    /// covers both relations: a read that did not answer, or that dropped
+    /// rows, is refused rather than read as an empty chain or an empty
+    /// archive, and the two facts `open` carries forward are taken from that
+    /// same snapshot rather than from whichever read happened to be last.
+    ///
+    /// At [`Depth::Full`] the bodies fetched are the ones those headers name.
+    /// A seal that commits after the snapshot is simply history this
+    /// verification did not cover, and a header in the snapshot always has a
+    /// durable body, because a seal writes the body before it commits the
+    /// header (B-2).
     pub(crate) async fn verify_chain_witnessed(
         &self,
         depth: Depth<'_>,
     ) -> Result<crate::chain::OpenedChain, Error> {
-        let segments = self.segments().await?;
-        let root = self.resident_root().await?;
-        // `records` is ordered from `root`, and 013's verifier checks that
-        // the oldest record links it: the check B-4 asks for at the seam
-        // between what is resident and what is sealed.
-        let records = self.records().await?;
-        crate::verify::verify_chain(&root, &records, &self.verifier())?;
+        let snapshot = self.chain_snapshot().await?;
+        // The records are ordered from the snapshot's own root, and 013's
+        // verifier checks that the oldest record links it: the check B-4 asks
+        // for at the seam between what is resident and what is sealed.
+        crate::verify::verify_chain(&snapshot.root, &snapshot.records, &self.verifier())?;
 
         if let Depth::Full(archive) = depth {
-            self.verify_segment_bodies(archive, &segments).await?;
+            self.verify_segment_bodies(archive, &snapshot.segments)
+                .await?;
         }
         Ok(crate::chain::OpenedChain {
-            resident: !records.is_empty(),
-            sealed: !segments.is_empty(),
+            resident: !snapshot.records.is_empty(),
+            sealed: !snapshot.segments.is_empty(),
         })
     }
 
