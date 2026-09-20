@@ -139,6 +139,34 @@ testing.
   forwarded and the listeners opened to the container network; that
   wrapper is session tooling, not part of the tree. On a Linux host the
   binary is the image's `/app/rauthy`.
+- **D-6 (2026-09-20, correction session; reads FR-003 and B-2's budget).**
+  FR-003's test measured a compilation against a boot deadline. `binary()`
+  shells out to `cargo build -p rahi-cli --locked`, because the harness has
+  no compile-time dependency on the chassis (B-2) and cargo therefore does
+  not build the cell for this crate's tests. That call sat *inside* the
+  window the test opened: `let started = Instant::now()` preceded
+  `BootSpec::new(binary())`, and Rust evaluates the argument after the
+  instant is taken. Under `cargo test --workspace` the nested invocation
+  resolves features differently from the outer one, so it rebuilt the whole
+  chassis, and 2m 14s of compilation was charged to a 90-second
+  `READY_BUDGET`. Observed as the failure of the scheduled live run of
+  2026-09-20 and reproduced twice locally under `make ci` (141.73s and
+  394.74s to failure); the same test passes in 8.55s run alone against warm
+  artifacts, which is why it had read as a load-sensitive flake rather than
+  as a defect with an address. The window now opens after the binary is
+  built and the `BootSpec` is constructed, and the assertion reports the
+  preparation and the boot as two durations so a future reader cannot
+  confuse them. Nothing else moved: the budget is still 90 seconds, the
+  boot is still a real refusal of `RAHI_RAUTHY_MODE=bogus`, and the stderr
+  assertion is unchanged. Rejected: raising the budget, which would hide
+  the measurement error behind a number nobody could justify; and relying
+  on CI's `make build` to warm the artifact first, which makes the test's
+  correctness a property of the caller's ordering rather than of the test.
+  The library's own window is correct and was left alone: `poll_ready`
+  takes its `start` after the child is spawned, and it never builds
+  anything. A workspace search finds `env!("CARGO")` in exactly one test,
+  this one, so this was the only site where a measured interval could
+  enclose a build.
 
 ## 8. Status
 
@@ -159,6 +187,20 @@ testing.
   exercised here: FR-002 on a Linux host with the binary itself, and the
   `develop.watch` rebuild loop, which needs a running daemon and an
   editing developer.
+- **2026-09-20.** FR-003 held only against warm build artifacts; D-6
+  corrects the measurement so it holds against a cold one. Verified with
+  an isolated `CARGO_TARGET_DIR` and bounded build concurrency
+  (`CARGO_BUILD_JOBS=4`), which makes `binary()` compile `rahi-cli` from
+  scratch inside the run: the test binary started, the nested build
+  reported `Finished dev profile in 1m 38s` between `running 6 tests` and
+  the first result, and the assertion passed. Ninety-eight seconds of
+  compilation against a ninety-second budget is a certain failure under
+  the mechanism D-6 replaces, not a probabilistic one, so the run is a
+  direct before-and-after on the defect rather than a re-roll of a flake.
+  `cargo test -p rahi-harness --locked --test boot`: 6 passed, 106.47s,
+  of which the build is 98. The budget, the refused configuration, and the
+  stderr assertion are unchanged, and the harness tests still run
+  standalone.
 
 ## Verification
 

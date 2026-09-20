@@ -134,12 +134,24 @@ fn a_boot_the_binary_refuses_fails_inside_the_budget_with_its_stderr() {
     // The manifest is compiled into the binary (spec 030), so the nearest
     // thing to a broken manifest is a configuration the binary refuses at
     // start (D-1): here, an identity mode it does not know.
+    //
+    // The budget FR-003 names is a *boot* deadline, and `binary()` can shell
+    // out to cargo and wait for a compilation (D-6). Both the build and the
+    // spec are therefore prepared before the measured window opens, and the
+    // two durations are reported separately when the assertion fails.
+    let preparing = std::time::Instant::now();
+    let spec = BootSpec::new(binary()).with_env("RAHI_RAUTHY_MODE", "bogus");
+    let prepared_in = preparing.elapsed();
+
     let started = std::time::Instant::now();
-    let err = Harness::boot(BootSpec::new(binary()).with_env("RAHI_RAUTHY_MODE", "bogus"))
-        .expect_err("the boot fails");
+    let err = Harness::boot(spec).expect_err("the boot fails");
+    let booted_in = started.elapsed();
+
     assert!(
-        started.elapsed() < rahi_harness::boot::READY_BUDGET,
-        "failed inside the budget"
+        booted_in < rahi_harness::boot::READY_BUDGET,
+        "failed inside the budget: the boot took {booted_in:?} of {:?}, \
+         after {prepared_in:?} preparing the binary outside the window",
+        rahi_harness::boot::READY_BUDGET
     );
     let text = err.to_string();
     assert!(text.starts_with("not ready:"), "{text}");
