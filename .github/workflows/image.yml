@@ -24,6 +24,10 @@ env:
   IMAGE: ghcr.io/${{ github.repository }}
   # The runtime an out-of-tree cell builds on (spec 039 B-3, B-4).
   RUNTIME_IMAGE: ghcr.io/${{ github.repository }}-runtime
+  # The reference app, which 039 AC-3 runs 034's AC-2 procedure against
+  # (039 D-14). `publish = false` keeps the crate off crates.io; the image
+  # is what the criterion names.
+  HELLO_IMAGE: ghcr.io/${{ github.repository }}-hello-cell
 
 jobs:
   build:
@@ -123,6 +127,40 @@ jobs:
           platforms: linux/${{ matrix.arch }}
           outputs: type=image,name=${{ env.RUNTIME_IMAGE }},push-by-digest=true,name-canonical=true,push=true
 
+      # Spec 039 AC-3 and D-14: the criterion runs 034's AC-2 procedure
+      # against the *published* hello-cell image, so the tag has to publish
+      # one. The smoke build above proves the page; this publishes the same
+      # recipe under a version a consumer can pull.
+      - name: Push hello-cell by digest
+        if: startsWith(github.ref, 'refs/tags/v')
+        id: push_hello
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          outputs: type=image,name=${{ env.HELLO_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          build-args: |
+            RAHI_PACKAGE=hello-cell
+            RAHI_BIN=hello-cell
+            RAHI_STATIC_SRC=apps/hello-cell/web
+          cache-from: type=gha,scope=${{ matrix.arch }}
+
+      # The artifact AC-3 is run against must be the artifact that was
+      # tested, not a second build of the same recipe. The smoke above runs
+      # on a locally loaded image; this pulls back the manifest that was
+      # actually pushed and smokes those bytes, page included.
+      - name: Smoke the published hello-cell digest
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          SMOKE_PAGE: "1"
+        run: |
+          set -euo pipefail
+          ref="${HELLO_IMAGE}@${{ steps.push_hello.outputs.digest }}"
+          docker pull "$ref"
+          docker tag "$ref" hello-cell:published
+          docker/smoke.sh hello-cell:published 18445
+
       - name: Record the digest
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
@@ -133,6 +171,9 @@ jobs:
           mkdir -p /tmp/runtime-digests
           runtime="${{ steps.push_runtime.outputs.digest }}"
           touch "/tmp/runtime-digests/${runtime#sha256:}"
+          mkdir -p /tmp/hello-digests
+          hello="${{ steps.push_hello.outputs.digest }}"
+          touch "/tmp/hello-digests/${hello#sha256:}"
 
       - name: Upload the digest
         if: startsWith(github.ref, 'refs/tags/v')
@@ -152,6 +193,15 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+      - name: Upload the hello-cell digest
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v7
+        with:
+          name: hello-digest-${{ matrix.arch }}
+          path: /tmp/hello-digests/*
+          if-no-files-found: error
+          retention-days: 1
+
   manifest:
     name: publish the multi-architecture tag
     if: startsWith(github.ref, 'refs/tags/v')
@@ -168,6 +218,12 @@ jobs:
         with:
           path: /tmp/runtime-digests
           pattern: runtime-digest-*
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: /tmp/hello-digests
+          pattern: hello-digest-*
           merge-multiple: true
 
       - uses: docker/setup-buildx-action@v4
@@ -203,3 +259,14 @@ jobs:
             -t "${RUNTIME_IMAGE}:${tag#v}" \
             $runtime_refs
           docker buildx imagetools inspect "${RUNTIME_IMAGE}:${tag#v}"
+
+          # Spec 039 AC-3 (D-14): the reference app under the same version.
+          hello_refs=""
+          for d in /tmp/hello-digests/*; do
+            hello_refs="$hello_refs ${HELLO_IMAGE}@sha256:$(basename "$d")"
+          done
+          # shellcheck disable=SC2086
+          docker buildx imagetools create \
+            -t "${HELLO_IMAGE}:${tag#v}" \
+            $hello_refs
+          docker buildx imagetools inspect "${HELLO_IMAGE}:${tag#v}"

@@ -19,8 +19,9 @@ Encore and Turso and what remains is what this is.
 
 This repository is a specification corpus, the harness that builds it, and
 the code it specifies. Spec ordinals are the build order, and each spec is
-bounded to one driven session's territory. Specs 036 and 038 were approved
-on 2026-09-17 and are `implementation: pending`: schedulable, not yet built.
+bounded to one driven session's territory. Spec 036 was approved on
+2026-09-17 and is now `implementation: complete`, as are 037 and 042. Spec
+038 is approved and `implementation: pending`: schedulable, not yet built.
 Specs 040 and 041 remain `status: draft`: proposals from the consumer
 contract below that schedule nothing until a human approves them. Nine crates and the reference app exist
 (`rahi-types`, `rahi-store`, `rahi-ledger`, `rahi-kernel`, `rahi-edge`,
@@ -39,11 +40,17 @@ Implementation, publication, and operational proof are separate:
 
 The 0.2.0 candidate changes recovery compatibility: new key sets contain an
 origin-bound backup passkey; old sets are not automatically upgraded and
-backups refuse without it. It does not fix hiqlite 0.14.0's stale lease
-release after TTL takeover, establish full-node second-lease restart, or
-prevent duplicate ledger IDs after sealing. Those require separate governed
-work; aicortex must not adopt this release as their fix. Publication changes
-no consumer rollout target.
+backups refuse without it. It **does** prevent duplicate ledger IDs after
+sealing, by spec 042, at the cost of a stop-the-world reindex of any chain
+sealed before it and one permanent resident row per decision; the
+CHANGELOG's "Upgrade limits (spec 042)" is the procedure. It does **not**
+fix hiqlite 0.14.0's stale lease release after TTL takeover: rahi patches
+that dependency in its own workspace root and a consumer does not inherit
+the patch, so every published crate still resolves 0.14.0 without the fix.
+It does **not** establish full-node restart followed by a second lease
+acquisition, which no approved spec carries. Its operational proof is N=1;
+Kubernetes N=3 has never run. Publication changes no consumer rollout
+target.
 
 [`docs/design/01-consumer-contract.md`](docs/design/01-consumer-contract.md)
 states what a consumer gets and what is proven, by which test, against which

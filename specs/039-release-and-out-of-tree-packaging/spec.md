@@ -446,6 +446,43 @@ RH-05 and RH-06 of the revision-3 register), and approved the spec on
   Drafts 036, 038, 040, and 041 and the lease/ledger implementation remain
   untouched. This decision changes no requirement and grants no waiver.
 
+- **D-14 (2026-09-20, correction session; reads AC-3 against B-3 and §6).**
+  AC-3 runs spec 034's AC-2 procedure "against the published hello-cell
+  image", and no such image had ever been published: `image.yml` builds
+  `hello-cell:smoke`, smokes its page for FR-004, and pushes only
+  `rahi:X.Y.Z` and `rahi-runtime:X.Y.Z`. AC-3 was therefore unsatisfiable
+  by construction, for `v0.1.0` as much as for this release, and D-12's
+  reading that it was waiting only on the owner's GHCR visibility action
+  was incomplete: the artifact did not exist either.
+
+  §6 excludes "Publishing `hello-cell` (`publish = false` stays)". Its
+  parenthetical names the Cargo manifest key, which is at
+  `apps/hello-cell/Cargo.toml:10` and governs crates.io alone, so that
+  exclusion is about the **crate**. Read that way, §6 and AC-3 are both
+  true as written: the crate is never published to the registry, and the
+  image AC-3 names is published to GHCR. The alternative reading, that §6
+  excludes the image too, would make an approved acceptance criterion
+  impossible to satisfy by any means, which is not a reading an approved
+  criterion can bear. No requirement text is amended here; B-3's sentence
+  stays true, since publishing a third artifact does not falsify a
+  statement about two.
+
+  A tag therefore also publishes
+  `ghcr.io/statecrafting/rahi-hello-cell:X.Y.Z` on the existing release
+  path: the same `build` matrix, the same `docker/Dockerfile` with the
+  three build args the smoke already uses, pushed by digest per
+  architecture and joined by the same `manifest` job, gated on `refs/tags/v`,
+  and never `latest`. The published digest is then pulled back and smoked
+  with `SMOKE_PAGE=1`, so the artifact AC-3 is run against is the artifact
+  that was tested rather than a second build of the same recipe; the cell
+  and runtime images do not do this today and are left as they are, since
+  changing them is not this correction's business. `deploy/k8s` is
+  untouched and stays pinned at its existing 0.1.0 target (D-13). AC-3 also
+  needs a real login through rauthy, which is an operator step 034 D-1
+  already recorded as such, and both AC-2 and AC-3 still need the packages
+  made public, which is an owner action in GitHub's package settings that
+  no workflow can take (D-12).
+
 ## Verification
 
 ```verify:cli

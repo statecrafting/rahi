@@ -1,9 +1,15 @@
 # The consumer contract, as built
 
-**Current release preparation, 2026-09-17:** 0.2.0 is an unpublished
-candidate under approved spec 039, carrying completed spec 037 from
-`ea6d0da125aaafe0927570410a8a1b0ee9d1286e`. Section 2.0 is the current
-consumer guidance; the dated readings below remain historical evidence.
+**Current release preparation, reconciled 2026-09-20:** 0.2.0 is an
+unpublished candidate under approved spec 039. It carries completed specs
+**037** (identity recovery and the live proof), **036** (manifest and
+schema evolution), and **042** (lifetime identity for decisions), plus the
+2026-09-20 corrections to 026's stream gauge and 033's boot-budget
+measurement. The 2026-09-17 preparation named only 037 from
+`ea6d0da125aaafe0927570410a8a1b0ee9d1286e`, which described a tree that
+`main` has since moved past; that reading is superseded here and kept below
+as historical evidence. Section 2.0 is the current consumer guidance; the
+dated readings below remain historical evidence.
 The final release revision is not known inside this preparation commit.
 The prospective in-repository release identity is
 [`v0.2.0` source](https://github.com/statecrafting/rahi/tree/v0.2.0): after
@@ -140,9 +146,13 @@ The upgrade boundary is explicit:
   restore behavior have changed. No rollback or old-binary compatibility
   across these changes has been established.
 - The `Cell` trait, schema version `1.0.0`, exit codes, and production bearer
-  audience validation are unchanged. Manifest evolution, native-client
-  changes, runtime identity, and deployment epochs remain drafts 036, 038,
-  040, and 041, with no approval implied by this release.
+  audience validation are unchanged. Corrected 2026-09-20: manifest
+  evolution is **spec 036, complete and carried by this release**, and its
+  `Cell`-surface and archive-format changes are in this document's 036
+  notes and in the CHANGELOG; lifetime ledger identity is **spec 042,
+  complete and carried**. Native-client changes are spec 038, approved and
+  `implementation: pending`, not in this release. Runtime identity and
+  deployment epochs remain drafts 040 and 041, with no approval implied.
 
 Two independent limitations constrain adoption. Published hiqlite 0.14.0
 has the stale lease release defect after TTL takeover; full-node restart
