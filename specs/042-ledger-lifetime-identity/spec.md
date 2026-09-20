@@ -33,6 +33,7 @@ extends:
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/verbs.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/tests/cli.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/preflight.rs", nature: additive }
+  - { spec: "036-manifest-and-schema-evolution", unit: "crates/rahi-ledger/src/transition.rs", nature: additive }
   - { spec: "039-release-and-out-of-tree-packaging", unit: "CHANGELOG.md", nature: additive }
 constrains:
   - { flavor: invariant-freeze, unit: "crates/rahi-ledger/src/identity.rs", note: "one id names one decision for the life of the chain; absence is never inferred from unavailable history" }
@@ -1610,6 +1611,124 @@ sets.
   than a second call of spec 036 D-15's `ReadInterleave`, so the two
   crossings can be driven one at a time and each test states which one it
   covers (AC-5).
+
+  **Corrected 2026-09-20 (build session), see D-18.** The paragraph above
+  beginning "Nothing about genuine damage changes" said that `order_chain`
+  "still verifies every link and every signature over whatever the snapshot
+  carried". `order_chain` verifies no signature and recomputes no content
+  hash: it walks the links and refuses a fork or an unreachable record, and
+  `SignedRecord::hash` parses the stored hash string rather than computing
+  it. What that sentence described is `verify_chain`, which the boot path
+  runs over the same snapshot and which the fixture tests named there do
+  exercise; the claim is true of boot and was never true of `order_chain`
+  alone. The distinction was not academic: `recover_resident` read the chain
+  through `records` and returned a matching record without ever calling
+  `verify_chain`, so a forged signature on a resident record was returned as
+  a recovered decision. D-18 records the defect and its correction. Nothing
+  else in this entry changes: the crossing D-17 removed was real, the
+  mechanism is unaltered, and the snapshot it established is what D-18
+  verifies over.
+- **D-18 (2026-09-20, build session; recovery verifies what it returns, and
+  verification reads one snapshot).** Two defects, both older than D-17,
+  found by review against the merged `50f3ef2` and each reproduced through
+  the production path before anything was changed.
+
+  **Resident recovery returned unverified evidence.** On a healthy,
+  already-open chain, a resident record's signature was replaced with one
+  produced by another key, its stored hash and its identity row left
+  untouched. `recover` returned that record as `Ok`; `verify` on the same
+  ledger a moment later returned `Integrity` naming it. `recover_resident`
+  matched the identity row's `record_hash` against `SignedRecord::hash`,
+  which parses the stored hash string rather than recomputing it, and the
+  only other check the resident path ran was `order_chain`, which checks
+  linkage and neither signatures nor content digests. So the resident half
+  of B-6 was answering from a label three places agreed on, while the
+  archived half had verified its evidence at full depth since it was
+  written. The boot tests did not cover it: they prove that a damaged chain
+  fails to *open*, not that recovery on an open chain refuses damage found
+  afterwards.
+
+  The correction is to verify the evidence rather than to re-read it.
+  `recover_resident` takes one chain snapshot, runs `verify::verify_chain`
+  over it, and returns the matching record **out of that same verified
+  snapshot**: content hashes recomputed, every signature checked against the
+  key this cell holds, every payload checked against the envelope it travels
+  in, the whole ordered against the root the snapshot itself names.
+  Verifying one read and returning a record from a second would put a seal
+  back between them, which is the crossing D-17 removed. Ordinary resident
+  recovery still fetches no archived body, and the archived path is
+  unchanged.
+
+  **Verification still crossed snapshots.** `verify_chain_witnessed` read
+  `segments()`, `resident_root()` and `records()` as three statements. A real
+  seal committing between the root read and the record read left records
+  from before it ordered against a root from after it, and verification
+  returned `Integrity` saying the genesis record links one hash while the
+  cell booted the chain rooted at another, over a chain that verified
+  cleanly immediately afterwards. Reproduced with one deterministic hook
+  after the root read, no clock involved. D-17 made `records` coherent and
+  left verification, whose evidence is all three answers, reading three
+  moments.
+
+  The mechanism is the one D-17 established, raised to the altitude the
+  evidence actually lives at. `Ledger::chain_snapshot` is now the one read
+  of the chain: the resident records, every segment header, and a census of
+  each relation, in one statement and therefore one snapshot. It decides the
+  root through `root_of_segment_heads`, the same function `resident_root`
+  uses, from the headers no other header claims as a predecessor, and orders
+  the headers through `order_segments` independently, so neither is derived
+  from the other and the two cannot disagree about a fork, a cycle or an
+  empty archive. `records`, `export_jsonl`, the manifest read of spec 036
+  D-15, resident recovery and verification at both depths all read it, so
+  there is no longer a second shape of this read to drift. At `Depth::Full`
+  the bodies fetched are the ones that snapshot's own headers name; a seal
+  committing after it is history that verification did not cover, and a
+  header in the snapshot always has a durable body because a seal writes the
+  body before it commits the header (spec 014 B-2).
+
+  Every completeness witness is preserved and one is gained: both relations
+  carry their own census from that single snapshot, so a read that did not
+  answer or that dropped rows is refused rather than read as an empty chain
+  or an empty archive (spec 036 D-11), and what `open` established is still
+  carried forward on top of it, in the order spec 036 D-15 established, with
+  the segment guard first (D-15). Genuine damage is unchanged and is
+  asserted directly: a forged signature and a tampered payload are refused
+  at resident depth and at full depth, a corrupt archived body is refused at
+  full depth and is invisible at resident depth as it must be, and a missing
+  record, a broken link, a fork, an ambiguous id and the three archive
+  failures answer what they answered before.
+
+  Nothing retries an `Integrity`, nothing matches an error message, and
+  nothing takes a lock, for the reasons D-15 and D-17 already give. D-15's
+  bound is untouched: exactly one revalidation in `recover_resident`, and
+  the verification added to it consumes none of it, because it runs over the
+  snapshot that branch already read.
+
+  The regression asserts the mechanism rather than the symptom. The instant
+  the defect needed, between the root read and the record read, is an instant
+  the correction removes, so no seam can be placed there afterwards and a
+  test that tried would be asserting the absence of an error it could no
+  longer provoke. What is asserted instead is what replaced it: a real seal
+  committed at the seam, at both depths, changes nothing about the answer,
+  and `Ledger::read_counts()` gains a `chain` counter showing that one
+  verification is one read of the chain. Three reads is what the defect was,
+  and the count states that more squarely than a message or a timing could.
+  The counter is in the shipped code for the same reason FR-018's three are:
+  the quantity under test is a property of the call sites.
+
+  Rejected: verifying after `records` returns, by re-reading the chain,
+  which reintroduces D-17's crossing between the verified read and the
+  returned one. Rejected: verifying only the one record the row names, which
+  cannot check that it links the chain it claims to be in and is the weaker
+  check the archived half was deliberately never given. Rejected: keeping
+  `segments`, `resident_root` and `records` as three reads and comparing
+  their answers, which is a consistency check over incoherent evidence
+  rather than coherent evidence.
+
+  Both defects predate PR #67, which is kept whole: its snapshot correction
+  is the mechanism this entry extends rather than replaces. D-17's
+  explanation of what `order_chain` proves is corrected in place, dated, with
+  its mechanism left standing.
 
 ## 8. Owner decisions, answered
 

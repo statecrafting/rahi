@@ -933,6 +933,410 @@ async fn a_seal_inside_the_chain_read_leaves_the_export_coherent() {
 }
 
 // ---------------------------------------------------------------------------
+// D-18: recovery verifies the evidence it returns, and verification's
+// evidence is one snapshot
+// ---------------------------------------------------------------------------
+
+/// Replace the stored envelope of `id` with `record`, keeping the row's
+/// indexed projections as they are.
+///
+/// The projections are what an identity row and the chain read are matched
+/// against, so leaving them alone is what makes the damage the kind a stored
+/// hash cannot detect: the row, the `hash` column and the envelope's
+/// `record_hash` all still agree on a label, and only recomputing the digest
+/// or checking the signature says otherwise.
+async fn overwrite_record(store: &StoreHandle, id: &str, record: &SignedRecord) {
+    store
+        .execute(
+            "UPDATE kernel_decisions SET record = $1 WHERE id = $2",
+            vec![
+                Value::from(record.to_canonical_bytes().unwrap()),
+                Value::from(id),
+            ],
+        )
+        .await
+        .unwrap();
+}
+
+/// B-6, D-18. Recovery verifies the evidence it returns, so a resident
+/// record whose signature was forged and whose payload was tampered with is
+/// refused rather than handed back.
+///
+/// Reproduced against the merged `50f3ef2`: on a healthy, already-open
+/// chain, replacing a resident record's signature with one produced by
+/// another key while leaving its stored hash and its identity row untouched
+/// made `recover` return `Ok` with that record, while `verify` on the same
+/// ledger a moment later returned `Integrity`. `recover_resident` matched
+/// the row's `record_hash` against `SignedRecord::hash`, which parses the
+/// stored hash string rather than recomputing it, and `order_chain` checks
+/// linkage without checking a signature or a content digest. Nothing in the
+/// recovery path ever asked whether the bytes were the bytes this cell
+/// signed.
+///
+/// The correction verifies the snapshot the answer comes out of, which is
+/// what the archived half has done since B-6. Four kinds of damage are
+/// asserted here because the stored hash covers none of them: a forged
+/// signature, a signature from a stranger's key re-stamped with that key, a
+/// tampered payload whose digest no longer recomputes, and an envelope whose
+/// payload names a different decision.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn resident_recovery_refuses_a_forged_signature_and_a_tampered_payload() {
+    let f = common::open().await;
+    let dir = tempfile::tempdir().unwrap();
+    let archive = Counting::open(dir.path().join("archive"));
+    let ledger = open_ledger(f.handle()).await;
+
+    let expected = ledger.append(decision("target")).await.unwrap();
+    ledger.append(decision("after")).await.unwrap();
+    let original = ledger
+        .records()
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|r| r.record.id == "target")
+        .unwrap();
+
+    // A healthy resident answer first, so every refusal below is the damage
+    // and not the mechanism: it is the original record, and it reaches no
+    // archive.
+    let healthy = ledger
+        .recover(&DecisionId::new("target"), &archive)
+        .await
+        .expect("a healthy resident record is recoverable");
+    assert_eq!(healthy.hash().unwrap(), expected);
+    assert_eq!(
+        archive.gets(),
+        0,
+        "ordinary resident recovery fetches no archived body"
+    );
+
+    let stranger = rahi_ledger::LedgerSigner::from_seed([0xa5; 32]);
+
+    // A forged signature over the record's own stored hash.
+    let mut forged = original.clone();
+    forged.signature = stranger.sign(forged.record.record_hash.as_bytes());
+    overwrite_record(&f.handle(), "target", &forged).await;
+    let err = ledger
+        .recover(&DecisionId::new("target"), &archive)
+        .await
+        .expect_err("a forged signature is refused rather than returned");
+    assert!(matches!(err, Error::Integrity(_)), "{err:?}");
+    assert!(err.message().contains("target"), "{}", err.message());
+
+    // The stranger's key stamped beside the stranger's signature: the record
+    // is now internally consistent and is still refused, because the key is
+    // pinned to the one this cell holds.
+    forged.public_key = stranger.public_key();
+    overwrite_record(&f.handle(), "target", &forged).await;
+    let err = ledger
+        .recover(&DecisionId::new("target"), &archive)
+        .await
+        .expect_err("a record signed by a key this cell does not hold is refused");
+    assert!(matches!(err, Error::Integrity(_)), "{err:?}");
+
+    // A tampered payload under the original hash and signature: the digest
+    // no longer recomputes to what the envelope claims.
+    let mut tampered = original.clone();
+    tampered.record.payload["reason"] = serde_json::json!("rewritten after the fact");
+    overwrite_record(&f.handle(), "target", &tampered).await;
+    let err = ledger
+        .recover(&DecisionId::new("target"), &archive)
+        .await
+        .expect_err("a tampered payload is refused rather than returned");
+    assert!(matches!(err, Error::Integrity(_)), "{err:?}");
+
+    // An envelope whose payload names another decision, with the digest
+    // recomputed so that only the envelope-to-payload check catches it.
+    let mut swapped = original.clone();
+    let mut elsewhere = Decision::new(
+        DecisionId::new("someone-else"),
+        DecisionKind::new("db.write"),
+        Sub::new("rauthy-subject-1"),
+        Outcome::Allow,
+        "covered by a declared grant",
+    );
+    elsewhere.prev_hash = original.prev_hash().unwrap();
+    swapped.record.payload = serde_json::to_value(&elsewhere).unwrap();
+    swapped.record.record_hash = attest_ledger_core::compute_record_hash(&swapped.record);
+    swapped.signature = common::signer().sign(swapped.record.record_hash.as_bytes());
+    overwrite_record(&f.handle(), "target", &swapped).await;
+    let err = ledger
+        .recover(&DecisionId::new("target"), &archive)
+        .await
+        .expect_err("an envelope that disagrees with its payload is refused");
+    assert!(matches!(err, Error::Integrity(_)), "{err:?}");
+
+    assert_eq!(
+        archive.gets(),
+        0,
+        "and no refusal reached for an archived body to decide with"
+    );
+
+    // Restored, the same call answers the original record again: the
+    // refusals above were the damage, not a recovery path that stopped
+    // working.
+    overwrite_record(&f.handle(), "target", &original).await;
+    let again = ledger
+        .recover(&DecisionId::new("target"), &archive)
+        .await
+        .expect("the undamaged record is recoverable again");
+    assert_eq!(again.hash().unwrap(), expected);
+
+    f.store.shutdown().await.unwrap();
+}
+
+/// B-6, D-18. A broken link in the resident chain is refused by recovery,
+/// and a record the walk cannot reach is never handed back as though it
+/// were in the chain.
+///
+/// `order_chain` has always caught this; what D-18 adds is that `recover`
+/// runs the full verification over the same snapshot, so the linkage check
+/// and the cryptographic checks refuse together rather than one of them
+/// standing alone.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn resident_recovery_refuses_a_broken_link() {
+    let f = common::open().await;
+    let dir = tempfile::tempdir().unwrap();
+    let archive = Counting::open(dir.path().join("archive"));
+    let ledger = open_ledger(f.handle()).await;
+
+    ledger.append(decision("target")).await.unwrap();
+    ledger.append(decision("after")).await.unwrap();
+    let original = ledger
+        .records()
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|r| r.record.id == "after")
+        .unwrap();
+
+    // Detach the tail: well formed, correctly signed for what it now says,
+    // and rooted at nothing the chain holds.
+    let mut detached = original.clone();
+    detached.record.previous_record_hash = format!("sha256:{}", "cc".repeat(32));
+    detached.record.record_hash = attest_ledger_core::compute_record_hash(&detached.record);
+    detached.signature = common::signer().sign(detached.record.record_hash.as_bytes());
+    f.handle()
+        .execute(
+            "UPDATE kernel_decisions SET record = $1, prev_hash = $2, hash = $3 WHERE id = $4",
+            vec![
+                Value::from(detached.to_canonical_bytes().unwrap()),
+                Value::from(detached.record.previous_record_hash.clone()),
+                Value::from(detached.record.record_hash.clone()),
+                Value::from("after"),
+            ],
+        )
+        .await
+        .unwrap();
+
+    let err = ledger
+        .recover(&DecisionId::new("target"), &archive)
+        .await
+        .expect_err("a chain that does not read back as one list is refused");
+    assert!(matches!(err, Error::Integrity(_)), "{err:?}");
+    assert_eq!(archive.gets(), 0, "and nothing was fetched to decide it");
+
+    f.store.shutdown().await.unwrap();
+}
+
+/// B-4, D-18, AC-5. Verification's whole evidence is one snapshot, so a real
+/// seal landing inside it changes nothing about the answer.
+///
+/// Reproduced against the merged `50f3ef2`: `verify_chain_witnessed` read
+/// `segments()`, `resident_root()` and `records()` as three statements, and a
+/// seal committing between the root read and the record read left records
+/// from before it ordered against a root from after it. The probe returned
+/// `Integrity` saying the genesis record links a hash "this cell booted the
+/// chain rooted at" another, over a chain that verified cleanly a moment
+/// later. D-17 had made `records()` internally coherent and left
+/// verification reading three answers from three moments.
+///
+/// The seam commits a real seal through the production path at the instant
+/// the read used to be vulnerable, and the read is required to be
+/// unaffected, which is a stronger claim than "it verifies anyway": no retry
+/// is spent, no error message is matched, and no lock is taken. Both depths
+/// are asserted, because the archived bodies at full depth are the ones the
+/// snapshot's own headers name.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn verification_survives_a_seal_that_lands_inside_it() {
+    let f = common::open().await;
+    let dir = tempfile::tempdir().unwrap();
+    let archive = FsArchive::open(dir.path().join("archive")).unwrap();
+    let ledger = open_ledger(f.handle()).await;
+
+    for i in 0..5 {
+        ledger
+            .append(decision(&format!("record-{i}")))
+            .await
+            .unwrap();
+    }
+
+    let sealer = ledger.clone();
+    let seal_archive = archive.clone();
+    let seals = Arc::new(AtomicUsize::new(0));
+    let counted = Arc::clone(&seals);
+    let reader = ledger
+        .clone()
+        .with_snapshot_interleave(SnapshotInterleave::new(move || {
+            let sealer = sealer.clone();
+            let archive = seal_archive.clone();
+            let counted = Arc::clone(&counted);
+            async move {
+                if counted.fetch_add(1, Ordering::SeqCst) == 0 {
+                    sealer
+                        .seal_if_needed(&archive, &eager())
+                        .await
+                        .expect("the seal lands")
+                        .expect("a real seal, not a no-op");
+                }
+            }
+        }));
+
+    reader
+        .verify()
+        .await
+        .expect("a seal inside the verification read leaves an intact chain verifying");
+    assert_eq!(
+        seals.load(Ordering::SeqCst),
+        1,
+        "the crossing was driven exactly once: verification takes one snapshot"
+    );
+    assert!(
+        !ledger.segments().await.unwrap().is_empty(),
+        "the seal really did commit, so the verification really did span it"
+    );
+
+    // The chain the seal left behind verifies at both depths, the second
+    // reaching every archived body through the headers the same snapshot
+    // carried. The mechanism is asserted directly here, on an uninstrumented
+    // handle whose count no concurrent seal is contributing to: the whole
+    // evidence is one read. Three reads is what the defect was, and no
+    // message, timing or absent error states that as squarely as the count
+    // does. The tally is shared across clones, so this is measured away from
+    // the seam rather than across it.
+    let before = ledger.read_counts().chain;
+    ledger.verify().await.expect("ordinary verification");
+    assert_eq!(
+        ledger.read_counts().chain - before,
+        1,
+        "verification reads the chain exactly once: segments, root and records \
+         are one snapshot rather than three answers from three moments"
+    );
+    let before = ledger.read_counts().chain;
+    ledger
+        .verify_chain(Depth::Full(&archive))
+        .await
+        .expect("full-depth verification over the archived history");
+    assert_eq!(
+        ledger.read_counts().chain - before,
+        1,
+        "full depth reads the chain once too: the bodies it fetches are the ones \
+         that one snapshot's own headers name"
+    );
+
+    // And a seal inside a full-depth verification is equally invisible: the
+    // bodies fetched are the ones the snapshot's headers name, and a seal
+    // after it is history this verification did not cover.
+    for i in 5..9 {
+        ledger
+            .append(decision(&format!("record-{i}")))
+            .await
+            .unwrap();
+    }
+    let sealer = ledger.clone();
+    let seal_archive = archive.clone();
+    let deep_seals = Arc::new(AtomicUsize::new(0));
+    let counted = Arc::clone(&deep_seals);
+    let deep = ledger
+        .clone()
+        .with_snapshot_interleave(SnapshotInterleave::new(move || {
+            let sealer = sealer.clone();
+            let archive = seal_archive.clone();
+            let counted = Arc::clone(&counted);
+            async move {
+                if counted.fetch_add(1, Ordering::SeqCst) == 0 {
+                    sealer
+                        .seal_if_needed(&archive, &eager())
+                        .await
+                        .expect("the seal lands")
+                        .expect("a real seal, not a no-op");
+                }
+            }
+        }));
+    deep.verify_chain(Depth::Full(&archive))
+        .await
+        .expect("full depth is coherent across a seal for the same reason");
+    assert_eq!(deep_seals.load(Ordering::SeqCst), 1);
+
+    f.store.shutdown().await.unwrap();
+}
+
+/// B-4, D-18. Genuine damage is still detected through the coherent read, at
+/// both depths, so the snapshot bought coherence and not blindness.
+///
+/// A forged signature on a resident record and a corrupt archived body are
+/// the two halves: the first is what the resident snapshot verifies, the
+/// second is what the headers in that same snapshot lead to.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_coherent_read_still_detects_genuine_damage_at_both_depths() {
+    let f = common::open().await;
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("archive");
+    let archive = FsArchive::open(&root).unwrap();
+    let ledger = open_ledger(f.handle()).await;
+
+    for i in 0..5 {
+        ledger
+            .append(decision(&format!("record-{i}")))
+            .await
+            .unwrap();
+    }
+    seal_all(&ledger, &archive).await;
+    ledger.verify().await.expect("the sealed chain verifies");
+    ledger
+        .verify_chain(Depth::Full(&archive))
+        .await
+        .expect("and so does its archived history");
+
+    // A corrupt body: resident verification cannot see it and full depth
+    // must.
+    let key = ledger.segments().await.unwrap()[0].key();
+    let body = root.join(&key);
+    let original = std::fs::read(&body).unwrap();
+    let mut corrupt = original.clone();
+    let at = corrupt.len() / 2;
+    corrupt[at] = if corrupt[at] == b'a' { b'b' } else { b'a' };
+    std::fs::write(&body, &corrupt).unwrap();
+    ledger
+        .verify()
+        .await
+        .expect("resident depth reads no body, so a corrupt one cannot change its answer");
+    let err = ledger
+        .verify_chain(Depth::Full(&archive))
+        .await
+        .expect_err("full depth fetches the body and refuses it");
+    assert!(matches!(err, Error::Integrity(_)), "{err:?}");
+    std::fs::write(&body, &original).unwrap();
+
+    // A forged signature on what is still resident: refused at both depths.
+    let resident = ledger.records().await.unwrap();
+    let victim = resident.last().unwrap().clone();
+    let mut forged = victim.clone();
+    forged.signature =
+        rahi_ledger::LedgerSigner::from_seed([0x5a; 32]).sign(forged.record.record_hash.as_bytes());
+    overwrite_record(&f.handle(), &victim.record.id, &forged).await;
+    let err = ledger.verify().await.expect_err("a forged signature");
+    assert!(matches!(err, Error::Integrity(_)), "{err:?}");
+    let err = ledger
+        .verify_chain(Depth::Full(&archive))
+        .await
+        .expect_err("and full depth refuses it for the same reason");
+    assert!(matches!(err, Error::Integrity(_)), "{err:?}");
+
+    f.store.shutdown().await.unwrap();
+}
+
+// ---------------------------------------------------------------------------
 // FR-007: nothing hashed moves
 // ---------------------------------------------------------------------------
 

@@ -55,6 +55,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-ledger/src/transition.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-ledger/src/verify.rs",
         "source": "spec-edge"
       },
@@ -256,6 +260,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-ledger/src/transition.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/src/transition.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-ledger/src/verify.rs"
           }
         ],
@@ -362,5 +379,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "6931486b8c6adabd362aa3d15e40f3a0a0654b85d51221daf61c8e82d36095ad"
+  "shardHash": "c65684cbb52ff19c8cc7cf3f401cef5262649745c71513d88129af0351ceac67"
 }

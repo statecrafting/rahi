@@ -1146,13 +1146,28 @@ impl Ledger {
     /// is history the row cannot account for and is an error, never an
     /// absence. Nothing retries an integrity failure and nothing here takes
     /// a lock: a lock would be process-local and this chain has replicas.
+    ///
+    /// The resident evidence is verified before anything is returned out of
+    /// it (D-18). The row names a record by hash and the stored envelope
+    /// carries that hash as a string, so matching the two proves only that
+    /// the row and the envelope agree about a label: it is not evidence that
+    /// the bytes hash to it, that the cell's key signed them, or that the
+    /// payload is the decision the envelope claims. `verify_chain` is what
+    /// proves all of that, and it is run over the same snapshot the returned
+    /// record comes out of, because verifying one read and returning a second
+    /// would put a seal back between them (D-17). The archived half is
+    /// verified the same way and has been since B-6: a resident answer now
+    /// costs what a sealed answer costs, minus the fetch, and a resident
+    /// answer still fetches no body at all.
     async fn recover_resident(
         &self,
         id: &DecisionId,
         record_hash: &Hash,
         archive: &dyn Archive,
     ) -> Result<SignedRecord, Error> {
-        for record in self.records().await? {
+        let snapshot = self.chain_snapshot().await?;
+        crate::verify::verify_chain(&snapshot.root, &snapshot.records, &self.verifier())?;
+        for record in snapshot.records {
             if &record.hash()? == record_hash {
                 return Ok(record);
             }

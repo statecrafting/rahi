@@ -220,6 +220,27 @@ is neither registry availability nor evidence of consumer deployment.
   a concurrent seal crossed. A record no seal archived and the resident chain
   does not hold is still `Error::Integrity`, no integrity error is retried,
   and no archive failure is converted into an absence.
+- `Ledger::recover(id, archive)` now **verifies the resident evidence it
+  returns**, which it previously did only for the archived half. A resident
+  record whose signature was forged, whose payload was tampered with, or
+  whose envelope disagrees with its payload was returned as a recovered
+  decision, because the resident path matched the identity row's hash against
+  the hash the record *stores* and checked nothing else. Content hashes are
+  now recomputed, every signature is checked against the key the cell holds,
+  and every payload is checked against its envelope, over the same snapshot
+  the returned record comes out of. Ordinary resident recovery still fetches
+  no archived body.
+- Verification takes its **whole evidence from one snapshot**. The segment
+  headers, the hash the resident chain is rooted at, and the resident records
+  were three separate reads, and a real seal between the last two made an
+  intact chain report an integrity failure. `Ledger::verify_chain` at either
+  depth, `Ledger::records`, `Ledger::export_jsonl`, the manifest read and
+  resident recovery now all read one statement, with a completeness census
+  for each relation from that same snapshot. Genuine damage is unchanged: a
+  forged signature and a tampered payload are refused at both depths, a
+  corrupt archived body at full depth, and a missing record, a broken link, a
+  fork, an ambiguous id and the three archive failures answer exactly what
+  they answered before.
 - A chain that already spent an id more than once is recorded in
   `kernel_decision_collisions` and never resolved: lookup of such an id
   answers `Ambiguous` with every copy, appends under it are refused, no copy
