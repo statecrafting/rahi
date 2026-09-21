@@ -10,15 +10,28 @@ Every chassis crate carries one version, and a release is an annotated tag
 `vX.Y.Z` on a `main` commit whose `make ci` passed. Pre-1.0, a minor bump may
 change the consumer contract and a patch bump may not.
 
-## 0.2.0, release candidate (not published)
+## 0.2.0, released 2026-09-20
 
 Every change since `v0.1.0` (`6e06c042df4e9f5b47dc86ee8d40167c2e668b5e`).
 All nine chassis crates move together. The minor bump follows spec 039 B-1
 because key-set, backup authentication, recovery, and the export API change
-compatibility. The coordinator must record the final tested main revision
-and release date when creating the annotated `v0.2.0` tag and forge
-release. This candidate is neither registry availability nor evidence of
-consumer deployment.
+compatibility.
+
+The final tested main revision is
+`8d686bdf7b10d4ee24357a31b4de25ae87cc5b2a`. On that revision the `ci` run
+(governance, `cargo gate`, cargo-deny) and the `image` run (build and smoke
+on native amd64 and arm64 runners) both passed, and the whole suite against
+the pinned rauthy passed on the identical tree as pull request #71. This
+commit adds only that record on top of it, and the annotated `v0.2.0` tag
+names this commit.
+
+What the tag has not yet proven at the moment this record was written:
+neither registry availability nor anonymous image access nor consumer
+deployment. The nine crates reach crates.io at 0.2.0 only when the tag's
+`release` run publishes them and its registry consumer stanza passes; the
+three images become anonymously pullable only when an owner makes the
+packages public in GitHub's package settings, which no workflow can do.
+Those outcomes are recorded in the release notes, not here.
 
 **Provenance, reconciled 2026-09-20.** This section was first prepared on
 2026-09-17 from the spec 037 merge
