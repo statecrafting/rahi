@@ -665,3 +665,25 @@ fn the_settings_are_what_the_upsert_carries() {
     let update = settings.update_request(&json!({}));
     assert_eq!(settings.first_mismatch(&update), None);
 }
+
+/// rauthy is free to answer with a list in its own order, and a comparison
+/// that read that as a difference would write the same document back on
+/// every boot for as long as the cell ran.
+#[test]
+fn a_reordered_list_from_rauthy_is_not_a_difference() {
+    let settings = NativeSettings::for_client(&cli(), FIXTURE_ORIGIN, 600);
+    let mut settled = settings.update_request(&json!({}));
+    settled["scopes"] = json!(["notes:write", "email", "openid", "profile"]);
+    settled["flows_enabled"] = json!([
+        "refresh_token",
+        "urn:ietf:params:oauth:grant-type:device_code"
+    ]);
+    assert_eq!(settings.first_mismatch(&settled), None);
+
+    settled["scopes"] = json!(["openid", "profile", "email"]);
+    assert_eq!(
+        settings.first_mismatch(&settled),
+        Some("scopes".to_owned()),
+        "a missing scope is still a difference"
+    );
+}

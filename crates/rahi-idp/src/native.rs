@@ -183,7 +183,11 @@ impl NativeSettings {
             ("default_scopes", &self.scopes),
             ("default_aud", &self.default_aud),
         ] {
-            if &strings_at(client, field) != required {
+            // As sets, not as sequences. rauthy is free to return a list in
+            // its own order, and a comparison that read that as a difference
+            // would write the same document back on every boot for as long
+            // as the cell ran.
+            if as_set(&strings_at(client, field)) != as_set(required) {
                 return Some(field.to_owned());
             }
         }
@@ -493,6 +497,12 @@ fn refused_the_key() -> Error {
          needs the Clients and Scopes groups (spec 031 D-8)"
             .to_owned(),
     )
+}
+
+/// `values` as a set, for a comparison that does not read order as
+/// difference.
+fn as_set(values: &[String]) -> BTreeSet<String> {
+    values.iter().cloned().collect()
 }
 
 /// Every string in `client`'s `field` array.

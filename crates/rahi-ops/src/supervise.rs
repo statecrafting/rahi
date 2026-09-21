@@ -280,7 +280,11 @@ impl Custodied {
     #[must_use]
     pub fn render(&self) -> String {
         if self.native.is_empty() {
-            return String::new();
+            return if self.lifetime_applied {
+                "the manifest's access token lifetime applied".to_owned()
+            } else {
+                String::new()
+            };
         }
         let named: Vec<String> = self
             .native
@@ -293,7 +297,12 @@ impl Custodied {
                 }
             })
             .collect();
-        format!("native clients {}", named.join(", "))
+        let lifetime = if self.lifetime_applied {
+            "; the manifest's access token lifetime applied"
+        } else {
+            ""
+        };
+        format!("native clients {}{lifetime}", named.join(", "))
     }
 }
 
