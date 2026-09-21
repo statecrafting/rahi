@@ -22,6 +22,18 @@ use serde::{Deserialize, Serialize};
 /// The table.
 pub const TABLE: &str = "notes";
 
+/// Where a bearer credential writes a note (spec 038 B-7).
+///
+/// A second path to `create` rather than a second handler: what changes is
+/// the credential that reaches it and the scope that gate requires, not what
+/// a note is. `/api/notes` stays the browser's route, cookie-authenticated
+/// and CSRF-checked; this one is declared bearer, so the CSRF pair is not
+/// asked for (038 B-1) and `notes:write` is (038 B-7).
+pub const BEARER_PREFIX: &str = "/api/v1";
+
+/// The scope the bearer route requires.
+pub const SCOPE_WRITE: &str = "notes:write";
+
 /// The outbox kind a note's envelope carries.
 pub const ENVELOPE_KIND: &str = "note";
 
@@ -95,11 +107,32 @@ pub fn router(state: &AppState) -> Router {
         migrate: Governed::new(kernel, "notes", CapabilityKind::DbMigrate, "notes", store)
             .unwrap_or_else(|err| panic!("the notes service is declared: {err}")),
     };
+    // The scope gate goes inside the bearer gate the chassis applies: it
+    // reads the credential that layer resolved (025 B-9). A request with a
+    // session cookie reaches the same handler through `/api/notes`, where no
+    // scope is asked for, because a scope is what a *token* was granted.
+    let scoped = rahi_idp::with_scope(
+        rahi_idp::RequireScope::new(SCOPE_WRITE, kernel.clone()),
+        Router::new()
+            .route("/notes", post(create))
+            .with_state(facades.clone()),
+    );
     Router::new()
         .route("/api/notes", get(list).post(create))
         .route("/api/notes/migrate", post(migrate))
         .route("/api/notes/{id}", axum::routing::delete(delete))
         .with_state(facades)
+        .nest(BEARER_PREFIX, scoped)
+}
+
+/// Where this cell accepts a bearer credential (spec 038 B-7).
+///
+/// A person's token only: nothing here is written for a machine acting as
+/// itself, so [`rahi_idp::BearerRoutes::service_route`] is deliberately not
+/// called (025 B-4).
+#[must_use]
+pub fn bearer_routes() -> rahi_idp::BearerRoutes {
+    rahi_idp::BearerRoutes::new().route(BEARER_PREFIX)
 }
 
 /// `GET /api/notes`: the principal's notes, newest last.

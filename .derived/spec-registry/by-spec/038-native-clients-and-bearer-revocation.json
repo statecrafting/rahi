@@ -39,10 +39,42 @@
       },
       {
         "nature": "additive",
+        "spec": "020-edge-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/router.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "020-edge-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "020-edge-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/tests/middleware.rs"
+        }
+      },
+      {
+        "nature": "additive",
         "spec": "025-api-tokens-and-resource-server",
         "unit": {
           "kind": "file",
           "path": "crates/rahi-idp/src/bearer.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "025-api-tokens-and-resource-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/bearer.rs"
         }
       },
       {
@@ -71,10 +103,74 @@
       },
       {
         "nature": "additive",
+        "spec": "015-kernel-manifest-and-adjudication",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "015-kernel-manifest-and-adjudication",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/tests/manifest.rs"
+        }
+      },
+      {
+        "nature": "additive",
         "spec": "030-operational-verbs",
         "unit": {
           "kind": "file",
           "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/cell.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_env.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "033-dev-substrate-and-harness",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-harness/src/rauthy.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "033-dev-substrate-and-harness",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-harness/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "034-hello-cell",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/src/cell.rs"
         }
       },
       {
@@ -130,7 +226,7 @@
       "wave": 3
     },
     "id": "038-native-clients-and-bearer-revocation",
-    "implementation": "pending",
+    "implementation": "complete",
     "kind": "feature",
     "references": [
       {
@@ -166,6 +262,6 @@
     "summary": "A hosted control plane built as a cell and a command-line client that logs in to it need four things the chassis does not yet give. The CSRF layer exempts only /auth/*, so a POST with a bearer token is refused 403 csrf (025 B-11 promised the exemption; D-6 left the wiring). No public client exists: the one client first boot creates is confidential, and a rauthy client defaults to EdDSA with no audience binding, so no CLI token passes the resource server without an admin's hand. Token lifetime is rauthy's default, 1800 seconds, not the fifteen minutes 025 B-5 states. And nothing writes the jti deny-list, so a bearer token cannot be revoked before it expires. This spec wires the exemption, declares native clients in the manifest and provisions them at boot bound to RS256 and the cell's audience, sets lifetimes explicitly, adds revocation by token and by subject, reports the bound in preflight, and gives hello-cell a scope-gated bearer route and a device-code login in its end-to-end test.\n",
     "title": "Native clients and bearer revocation: the CSRF exemption wired, a public client for a CLI declared in the manifest, token lifetimes set, and a token that can be revoked"
   },
-  "shardHash": "9f0b6c77448499a39080e7ea836c6463b788f6350603b4a3b1e824adc6cac263",
+  "shardHash": "07e7d77a1b3dac296eb6a622c86010d607742456c5b30e274d2626ae1166ed4f",
   "specVersion": "1.3.0"
 }

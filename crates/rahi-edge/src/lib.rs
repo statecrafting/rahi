@@ -63,7 +63,7 @@ pub mod stream;
 pub use client_identity::ClientIdentity;
 pub use error::{EdgeError, EdgeResult, status_of};
 pub use exposure::{Exposure, Route, RouteClass};
-pub use middleware::csrf::Csrf;
+pub use middleware::csrf::{Csrf, Exemption as CsrfExemption};
 pub use middleware::rate_limit::{ClientResolver, Clock, RateLimiter, RateLimits};
 pub use middleware::security_headers::SecurityHeaders;
 pub use obs::{Metrics, Obs, ObsOptions, Ring, Trace, get_trace, list_traces, subscribe};

@@ -12,6 +12,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use axum::Router;
+use axum::http::HeaderMap;
 use rahi_edge::obs::DECISION_TARGET;
 use rahi_edge::{
     AppState, Edge, Route, RouteClass, StreamHub, StreamIdentityResolver, StreamOptions,
@@ -356,18 +357,23 @@ pub async fn compose_parts<C: Cell>(
         booted.config.clone(),
     )
     .with_extension(streams.clone());
-    let mut edge = Edge::builder(state.clone())
-        .stream_identity(stream_identity())
-        .mount("/", C::routes(state.clone()))
-        .mount_operator(OPERATOR_PREFIX, C::operator_routes(state.clone()));
-    for route in C::exposed() {
-        edge = edge.expose(route);
-    }
-    if let Some(dir) = static_dir::<C>(env)? {
-        edge = edge.static_slot(dir);
-    }
+
+    // The app's routes are built first because building them is what
+    // publishes the scopes its gates require (spec 025 B-2), and spec 038
+    // B-2 holds the manifest's native clients to that published set. A
+    // client declared a scope no route asks for is a ceiling nobody
+    // enforces, and the cell refuses to serve rather than provision it.
+    let app_routes = C::routes(state.clone());
+    let operator_routes = C::operator_routes(state.clone());
+    let declared_bearer = C::bearer_routes();
+    booted
+        .manifest
+        .validate_native_scopes(&rahi_idp::scope::supported().into_iter().collect())?;
 
     let mut resolver: Option<Sessions> = None;
+    let mut bearer: Option<rahi_idp::RequireBearer> = None;
+    let mut operator_routes = operator_routes;
+    let mut identity: Option<Identity> = None;
     if RauthyMode::from_env(env)? == RauthyMode::Required {
         let idp = IdpConfig::derive(&booted.config, booted.manifest.app.name.as_str())?;
         let discovery = Discovery::fetch(&idp).await?;
@@ -378,6 +384,7 @@ pub async fn compose_parts<C: Cell>(
         let mut on_loopback = discovery.clone();
         on_loopback.jwks_uri = back_channel(&idp, &discovery.jwks_uri);
         let jwks = Jwks::load(&on_loopback).await?;
+        let jwks_cache = jwks.clone();
         let key = SessionKey::load(&booted.keys.path(rahi_ops::SESSION_KEY_FILE))?;
         let secret_path = rahi_ops::supervise::client_secret_path(&booted.config);
         let client_secret = std::fs::read_to_string(&secret_path)
@@ -398,17 +405,81 @@ pub async fn compose_parts<C: Cell>(
             client_secret,
         )?;
         let resource = Resource::derive(&idp)?;
+
+        // Spec 025's resource server, with spec 038's two additions: the
+        // deny-list remembers a revocation for as long as a token of the
+        // manifest's lifetime can still validate (038 D-7), and the
+        // revocation routes are what write it (038 B-5).
+        let lifetime = Duration::from_secs(booted.manifest.access_token_lifetime_secs());
+        let server = rahi_idp::ResourceServer::new(
+            &booted.config,
+            resource.clone(),
+            jwks_cache.clone(),
+            booted.store.handle(),
+            kernel.clone(),
+        )
+        .with_lifetime(lifetime);
+        let mut revoker = rahi_idp::Revoker::new(server.clone());
+        if let Ok(admin_token) = booted.keys.admin_token() {
+            // Spec 038 D-8: revoking a subject ends the grant at rauthy as
+            // well as deny-listing the access tokens. A cell whose key set
+            // holds no admin token still revokes the tokens and says in its
+            // answer that the grant is untouched.
+            revoker = revoker.ending_grants(&idp, &admin_token)?;
+        }
+        operator_routes = operator_routes.merge(rahi_idp::operator_revoke_router(revoker.clone()));
+
+        // The route a bearer client revokes its own token on is itself a
+        // bearer route: it reads the credential the gate resolved, and
+        // nothing a caller writes decides what is revoked (038 B-5).
+        let declared = declared_bearer.clone().route(rahi_idp::SESSION_REVOKE_PATH);
+        bearer = Some(rahi_idp::RequireBearer::new(server, declared));
+
         // The proxy and the resource metadata carry their full paths, so they
         // merge at the root and are named in the exposure table by prefix;
         // the session routes are relative and nest under their prefix.
-        edge = edge
-            .mount("/", proxy_router(Proxy::new(&idp)?))
-            .expose(Route::new(AUTH_PREFIX, RouteClass::Proxy))
-            .mount_public(SESSION_PREFIX, session_router(sessions.clone()))
-            .mount("/", resource_router(resource))
-            .expose(Route::new(rahi_idp::METADATA_PATH, RouteClass::Public));
+        identity = Some(Identity {
+            proxy: proxy_router(Proxy::new(&idp)?),
+            sessions: session_router(sessions.clone()),
+            resource: resource_router(resource),
+            revoke: rahi_idp::revoke_router(revoker),
+        });
         resolver = Some(sessions);
     }
+
+    let mut edge = Edge::builder(state.clone())
+        .stream_identity(stream_identity())
+        .mount("/", app_routes)
+        .mount_operator(OPERATOR_PREFIX, operator_routes);
+    for route in C::exposed() {
+        edge = edge.expose(route);
+    }
+    if let Some(dir) = static_dir::<C>(env)? {
+        edge = edge.static_slot(dir);
+    }
+    if let Some(identity) = identity {
+        edge = edge
+            .mount("/", identity.proxy)
+            .expose(Route::new(AUTH_PREFIX, RouteClass::Proxy))
+            .mount_public(SESSION_PREFIX, identity.sessions)
+            .mount("/", identity.revoke)
+            .mount("/", identity.resource)
+            .expose(Route::new(rahi_idp::METADATA_PATH, RouteClass::Public));
+    }
+    // Spec 038 B-1: the CSRF check does not apply to a bearer write. The
+    // predicate is passed from here because the facts it reads are the
+    // composer's: which routes were declared bearer, and what this cell's
+    // session cookie is called. A request carrying both credentials is not
+    // exempt and never reaches the check anyway, because the bearer layer
+    // refuses it first (025 B-10).
+    let scheme = booted.config.cookie_scheme;
+    edge = edge.csrf_exemption(std::sync::Arc::new(
+        move |path: &str, headers: &HeaderMap| {
+            rahi_idp::is_bearer_route(path)
+                && headers.contains_key(axum::http::header::AUTHORIZATION)
+                && !rahi_idp::bearer::both_credentials(headers, scheme)
+        },
+    ));
 
     let router = edge.try_build().map_err(|err| err.0)?;
     // Spec 022's layer, outermost: it opens the session cookie, renews the
@@ -420,7 +491,22 @@ pub async fn compose_parts<C: Cell>(
         Some(sessions) => with_sessions(sessions, router),
         None => router,
     };
+    // Spec 025 B-11: outside the session layer, where the paths are whole.
+    // It resolves a token, refuses a request carrying two credentials, and
+    // strips any cookie a bearer-authenticated answer tried to set.
+    let router = match bearer {
+        Some(gate) => rahi_idp::with_bearer(gate, router),
+        None => router,
+    };
     Ok(Composed { router, kernel })
+}
+
+/// What the identity block built, mounted once the edge builder exists.
+struct Identity {
+    proxy: Router,
+    sessions: Router,
+    resource: Router,
+    revoke: Router,
 }
 
 /// B-7 of spec 035: the line naming the nonce and the node this boot's

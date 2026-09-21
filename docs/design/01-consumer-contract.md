@@ -863,45 +863,54 @@ specs 021, 022, 025; rauthy source at the pinned tag):
 | clock leeway | 60 seconds on `exp` and `nbf` |
 | principal | `sub` verbatim; roles from the `roles` claim; for a bearer, rebuilt from the token on every request |
 | browser session | `__Host-session` (`session` over http), no `Max-Age`; a cached assertion for 900 seconds, then a renewal round trip that re-reads roles |
-| bearer lifetime | not configured by rahi; rauthy's client default, 1800 seconds in 0.36.2 |
+| bearer lifetime | `[auth] access_token_lifetime_secs` in the manifest, default 600, applied to the cell's own client and to every native client at boot (038 B-4); `preflight`'s `tokens` check reads it back from rauthy and fails if rauthy is applying a longer one |
 | revocation, browser | at the next renewal, so within 900 seconds of a user being disabled |
-| revocation, bearer | none before `exp`: the `jti` deny-list and its writer (`ResourceServer::deny`) exist, and nothing calls the writer outside a test (025 B-5 says logout and a verb would); `preflight` does not report the bound |
+| revocation, bearer | two deny-lists in the cache group (038 B-5). By `jti`: `POST /session/token/revoke` with the token itself, or `POST /operator/tokens/revoke` with `{"jti": ...}`. By subject: `POST /operator/tokens/revoke` with `{"sub": ...}`, which refuses every access token that subject was issued *before* the instant and also ends the grant at rauthy (`DELETE /auth/v1/sessions/{user_id}`, 038 D-8), so a refresh presented afterwards is refused too. Entries are remembered for `lifetime + 120` seconds, which is the whole window a token can still validate in (038 D-7): 720 seconds at the default lifetime. The answer states `grant_ended`, which is `false` when the cell holds no admin credential and only the access tokens were bounded. |
 | introspection | rauthy has `/auth/v1/oidc/introspect`; the cell never calls it (025 D-1) |
 | the cell's own client | one confidential client bootstrapped at first boot through rauthy's admin API; redirect `<origin>/session/callback` |
+| native clients | `[[auth.native_clients]]` in the manifest declares `id`, `flows` (`device_code`, `authorization_code`, `refresh_token` beside either), `scopes`, and loopback `redirect_uris` for the code flow (038 B-2). Each is upserted at every boot as a **public** client with PKCE `S256`, RS256 access tokens, `default_aud` the cell's origin, and the manifest's lifetime (038 B-3). Declaring one moves the manifest hash, so spec 036 governs the change. The declared settings replace what rauthy holds rather than widening it (038 D-12); a client the manifest never declared is never deleted. A scope no bearer route of the cell requires is refused at boot. |
+| refresh window | a refresh token carries `nbf = issued_at + access_token_lifetime - 60`, and an early use invalidates it and every linked session; rahi keeps rauthy's control and does not set `DISABLE_REFRESH_TOKEN_NBF` (038 D-13) |
+| native refresh lifetime | `[auth] native_refresh_lifetime_secs`, default 86,400. rauthy takes this as whole **hours** in its own configuration (`DEVICE_GRANT_REFRESH_TOKEN_LIFETIME`), not as a client field, so it is cell-wide and applied to rauthy's environment at every start (038 D-11). |
 | dynamic registration | rauthy's `/auth/v1/clients_dyn` through the proxy, advertised in the resource metadata; `RAHI_IDP_REGISTRATION` defaults to `token` |
-| device authorization | rauthy's `POST /auth/v1/oidc/device` and the page `GET /auth/v1/device` are reachable through the proxy; the chassis implements no leg of it (025 B-8) |
+| device authorization | rauthy's `POST /auth/v1/oidc/device` and the page `GET /auth/v1/device` are reachable through the proxy; the chassis implements no leg of it (025 B-8) and issues, stores, and refreshes nothing for a bearer client (038 D-1). A native client renews with the `refresh_token` grant at rauthy's own token endpoint and presents each new access token; the browser session's renewal (022 B-5) is a different mechanism and is not offered to it. |
 | client credentials | validated when a token arrives (`sub == azp` marks a service principal, 025 D-4); nothing provisions such a client, and the chassis never mints a key (025 B-1) |
-| CSRF on a bearer route | 025 B-11 exempts bearer routes; the edge's CSRF layer exempts only `/auth/*` and the composer applies no bearer predicate (025 D-6 "what remains is wiring"), so a `POST`, `PUT`, or `DELETE` with a bearer token is refused `403 csrf` unless it also carries a `csrf` cookie and an equal `X-CSRF-Token` header; the pair is compared, not issued-checked, so any equal pair passes |
+| CSRF on a bearer route | wired (038 B-1). The check exempts a request on a route the cell declared bearer that carries an `Authorization` header and **no** session cookie, so a bearer `POST`, `PUT`, or `DELETE` needs no pair. A request carrying both credentials is not exempt and is refused `400` by the bearer layer before the check is reached (025 B-10). Nothing else changed: a cookie-authenticated unsafe method still needs the pair. |
 
-What a CLI device-code login needs that the chassis does not provide,
-**Verified** against rauthy 0.36.2's source:
+What a CLI device-code login needs, and where it now comes from. Each of
+the five was missing at 0.2.0 and is supplied by spec 038; the first four
+are **Verified** against rauthy 0.36.2's source and the fifth by
+hello-cell's end-to-end test on the rauthy path:
 
-1. A public client with `device_code` in its enabled flows. Nothing
-   provisions one; rauthy's device endpoint demands the secret from a
-   confidential client, which a CLI cannot keep.
-2. RS256 and the audience. rauthy signs a new client's tokens with EdDSA,
-   and its device grant request has no `resource` parameter, so the only
-   way to put the cell's origin in `aud` is the client's `default_aud`,
-   set by an admin. A dynamically registered client needs the same admin
-   call before its tokens pass (025 D-12).
-3. Revocation of a CLI's token before expiry. Not available (above).
-4. Writes without a CSRF pair. Not available until the exemption is wired
-   (above).
-5. A worked example. hello-cell mounts no bearer route, and its resource
-   metadata advertises `scopes_supported: []`.
-
-**Recommendation** (draft spec 038): wire the CSRF exemption for bearer
-routes, provision the CLI's public client at first boot from the manifest,
-bind it to RS256 and the cell's audience, set the access token lifetime
-explicitly, wire the deny-list to logout and to an operator verb, and
-report the bound in `preflight`.
+1. A public client with `device_code` in its enabled flows. Declared in the
+   cell's manifest as `[[auth.native_clients]]` and upserted at every boot
+   (038 B-2, B-3). It has no secret, which is what rauthy's device endpoint
+   requires of a client that is not confidential.
+2. RS256 and the audience. Both written onto the client at boot:
+   `access_token_alg` and `id_token_alg` `RS256`, and `default_aud` the
+   cell's origin, which is the only way the origin reaches `aud` when the
+   device grant carries no `resource` parameter. A dynamically registered
+   client still needs the same admin call (025 D-12); `RAHI_IDP_REGISTRATION`
+   keeps its `token` default (038 D-5).
+3. Revocation before expiry. `POST /session/token/revoke` with the token, or
+   `POST /operator/tokens/revoke` by `jti` or by `sub`; a subject revocation
+   also ends the refresh grant at rauthy (038 B-5, D-8).
+4. Writes without a CSRF pair. Wired: a declared bearer route with an
+   `Authorization` header and no session cookie is exempt (038 B-1). The
+   equal-pair workaround is not the way a bearer client writes and nothing
+   in the chassis relies on it (038 D-2).
+5. A worked example. hello-cell declares `hello-cli` and mounts
+   `POST /api/v1/notes` behind scope `notes:write`; its end-to-end test runs
+   the device grant against rauthy through the cell's origin, approves it,
+   writes with the token and no pair, renews with the refresh grant at the
+   issuer, writes again, revokes, and is refused.
 
 **Unresolved** (owners: Statecraft and the CLI): the scopes the control
-plane's API declares, the client id the CLI presents, whether refresh
-tokens are held by the CLI (rauthy's device-grant refresh lifetime
-defaults to 72 hours), and whether a runner authenticates as a user, as a
-client-credentials service principal, or through a token the control
-plane mints. The chassis never mints one (025 B-1), so the last option is
+plane's API declares and the client id the CLI presents, both of which are
+now *stated in that cell's manifest* rather than negotiated. Refresh tokens
+are held by the CLI and their lifetime is the manifest's
+`native_refresh_lifetime_secs` (038 D-1); a runner authenticates as an
+enrolled person's device-grant session renewed by refresh token, and
+service-principal enrolment is deferred (038 D-3). The chassis never mints one (025 B-1), so the last option is
 a consumer design outside the chassis. *Added 2026-09-12:* note 02 section
 6.1 answers Statecraft R-1 and CLI D72, separates today's validation from
 the proposed renewal, and recommends a client-credentials principal per
@@ -933,16 +942,31 @@ These are requests, not decisions made for those repositories.
    discovery document at the cell's issuer: polling interval 5 seconds
    and code lifetime 300 seconds by rauthy's defaults, both from the
    response.
-2. Present the public client id spec 038 provisions; request only the
-   control plane's declared scopes; expect RS256 tokens whose `aud` is the
-   cell's origin.
+2. Present the public client id the cell's manifest declares under
+   `[[auth.native_clients]]`; request only the scopes that manifest lists
+   for it, which are the ones the control plane's bearer routes require;
+   expect RS256 tokens whose `aud` is the cell's origin.
 3. Treat `401` with `WWW-Authenticate: Bearer resource_metadata=...` as the
    bootstrap (025 B-6) and `403 insufficient_scope` as final.
 4. Never send a session cookie with an `Authorization` header (`400`,
-   025 B-10). Until spec 038 wires 025 B-11's exemption, send an equal
-   `csrf` cookie and `X-CSRF-Token` header on every unsafe method.
-5. Assume a stolen token stays valid until `exp` (up to 1800 seconds plus
-   60) until spec 038 lands, and keep tokens out of logs and receipts.
+   025 B-10). Send **no** CSRF pair: a bearer write on a declared bearer
+   route is exempt (038 B-1), and a pair of your own choosing is not a
+   mechanism the chassis supports (038 D-2).
+5. Renew at the issuer, on the `expires_in` the token response carries and
+   never on a number read from the cell's manifest (038 D-1). The chassis
+   issues, stores, and refreshes nothing for you. **Renew late, not early.**
+   rauthy gives a refresh token `nbf = issued_at + access_token_lifetime -
+   60`, and presenting it before that invalidates the refresh token *and
+   every session and token linked to that user*: an early refresh logs the
+   person out rather than renewing them. At the default 600 second lifetime
+   the window opens 540 seconds after the grant. rahi keeps that control and
+   does not set `DISABLE_REFRESH_TOKEN_NBF` (038 D-13). A client that lost
+   its access token and holds only a refresh token must wait for the window
+   or log in again.
+6. Assume a stolen access token stays valid until `exp` plus 60 seconds
+   unless it is revoked: the cell does not introspect (025 D-1). With the
+   default lifetime that is at most 660 seconds. Revoke it with
+   `POST /session/token/revoke`, and keep tokens out of logs and receipts.
 
 **hqgit**:
 

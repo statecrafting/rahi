@@ -146,7 +146,22 @@ pub fn render_nodes(nodes: &[NodeLine]) -> String {
 /// access from the rendered environment at every start, so a later spec
 /// that needs more widens it here by re-rendering, not by minting a broad
 /// key ahead of its use (spec 031 D-8).
-pub const API_KEY_ACCESS: &str = r#"[{"group":"Clients","access_rights":["read","create","update"]},{"group":"Secrets","access_rights":["read"]},{"group":"Users","access_rights":["read","create","update"]},{"group":"Roles","access_rights":["read","create"]}]"#;
+///
+/// Spec 038 widened it twice, and each widening is one call: `Scopes`
+/// read and create, because a declared native client cannot be given a
+/// scope rauthy's catalog does not hold yet (038 B-3), and `Sessions`
+/// delete, because revoking a subject has to end the refresh grant as well
+/// as the access tokens or the revocation buys nothing (038 D-8).
+pub const API_KEY_ACCESS: &str = r#"[{"group":"Clients","access_rights":["read","create","update"]},{"group":"Secrets","access_rights":["read"]},{"group":"Users","access_rights":["read","create","update"]},{"group":"Roles","access_rights":["read","create"]},{"group":"Scopes","access_rights":["read","create"]},{"group":"Sessions","access_rights":["delete"]}]"#;
+
+/// rauthy's device-grant refresh token lifetime, in **hours** (spec 038
+/// B-4, D-11).
+///
+/// Not a client field: rauthy reads this from its own configuration when a
+/// device grant mints a refresh token (`src/service/src/token_set.rs`), and
+/// its default is 72 hours. The supervisor sets it from the manifest at
+/// every start.
+pub const ENV_DEVICE_GRANT_REFRESH_HOURS: &str = "DEVICE_GRANT_REFRESH_TOKEN_LIFETIME";
 
 /// rauthy's secrets, custodied as `keys/rauthy.json`.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]

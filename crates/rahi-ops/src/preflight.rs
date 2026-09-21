@@ -8,6 +8,7 @@
 
 use std::fmt;
 
+use rahi_idp::IdpConfig;
 use rahi_kernel::Manifest;
 use rahi_ledger::Ledger;
 use rahi_store::Store;
@@ -20,7 +21,7 @@ use crate::rauthy_api::RauthyApi;
 pub const MIN_FREE_BYTES: u64 = 512 * 1024 * 1024;
 
 /// The check names, in the order they are reported.
-pub const CHECKS: [&str; 10] = [
+pub const CHECKS: [&str; 11] = [
     "config",
     "data_dir",
     "keys",
@@ -28,6 +29,7 @@ pub const CHECKS: [&str; 10] = [
     "hiqlite",
     "engine",
     "rauthy",
+    "tokens",
     "ledger",
     "coverage",
     "disk",
@@ -215,6 +217,7 @@ async fn run_inner(env: &dyn EnvReader, manifest_text: &str) -> Report {
         None => checks.push(Check::skipped("engine", "the store did not open")),
     }
 
+    let mut rauthy_answers = false;
     match keys.admin_token() {
         Ok(token) => {
             let rauthy =
@@ -226,9 +229,28 @@ async fn run_inner(env: &dyn EnvReader, manifest_text: &str) -> Report {
                     .map(|()| format!("answers at {}", api.base())),
                 Err(err) => Err(Error::Config(err)),
             };
+            rauthy_answers = verdict.is_ok();
             checks.push(Check::of("rauthy", verdict));
         }
         Err(_) => checks.push(Check::skipped("rauthy", "no admin token")),
+    }
+
+    // Spec 038 B-6: the bound an operator reasons about during an incident,
+    // read back from rauthy rather than repeated from the manifest. The two
+    // are the same only until somebody changes one of them, and a lifetime
+    // longer than the deny-list's memory is a revoked token that comes back.
+    match (
+        rauthy_answers.then(|| keys.admin_token().ok()).flatten(),
+        Manifest::parse(manifest_text),
+    ) {
+        (Some(token), Ok(manifest)) => {
+            checks.push(Check::of(
+                "tokens",
+                token_bounds(&config, &manifest, &token).await,
+            ));
+        }
+        (None, _) => checks.push(Check::skipped("tokens", "rauthy did not answer")),
+        (_, Err(err)) => checks.push(Check::skipped("tokens", err.message())),
     }
 
     match &store {
@@ -249,6 +271,54 @@ async fn run_inner(env: &dyn EnvReader, manifest_text: &str) -> Report {
         let _ = store.shutdown().await;
     }
     Report { checks }
+}
+
+/// The token lifetimes rauthy is applying, and the deny-list's memory
+/// (spec 038 B-6).
+///
+/// Every client this cell declares is read back: its own, and each native
+/// client. A lifetime above the manifest's is a failure, not a note, because
+/// the deny-list's TTL is computed from the manifest's (038 D-7) and a token
+/// that outlives its own revocation is the one thing revocation exists to
+/// prevent.
+async fn token_bounds(config: &Config, manifest: &Manifest, admin_token: &str) -> Result<String> {
+    let idp = IdpConfig::derive(config, manifest.app.name.as_str())?;
+    let declared = manifest.access_token_lifetime_secs();
+    let ttl = rahi_idp::denylist_ttl(std::time::Duration::from_secs(declared)).as_secs();
+
+    let mut said = Vec::new();
+    let mut over: Vec<String> = Vec::new();
+    let mut ids = vec![manifest.app.name.as_str().to_owned()];
+    ids.extend(
+        manifest
+            .native_clients()
+            .iter()
+            .map(|client| client.id.clone()),
+    );
+    for id in ids {
+        match rahi_idp::read_lifetime(&idp, admin_token, &id).await {
+            Ok(applied) => {
+                said.push(format!("{id} {applied}s"));
+                if applied > declared {
+                    over.push(format!("{id} {applied}s"));
+                }
+            }
+            Err(Error::NotFound(_)) => said.push(format!("{id} not registered yet")),
+            Err(err) => return Err(err),
+        }
+    }
+    if !over.is_empty() {
+        return Err(Error::Validation(format!(
+            "rauthy applies a longer access token lifetime than this manifest declares \
+             ({declared}s) to: {}; a token that outlives the deny-list's memory of {ttl}s \
+             comes back to life after it is revoked",
+            over.join(", ")
+        )));
+    }
+    Ok(format!(
+        "lifetimes {} (manifest {declared}s); revocation remembered for {ttl}s",
+        said.join(", ")
+    ))
 }
 
 fn data_dir_writable(config: &Config) -> Result<String> {

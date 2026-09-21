@@ -143,6 +143,11 @@ struct AccessClaims {
     exp: u64,
     #[serde(default)]
     nbf: Option<u64>,
+    /// When rauthy minted it. Read by the subject deny-list, which refuses a
+    /// token issued before the revocation and admits one issued after
+    /// (spec 038 B-5).
+    #[serde(default)]
+    iat: Option<u64>,
     #[serde(default)]
     jti: Option<String>,
     #[serde(default)]
@@ -233,6 +238,24 @@ impl ResourceServer {
     pub const fn with_rate_limit(mut self, per_minute: u32) -> Self {
         self.rate_limit = per_minute;
         self
+    }
+
+    /// Remember a revocation for as long as a token of `lifetime` can still
+    /// validate (spec 038 B-4, D-7).
+    ///
+    /// The manifest names the lifetime and
+    /// [`crate::revoke::denylist_ttl`] turns it into the accepted validity,
+    /// which is longer: the leeway on either end of the window is time a
+    /// revoked token would otherwise come back to life in.
+    #[must_use]
+    pub fn with_lifetime(self, lifetime: Duration) -> Self {
+        self.with_revocation_lag(crate::revoke::denylist_ttl(lifetime))
+    }
+
+    /// The cache group the deny-lists live in (spec 038 B-5).
+    #[must_use]
+    pub const fn store(&self) -> &StoreHandle {
+        &self.store
     }
 
     /// What this cell is, and what every token must be addressed to.
@@ -385,6 +408,15 @@ impl ResourceServer {
         {
             return Err(Error::Unauthorized(
                 "this token has been revoked".to_owned(),
+            ));
+        }
+        // Spec 038 B-5: the same question asked of the person rather than of
+        // the token, so one call ends every token a subject holds without
+        // the operator having to have collected their ids.
+        if crate::revoke::is_subject_denied(&self.store, sub.as_str(), claims.iat).await? {
+            return Err(Error::Unauthorized(
+                "every token issued to this subject before the revocation has been revoked"
+                    .to_owned(),
             ));
         }
 

@@ -60,6 +60,7 @@ pub struct EdgeBuilder {
     resolver: Option<ClientResolver>,
     clock: Option<Clock>,
     stream_identity: Option<StreamIdentityResolver>,
+    csrf_exemption: Option<csrf::Exemption>,
 }
 
 impl std::fmt::Debug for EdgeBuilder {
@@ -94,7 +95,21 @@ impl EdgeBuilder {
             resolver: None,
             clock: None,
             stream_identity: None,
+            csrf_exemption: None,
         }
+    }
+
+    /// Exempt from the CSRF check every request `exempt` answers true for,
+    /// beside rauthy's own subtree (spec 038 B-1).
+    ///
+    /// The composer names it because the fact it reads is the composer's: a
+    /// bearer route is declared by the spec that mounts it, and the session
+    /// cookie's name belongs to the identity crate, which this one never
+    /// depends on (spec 021 D-6).
+    #[must_use]
+    pub fn csrf_exemption(mut self, exempt: csrf::Exemption) -> Self {
+        self.csrf_exemption = Some(exempt);
+        self
     }
 
     /// Mount `router` under `prefix`.
@@ -339,10 +354,11 @@ impl EdgeBuilder {
             guarded.merge(operator::with_operator(gate, ops))
         };
 
-        let guarded = guarded.layer(from_fn_with_state(
-            Csrf::from_config(self.state.config()),
-            csrf::enforce,
-        ));
+        let mut check = Csrf::from_config(self.state.config());
+        if let Some(exempt) = self.csrf_exemption {
+            check = check.with_exemption(exempt);
+        }
+        let guarded = guarded.layer(from_fn_with_state(check, csrf::enforce));
 
         Router::new()
             .merge(probes::router().with_state(self.state.clone()))

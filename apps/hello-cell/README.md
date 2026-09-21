@@ -50,6 +50,29 @@ the runtime adjudicator read the same three tokens.
 - `DELETE /api/notes/{id}` deletes only the caller's; another principal's
   note is not found, which says nothing about whether it exists.
 - `POST /api/notes/migrate` is the denial.
+- `POST /api/v1/notes` is the same write reached with a **bearer token**
+  (spec 038 B-7): declared a bearer route, so the CSRF pair is not asked
+  for, and behind the scope `notes:write`, which is what the token has to
+  have been granted. `/api/notes` stays the browser's route, cookie
+  authenticated and CSRF checked; what differs is the credential, not what
+  a note is.
+
+## The command-line client
+
+`manifest.toml` declares `hello-cli` under `[[auth.native_clients]]`: a
+public client with the device grant and the refresh grant, scoped to
+`notes:write`. Boot upserts it in rauthy bound to RS256, to this cell's
+origin as its audience, and to the manifest's 600 second access token
+lifetime, because a client rauthy creates on its own defaults would sign
+with EdDSA, carry no audience, and live for 1800 seconds.
+
+The end-to-end test drives the whole of it against a real rauthy: the
+device grant through the cell's origin, the approval as the test user, the
+poll, a write with the token and no CSRF pair, a renewal at the issuer's
+token endpoint, a second write with the renewed token, a revocation
+through `POST /session/token/revoke`, and the `401` that follows. Nothing
+in the chassis issues, stores, or refreshes a token for that client; it
+renews on the `expires_in` the token response carries.
 
 ## The operator surface
 

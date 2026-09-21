@@ -33,6 +33,13 @@ impl Cell for HelloCell {
         notes::router(&state)
     }
 
+    /// `POST /api/v1/notes` takes a bearer token (spec 038 B-7). The
+    /// declaration is what exempts it from the CSRF pair and what the
+    /// manifest's `hello-cli` scopes are held to.
+    fn bearer_routes() -> rahi_idp::BearerRoutes {
+        notes::bearer_routes()
+    }
+
     /// `GET /operator/traces`: the in-process trace ring (spec 023 B-3),
     /// and `GET /operator/exposure`: the route table as the edge published
     /// it (spec 024 B-3, this spec's B-6), both behind the `hello_operator`

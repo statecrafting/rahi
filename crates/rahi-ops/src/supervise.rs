@@ -265,14 +265,67 @@ fn write_client_secret(config: &Config, secret: &str) -> Result<()> {
     crate::set_mode(&path, crate::KEY_FILE_MODE)
 }
 
+/// What the custody step did beyond the cell's own client (spec 038 B-3).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Custodied {
+    /// Each declared native client, and whether this boot created it.
+    pub native: Vec<rahi_idp::Provisioned>,
+    /// Whether this boot had to write the access token lifetime onto the
+    /// cell's own client (B-4).
+    pub lifetime_applied: bool,
+}
+
+impl Custodied {
+    /// One clause for the supervisor's line, or nothing to say.
+    #[must_use]
+    pub fn render(&self) -> String {
+        if self.native.is_empty() {
+            return if self.lifetime_applied {
+                "the manifest's access token lifetime applied".to_owned()
+            } else {
+                String::new()
+            };
+        }
+        let named: Vec<String> = self
+            .native
+            .iter()
+            .map(|client| {
+                if client.created {
+                    format!("{} (created)", client.id)
+                } else {
+                    client.id.clone()
+                }
+            })
+            .collect();
+        let lifetime = if self.lifetime_applied {
+            "; the manifest's access token lifetime applied"
+        } else {
+            ""
+        };
+        format!("native clients {}{lifetime}", named.join(", "))
+    }
+}
+
 /// Register the cell's OIDC client and custody its secret (spec 021 B-5),
+/// then provision every native client the manifest declares (spec 038 B-3),
 /// after rauthy is healthy and before serve.
+///
+/// The order is the one spec 038 B-3 states: the cell's own client first,
+/// because a native client is bound to the audience that client's origin
+/// defines, and a failure to custody the cell's own secret is a cell that
+/// cannot log anybody in at all.
 ///
 /// # Errors
 ///
 /// As `rahi_idp::bootstrap_client`, plus [`Error::Upstream`] when the
-/// secret cannot be read back from rauthy.
-pub async fn custody_client(config: &Config, keys: &KeySet, app_name: &str) -> Result<()> {
+/// secret cannot be read back from rauthy or a native client cannot be
+/// provisioned.
+pub async fn custody_client(
+    config: &Config,
+    keys: &KeySet,
+    manifest: &rahi_kernel::Manifest,
+) -> Result<Custodied> {
+    let app_name = manifest.app.name.as_str();
     let idp = IdpConfig::derive(config, app_name)?;
     let token = keys.admin_token()?;
     let minted = match bootstrap_client(&idp, &token).await? {
@@ -282,14 +335,62 @@ pub async fn custody_client(config: &Config, keys: &KeySet, app_name: &str) -> R
         Bootstrap::Created { secret: None } | Bootstrap::Unchanged => None,
     };
     match minted {
-        Some(secret) => write_client_secret(config, &secret),
-        None if client_secret_path(config).exists() => Ok(()),
+        Some(secret) => write_client_secret(config, &secret)?,
+        None if client_secret_path(config).exists() => {}
         None => {
             let secret = read_client_secret(&idp, &token).await?;
-            write_client_secret(config, &secret)
+            write_client_secret(config, &secret)?;
         }
     }
+
+    // Spec 038 B-4: the manifest's lifetime, on the cell's own client too.
+    // A narrow write of one field rather than a `first_mismatch` refusal:
+    // spec 021 B-5 refuses to overwrite a client an operator widened, and a
+    // lifetime rauthy defaulted is not a decision anybody made.
+    let lifetime = manifest.access_token_lifetime_secs();
+    let lifetime_applied =
+        rahi_idp::native::apply_lifetime(&idp, &token, app_name, lifetime).await?;
+
+    let audience = rahi_idp::Resource::derive(&idp)?.audience().to_owned();
+    let native = rahi_idp::provision_native_clients(
+        &idp,
+        &token,
+        manifest.native_clients(),
+        &audience,
+        lifetime,
+    )
+    .await?;
+
+    Ok(Custodied {
+        native,
+        lifetime_applied,
+    })
 }
+
+/// Give rauthy the refresh token lifetime the manifest names (038 B-4,
+/// D-11).
+///
+/// rauthy takes it as a number of hours in its own configuration rather
+/// than as a client field, so it is applied to the child's environment at
+/// every start; a manifest whose value changed takes effect at the restart
+/// that re-reads it. A manifest that declares no client using the refresh
+/// grant leaves rauthy's own default alone.
+pub fn apply_device_grant_lifetime(command: &mut Command, manifest: &rahi_kernel::Manifest) {
+    if !rahi_idp::uses_refresh(manifest.native_clients()) {
+        return;
+    }
+    let hours = manifest
+        .native_refresh_lifetime_secs()
+        .saturating_div(SECONDS_PER_HOUR)
+        .max(1);
+    command.env(
+        rauthy_env::ENV_DEVICE_GRANT_REFRESH_HOURS,
+        hours.to_string(),
+    );
+}
+
+/// Seconds in the hour rauthy counts the refresh lifetime in.
+const SECONDS_PER_HOUR: u64 = 3_600;
 
 async fn read_client_secret(idp: &IdpConfig, token: &str) -> Result<String> {
     #[derive(serde::Deserialize)]

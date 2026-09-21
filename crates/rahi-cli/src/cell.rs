@@ -9,6 +9,7 @@ use std::path::PathBuf;
 
 use axum::Router;
 use rahi_edge::{AppState, Route};
+use rahi_idp::BearerRoutes;
 use rahi_store::Migration;
 
 /// The prefix a cell's operator routes are mounted under (spec 024 B-2).
@@ -36,6 +37,17 @@ pub trait Cell: Send + Sync + 'static {
     fn operator_routes(state: AppState) -> Router {
         let _ = state;
         Router::new()
+    }
+
+    /// Where this cell accepts a bearer credential (spec 025 B-11, 038 B-1).
+    ///
+    /// Declared rather than inferred, and declared here rather than read off
+    /// the headers of a request: a route's credential kind is a fact the app
+    /// states when it mounts the route, and what turns on it is whether the
+    /// CSRF check applies (038 B-1). Empty by default, which is a cell whose
+    /// routes take a session cookie and nothing else.
+    fn bearer_routes() -> BearerRoutes {
+        BearerRoutes::new()
     }
 
     /// Routes named individually in the exposure table (spec 024 B-3), for

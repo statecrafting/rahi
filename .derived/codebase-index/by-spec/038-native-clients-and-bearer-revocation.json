@@ -1,24 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '038-native-clients-and-bearer-revocation' file unit 'crates/rahi-idp/src/native.rs' does not exist",
-        "path": "crates/rahi-idp/src/native.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '038-native-clients-and-bearer-revocation' file unit 'crates/rahi-idp/src/revoke.rs' does not exist",
-        "path": "crates/rahi-idp/src/revoke.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '038-native-clients-and-bearer-revocation' file unit 'crates/rahi-idp/tests/native.rs' does not exist",
-        "path": "crates/rahi-idp/tests/native.rs"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "015-kernel-manifest-and-adjudication",
@@ -39,6 +19,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "apps/hello-cell/src/cell.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "apps/hello-cell/src/notes.rs",
         "source": "spec-edge"
       },
@@ -47,11 +31,39 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-cli/src/cell.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-cli/src/serve.rs",
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-edge/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-edge/src/middleware/csrf.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/router.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/tests/middleware.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-harness/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-harness/src/rauthy.rs",
         "source": "spec-edge"
       },
       {
@@ -67,11 +79,39 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-idp/src/native.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/revoke.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/tests/bearer.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/tests/native.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-kernel/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-kernel/src/manifest.rs",
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-kernel/tests/manifest.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-ops/src/preflight.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/rauthy_env.rs",
         "source": "spec-edge"
       },
       {
@@ -81,7 +121,11 @@
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/native.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -90,7 +134,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/revoke.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -99,7 +147,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/tests/native.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -136,6 +188,19 @@
       {
         "locations": [
           {
+            "file": "apps/hello-cell/src/cell.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/src/cell.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "apps/hello-cell/src/notes.rs"
           }
         ],
@@ -162,6 +227,32 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-cli/src/cell.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/cell.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-cli/src/serve.rs"
           }
         ],
@@ -175,6 +266,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-edge/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-edge/src/middleware/csrf.rs"
           }
         ],
@@ -183,6 +287,58 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-edge/src/middleware/csrf.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/router.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/router.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/tests/middleware.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/tests/middleware.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-harness/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-harness/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-harness/src/rauthy.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-harness/src/rauthy.rs"
         }
       },
       {
@@ -227,6 +383,32 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-idp/tests/bearer.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/bearer.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-kernel/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-kernel/src/manifest.rs"
           }
         ],
@@ -240,6 +422,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-kernel/tests/manifest.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-kernel/tests/manifest.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-ops/src/preflight.rs"
           }
         ],
@@ -248,6 +443,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-ops/src/preflight.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/rauthy_env.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_env.rs"
         }
       },
       {
@@ -294,5 +502,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "fa58499818396ca10afa78e704b85423b44d19088d8233443aadb3017fc2deda"
+  "shardHash": "9db5e329443f7ec51a05ed49a518877822d3f7045381f277419375199d4120bc"
 }
