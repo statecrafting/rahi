@@ -409,6 +409,49 @@ mod tests {
     }
 }
 
+impl Rauthy {
+    /// Set one client's access token lifetime, in seconds (spec 038 B-4).
+    ///
+    /// For a test that has to observe a renewal: rauthy gives a refresh
+    /// token `nbf = now + access_token_lifetime - 60`, and using it before
+    /// that invalidates the token and every session linked to it, so a
+    /// renewal at the manifest's 600 seconds is 540 seconds of waiting. A
+    /// test shortens the lifetime at the IdP instead of asking the chassis
+    /// to turn the `nbf` off (038 D-13).
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Rauthy`] when rauthy does not hold the client or refuses the
+    /// update, with the status and body.
+    pub async fn set_access_token_lifetime(&self, client_id: &str, seconds: u64) -> Result<()> {
+        let url = format!("{}/auth/v1/clients/{client_id}", self.base);
+        let current = self.auth(self.http.get(&url)).send().await?;
+        let status = current.status();
+        if !status.is_success() {
+            return Err(Error::Rauthy(format!(
+                "GET {url} answered {status}: {}",
+                current.text().await.unwrap_or_default()
+            )));
+        }
+        let mut client: Value = current
+            .json()
+            .await
+            .map_err(|err| Error::Rauthy(format!("the client document is not json: {err}")))?;
+        if let Some(object) = client.as_object_mut() {
+            object.insert("access_token_lifetime".to_owned(), json!(seconds));
+        }
+        let updated = self.auth(self.http.put(&url)).json(&client).send().await?;
+        let status = updated.status();
+        if !status.is_success() {
+            return Err(Error::Rauthy(format!(
+                "PUT {url} answered {status}: {}",
+                updated.text().await.unwrap_or_default()
+            )));
+        }
+        Ok(())
+    }
+}
+
 // ------------------------------------------------- the device grant (038)
 
 /// What a token endpoint answered: the credential, and what a client is

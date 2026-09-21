@@ -869,6 +869,7 @@ specs 021, 022, 025; rauthy source at the pinned tag):
 | introspection | rauthy has `/auth/v1/oidc/introspect`; the cell never calls it (025 D-1) |
 | the cell's own client | one confidential client bootstrapped at first boot through rauthy's admin API; redirect `<origin>/session/callback` |
 | native clients | `[[auth.native_clients]]` in the manifest declares `id`, `flows` (`device_code`, `authorization_code`, `refresh_token` beside either), `scopes`, and loopback `redirect_uris` for the code flow (038 B-2). Each is upserted at every boot as a **public** client with PKCE `S256`, RS256 access tokens, `default_aud` the cell's origin, and the manifest's lifetime (038 B-3). Declaring one moves the manifest hash, so spec 036 governs the change. The declared settings replace what rauthy holds rather than widening it (038 D-12); a client the manifest never declared is never deleted. A scope no bearer route of the cell requires is refused at boot. |
+| refresh window | a refresh token carries `nbf = issued_at + access_token_lifetime - 60`, and an early use invalidates it and every linked session; rahi keeps rauthy's control and does not set `DISABLE_REFRESH_TOKEN_NBF` (038 D-13) |
 | native refresh lifetime | `[auth] native_refresh_lifetime_secs`, default 86,400. rauthy takes this as whole **hours** in its own configuration (`DEVICE_GRANT_REFRESH_TOKEN_LIFETIME`), not as a client field, so it is cell-wide and applied to rauthy's environment at every start (038 D-11). |
 | dynamic registration | rauthy's `/auth/v1/clients_dyn` through the proxy, advertised in the resource metadata; `RAHI_IDP_REGISTRATION` defaults to `token` |
 | device authorization | rauthy's `POST /auth/v1/oidc/device` and the page `GET /auth/v1/device` are reachable through the proxy; the chassis implements no leg of it (025 B-8) and issues, stores, and refreshes nothing for a bearer client (038 D-1). A native client renews with the `refresh_token` grant at rauthy's own token endpoint and presents each new access token; the browser session's renewal (022 B-5) is a different mechanism and is not offered to it. |
@@ -953,7 +954,15 @@ These are requests, not decisions made for those repositories.
    mechanism the chassis supports (038 D-2).
 5. Renew at the issuer, on the `expires_in` the token response carries and
    never on a number read from the cell's manifest (038 D-1). The chassis
-   issues, stores, and refreshes nothing for you.
+   issues, stores, and refreshes nothing for you. **Renew late, not early.**
+   rauthy gives a refresh token `nbf = issued_at + access_token_lifetime -
+   60`, and presenting it before that invalidates the refresh token *and
+   every session and token linked to that user*: an early refresh logs the
+   person out rather than renewing them. At the default 600 second lifetime
+   the window opens 540 seconds after the grant. rahi keeps that control and
+   does not set `DISABLE_REFRESH_TOKEN_NBF` (038 D-13). A client that lost
+   its access token and holds only a refresh token must wait for the window
+   or log in again.
 6. Assume a stolen access token stays valid until `exp` plus 60 seconds
    unless it is revoked: the cell does not introspect (025 D-1). With the
    default lifetime that is at most 660 seconds. Revoke it with

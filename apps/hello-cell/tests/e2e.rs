@@ -236,17 +236,6 @@ async fn the_cell_end_to_end() {
             wrote.1
         );
 
-        // Renewal is the client's, at the issuer, and driven by what the
-        // token response said rather than by anything the manifest told it
-        // (D-1). The chassis has no leg of this.
-        let renewed = rahi_harness::refresh_tokens(cell.base_url(), "hello-cli", &refresh_token)
-            .await
-            .expect("the refresh grant renews");
-        assert_ne!(renewed.access_token, tokens.access_token);
-        assert_eq!(renewed.expires_in, 600);
-        let again = bearer_note(&cli, &renewed.access_token, "after the renewal").await;
-        assert_eq!(again.0, StatusCode::CREATED, "{}", again.1);
-
         // The revocation: the client ends its own token, and the next
         // request with it is refused inside one cache read (B-5).
         let revoked = cli
@@ -254,7 +243,7 @@ async fn the_cell_end_to_end() {
                 cli.request(reqwest::Method::POST, "/session/token/revoke")
                     .await
                     .unwrap()
-                    .header("authorization", format!("Bearer {}", renewed.access_token)),
+                    .header("authorization", format!("Bearer {}", tokens.access_token)),
             )
             .await
             .unwrap();
@@ -264,13 +253,70 @@ async fn the_cell_end_to_end() {
             "{}",
             revoked.text().await.unwrap()
         );
-        let refused = bearer_note(&cli, &renewed.access_token, "after the revocation").await;
+        let refused = bearer_note(&cli, &tokens.access_token, "after the revocation").await;
         assert_eq!(
             refused.0,
             StatusCode::UNAUTHORIZED,
             "a revoked token is refused: {}",
             refused.1
         );
+        assert!(
+            !refresh_token.is_empty(),
+            "the declared refresh flow yields a refresh token"
+        );
+
+        // Renewal is the client's, at the issuer, and driven by what the
+        // token response said rather than by anything the manifest told it
+        // (D-1). The chassis has no leg of it.
+        //
+        // rauthy gives a refresh token `nbf = now + lifetime - 60`, and
+        // presenting it earlier invalidates that token and every session
+        // linked to it. At the manifest's 600 seconds that window opens 540
+        // seconds after the login, which is not a test; the chassis keeps
+        // the control rather than turning it off, so this leg shortens the
+        // client's lifetime at the IdP, logs in again, and waits for the
+        // window the way a real client does (038 D-13).
+        let admin = rahi_harness::Rauthy::new(&cell.rauthy_loopback(), cell.admin_token());
+        admin
+            .set_access_token_lifetime("hello-cli", 70)
+            .await
+            .expect("the lifetime shortens for the renewal leg");
+        let short = rahi_harness::device_login(
+            cell.base_url(),
+            &user,
+            "hello-cli",
+            "openid profile email notes:write",
+        )
+        .await
+        .expect("the second device grant completes");
+        assert_eq!(short.expires_in, 70, "the shortened lifetime is applied");
+        let short_refresh = short
+            .refresh_token
+            .clone()
+            .expect("the refresh flow yields a refresh token");
+
+        // The window opens at `lifetime - 60`, which is what a client that
+        // renews on `expires_in` waits for.
+        tokio::time::sleep(std::time::Duration::from_secs(
+            short.expires_in.saturating_sub(55),
+        ))
+        .await;
+        let renewed = rahi_harness::refresh_tokens(cell.base_url(), "hello-cli", &short_refresh)
+            .await
+            .expect("the refresh grant renews once its window is open");
+        assert_ne!(renewed.access_token, short.access_token);
+        assert_eq!(renewed.expires_in, 70);
+        let again = bearer_note(&cli, &renewed.access_token, "after the renewal").await;
+        assert_eq!(
+            again.0,
+            StatusCode::CREATED,
+            "the renewed token writes like any other: {}",
+            again.1
+        );
+        admin
+            .set_access_token_lifetime("hello-cli", 600)
+            .await
+            .expect("the manifest's lifetime is put back");
 
         // 025 B-10, at the composed cell: a request carrying both
         // credentials is refused rather than resolved by a rule. `client`
@@ -426,8 +472,19 @@ async fn the_cell_end_to_end() {
         renewed.text().await.unwrap()
     );
     let listed: Vec<serde_json::Value> = renewed.json().await.unwrap();
-    assert_eq!(listed.len(), 1, "her surviving note: {listed:?}");
-    assert_eq!(listed[0]["body"], "second");
+    // The note she wrote in the browser before the restart, and the two her
+    // command-line client wrote with a bearer token (038 B-7). They are one
+    // person's notes because they are one `sub`: the credential decided how
+    // the request authenticated, not who it was.
+    let bodies: Vec<&str> = listed
+        .iter()
+        .filter_map(|note| note["body"].as_str())
+        .collect();
+    assert_eq!(
+        bodies,
+        vec!["second", "from the cli", "after the renewal"],
+        "her surviving notes: {listed:?}"
+    );
     assert_eq!(
         rauthy_sub(&again, &alice.email).await,
         alice_sub,
@@ -484,8 +541,9 @@ async fn the_cell_end_to_end() {
     // written under (spec 034 D-5).
     assert_eq!(
         count_notes(fresh.path(), cell.env()).await,
-        1,
-        "one note survived the round trip"
+        3,
+        "the three notes alice still had survived the round trip: the one she \
+         wrote in the browser and the two her command-line client wrote (038 B-7)"
     );
 
     // And the cell comes up *with* identity: the supervisor hands rauthy the
@@ -529,11 +587,14 @@ async fn the_cell_end_to_end() {
         .await
         .unwrap();
     assert_eq!(
-        listed.len(),
-        1,
-        "alice reads the note she wrote before the backup: {listed:?}"
+        listed
+            .iter()
+            .filter_map(|note| note["body"].as_str())
+            .collect::<Vec<_>>(),
+        vec!["second", "from the cli", "after the renewal"],
+        "alice reads the notes she wrote before the backup, through either \
+         credential: {listed:?}"
     );
-    assert_eq!(listed[0]["body"], "second");
 
     // The marker records the hand-off, and a second start passes nothing.
     let marker: serde_json::Value =

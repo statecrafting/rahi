@@ -357,6 +357,26 @@ this spec was silent on. None of them changes what the spec requires.
   Alternative rejected: the union `bootstrap_client` takes, which would leave
   a removed flow enabled forever and make the manifest advisory.
 
+- **D-13 (2026-09-20, build; rauthy's refresh-token `nbf` is kept, and the
+  renewal window is what a client waits for).** rauthy issues a refresh
+  token with `nbf = now + access_token_lifetime - 60`
+  (`src/service/src/token_set.rs`), and presenting it earlier invalidates
+  that token *and every session and token linked to the user*, which is a
+  deliberate control against a leaked refresh token: rauthy's own
+  documentation says to disable it only with a good reason
+  (`DISABLE_REFRESH_TOKEN_NBF`, default false). The chassis keeps it. The
+  consequence is stated rather than worked around: a native client renews in
+  the last 60 seconds of its access token's life, which is what "renews on
+  `expires_in`" (D-1) means in practice, and at the manifest's 600 second
+  lifetime that window opens 540 seconds after the login. B-7's renewal leg
+  therefore shortens `hello-cli`'s lifetime at the IdP to 70 seconds, logs
+  in again, and waits for the window the way a real client does, rather than
+  asking the chassis to turn the `nbf` off so a test could renew
+  immediately. Alternative rejected: setting `DISABLE_REFRESH_TOKEN_NBF`,
+  which would weaken a security control of the IdP to make an assertion
+  convenient, and would hide from every consumer that an early refresh ends
+  their session.
+
 ### Evidence and proposals (2026-09-12)
 
 Recorded by the operational-prerequisites session and kept as written. P-1
