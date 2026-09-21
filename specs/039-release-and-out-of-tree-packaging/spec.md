@@ -552,6 +552,38 @@ RH-05 and RH-06 of the revision-3 register), and approved the spec on
   A release heading is not evidence of either; the release notes record
   those outcomes when they occur.
 
+- **D-17 (2026-09-20, release checkpoint; AC-3 run against the published
+  artifact).** AC-3 was executed against
+  `ghcr.io/statecrafting/rahi-hello-cell:0.2.0`, pulled by digest
+  `sha256:494a566d1ea97aa348a0ccbe0adda4a87522f0b67a87518a46f980d68b66f06b`
+  with docker credentials forced off, so the artifact under test is the
+  published one and the pull was anonymous. The cell answered `/readyz`,
+  `/` and `/.well-known/openid-configuration` with 200; `/api/notes` was
+  401 before login; a full authorization-code login with PKCE through the
+  cell's own `/auth` proxy succeeded, rauthy logging `JWT Token issued
+  hello-cell (authorization_code)`; `/api/notes` was then 200, and an
+  authenticated `POST` returned 201 with the note stamped `revision: 1`.
+  The login was driven by `rahi-harness` **0.2.0 resolved from crates.io**
+  (`source = "registry+https://github.com/rust-lang/crates.io-index"`), so
+  the same run is also an out-of-tree registry-consumer proof.
+
+  Running it found a defect in the procedure D-14 added: it published
+  `-p 8080:8080`, but the image exposes **8443** (`docker/Dockerfile`
+  `EXPOSE 8443`, and `docker/smoke.sh` maps `${port}:8443`), so the
+  documented command could not serve the page at all. Corrected to
+  `-p 8080:8443`, with the reason stated in the README rather than left as
+  a bare number, and the bootstrap-administrator note added because the
+  login step needs an account and the container prints one only on first
+  boot. This is a documentation correction; no behavior, functional
+  requirement or acceptance criterion changes.
+
+  What this does not reach: AC-2 is still unsatisfied. `rahi-hello-cell`
+  became public on creation because a new package inherits the public
+  repository's visibility, but `rahi` and `rahi-runtime` predate it and
+  remain private: with credentials forced off both answer `unauthorized`,
+  and AC-2 names those two images. That remains the owner action D-12
+  records.
+
 ## Verification
 
 ```verify:cli

@@ -159,9 +159,18 @@ version, or by digest to pin exactly what you ran:
 ```sh
 docker pull ghcr.io/statecrafting/rahi-hello-cell:0.2.0
 docker run --rm -e RAHI_PUBLIC_URL=http://localhost:8080 \
-  -p 8080:8080 -v hello-cell-data:/data \
+  -p 8080:8443 -v hello-cell-data:/data \
   ghcr.io/statecrafting/rahi-hello-cell:0.2.0
 ```
+
+The cell listens on **8443** inside the container, which is what
+`docker/Dockerfile` exposes and what `docker/smoke.sh` maps, so the
+published port is `8080:8443` and not `8080:8080`. `RAHI_PUBLIC_URL` names
+the origin a browser uses and must agree with the host side of that
+mapping.
+
+The container prints rauthy's bootstrap administrator and its one-time
+password on first boot; that is the account the login step below uses.
 
 The image carries the page at `/usr/local/share/rahi/static`, the pinned
 rauthy, the non-root user, `/data`, and the entrypoint, so steps 2 onward
