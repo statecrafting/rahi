@@ -23,6 +23,9 @@ establishes:
   - "crates/rahi-idp/tests/native.rs"
 extends:
   - { spec: "020-edge-server", unit: "crates/rahi-edge/src/middleware/csrf.rs", nature: additive }
+  - { spec: "020-edge-server", unit: "crates/rahi-edge/src/router.rs", nature: additive }
+  - { spec: "020-edge-server", unit: "crates/rahi-edge/src/lib.rs", nature: additive }
+  - { spec: "020-edge-server", unit: "crates/rahi-edge/tests/middleware.rs", nature: additive }
   - { spec: "025-api-tokens-and-resource-server", unit: "crates/rahi-idp/src/bearer.rs", nature: additive }
   - { spec: "021-idp-proxy-and-discovery", unit: "crates/rahi-idp/src/lib.rs", nature: additive }
   - { spec: "021-idp-proxy-and-discovery", unit: "crates/rahi-idp/src/bootstrap.rs", nature: additive }

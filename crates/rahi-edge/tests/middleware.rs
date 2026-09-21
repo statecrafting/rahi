@@ -164,6 +164,94 @@ async fn a_matching_pair_passes_and_a_mismatched_one_does_not() {
     cell.stop().await;
 }
 
+/// Spec 038 B-1 and FR-001: the composer's exemption lets a bearer write
+/// through with no CSRF pair, and declines everything else.
+///
+/// The predicate here is the one `serve` passes, written out: a declared
+/// bearer route, an `Authorization` header, and no session cookie. The
+/// second clause matters as much as the first. A request carrying both
+/// credentials is not exempt, so it still meets this check; in a composed
+/// cell it never gets that far, because the bearer layer answers 400 first
+/// (spec 025 B-10, asserted in `rahi-idp`'s `bearer` test at FR-003).
+#[tokio::test]
+async fn a_bearer_write_needs_no_pair_and_nothing_else_is_exempt() {
+    const SESSION_COOKIE: &str = "__Host-session";
+
+    let cell = boot("https://cell.example.com").await;
+    let exemption: rahi_edge::CsrfExemption =
+        Arc::new(|path: &str, headers: &axum::http::HeaderMap| {
+            let bearer_route = path.starts_with("/api/v1/");
+            let authorized = headers.contains_key(header::AUTHORIZATION);
+            let session = headers
+                .get(header::COOKIE)
+                .and_then(|value| value.to_str().ok())
+                .and_then(|header| csrf::cookie_value(header, SESSION_COOKIE))
+                .is_some();
+            bearer_route && authorized && !session
+        });
+    let router = Edge::builder(cell.state.clone())
+        .mount("/api", app())
+        .mount("/api/v1", app())
+        .csrf_exemption(exemption)
+        .build();
+
+    let bearer = |path: &str, extra: Option<(&str, String)>| {
+        let mut request = Request::builder()
+            .method("POST")
+            .uri(path)
+            .header(header::AUTHORIZATION, "Bearer a.b.c");
+        if let Some((name, value)) = extra {
+            request = request.header(name, value);
+        }
+        request.body(Body::empty()).expect("a well-formed request")
+    };
+
+    let written = send(&router, bearer("/api/v1/notes", None)).await;
+    assert_eq!(
+        written.status,
+        StatusCode::OK,
+        "a bearer write on a declared route needs no pair: {}",
+        written.body
+    );
+
+    let both = send(
+        &router,
+        bearer(
+            "/api/v1/notes",
+            Some((
+                header::COOKIE.as_str(),
+                format!("{SESSION_COOKIE}=whatever"),
+            )),
+        ),
+    )
+    .await;
+    assert_eq!(
+        both.status,
+        StatusCode::FORBIDDEN,
+        "a request carrying a session cookie is not exempt: {}",
+        both.body
+    );
+    assert_eq!(both.json()["error"], "csrf");
+
+    let undeclared = send(&router, bearer("/api/notes", None)).await;
+    assert_eq!(
+        undeclared.status,
+        StatusCode::FORBIDDEN,
+        "a route nobody declared bearer is checked as before: {}",
+        undeclared.body
+    );
+
+    let cookied = send(&router, post_request("/api/v1/notes")).await;
+    assert_eq!(
+        cookied.status,
+        StatusCode::FORBIDDEN,
+        "a request with neither credential is checked as before: {}",
+        cookied.body
+    );
+
+    cell.stop().await;
+}
+
 /// Over plain http the `__Host-` prefix is not legal, so the cookie is the
 /// unprefixed one and carries no `Secure` (spec 010 D-4).
 #[tokio::test]

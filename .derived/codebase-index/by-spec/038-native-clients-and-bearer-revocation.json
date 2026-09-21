@@ -51,7 +51,19 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-edge/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-edge/src/middleware/csrf.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/router.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/tests/middleware.rs",
         "source": "spec-edge"
       },
       {
@@ -183,6 +195,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-edge/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-edge/src/middleware/csrf.rs"
           }
         ],
@@ -191,6 +216,32 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-edge/src/middleware/csrf.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/router.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/router.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/tests/middleware.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/tests/middleware.rs"
         }
       },
       {
@@ -328,5 +379,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "15a3a6a1eaacf62a0c8fec0ec6cec7a884cb76b07a31435caecdffc855a2d9f9"
+  "shardHash": "c38a74bb7f1be9f07fc40ed32ad70125d31390602cde8850ade6b4b796859e6a"
 }
