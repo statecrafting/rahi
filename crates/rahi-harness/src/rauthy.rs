@@ -408,3 +408,278 @@ mod tests {
         assert!(solve_pow("nonsense").is_err());
     }
 }
+
+// ------------------------------------------------- the device grant (038)
+
+/// What a token endpoint answered: the credential, and what a client is
+/// meant to renew on (spec 038 B-4, D-1).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Tokens {
+    /// The access token, to be presented as `Authorization: Bearer`.
+    pub access_token: String,
+    /// The refresh token, when the grant included one.
+    pub refresh_token: Option<String>,
+    /// The lifetime the response states. A client renews on this and never
+    /// on a number it read from a manifest (038 D-1).
+    pub expires_in: u64,
+}
+
+/// Drive RFC 8628 against rauthy, through the cell's origin, as `user`
+/// (spec 038 B-7).
+///
+/// What a person at a terminal does: the client asks for a device code, the
+/// person approves it in a browser that is already logged in, and the client
+/// polls until rauthy hands over the token set. Every leg goes through the
+/// cell's `/auth` proxy, because that is the only way rauthy is reachable.
+///
+/// # Errors
+///
+/// [`Error::Rauthy`] at whichever leg does not answer as expected, with the
+/// status and the body.
+pub async fn device_login(base: &str, user: &User, client_id: &str, scope: &str) -> Result<Tokens> {
+    let proxy = format!("{}/auth/v1", base.trim_end_matches('/'));
+    let http = http_client();
+
+    // The client's leg: a device code and the code the person types in.
+    let asked = http
+        .post(format!("{proxy}/oidc/device"))
+        .form(&[("client_id", client_id), ("scope", scope)])
+        .send()
+        .await?;
+    let status = asked.status();
+    if !status.is_success() {
+        return Err(Error::Rauthy(format!(
+            "POST /oidc/device answered {status}: {}",
+            asked.text().await.unwrap_or_default()
+        )));
+    }
+    let granted: Value = asked
+        .json()
+        .await
+        .map_err(|err| Error::Rauthy(format!("the device grant is not json: {err}")))?;
+    let device_code = string_at(&granted, "device_code")?;
+    let user_code = string_at(&granted, "user_code")?;
+
+    // The person's leg: an authenticated rauthy session, then the approval.
+    let (session_cookie, csrf) = authenticated_session(base, &proxy, &http, user).await?;
+    let pow = solve_pow(
+        http.post(format!("{proxy}/pow"))
+            .send()
+            .await?
+            .text()
+            .await?
+            .trim(),
+    )?;
+    let approved = http
+        .post(format!("{proxy}/oidc/device/verify"))
+        .header(COOKIE, &session_cookie)
+        .header("x-csrf-token", &csrf)
+        .json(&json!({
+            "user_code": user_code,
+            "pow": pow,
+            "device_accepted": "accept",
+        }))
+        .send()
+        .await?;
+    let status = approved.status();
+    if !status.is_success() {
+        return Err(Error::Rauthy(format!(
+            "POST /oidc/device/verify answered {status}: {}",
+            approved.text().await.unwrap_or_default()
+        )));
+    }
+
+    // The client's poll. rauthy answers `authorization_pending` until the
+    // approval lands, which is the one legitimate reason to try again.
+    for _ in 0..20u8 {
+        let answer = http
+            .post(format!("{proxy}/oidc/token"))
+            .form(&[
+                ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
+                ("device_code", device_code.as_str()),
+                ("client_id", client_id),
+            ])
+            .send()
+            .await?;
+        if answer.status().is_success() {
+            return tokens(answer).await;
+        }
+        let body = answer.text().await.unwrap_or_default();
+        if !body.contains("authorization_pending") && !body.contains("slow_down") {
+            return Err(Error::Rauthy(format!(
+                "the device token endpoint refused: {body}"
+            )));
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    }
+    Err(Error::Rauthy(
+        "the device grant never yielded a token set".to_owned(),
+    ))
+}
+
+/// Renew at the issuer with the refresh grant (spec 038 B-7, D-1).
+///
+/// The chassis has no leg of this: a native client renews at rauthy's own
+/// token endpoint and presents the new access token like any other (025
+/// B-1, 038 P-1).
+///
+/// # Errors
+///
+/// [`Error::Rauthy`] when the token endpoint refuses, with its body.
+pub async fn refresh_tokens(base: &str, client_id: &str, refresh_token: &str) -> Result<Tokens> {
+    let proxy = format!("{}/auth/v1", base.trim_end_matches('/'));
+    let answer = http_client()
+        .post(format!("{proxy}/oidc/token"))
+        .form(&[
+            ("grant_type", "refresh_token"),
+            ("refresh_token", refresh_token),
+            ("client_id", client_id),
+        ])
+        .send()
+        .await?;
+    let status = answer.status();
+    if !status.is_success() {
+        return Err(Error::Rauthy(format!(
+            "the refresh grant answered {status}: {}",
+            answer.text().await.unwrap_or_default()
+        )));
+    }
+    tokens(answer).await
+}
+
+/// An anonymous rauthy session, logged in as `user` through the cell's own
+/// authorization-code flow, kept as a cookie the caller can present.
+async fn authenticated_session(
+    base: &str,
+    proxy: &str,
+    http: &reqwest::Client,
+    user: &User,
+) -> Result<(String, String)> {
+    let client = Client::new(base);
+    let start = client.get(LOGIN_PATH).await?;
+    let status = start.status();
+    let authorize_url = start
+        .headers()
+        .get(LOCATION)
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_owned)
+        .ok_or_else(|| {
+            Error::Rauthy(format!(
+                "GET {LOGIN_PATH} answered {status} without a Location"
+            ))
+        })?;
+    let authorize = url::Url::parse(&authorize_url)
+        .map_err(|err| Error::Rauthy(format!("the authorize URL does not parse: {err}")))?;
+    let param = |name: &str| -> Option<String> {
+        authorize
+            .query_pairs()
+            .find(|(k, _)| k == name)
+            .map(|(_, v)| v.into_owned())
+    };
+
+    let session = http.post(format!("{proxy}/oidc/session")).send().await?;
+    if session.status() != StatusCode::CREATED && session.status() != StatusCode::OK {
+        return Err(Error::Rauthy(format!(
+            "POST /oidc/session answered {}",
+            session.status()
+        )));
+    }
+    let session_cookie = session
+        .headers()
+        .get(SET_COOKIE)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.split(';').next())
+        .map(str::to_owned)
+        .ok_or_else(|| Error::Rauthy("the session set no cookie".to_owned()))?;
+    let info: Value = session
+        .json()
+        .await
+        .map_err(|err| Error::Rauthy(format!("the session is not json: {err}")))?;
+    let csrf = string_at(&info, "csrf_token")?;
+
+    let pow = solve_pow(
+        http.post(format!("{proxy}/pow"))
+            .send()
+            .await?
+            .text()
+            .await?
+            .trim(),
+    )?;
+    let mut body = json!({
+        "email": user.email,
+        "password": user.password,
+        "pow": pow,
+        "client_id": param("client_id").unwrap_or_default(),
+        "redirect_uri": param("redirect_uri").unwrap_or_default(),
+        "scopes": param("scope")
+            .unwrap_or_else(|| "openid".to_owned())
+            .split_whitespace()
+            .map(str::to_owned)
+            .collect::<Vec<_>>(),
+    });
+    for name in [
+        "state",
+        "nonce",
+        "code_challenge",
+        "code_challenge_method",
+        "resource",
+    ] {
+        if let (Some(value), Some(fields)) = (param(name), body.as_object_mut()) {
+            fields.insert(name.to_owned(), Value::String(value));
+        }
+    }
+    let answer = http
+        .post(format!("{proxy}/oidc/authorize"))
+        .header(COOKIE, &session_cookie)
+        .header("x-csrf-token", &csrf)
+        .json(&body)
+        .send()
+        .await?;
+    let status = answer.status();
+    if !status.is_success() {
+        return Err(Error::Rauthy(format!(
+            "POST /oidc/authorize answered {status}: {}",
+            answer.text().await.unwrap_or_default()
+        )));
+    }
+    Ok((session_cookie, csrf))
+}
+
+/// The one http client every leg above uses: no redirects, so a `Location`
+/// is read rather than followed.
+fn http_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .user_agent("rahi-harness")
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .unwrap_or_default()
+}
+
+/// A token endpoint's answer, read as [`Tokens`].
+async fn tokens(response: reqwest::Response) -> Result<Tokens> {
+    let body: Value = response
+        .json()
+        .await
+        .map_err(|err| Error::Rauthy(format!("the token set is not json: {err}")))?;
+    Ok(Tokens {
+        access_token: string_at(&body, "access_token")?,
+        refresh_token: body
+            .get("refresh_token")
+            .and_then(Value::as_str)
+            .map(str::to_owned),
+        expires_in: body
+            .get("expires_in")
+            .and_then(Value::as_u64)
+            .ok_or_else(|| Error::Rauthy("the token set states no expires_in".to_owned()))?,
+    })
+}
+
+/// One string field, or a refusal naming it.
+fn string_at(value: &Value, field: &str) -> Result<String> {
+    value
+        .get(field)
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+        .ok_or_else(|| Error::Rauthy(format!("the answer carries no {field}: {value}")))
+}

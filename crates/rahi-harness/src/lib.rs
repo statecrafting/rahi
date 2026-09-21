@@ -56,7 +56,7 @@ pub mod rauthy;
 pub use boot::{BootSpec, Harness, Instance, RauthyMode, Stopped};
 pub use client::Client;
 pub use cookies::CookieJar;
-pub use rauthy::{Rauthy, User};
+pub use rauthy::{Rauthy, Tokens, User, device_login, refresh_tokens};
 
 /// Everything the harness can fail with.
 #[derive(Debug)]

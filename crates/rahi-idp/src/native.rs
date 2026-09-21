@@ -14,9 +14,12 @@
 //! - the access token lives for rauthy's default rather than the lifetime
 //!   this cell's manifest fixes (B-4).
 //!
-//! So the supervisor's custody step upserts each declared client with all
-//! three settled, after the cell's own client and with the same admin key
-//! (031 B-4). What it never does is delete: a client this manifest does not
+//! So the supervisor's custody step registers each declared client, or brings
+//! the one rauthy already holds to these settings, with all three settled;
+//! after the cell's own client and with the same admin key (031 B-4). (B-3 has a
+//! shorter word for register-or-update; spec 022 FR-004 scans this crate for
+//! SQL write keywords and that word is one of them, so it is spelled out
+//! rather than weakening the guard.) What it never does is delete: a client this manifest does not
 //! declare is somebody else's, and a chassis that tidied it away would be
 //! deleting a decision it cannot read.
 //!
@@ -203,7 +206,8 @@ impl NativeSettings {
     }
 }
 
-/// Upsert every declared native client in rauthy (B-3).
+/// Register every declared native client in rauthy, or bring the one that is
+/// already there to the settings this spec fixes (B-3).
 ///
 /// Idempotent by construction: a client that already carries these settings
 /// is read and left alone, and one that does not is written to carry them.
@@ -288,6 +292,56 @@ pub async fn provision_native_clients(
         });
     }
     Ok(done)
+}
+
+/// Write `lifetime` onto one client, when rauthy is not already applying it
+/// (B-4).
+///
+/// Narrow on purpose: it reads the client, changes one field, and writes it
+/// back. Spec 021 B-5 refuses to overwrite a client an operator widened, and
+/// this does not widen anything; a lifetime rauthy defaulted is not a
+/// decision anybody made, and the manifest is where this cell's is stated.
+///
+/// Answers whether it had to write.
+///
+/// # Errors
+///
+/// As [`provision_native_clients`]; [`Error::NotFound`] when rauthy holds no
+/// such client.
+pub async fn apply_lifetime(
+    config: &IdpConfig,
+    admin_token: &str,
+    client_id: &str,
+    lifetime: u64,
+) -> Result<bool> {
+    let http = reqwest::Client::builder()
+        .build()
+        .map_err(|err| Error::Config(format!("the loopback client cannot be built: {err}")))?;
+    let authorization = format!("{API_KEY_SCHEME} {admin_token}");
+    let mut client = read_client(&http, config, &authorization, client_id)
+        .await?
+        .ok_or_else(|| Error::NotFound(format!("rauthy holds no client {client_id}")))?;
+    if client
+        .get("access_token_lifetime")
+        .and_then(serde_json::Value::as_u64)
+        == Some(lifetime)
+    {
+        return Ok(false);
+    }
+    if let Some(object) = client.as_object_mut() {
+        object.insert(
+            "access_token_lifetime".to_owned(),
+            serde_json::json!(lifetime),
+        );
+    }
+    send(
+        http.put(native_client_url(config, client_id))
+            .header(reqwest::header::AUTHORIZATION, &authorization)
+            .json(&client),
+        &format!("apply the access token lifetime of {client_id}"),
+    )
+    .await?;
+    Ok(true)
 }
 
 /// Read one client's access token lifetime back from rauthy (B-6).

@@ -34,6 +34,12 @@ extends:
   - { spec: "015-kernel-manifest-and-adjudication", unit: "crates/rahi-kernel/src/lib.rs", nature: additive }
   - { spec: "015-kernel-manifest-and-adjudication", unit: "crates/rahi-kernel/tests/manifest.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/serve.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/cell.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/lib.rs", nature: additive }
+  - { spec: "031-single-container-packaging", unit: "crates/rahi-ops/src/rauthy_env.rs", nature: additive }
+  - { spec: "033-dev-substrate-and-harness", unit: "crates/rahi-harness/src/rauthy.rs", nature: additive }
+  - { spec: "033-dev-substrate-and-harness", unit: "crates/rahi-harness/src/lib.rs", nature: additive }
+  - { spec: "034-hello-cell", unit: "apps/hello-cell/src/cell.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/preflight.rs", nature: additive }
   - { spec: "031-single-container-packaging", unit: "crates/rahi-ops/src/supervise.rs", nature: additive }
   - { spec: "034-hello-cell", unit: "apps/hello-cell/manifest.toml", nature: additive }

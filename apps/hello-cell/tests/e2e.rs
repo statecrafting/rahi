@@ -49,6 +49,30 @@ fn verb(cell: &Instance, args: &[&str], env: &[(&str, &str)]) -> String {
     String::from_utf8_lossy(&out.stdout).into_owned()
 }
 
+/// One bearer write of a note: the status, and the body if it was not one.
+///
+/// Deliberately no CSRF pair: that is what spec 038 B-1 is, and a helper
+/// that quietly added one would make every assertion above vacuous.
+async fn bearer_note(
+    client: &rahi_harness::Client,
+    token: &str,
+    body: &str,
+) -> (StatusCode, String) {
+    let answer = client
+        .send(
+            client
+                .request(reqwest::Method::POST, "/api/v1/notes")
+                .await
+                .unwrap()
+                .header("authorization", format!("Bearer {token}"))
+                .json(&serde_json::json!({ "body": body })),
+        )
+        .await
+        .unwrap();
+    let status = answer.status();
+    (status, answer.text().await.unwrap_or_default())
+}
+
 fn head_of(verify_output: &str) -> String {
     verify_output
         .split("head ")
@@ -175,6 +199,99 @@ async fn the_cell_end_to_end() {
             .to_owned();
         assert!(!id.is_empty());
         decision = Some(id);
+
+        // ---------------------------------------------------------------
+        // Spec 038 B-7, FR-005: the command-line client, for real.
+        //
+        // A device grant against rauthy through the cell's origin, approved
+        // as alice, then a bearer write with no CSRF pair, a renewal at the
+        // issuer, a second write with the renewed token, a revocation, and
+        // a refusal. The client here is a fresh one with an empty cookie
+        // jar, which is what a CLI is: a request carrying both a session
+        // cookie and a token is refused 400 (025 B-10), and that refusal is
+        // asserted at the end.
+        let tokens = rahi_harness::device_login(
+            cell.base_url(),
+            &user,
+            "hello-cli",
+            "openid profile email notes:write",
+        )
+        .await
+        .expect("the device grant completes");
+        assert_eq!(
+            tokens.expires_in, 600,
+            "the lifetime as issued is the manifest's, not rauthy's 1800 (B-4, FR-006)"
+        );
+        let refresh_token = tokens
+            .refresh_token
+            .clone()
+            .expect("the declared refresh flow yields a refresh token");
+
+        let cli = cell.client();
+        let wrote = bearer_note(&cli, &tokens.access_token, "from the cli").await;
+        assert_eq!(
+            wrote.0,
+            StatusCode::CREATED,
+            "a bearer write passes the CSRF layer with no pair (B-1): {}",
+            wrote.1
+        );
+
+        // Renewal is the client's, at the issuer, and driven by what the
+        // token response said rather than by anything the manifest told it
+        // (D-1). The chassis has no leg of this.
+        let renewed = rahi_harness::refresh_tokens(cell.base_url(), "hello-cli", &refresh_token)
+            .await
+            .expect("the refresh grant renews");
+        assert_ne!(renewed.access_token, tokens.access_token);
+        assert_eq!(renewed.expires_in, 600);
+        let again = bearer_note(&cli, &renewed.access_token, "after the renewal").await;
+        assert_eq!(again.0, StatusCode::CREATED, "{}", again.1);
+
+        // The revocation: the client ends its own token, and the next
+        // request with it is refused inside one cache read (B-5).
+        let revoked = cli
+            .send(
+                cli.request(reqwest::Method::POST, "/session/token/revoke")
+                    .await
+                    .unwrap()
+                    .header("authorization", format!("Bearer {}", renewed.access_token)),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            revoked.status(),
+            StatusCode::OK,
+            "{}",
+            revoked.text().await.unwrap()
+        );
+        let refused = bearer_note(&cli, &renewed.access_token, "after the revocation").await;
+        assert_eq!(
+            refused.0,
+            StatusCode::UNAUTHORIZED,
+            "a revoked token is refused: {}",
+            refused.1
+        );
+
+        // 025 B-10, at the composed cell: a request carrying both
+        // credentials is refused rather than resolved by a rule. `client`
+        // still holds alice's session cookie.
+        let both = client
+            .send(
+                client
+                    .request(reqwest::Method::POST, "/api/v1/notes")
+                    .await
+                    .unwrap()
+                    .header("authorization", format!("Bearer {}", tokens.access_token))
+                    .json(&serde_json::json!({ "body": "two credentials" })),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            both.status(),
+            StatusCode::BAD_REQUEST,
+            "{}",
+            both.text().await.unwrap()
+        );
 
         // The operator surface, as an operator (spec 024 B-2): the trace
         // ring holds the requests above, and the exposure table names

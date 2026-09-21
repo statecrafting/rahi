@@ -99,7 +99,8 @@ pub use extractor::{Authenticated, RequireRole, with_role, with_sessions};
 pub use jwks::{DEFAULT_REFRESH_INTERVAL, Jwk, Jwks};
 pub use login::{LoginState, login_cookie, login_cookie_name, session_router};
 pub use native::{
-    NativeSettings, Provisioned, provision_native_clients, read_lifetime, uses_refresh,
+    NativeSettings, Provisioned, apply_lifetime, provision_native_clients, read_lifetime,
+    uses_refresh,
 };
 pub use principal::{IdpClaims, pinned, principal};
 pub use proxy::{Proxy, proxy_router};

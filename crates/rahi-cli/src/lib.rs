@@ -134,7 +134,11 @@ async fn supervise<C: Cell>(env: &dyn EnvReader) -> Result<i32> {
     keys.check()?;
     let manifest = rahi_kernel::Manifest::parse(C::manifest())?;
     let app_name = manifest.app.name.as_str().to_owned();
-    let (rauthy, supplied) = sup::prepare_rauthy(&config, env)?;
+    let (mut rauthy, supplied) = sup::prepare_rauthy(&config, env)?;
+    // Spec 038 B-4 and D-11: rauthy takes the refresh token lifetime as a
+    // number of hours in its own configuration rather than as a client
+    // field, so the manifest's value is applied to the child at every start.
+    sup::apply_device_grant_lifetime(&mut rauthy, &manifest);
     let api = rahi_ops::rauthy_api::RauthyApi::new(config.rauthy_base_url(), keys.admin_token()?)?;
     let ready = async {
         sup::wait_healthy(&api, sup::HEALTH_BUDGET).await?;
@@ -143,8 +147,15 @@ async fn supervise<C: Cell>(env: &dyn EnvReader) -> Result<i32> {
         // admin the verb logs in as must exist before anything asks for a
         // backup.
         let steps = sup::ready_after_health(&config, &keys, &api, supplied.as_ref()).await?;
-        sup::custody_client(&config, &keys, &app_name).await?;
-        let said = steps.render();
+        let custodied = sup::custody_client(&config, &keys, &manifest).await?;
+        let mut said = steps.render();
+        let native = custodied.render();
+        if !native.is_empty() {
+            if !said.is_empty() {
+                said.push_str("; ");
+            }
+            said.push_str(&native);
+        }
         println!(
             "supervise: rauthy is healthy at {}, client {app_name} custodied{}{said}",
             api.base(),

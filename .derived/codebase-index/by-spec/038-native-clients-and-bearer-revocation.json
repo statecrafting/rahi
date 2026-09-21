@@ -19,11 +19,23 @@
         "source": "spec-edge"
       },
       {
+        "path": "apps/hello-cell/src/cell.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "apps/hello-cell/src/notes.rs",
         "source": "spec-edge"
       },
       {
         "path": "apps/hello-cell/tests/e2e.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/cell.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/lib.rs",
         "source": "spec-edge"
       },
       {
@@ -44,6 +56,14 @@
       },
       {
         "path": "crates/rahi-edge/tests/middleware.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-harness/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-harness/src/rauthy.rs",
         "source": "spec-edge"
       },
       {
@@ -88,6 +108,10 @@
       },
       {
         "path": "crates/rahi-ops/src/preflight.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/rauthy_env.rs",
         "source": "spec-edge"
       },
       {
@@ -164,6 +188,19 @@
       {
         "locations": [
           {
+            "file": "apps/hello-cell/src/cell.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "apps/hello-cell/src/cell.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "apps/hello-cell/src/notes.rs"
           }
         ],
@@ -185,6 +222,32 @@
         "unit": {
           "kind": "file",
           "path": "apps/hello-cell/tests/e2e.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/cell.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/cell.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/lib.rs"
         }
       },
       {
@@ -250,6 +313,32 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-edge/tests/middleware.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-harness/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-harness/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-harness/src/rauthy.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-harness/src/rauthy.rs"
         }
       },
       {
@@ -359,6 +448,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-ops/src/rauthy_env.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_env.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-ops/src/supervise.rs"
           }
         ],
@@ -400,5 +502,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "e8902b5fd3f86dc89850d29031a5f0f4b68d8c9e63351be4c211c4d9b7f6bffb"
+  "shardHash": "f08b7c7e9b0c57a8b7827b1acfef1871b1807fbf09ded0bfa78193937f5be5bd"
 }

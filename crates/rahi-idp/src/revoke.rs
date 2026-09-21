@@ -62,8 +62,11 @@ use crate::session::answer;
 /// Where a bearer client revokes the token it is holding (B-5).
 ///
 /// Under the session prefix, which is the app's own subtree: `/auth/*` is
-/// rauthy's and is forwarded raw (021 B-2).
-pub const SESSION_REVOKE_PATH: &str = "/token/revoke";
+/// rauthy's and is forwarded raw (021 B-2). The whole path, not a relative
+/// one, because this router merges at the root: the session prefix is
+/// already mounted as a public subtree (022) and this route is not public,
+/// so it cannot be nested inside that mount.
+pub const SESSION_REVOKE_PATH: &str = "/session/token/revoke";
 
 /// Where an operator revokes by `jti` or by subject (B-5).
 ///
@@ -309,9 +312,10 @@ impl Admin {
 
 /// `POST /session/token/revoke`: a client revokes the token it presented.
 ///
-/// Mounted inside the bearer gate, so the credential is already resolved and
-/// the only thing this route can revoke is the caller's own: there is no
-/// body, and nothing a caller writes decides what is revoked.
+/// Mounted at the root, because [`SESSION_REVOKE_PATH`] is a whole path, and
+/// inside the bearer gate, so the credential is already resolved and the
+/// only thing this route can revoke is the caller's own: there is no body,
+/// and nothing a caller writes decides what is revoked.
 pub fn revoke_router(revoker: Revoker) -> Router {
     Router::new()
         .route(SESSION_REVOKE_PATH, post(revoke_own))

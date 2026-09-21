@@ -71,6 +71,22 @@ otel = false
 
 [auth]
 operator_role = "hello_operator"
+# Spec 038 B-4: the lifetimes this cell fixes, said out loud rather than
+# left to rauthy's defaults (1800 seconds, and 72 hours for a device
+# grant's refresh token). The access lifetime is also what the revocation
+# deny-list's memory is computed from (038 D-7).
+access_token_lifetime_secs = 600
+native_refresh_lifetime_secs = 86400
+
+# Spec 038 B-7: the command-line client. Public, so it keeps no secret; the
+# device grant, so it logs a person in from a terminal; the refresh grant,
+# so it renews without asking them again. `notes:write` is the scope the
+# bearer route at POST /api/v1/notes requires, and declaring one no route
+# requires is refused at boot (038 B-2).
+[[auth.native_clients]]
+id = "hello-cli"
+flows = ["device_code", "refresh_token"]
+scopes = ["notes:write"]
 
 [contract]
 version = "1.0.0"
