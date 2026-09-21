@@ -26,6 +26,7 @@
 //! cell is permitted to do. Changing a grant must, and does.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt;
 
 use action_gate_core::{Gate, sha256_hex};
 use rahi_ledger::Hash;
@@ -127,12 +128,153 @@ pub struct Observability {
     pub otel: bool,
 }
 
-/// The role the operator verbs require (spec 024 enforces it).
+/// The default access token lifetime, in seconds (spec 038 B-4).
+pub const DEFAULT_ACCESS_TOKEN_LIFETIME_SECS: u64 = 600;
+
+/// The default refresh token lifetime of a native client, in seconds
+/// (spec 038 B-4). One day, in place of rauthy's 72-hour device-grant
+/// default.
+pub const DEFAULT_NATIVE_REFRESH_LIFETIME_SECS: u64 = 86_400;
+
+/// rauthy's own bound on a client's access token lifetime, in seconds.
+///
+/// `UpdateClientRequest` validates `10 <= access_token_lifetime <= 86400`. A
+/// manifest that names a number outside it is refused here, where the
+/// document is read, rather than by rauthy's validator at the first boot that
+/// tries to apply it.
+pub const MAX_ACCESS_TOKEN_LIFETIME_SECS: u64 = 86_400;
+
+/// The granularity rauthy's refresh token lifetime is configured at, in
+/// seconds.
+///
+/// `DEVICE_GRANT_REFRESH_TOKEN_LIFETIME` is a number of hours, so a value
+/// that is not a whole number of them cannot be applied and is refused here
+/// rather than silently rounded (spec 038 D-11).
+pub const NATIVE_REFRESH_GRANULARITY_SECS: u64 = 3_600;
+
+/// One grant a native client may use (spec 038 B-2).
+///
+/// Closed, and named as the manifest spells it rather than as OAuth spells
+/// it on the wire: a document an operator diffs says `device_code`, and
+/// [`NativeFlow::grant`] is the one place that knows the URN.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NativeFlow {
+    /// RFC 8628, what a command-line client logs in with.
+    DeviceCode,
+    /// RFC 6749 with PKCE, what a client with a loopback listener uses.
+    AuthorizationCode,
+    /// RFC 6749 §6, beside either of the two above and never alone.
+    RefreshToken,
+}
+
+impl NativeFlow {
+    /// The grant type as rauthy names it on the wire.
+    #[must_use]
+    pub const fn grant(self) -> &'static str {
+        match self {
+            Self::DeviceCode => "urn:ietf:params:oauth:grant-type:device_code",
+            Self::AuthorizationCode => "authorization_code",
+            Self::RefreshToken => "refresh_token",
+        }
+    }
+
+    /// Whether this flow logs a person in, as opposed to renewing a grant
+    /// one of them already made.
+    #[must_use]
+    pub const fn is_login(self) -> bool {
+        matches!(self, Self::DeviceCode | Self::AuthorizationCode)
+    }
+}
+
+impl fmt::Display for NativeFlow {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            Self::DeviceCode => "device_code",
+            Self::AuthorizationCode => "authorization_code",
+            Self::RefreshToken => "refresh_token",
+        };
+        f.write_str(name)
+    }
+}
+
+/// A public client this cell declares for a program of its own (038 B-2).
+///
+/// It is manifest content and not deployment configuration (038 D-4): a
+/// native client is part of what the cell permits, so it belongs inside the
+/// ceiling the manifest declares, and declaring one moves the manifest hash
+/// the way any other change to the ceiling does.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NativeClient {
+    /// The client id, as rauthy will hold it: `[a-zA-Z0-9._-]{2,256}`.
+    pub id: String,
+    /// The grants this client may use. At least one of them logs a person
+    /// in; `refresh_token` stands beside one, never alone.
+    pub flows: Vec<NativeFlow>,
+    /// The scopes it may be granted, a subset of what the cell's bearer
+    /// routes require ([`Manifest::validate_native_scopes`]).
+    #[serde(default)]
+    pub scopes: Vec<String>,
+    /// Where an authorization code comes back to: loopback only (RFC 8252).
+    /// Empty unless `flows` includes `authorization_code`.
+    #[serde(default)]
+    pub redirect_uris: Vec<String>,
+}
+
+impl NativeClient {
+    /// Whether this client may use `flow`.
+    #[must_use]
+    pub fn has_flow(&self, flow: NativeFlow) -> bool {
+        self.flows.contains(&flow)
+    }
+
+    /// The grant types rauthy is told to enable, in the manifest's order.
+    #[must_use]
+    pub fn grants(&self) -> Vec<String> {
+        self.flows
+            .iter()
+            .map(|flow| flow.grant().to_owned())
+            .collect()
+    }
+}
+
+/// The role the operator verbs require (spec 024 enforces it), the token
+/// lifetimes this cell fixes, and the native clients it declares.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Auth {
     /// The rauthy role name an operator carries.
     pub operator_role: String,
+    /// How long an access token this cell's clients are issued lives, in
+    /// seconds (spec 038 B-4). Absent means
+    /// [`DEFAULT_ACCESS_TOKEN_LIFETIME_SECS`].
+    ///
+    /// Optional in the type, and skipped when it is absent, so a manifest
+    /// that says nothing about lifetimes serializes exactly as it did before
+    /// this table grew: the model is what [`Manifest::hash`] digests, and a
+    /// field defaulted into it would move the genesis parent of every chain
+    /// whose manifest never changed (spec 038 D-9).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub access_token_lifetime_secs: Option<u64>,
+    /// How long a native client's refresh token lives, in seconds
+    /// (spec 038 B-4). Absent means
+    /// [`DEFAULT_NATIVE_REFRESH_LIFETIME_SECS`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub native_refresh_lifetime_secs: Option<u64>,
+    /// Whether a browser logout also deny-lists the subject's bearer tokens
+    /// (spec 038 B-5).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub logout_revokes_bearer: bool,
+    /// The public clients this cell declares (spec 038 B-2).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub native_clients: Vec<NativeClient>,
+}
+
+/// Whether `value` is false, for `skip_serializing_if`.
+#[allow(clippy::trivially_copy_pass_by_ref)]
+const fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 /// The app's own contract version, for its clients.
@@ -212,7 +354,8 @@ impl Manifest {
         self.validate_capabilities()?;
         self.validate_services()?;
         self.validate_gate()?;
-        self.validate_policy()
+        self.validate_policy()?;
+        self.validate_auth()
     }
 
     /// The manifest names the schema it was written for, and this build
@@ -351,6 +494,169 @@ impl Manifest {
             }
         }
         Ok(())
+    }
+
+    /// The `[auth]` table: the lifetimes, and every declared native client
+    /// (spec 038 B-2, B-4).
+    ///
+    /// What is *not* checked here is the one rule this document cannot
+    /// decide alone: whether a client's scopes are ones the cell's bearer
+    /// routes require. That is a fact about mounted routes, which the kernel
+    /// does not and must not know, so it is
+    /// [`Manifest::validate_native_scopes`], checked at boot where both
+    /// halves are in hand (spec 038 D-9).
+    fn validate_auth(&self) -> Result<(), Error> {
+        let lifetime = self.access_token_lifetime_secs();
+        if !(10..=MAX_ACCESS_TOKEN_LIFETIME_SECS).contains(&lifetime) {
+            return Err(Error::Validation(format!(
+                "auth.access_token_lifetime_secs is {lifetime}, and rauthy accepts 10 to \
+                 {MAX_ACCESS_TOKEN_LIFETIME_SECS} seconds"
+            )));
+        }
+        let refresh = self.native_refresh_lifetime_secs();
+        if refresh < NATIVE_REFRESH_GRANULARITY_SECS
+            || !refresh.is_multiple_of(NATIVE_REFRESH_GRANULARITY_SECS)
+        {
+            return Err(Error::Validation(format!(
+                "auth.native_refresh_lifetime_secs is {refresh}, and rauthy configures the \
+                 refresh lifetime in whole hours: name a positive multiple of \
+                 {NATIVE_REFRESH_GRANULARITY_SECS}"
+            )));
+        }
+
+        let mut seen = BTreeSet::new();
+        for client in &self.auth.native_clients {
+            if !is_client_id(&client.id) {
+                return Err(Error::Validation(format!(
+                    "the native client id {:?} is not two to 256 characters of [a-zA-Z0-9._-], \
+                     which is what rauthy accepts",
+                    client.id
+                )));
+            }
+            if !seen.insert(client.id.clone()) {
+                return Err(Error::Validation(format!(
+                    "auth.native_clients declares {:?} twice",
+                    client.id
+                )));
+            }
+            if !client.flows.iter().any(|flow| flow.is_login()) {
+                return Err(Error::Validation(format!(
+                    "the native client {:?} enables no flow that logs a person in: name \
+                     device_code, authorization_code, or both",
+                    client.id
+                )));
+            }
+            let mut flows = BTreeSet::new();
+            for flow in &client.flows {
+                if !flows.insert(*flow) {
+                    return Err(Error::Validation(format!(
+                        "the native client {:?} names the flow {flow} twice",
+                        client.id
+                    )));
+                }
+            }
+            for scope in &client.scopes {
+                if !is_scope(scope) {
+                    return Err(Error::Validation(format!(
+                        "the native client {:?} names the scope {scope:?}, which is not two to \
+                         64 characters of [a-z0-9-_/:*]",
+                        client.id
+                    )));
+                }
+            }
+            if client.has_flow(NativeFlow::AuthorizationCode) {
+                if client.redirect_uris.is_empty() {
+                    return Err(Error::Validation(format!(
+                        "the native client {:?} uses authorization_code and names no \
+                         redirect_uris; RFC 8252 wants a loopback one",
+                        client.id
+                    )));
+                }
+                for uri in &client.redirect_uris {
+                    if !is_loopback_uri(uri) {
+                        return Err(Error::Validation(format!(
+                            "the native client {:?} names the redirect URI {uri:?}, which is not \
+                             a loopback address; RFC 8252 §7.3 wants http://127.0.0.1 or \
+                             http://[::1] with the port the client listens on",
+                            client.id
+                        )));
+                    }
+                }
+            } else if !client.redirect_uris.is_empty() {
+                return Err(Error::Validation(format!(
+                    "the native client {:?} names redirect_uris and does not use \
+                     authorization_code: a redirect nothing redirects to is a typo, not a \
+                     wider ceiling",
+                    client.id
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    /// Every declared native client's scopes are ones a bearer route
+    /// requires (spec 038 B-2).
+    ///
+    /// `declared` is what the mounted scope gates published, which is a fact
+    /// about the composed cell rather than about this document, so the check
+    /// is here and not in [`Manifest::validate`]: a manifest is parsed in a
+    /// build that mounts nothing, and a rule that read an empty set there
+    /// would refuse every manifest that declares a client.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Validation`] naming the client and the scope no route asks
+    /// for.
+    pub fn validate_native_scopes(&self, declared: &BTreeSet<String>) -> Result<(), Error> {
+        for client in &self.auth.native_clients {
+            for scope in &client.scopes {
+                if !declared.contains(scope) {
+                    return Err(Error::Validation(format!(
+                        "the native client {:?} is declared the scope {scope:?}, which no bearer \
+                         route of this cell requires; the scopes its routes require are: {}",
+                        client.id,
+                        if declared.is_empty() {
+                            "none".to_owned()
+                        } else {
+                            declared.iter().cloned().collect::<Vec<_>>().join(", ")
+                        }
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// How long an access token this cell's clients are issued lives, in
+    /// seconds (spec 038 B-4).
+    #[must_use]
+    pub const fn access_token_lifetime_secs(&self) -> u64 {
+        match self.auth.access_token_lifetime_secs {
+            Some(secs) => secs,
+            None => DEFAULT_ACCESS_TOKEN_LIFETIME_SECS,
+        }
+    }
+
+    /// How long a native client's refresh token lives, in seconds (B-4).
+    #[must_use]
+    pub const fn native_refresh_lifetime_secs(&self) -> u64 {
+        match self.auth.native_refresh_lifetime_secs {
+            Some(secs) => secs,
+            None => DEFAULT_NATIVE_REFRESH_LIFETIME_SECS,
+        }
+    }
+
+    /// The declared native clients (spec 038 B-2).
+    #[must_use]
+    pub fn native_clients(&self) -> &[NativeClient] {
+        &self.auth.native_clients
+    }
+
+    /// Whether a browser logout deny-lists the subject's bearer tokens
+    /// (spec 038 B-5).
+    #[must_use]
+    pub const fn logout_revokes_bearer(&self) -> bool {
+        self.auth.logout_revokes_bearer
     }
 
     /// The ledger, observability, auth, and contract policies.
@@ -501,6 +807,64 @@ impl Manifest {
             .map_err(|e| Error::Integrity(format!("the manifest does not serialize: {e}")))?;
         Ok(canonical_keysort_json::to_canonical_string(&value))
     }
+}
+
+/// rauthy's client id rule: `^[a-zA-Z0-9._\-]{2,256}$`.
+fn is_client_id(id: &str) -> bool {
+    (2..=256).contains(&id.len())
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
+}
+
+/// rauthy's scope rule: `^[a-z0-9-_/,:*]{2,64}$`, without the comma, which
+/// separates two scopes rather than appearing inside one.
+fn is_scope(scope: &str) -> bool {
+    (2..=64).contains(&scope.len())
+        && scope.chars().all(|c| {
+            c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '-' | '_' | '/' | ':' | '*')
+        })
+}
+
+/// Whether `uri` redirects to this machine (RFC 8252 §7.3).
+///
+/// The literal addresses only. `localhost` is deliberately refused: RFC 8252
+/// §8.3 says it resolves through whatever the host's name service says, and a
+/// name that can be pointed elsewhere is not the property the loopback rule
+/// is buying. The port is the client's and is not fixed, which is the other
+/// half of §7.3.
+fn is_loopback_uri(uri: &str) -> bool {
+    let Some(rest) = uri.strip_prefix("http://") else {
+        return false;
+    };
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    let host = match authority.strip_prefix('[') {
+        Some(after) => match after.split_once(']') {
+            Some((host, port)) => {
+                if !port.is_empty() && !is_port(port) {
+                    return false;
+                }
+                host
+            }
+            None => return false,
+        },
+        None => match authority.split_once(':') {
+            Some((host, port)) => {
+                if !is_port(&format!(":{port}")) {
+                    return false;
+                }
+                host
+            }
+            None => authority,
+        },
+    };
+    matches!(host, "127.0.0.1" | "::1")
+}
+
+/// Whether `port` is `:` followed by a decimal port number.
+fn is_port(port: &str) -> bool {
+    port.strip_prefix(':')
+        .is_some_and(|digits| !digits.is_empty() && digits.parse::<u16>().is_ok())
 }
 
 /// The MAJOR of a `MAJOR.MINOR.PATCH` version, if it is one.

@@ -273,3 +273,229 @@ fn the_schema_version_is_part_of_what_the_chain_is_rooted_at() {
         .expect("hashes");
     assert_ne!(valid, later, "the named schema version is inside the hash");
 }
+
+// ---------------------------------------------------------------------------
+// Native clients and the token lifetimes (spec 038 B-2, B-4, FR-002).
+// ---------------------------------------------------------------------------
+
+/// `VALID` with an `[auth]` table replaced by `table`.
+fn with_auth(table: &str) -> String {
+    let head = VALID
+        .split("[auth]")
+        .next()
+        .expect("the fixture has an [auth] table");
+    let tail = VALID
+        .split_once("[contract]")
+        .expect("the fixture has a [contract] table")
+        .1;
+    format!("{head}{table}\n[contract]{tail}")
+}
+
+/// The hash `valid.toml` had before the `[auth]` table grew the lifetimes
+/// and the native clients, measured at `0caff51`.
+///
+/// A manifest that says nothing about either must hash to exactly this: the
+/// model is what the chain is rooted at (spec 015 B-2), and a field
+/// defaulted into every document's model would move the genesis parent of
+/// every chain whose manifest never changed (spec 038 D-9).
+const VALID_HASH_BEFORE_038: &str =
+    "sha256:f3407fd4af0c4bfb852e8349872397b4810557decdd5fd87dc0fbdb38d3f8f2f";
+
+#[test]
+fn a_manifest_that_declares_no_native_client_hashes_as_it_did_before() {
+    assert_eq!(
+        valid().hash().expect("hashes").as_str(),
+        VALID_HASH_BEFORE_038
+    );
+}
+
+#[test]
+fn the_lifetimes_default_and_a_declared_one_is_read() {
+    let manifest = valid();
+    assert_eq!(manifest.access_token_lifetime_secs(), 600);
+    assert_eq!(manifest.native_refresh_lifetime_secs(), 86_400);
+    assert!(!manifest.logout_revokes_bearer());
+    assert!(manifest.native_clients().is_empty());
+
+    let declared = Manifest::parse(&with_auth(
+        "[auth]\noperator_role = \"op\"\naccess_token_lifetime_secs = 300\n\
+         native_refresh_lifetime_secs = 7200\nlogout_revokes_bearer = true\n",
+    ))
+    .expect("parses");
+    assert_eq!(declared.access_token_lifetime_secs(), 300);
+    assert_eq!(declared.native_refresh_lifetime_secs(), 7_200);
+    assert!(declared.logout_revokes_bearer());
+}
+
+#[test]
+fn a_declared_lifetime_moves_the_hash() {
+    let declared = Manifest::parse(&with_auth(
+        "[auth]\noperator_role = \"op\"\naccess_token_lifetime_secs = 600\n",
+    ))
+    .expect("parses");
+    assert_ne!(
+        declared.hash().expect("hashes").as_str(),
+        VALID_HASH_BEFORE_038,
+        "saying the default out loud is still a different ceiling document"
+    );
+}
+
+#[test]
+fn a_lifetime_rauthy_would_refuse_is_refused_here() {
+    for bad in [
+        "access_token_lifetime_secs = 9",
+        "access_token_lifetime_secs = 86401",
+    ] {
+        let err = Manifest::parse(&with_auth(&format!(
+            "[auth]\noperator_role = \"op\"\n{bad}\n"
+        )))
+        .expect_err("refused");
+        assert_eq!(err.kind(), "validation");
+        assert!(
+            err.message().contains("access_token_lifetime_secs"),
+            "{err}"
+        );
+    }
+    let err = Manifest::parse(&with_auth(
+        "[auth]\noperator_role = \"op\"\nnative_refresh_lifetime_secs = 5400\n",
+    ))
+    .expect_err("whole hours only");
+    assert!(err.message().contains("whole hours"), "{err}");
+}
+
+/// A manifest declaring one native client with `flows` and `scopes`.
+fn with_client(body: &str) -> String {
+    with_auth(&format!(
+        "[auth]\noperator_role = \"op\"\n\n[[auth.native_clients]]\n{body}"
+    ))
+}
+
+#[test]
+fn a_declared_native_client_is_read_with_its_flows_and_scopes() {
+    let manifest = Manifest::parse(&with_client(
+        "id = \"hello-cli\"\nflows = [\"device_code\", \"refresh_token\"]\n\
+         scopes = [\"notes:write\"]\n",
+    ))
+    .expect("parses");
+    let client = manifest
+        .native_clients()
+        .first()
+        .expect("the declared client");
+    assert_eq!(client.id, "hello-cli");
+    assert!(client.has_flow(rahi_kernel::NativeFlow::DeviceCode));
+    assert!(client.has_flow(rahi_kernel::NativeFlow::RefreshToken));
+    assert!(!client.has_flow(rahi_kernel::NativeFlow::AuthorizationCode));
+    assert_eq!(
+        client.grants(),
+        vec![
+            "urn:ietf:params:oauth:grant-type:device_code".to_owned(),
+            "refresh_token".to_owned(),
+        ]
+    );
+    assert_ne!(
+        manifest.hash().expect("hashes").as_str(),
+        VALID_HASH_BEFORE_038,
+        "a declared client is part of the ceiling and moves the hash (B-2)"
+    );
+}
+
+#[test]
+fn a_native_client_that_logs_nobody_in_is_refused() {
+    let err = Manifest::parse(&with_client(
+        "id = \"hello-cli\"\nflows = [\"refresh_token\"]\n",
+    ))
+    .expect_err("refresh_token never stands alone");
+    assert_eq!(err.kind(), "validation");
+    assert!(err.message().contains("logs a person in"), "{err}");
+}
+
+#[test]
+fn two_native_clients_of_one_id_are_refused() {
+    let err = Manifest::parse(&with_auth(
+        "[auth]\noperator_role = \"op\"\n\n[[auth.native_clients]]\nid = \"cli\"\n\
+         flows = [\"device_code\"]\n\n[[auth.native_clients]]\nid = \"cli\"\n\
+         flows = [\"device_code\"]\n",
+    ))
+    .expect_err("ids are unique");
+    assert!(err.message().contains("twice"), "{err}");
+}
+
+/// FR-002, second half: a redirect URI that is not loopback is refused, and
+/// so is one on a client that redirects nowhere.
+#[test]
+fn a_redirect_uri_that_is_not_loopback_is_refused() {
+    for bad in [
+        "https://app.example.com/cb",
+        "http://localhost:1234/cb",
+        "http://127.0.0.1.evil.example.com/cb",
+        "http://[::1/cb",
+    ] {
+        let err = Manifest::parse(&with_client(&format!(
+            "id = \"cli\"\nflows = [\"authorization_code\"]\nredirect_uris = [\"{bad}\"]\n"
+        )))
+        .expect_err("RFC 8252 wants loopback");
+        assert!(err.message().contains("loopback"), "{bad}: {err}");
+    }
+    for good in [
+        "http://127.0.0.1:8123/callback",
+        "http://127.0.0.1/callback",
+        "http://[::1]:8123/callback",
+    ] {
+        Manifest::parse(&with_client(&format!(
+            "id = \"cli\"\nflows = [\"authorization_code\"]\nredirect_uris = [\"{good}\"]\n"
+        )))
+        .unwrap_or_else(|err| panic!("{good} is loopback: {err}"));
+    }
+
+    let err = Manifest::parse(&with_client(
+        "id = \"cli\"\nflows = [\"authorization_code\"]\n",
+    ))
+    .expect_err("authorization_code needs somewhere to come back to");
+    assert!(err.message().contains("redirect_uris"), "{err}");
+
+    let err = Manifest::parse(&with_client(
+        "id = \"cli\"\nflows = [\"device_code\"]\nredirect_uris = [\"http://127.0.0.1/cb\"]\n",
+    ))
+    .expect_err("a device client redirects nowhere");
+    assert!(err.message().contains("typo"), "{err}");
+}
+
+/// FR-002, first half: a scope no bearer route requires is refused. The
+/// check takes the routes' declaration because the manifest alone cannot
+/// know it (spec 038 D-9).
+#[test]
+fn a_native_client_scope_no_route_declares_is_refused() {
+    let manifest = Manifest::parse(&with_client(
+        "id = \"hello-cli\"\nflows = [\"device_code\"]\nscopes = [\"notes:write\"]\n",
+    ))
+    .expect("parses");
+
+    let declared = std::collections::BTreeSet::from(["notes:write".to_owned()]);
+    manifest
+        .validate_native_scopes(&declared)
+        .expect("the scope a route requires");
+
+    let err = manifest
+        .validate_native_scopes(&std::collections::BTreeSet::from(["notes:read".to_owned()]))
+        .expect_err("a scope nothing requires");
+    assert_eq!(err.kind(), "validation");
+    assert!(err.message().contains("notes:write"), "{err}");
+    assert!(
+        err.message().contains("notes:read"),
+        "it names what is available: {err}"
+    );
+
+    let err = manifest
+        .validate_native_scopes(&std::collections::BTreeSet::new())
+        .expect_err("a cell with no bearer route declares no scopes");
+    assert!(err.message().contains("none"), "{err}");
+}
+
+#[test]
+fn an_unknown_key_in_a_native_client_is_refused() {
+    let err = Manifest::parse(&with_client(
+        "id = \"cli\"\nflows = [\"device_code\"]\nsecret = \"hunter2\"\n",
+    ))
+    .expect_err("deny_unknown_fields reaches into the client table too");
+    assert_eq!(err.kind(), "validation");
+}

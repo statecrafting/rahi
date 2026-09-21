@@ -27,6 +27,8 @@ extends:
   - { spec: "021-idp-proxy-and-discovery", unit: "crates/rahi-idp/src/lib.rs", nature: additive }
   - { spec: "021-idp-proxy-and-discovery", unit: "crates/rahi-idp/src/bootstrap.rs", nature: additive }
   - { spec: "015-kernel-manifest-and-adjudication", unit: "crates/rahi-kernel/src/manifest.rs", nature: additive }
+  - { spec: "015-kernel-manifest-and-adjudication", unit: "crates/rahi-kernel/src/lib.rs", nature: additive }
+  - { spec: "015-kernel-manifest-and-adjudication", unit: "crates/rahi-kernel/tests/manifest.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/serve.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/preflight.rs", nature: additive }
   - { spec: "031-single-container-packaging", unit: "crates/rahi-ops/src/supervise.rs", nature: additive }
@@ -284,6 +286,54 @@ because D-1 noticed both and decided neither.
   that full sign-out is not offered. It may not leave the question implied
   by a test that never presents a refresh token after revoking. Whichever
   is built is what the documentation claims.
+
+The build session of 2026-09-20 recorded the decisions below for choices
+this spec was silent on. None of them changes what the spec requires.
+
+- **D-9 (2026-09-20, build; the new `[auth]` fields are absent, not
+  defaulted, in the model).** `access_token_lifetime_secs`,
+  `native_refresh_lifetime_secs`, `logout_revokes_bearer` and
+  `native_clients` are optional in the type and skipped when absent, so a
+  manifest that says nothing about any of them serializes exactly as it did
+  before this spec, and its hash does not move.
+  `Manifest::hash` digests the parsed model (015 B-2) and that hash is the
+  chain's genesis parent (013 B-2), so a field defaulted into every
+  document's model would silently re-root every existing chain whose
+  manifest never changed. A regression test pins `valid.toml` to the hash it
+  had at `0caff51`. The consequence is that saying `access_token_lifetime_secs
+  = 600` out loud is a different document from saying nothing, which is
+  correct: the second is governed by this build's default and the first is
+  governed by the operator.
+  The same decision places B-2's scope-subset rule outside
+  `Manifest::validate`: whether a client's scopes are ones a bearer route
+  requires is a fact about the composed cell, not about the document, and the
+  kernel neither knows nor may know the mounted routes.
+  `Manifest::validate_native_scopes(&declared)` takes that set and is called
+  at boot, where both halves are in hand. Alternative rejected: a manifest
+  field listing the cell's scopes, which would be a second declaration of
+  something the scope gates already state and could drift from them.
+- **D-10 (2026-09-20, build; loopback means the literal address).** B-2's
+  loopback rule accepts `http://127.0.0.1` and `http://[::1]`, with any port
+  or none, and refuses `http://localhost`. RFC 8252 §8.3 says `localhost`
+  resolves through whatever the host's name service answers, and a name that
+  can be pointed elsewhere is not the property the loopback rule buys.
+  Alternative rejected: accepting `localhost` for the convenience of a
+  hand-written client, which would make the check advisory.
+- **D-11 (2026-09-20, build; the refresh lifetime is rauthy's configuration,
+  not a client field).** B-4 says the manifest's
+  `native_refresh_lifetime_secs` is applied "as rauthy's refresh token
+  lifetime for every native client whose flows include `refresh_token`". In
+  rauthy 0.36.2 that lifetime is not a client field: it is
+  `DEVICE_GRANT_REFRESH_TOKEN_LIFETIME`, a number of **hours** in rauthy's
+  own configuration (`src/data/src/rauthy_config.rs`, default 72), read by
+  `token_set.rs` when a device grant mints a refresh token. The build
+  therefore applies it where rauthy reads it, in the environment spec 031
+  renders, and the manifest value is refused unless it is a positive whole
+  number of hours rather than silently rounded. Two consequences are stated
+  rather than hidden: the value is cell-wide rather than per client, and it
+  reaches rauthy at the restart that re-renders the environment. Alternative
+  rejected: sending it in the client upsert, which rauthy's
+  `UpdateClientRequest` has no field for and would discard.
 
 ### Evidence and proposals (2026-09-12)
 
