@@ -1,24 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '038-native-clients-and-bearer-revocation' file unit 'crates/rahi-idp/src/native.rs' does not exist",
-        "path": "crates/rahi-idp/src/native.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '038-native-clients-and-bearer-revocation' file unit 'crates/rahi-idp/src/revoke.rs' does not exist",
-        "path": "crates/rahi-idp/src/revoke.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '038-native-clients-and-bearer-revocation' file unit 'crates/rahi-idp/tests/native.rs' does not exist",
-        "path": "crates/rahi-idp/tests/native.rs"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "015-kernel-manifest-and-adjudication",
@@ -79,6 +59,22 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-idp/src/native.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/revoke.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/tests/bearer.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/tests/native.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-kernel/src/lib.rs",
         "source": "spec-edge"
       },
@@ -101,7 +97,11 @@
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/native.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -110,7 +110,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/revoke.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -119,7 +123,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/tests/native.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -286,6 +294,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-idp/tests/bearer.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/bearer.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-kernel/src/lib.rs"
           }
         ],
@@ -379,5 +400,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "c38a74bb7f1be9f07fc40ed32ad70125d31390602cde8850ade6b4b796859e6a"
+  "shardHash": "e8902b5fd3f86dc89850d29031a5f0f4b68d8c9e63351be4c211c4d9b7f6bffb"
 }

@@ -74,11 +74,13 @@ pub mod envelope;
 pub mod extractor;
 pub mod jwks;
 pub mod login;
+pub mod native;
 pub mod principal;
 pub mod proxy;
 pub mod refresh;
 pub mod registration;
 pub mod resource;
+pub mod revoke;
 pub mod scope;
 pub mod session;
 
@@ -96,11 +98,18 @@ pub use envelope::{Cookie, Envelope, Secret, SessionId, SessionKey, cookie_value
 pub use extractor::{Authenticated, RequireRole, with_role, with_sessions};
 pub use jwks::{DEFAULT_REFRESH_INTERVAL, Jwk, Jwks};
 pub use login::{LoginState, login_cookie, login_cookie_name, session_router};
+pub use native::{
+    NativeSettings, Provisioned, provision_native_clients, read_lifetime, uses_refresh,
+};
 pub use principal::{IdpClaims, pinned, principal};
 pub use proxy::{Proxy, proxy_router};
 pub use refresh::{Renewed, ends_the_session, renew};
 pub use registration::Registration;
 pub use resource::{METADATA_PATH, Resource, ResourceMetadata, resource_router};
+pub use revoke::{
+    OPERATOR_REVOKE_PATH, RevokeRequest, Revoked, Revoker, SESSION_REVOKE_PATH, denylist_ttl,
+    operator_revoke_router, revoke_router,
+};
 pub use scope::{RequireScope, with_scope};
 pub use session::{
     DEFAULT_ACCESS_TTL, SESSION_PREFIX, SESSION_RATE_LIMIT, Session, Sessions, answer,

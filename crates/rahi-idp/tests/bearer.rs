@@ -776,6 +776,16 @@ fn no_credential_is_minted_anywhere_in_this_workspace() {
             "presents that key on the client bootstrap and secret read (spec 031 B-3)",
         ),
         (
+            "crates/rahi-idp/src/native.rs",
+            "presents that same key to upsert a declared native client (spec 038 B-3); \
+             the client it creates is public and has no secret to mint",
+        ),
+        (
+            "crates/rahi-idp/src/revoke.rs",
+            "presents that same key to end a revoked subject's rauthy sessions \
+             (spec 038 D-8)",
+        ),
+        (
             "crates/rahi-ops/tests/first_boot.rs",
             "asserts the provisioned key and rauthy's floor on its length",
         ),

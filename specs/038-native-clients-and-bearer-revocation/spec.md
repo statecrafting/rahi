@@ -27,6 +27,7 @@ extends:
   - { spec: "020-edge-server", unit: "crates/rahi-edge/src/lib.rs", nature: additive }
   - { spec: "020-edge-server", unit: "crates/rahi-edge/tests/middleware.rs", nature: additive }
   - { spec: "025-api-tokens-and-resource-server", unit: "crates/rahi-idp/src/bearer.rs", nature: additive }
+  - { spec: "025-api-tokens-and-resource-server", unit: "crates/rahi-idp/tests/bearer.rs", nature: additive }
   - { spec: "021-idp-proxy-and-discovery", unit: "crates/rahi-idp/src/lib.rs", nature: additive }
   - { spec: "021-idp-proxy-and-discovery", unit: "crates/rahi-idp/src/bootstrap.rs", nature: additive }
   - { spec: "015-kernel-manifest-and-adjudication", unit: "crates/rahi-kernel/src/manifest.rs", nature: additive }
@@ -337,6 +338,18 @@ this spec was silent on. None of them changes what the spec requires.
   reaches rauthy at the restart that re-renders the environment. Alternative
   rejected: sending it in the client upsert, which rauthy's
   `UpdateClientRequest` has no field for and would discard.
+
+- **D-12 (2026-09-20, build; a native client's settings replace rather than
+  widen).** `bootstrap_client` (021 B-5) refuses to overwrite the cell's own
+  client, because an operator who widened it did so on purpose. Provisioning
+  a native client does the opposite: it writes the declared flows, scopes,
+  audience, algorithms and lifetime over whatever rauthy holds, keeping only
+  the fields this spec does not fix. A native client is manifest content
+  (D-4), the manifest is the ceiling, and a grant the document no longer
+  declares has to come off the client or the ceiling was a description rather
+  than a bound. It still never deletes a client it did not declare.
+  Alternative rejected: the union `bootstrap_client` takes, which would leave
+  a removed flow enabled forever and make the manifest advisory.
 
 ### Evidence and proposals (2026-09-12)
 
