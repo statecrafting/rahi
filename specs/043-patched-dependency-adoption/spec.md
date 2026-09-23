@@ -187,9 +187,13 @@ workflow's upgrade leg (037, additive).
 - **B-6a (Rauthy's cache state).** What Rauthy loses with its cache is
   Rauthy's to enumerate. Known from the producer's handoff: in-flight
   authorization codes, device codes, WebAuthn challenges, rate-limit
-  counters and IP blacklist entries; sessions survive. The README states
-  this for the upgrade, every restore, and every migration, because none of
-  them carries either cache.
+  counters and IP blacklist entries; sessions survive. Reported by the
+  hiqlite proposal's reconciliation handoff (read from Rauthy source, not
+  tested here): the same event lifts every IP ban, manual ones included,
+  and resets the failed-login counters; Rauthy's own revocations live in
+  its SQLite and survive a cache move-aside, but not a restore of an older
+  backup. The README states this for the upgrade, every restore, and every
+  migration, because none of them carries either cache.
 
 ### Terminal storage failure
 
@@ -210,18 +214,27 @@ workflow's upgrade leg (037, additive).
 
 ### Stopping
 
-- **B-9 (two outcomes, one measured bound).** A stop ends in exactly one of:
-  *graceful completion*: streams closed or drained, every queued denial
+- **B-9 (three outcomes, one measured bound).** Every stop is recorded as
+  exactly one of:
+  *confirmed completion*: streams closed or drained, every queued denial
   ledgered, `Client::shutdown` returned `Ok`, Rauthy exited `0`, both
-  `hiqlite-owner.lock` flocks released, exit `0`; or *bounded forced
-  termination*: a stage exceeded its bound, `Client::shutdown` returned
-  `Error::Timeout` (hiqlite's 15 s `SHUTDOWN_WAIT`) or another error, or the
-  outer grace sent SIGKILL. A forced termination is logged with the stage
-  that overran, counts every unledgered denial as abandoned (035 D-5), exits
-  non-zero, and the next start succeeds with no manual step. `SERVE_GRACE`,
-  `SHUTDOWN_TERM_GRACE` and `terminationGracePeriodSeconds` are set from
-  the measurement AC-7 records, at its maximum plus the margin P-4 fixes;
-  until then they are unchanged.
+  `hiqlite-owner.lock` flocks released, exit `0`;
+  *unconfirmed completion*: the process exited on its own, but
+  `Client::shutdown` returned `Error::Timeout` (hiqlite's caller-side 15 s
+  `SHUTDOWN_WAIT`, a bound and not a measured duration) or another error,
+  so the store's stop sequence was not confirmed finished; or
+  *forced exit*: the outer grace sent SIGKILL.
+  Only confirmed completion satisfies graceful-within-budget acceptance.
+  The chassis never wraps `Client::shutdown` in a shorter timeout and then
+  treats the node as stopped. An unconfirmed completion or a forced exit is
+  logged with the stage that overran, counts every unledgered denial as
+  abandoned (035 D-5), exits non-zero, and the next start must succeed with
+  no manual step. hiqlite's five-second membership drain is reached only
+  when a membership change is in flight and its 9.5 s pre-delay is skipped
+  at N=1, so the store's share of the budget is plausible but unmeasured
+  until AC-7. `SERVE_GRACE`, `SHUTDOWN_TERM_GRACE` and
+  `terminationGracePeriodSeconds` are set from AC-7's measurement, at its
+  maximum plus the margin P-4 fixes; until then they are unchanged.
 
 ## 4. Functional requirements
 
@@ -274,8 +287,9 @@ patched Rauthy image; none substitutes a mock for storage or identity.
   directories, are refused afterwards; a token revoked after the restore's
   backup point is documented, not tested, as lost.
 - **AC-7 (stop).** FR-006 records a bounded series of stops; each run's
-  outcome is classified per B-9; graceful runs release both flocks; forced
-  runs restart without a manual step; the graces are then set as B-9 says.
+  outcome is classified per B-9 as confirmed completion, unconfirmed
+  completion or forced exit; confirmed runs release both flocks; the other
+  two restart without a manual step; the graces are then set as B-9 says.
 - **AC-8 (terminal).** FR-005's fault makes `serve` exit with B-7's code
   within B-9's bound; a restart after the fault is cleared is ready; denials
   queued at the fault are ledgered or counted abandoned.
@@ -318,8 +332,12 @@ Still open before approval:
   its persistence (SQL, written before the caches move), missing-`iat`
   refusal, `<=` boundary, clock leeway, window end (the manifest's current
   maximum access lifetime plus leeway), restart-inside-the-window
-  enforcement and restore/DR application are specified and each tested; it
-  also refuses every legitimate pre-upgrade token for the window.
+  enforcement and restore/DR application are specified and each tested,
+  with the window taken from the largest access lifetime `preflight` reads
+  back from Rauthy (038 B-6), never from the 600-second manifest default
+  (Rauthy's own default is 1800 seconds, 038's evidence entry); it also
+  refuses every legitimate pre-upgrade token for the window. This matches
+  the hiqlite proposal's D-8b.
 - **P-3 (N=1 Rauthy fallback).** None (recommended until Rauthy exposes a
   terminal indicator), or a persistent-unready bound with a value, recorded
   as a heuristic and never applied at N=3.
