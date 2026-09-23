@@ -51,11 +51,6 @@
         "code": "W-001",
         "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-store/tests/dependency_identity.rs' does not exist",
         "path": "crates/rahi-store/tests/dependency_identity.rs"
-      },
-      {
-        "code": "W-002",
-        "message": "spec '043-patched-dependency-adoption' file unit 'docs/design/07-owner-decision-packet-rev3-2026-09-23.md' does not exist",
-        "path": "docs/design/07-owner-decision-packet-rev3-2026-09-23.md"
       }
     ]
   },
@@ -694,7 +689,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "docs/design/07-owner-decision-packet-rev3-2026-09-23.md"
+          }
+        ],
         "ownership": false,
         "sourceField": "references",
         "unit": {
@@ -707,5 +706,5 @@
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "fee0dc4e37ea087bf6889fcb27c4a603ef0563771233ae83437fb1c3d442aede"
+  "shardHash": "15bf87e13756ee4cc04b06e2ec6434e1491e6b63c93078168e7ac762f8a4e9f1"
 }

@@ -1,5 +1,11 @@
 # Owner decision packet, 2026-09-23: spec 043 revision 2, and the 044 anchor question
 
+**Superseded by `07-owner-decision-packet-rev3-2026-09-23.md`.** Revision 2
+is withdrawn and its approval text below is void. Section 1.2's text for 011
+and 037 and section 6's list of 044 choices are still cited by 07; section
+4.3's anchor text is replaced by
+`08-owner-instrument-one-deployment-unit.md` (draft PR #77).
+
 Version 1. Owned by `specs/043-patched-dependency-adoption/spec.md` (draft).
 Prepared for the rahi owner. **Nothing in this packet is accepted.** Each
 decision below is a recommendation until the owner records it; the text
