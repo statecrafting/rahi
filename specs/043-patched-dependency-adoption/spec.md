@@ -55,6 +55,7 @@ extends:
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/tests/cli.rs", nature: amending }
   - { spec: "035-denials-survive-shutdown", unit: "crates/rahi-cli/tests/shutdown.rs", nature: amending }
   - { spec: "031-single-container-packaging", unit: "crates/rahi-ops/src/supervise.rs", nature: amending }
+  - { spec: "031-single-container-packaging", unit: "crates/rahi-ops/src/first_boot.rs", nature: amending }
   - { spec: "031-single-container-packaging", unit: "docker/Dockerfile", nature: amending }
   - { spec: "031-single-container-packaging", unit: ".github/workflows/image.yml", nature: additive }
   - { spec: "039-release-and-out-of-tree-packaging", unit: "docker/runtime.Dockerfile", nature: amending }
@@ -134,7 +135,7 @@ verb passes through (`rahi-cli/src/lib.rs`, `serve.rs`, amending);
 preflight's reported bound and restore's floor and fence (030, amending);
 `serve`'s gating, terminal exit, stop record and exit status (030, 035,
 amending); the supervisor's cell lock, Rauthy consent, stop recording and
-exit status (031, amending); both Dockerfiles' Rauthy pin (031, 039,
+exit status, and `first-boot`'s fence on a fresh volume (031, amending); both Dockerfiles' Rauthy pin (031, 039,
 amending); the operator README and StatefulSet grace (032, amending); the
 live workflow's upgrade and old-version legs (037, additive).
 
@@ -201,11 +202,11 @@ Terms.
   | step | intent recorded | action | completion recorded | recovery if interrupted after the intent |
   |---|---|---|---|---|
   | T0 cell | none | take `<data>/cell.lock` non-blocking and hold it until exit (B-4a); refuse if held | none | a held lock: refuse, change nothing |
-  | T1 guard | `begin{id}` | refuse if `upgrade-cache.json` names another unfinished transition; create `<legacy>/state_machine/lock` with `O_CREAT|O_EXCL` and content `rahi-upgrade-cache <id>`, fsync it and its directory; if the create fails because a marker exists, refuse and change nothing (a live or uncleanly stopped pre-043 node; the message says which, from a non-blocking probe of `<legacy>/logs/lock.hql` and `<legacy>/logs_cache/lock.hql` that opens existing files only and creates none); then probe the same two files, and if either is held, remove the guard (only when its content is this `id`) and refuse; read `instant` from the wall clock | `guarded{instant}` | a guard with this `id` present: resume from the probe; absent: redo T1 (nothing else has changed, and a pre-043 process that ran meanwhile ran on an untouched store, so the `instant` read now covers it) |
+  | T1 guard | `begin{id}` | refuse if `upgrade-cache.json` names another unfinished transition; create `<legacy>/state_machine/lock` with `O_CREAT|O_EXCL` and content `rahi-upgrade-cache <id>`, fsync it and its directory; if the create fails because a marker exists, refuse and change nothing (a live or uncleanly stopped pre-043 node; the message says which, from a non-blocking probe of `<legacy>/logs/lock.hql` and `<legacy>/logs_cache/lock.hql` that opens existing files only and creates none, an absent file counting as not held rather than as an error); then probe the same two files the same way, and if either is held, remove the guard (only when its content is this `id`) and refuse; read `instant` from the wall clock | `guarded{instant}` | a guard with this `id` present: resume from the probe; absent: redo T1 (nothing else has changed, and a pre-043 process that ran meanwhile ran on an untouched store, so the `instant` read now covers it) |
   | T1a verify | `verifying` | verify the archive with 030's read-only verification | `verified{digest}` | rerun; nothing on disk changed |
-  | T2 relocate | `relocating{target}` with `target` = `<app store>/pre-upgrade-<instant>/` | create `<app store>`; rename every child of `<legacy>` except `state_machine`, and every child of `<legacy>/state_machine` except `lock`, into the app store at the same relative path, except `logs_cache` and `state_machine_cache`, which go into `target`; fsync each parent after each rename | `relocated`; `<legacy>` is now the fence | per entry, `rename` is atomic, so a destination that exists means moved; a source that also exists beside a moved destination was created by a refused pre-043 start (D-P7) and is moved into `<data>/upgrade-cache/evidence/<id>/`, never deleted |
-  | T3 floor | `flooring` | open the app store in-process with 0.15 (the verb holds no hiqlite lock of its own; B-4a says what excludes); in one `txn` upsert the transition row and raise the floor (B-6b) to `before = instant`; shut the store down and require `Ok` | `floored` | an empty `<app store>/state_machine/lock` is this step's own unclean stop, because only a process holding `cell.lock` while the state is `flooring` can have opened the app store (B-4a): the verb requires the app store's `hiqlite-owner.lock` to be free, moves the marker into `<data>/upgrade-cache/evidence/<id>/t3-marker-<n>` and reruns T3; a marker with any other content is refused as foreign |
-  | T4 Rauthy | written by `supervise` | while the state is `floored`, `supervise` adds `HQL_CACHE_LEGACY_MOVE_ASIDE=true` to the Rauthy child's environment and Rauthy moves its own cache | `rauthy-done`, once Rauthy answers ready | a boot while still `floored` passes the consent again; once Rauthy's own format marker exists the variable is a no-op (hiqlite source and probe; for Rauthy, a source finding until AC-4 runs it) |
+  | T2 relocate | `relocating{target}` with `target` = `<app store>/pre-upgrade-<instant>/` | create `<app store>`, or accept it when it exists and is empty (`first-boot`'s layout creates it); rename every child of `<legacy>` except `state_machine`, and every child of `<legacy>/state_machine` except `lock`, into the app store at the same relative path, except `logs_cache` and `state_machine_cache`, which go into `target`, `state_machine_cache` before `logs_cache` (so no interruption leaves a 0.14 cache snapshot without its log beside it; hiqlite's F-130, source-read, uncommitted at 2026-09-23); fsync each parent after each rename | `relocated`; `<legacy>` is now the fence | per entry, `rename` is atomic, so a destination that exists means moved; a source that also exists beside a moved destination was created by a refused pre-043 start (D-P7) and is moved into `<data>/upgrade-cache/evidence/<id>/`, never deleted |
+  | T3 floor | `flooring` | open the app store in-process with 0.15, which binds its configured loopback addresses since hiqlite has no start mode without listeners (the verb holds no hiqlite lock of its own; B-4a says what excludes, and its state check keeps every attaching verb away); in one `txn` upsert the transition row and raise the floor (B-6b) to `before = instant`; shut the store down and require `Ok` | `floored` | an empty `<app store>/state_machine/lock` is this step's own unclean stop, because only a process holding `cell.lock` while the state is `flooring` can have opened the app store (B-4a): the verb requires the app store's `hiqlite-owner.lock` to be free, moves the marker into `<data>/upgrade-cache/evidence/<id>/t3-marker-<n>` and reruns T3; a marker with any other content is refused as foreign (a defensive branch: hiqlite writes only empty markers and T2 never relocates the guard, so only AC-5's synthetic case reaches it) |
+  | T4 Rauthy | written by `supervise` | while the state is `floored`, `supervise` adds `HQL_CACHE_LEGACY_MOVE_ASIDE=true` to the Rauthy child's environment and Rauthy moves its own cache | `rauthy-done`, once Rauthy answers ready | a boot while still `floored` passes the consent again; once Rauthy's own format marker exists the variable is a no-op (hiqlite source and probe; for Rauthy, a source finding until AC-4 runs it); an interruption inside Rauthy's own two renames is not a rahi fault point, and hiqlite's F-130 says such a crash can leave a 0.14 cache snapshot the next start restores; that is the producer's (H-8) |
   | T5 serve | written by `serve` | at `floored` or `rauthy-done`, `serve` starts normally | `done`, after the first `/readyz` 200; the file is kept as history | none needed; `serve` is idempotent here |
 
   The fence is never removed by this version. A second run of the verb
@@ -218,7 +219,8 @@ Terms.
   passes one gate in this order, before it opens, writes or spawns
   anything: (1) refuse `HQL_CACHE_LEGACY_MOVE_ASIDE` in its environment;
   (2) read `upgrade-cache.json`; (3) inspect the legacy path; (4) take or
-  test `cell.lock`. A process takes `cell.lock` once, holds one descriptor
+  test `cell.lock`; (5) when the legacy path is absent and there is no state
+  file, create the fence before anything creates or opens the app store. A process takes `cell.lock` once, holds one descriptor
   for its life, opened close-on-exec so Rauthy never inherits it, and passes
   ownership inward; nothing in the same process opens it a second time.
 
@@ -226,10 +228,10 @@ Terms.
   |---|---|---|---|---|
   | `upgrade-cache` | takes, holds to exit | any; resumes | legacy store or fence | the only writer of T0 to T3 |
   | `upgrade-cache --abort` | takes, holds to exit | `begin` to `relocated` only | legacy store, partial, or fence | reverses T2 per entry, then removes the guard when its content is this `id`; refused from `flooring` on (rollback is B-5a's archive) |
-  | `supervise` (and so the image) | takes first, holds for its life; its in-process `serve` uses that ownership | `floored`, `rauthy-done`, `done`, or no file on a fresh volume | fence, or absent (a fresh volume: the fence is created before the app store) | refuses before spawning Rauthy otherwise |
+  | `supervise` (and so the image) | takes first, holds for its life; its in-process `serve` uses that ownership | `floored`, `rauthy-done`, `done`, or no file | fence, or absent (the gate then creates the fence, as `first-boot` does) | refuses before spawning Rauthy otherwise |
   | `serve` alone | takes, holds for its life | as `supervise` | as `supervise` | Rauthy's consent is then the operator's |
-  | `first-boot` | none | any | any | writes only keys and rendered files that are absent (031 B-2); touches neither store |
-  | `migrate`, `preflight`, `backup`, `ledger`, and every other verb that opens the store | takes, or, when it supports attaching and another process holds `cell.lock`, attaches without it | `done` or no file | fence | refuses at every other state, before attaching |
+  | `first-boot` | none | any | any | on a volume whose legacy path is absent and which has no state file, creates the fence (`O_CREAT|O_EXCL`, content `rahi-fence <version>`) before its layout creates the app store directory, so a fresh volume is fenced before any other entry point runs; otherwise writes only keys, rendered files and directories that are absent (031 B-1, B-2) and opens neither store |
+  | `migrate`, `preflight`, `backup`, `ledger`, and every other verb that opens the store | takes, or, when it supports attaching and another process holds `cell.lock`, attaches without it | `done` or no file | fence, or absent (the gate creates the fence) | refuses at every other state, before attaching; in the image, `first-boot` has already fenced a fresh volume |
   | `restore` | takes, holds to exit | `done` or no file | fence or absent | creates the fence before it resets the app store; refuses a volume whose legacy path holds a store |
   | a second instance of any of these | refused at `cell.lock` (or attaches, as above) | | | concurrent-start refusal, AC-5 |
 
@@ -425,7 +427,9 @@ Terms.
 - **FR-008.** B-4a's gate is one function in `rahi-ops`, called by every
   entry point in its table before anything else touches the volume; a test
   enumerates the CLI's verbs (030 D-9's `VERBS`) and fails on one that
-  opens the store without it.
+  opens the store without it. `first-boot` is outside the gate by design;
+  its only store-adjacent writes are the fence on a fresh volume and empty
+  directories, and a test asserts it opens neither store.
 - **FR-009.** Every exit path of `serve` and `supervise` carries B-10's
   outcome into its exit status: `Booted::shutdown` returns the store's
   shutdown result, the drains report overruns, and the supervisor's
@@ -455,8 +459,12 @@ storage or identity. A required leg that did not execute fails its job.
   Rauthy), the legacy path is the fence, and a second boot needs nothing;
   app rows, a logged-in principal's `sub`, `ledger verify --full` and the
   key set are unchanged.
+- **AC-3a (fresh volume).** On an empty volume the new image's first boot
+  creates the fence before the app store, reaches ready without the verb,
+  and a v0.2.0 image started afterwards on that volume serves nothing,
+  spawns no Rauthy, and changes no path under the app store.
 - **AC-4 (interruption, resumption, repetition).** For every fault point of
-  FR-003, and for each persistent state `begin`, `guarded`, `verified`,
+  FR-003, and for each persistent state `begin`, `guarded`, `verifying`, `verified`,
   `relocating` (after each single rename), `relocated`, `flooring` (with
   the node killed while open), `floored`, `rauthy-done` and `done`:
   (a) a rerun of the verb, or the next new-image boot for T4 and T5,
@@ -513,7 +521,7 @@ storage or identity. A required leg that did not execute fails its job.
   cleared is ready. A Rauthy held unready does not end the process.
 - **AC-9 (live).** The live workflow (037) passes with
   `RAHI_REQUIRE_RAUTHY=1` against the image built from this change on both
-  architectures it builds, runs AC-3, AC-4 (d) and AC-5's v0.2.0 legs, and
+  architectures it builds, runs AC-3, AC-3a, AC-4 (d) and AC-5's v0.2.0 legs, and
   reports zero skipped required legs.
 
 ## 6. Out of scope

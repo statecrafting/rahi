@@ -121,6 +121,39 @@ and no remote ref contained it on 2026-09-23. Section 2 below cites it.
 reachable from a ref of `bartekus/hiqlite`. **Class.** Non-blocking; section
 2 records what was read.
 
+### H-7. Review revision 2's fence route
+
+**Problem.** The hiqlite working tree after `ec8fc6d` (section 2.1) concludes
+that no public-API rearrangement keeps lock-based exclusion continuous from
+rahi's locks into a 0.15 start, and offers rahi two routes: wait for its
+draft `035` B-6 handle, or rely on an operator precondition. 043 revision 2
+takes a third route that draft did not examine: pre-043 binaries are
+excluded by a persistent marker at a path they are the only readers of, and
+the live store is relocated to a path they never open (043 B-4, P-8, D-P7).
+
+**Requested.** An adversarial reading against 0.14 (`8f3b9bd`) and
+`0.15.0-patched.1` source: does any 0.14 path, without `auto-heal`, remove
+or bypass `state_machine/lock` before failing; is a 0.14 data directory
+relocated entry by entry to a new `data_dir` path sound for 0.15 (membership
+names addresses, not paths); what else 0.14's racing WAL task can write.
+
+**Acceptance.** A written answer on a published branch, or a finding.
+**Class.** Non-blocking; the owner may ask for it before approving.
+
+### H-8. An interrupted consent move (F-130)
+
+**Problem.** The uncommitted register entry F-130 (source-read) says a crash
+between the consent move's two renames can leave a 0.14 cache snapshot that
+the next start restores without refusal. rahi never uses consent on the app
+store and orders its own two renames to avoid the case (043 T2), but
+Rauthy's T4 move is hiqlite's consent path.
+
+**Requested.** Move `state_machine_cache` first, or make the legacy check
+look at snapshots too. **Acceptance.** A crash injected between the renames,
+then a start: refused or completed, never a restored 0.14 snapshot.
+**Class.** Claim-blocking for "an interrupted Rauthy move recovers cleanly";
+043 states it as the producer's (B-4, T4).
+
 ## 2. Reconciliation with the hiqlite handoff at `ec8fc6d`
 
 Read: `standards/spec/n3-rahi-reconciliation-handoff.md`,
@@ -148,6 +181,22 @@ and every other hiqlite decision as pending.
 | §4 F9: `DPoPNonce::is_valid` returns `slf.is_ok()` (read from source, untested) | Forwarded to Rauthy's maintainer as R-5; not a rahi finding and not a 043 blocker. |
 | §5: a planned clean-stop marker (034 B-7) | When it ships, a later rahi change may use it to confirm the store's stop in B-10; 043 does not wait. |
 | F-124, F-125 (committed log id not persisted; applied id persisted only at snapshots and clean exit) | N3-only (export currency). Noted because B-10's `store_timeout` is exactly the case where the applied id may not have been persisted. |
+
+### 2.1 The hiqlite working tree after `ec8fc6d` (uncommitted, 2026-09-23)
+
+Observed, not citable as a revision: a concurrent hiqlite session had, on top
+of `ec8fc6d` and uncommitted, a draft `specs/035-n1-upgrade-exclusion`, a
+revised handoff and new findings F-126 to F-133. As observed, it accepts H-1
+to H-4 (widened: the live 0.14 node also wrote into the moved WAL, F-126),
+reproduces revision 1's T0 to T3 self-contention independently (rahi's
+D-P6), notes that hiqlite has no start mode without listeners (043 T3 now
+says so), and asks rahi (its F10) to wait for a public exclusion handle or
+rely on an operator precondition. rahi's answer is revision 2's fence (H-7),
+which needs neither for the app store; the precondition remains for Rauthy's
+directory only (043 B-5). It also records F-130 (H-8) and that a clean WAL
+stop releases its lock before unlinking the file (F-133), which T1's probe
+tolerates: a released lock reads as not held. When that work is committed,
+this section is updated to cite its revision.
 
 What the earlier conversational handoff said and this replaces: the lifetime
 figure used for the floor (above), the forced-exit classification (above),
