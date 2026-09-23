@@ -225,13 +225,15 @@ Terms.
   file description, so the verb would contend with itself). No step
   replaces an existing path: every rename is a no-replace rename
   (`renameat2(RENAME_NOREPLACE)` on Linux, `renamex_np(RENAME_EXCL)` on
-  macOS), and a filesystem that refuses the flag refuses the step; there is
-  no fallback to a plain `rename` (FR-011).
+  macOS; `rustix` 1.x, already in the graph, exposes both), and a
+  filesystem that refuses the flag refuses the step; there is no fallback
+  to a plain `rename` (FR-011). The data directory is a mounted volume
+  (031, 032), never the container's overlay layer.
 
   | step | intent recorded | action | completion recorded | recovery if interrupted after the intent |
   |---|---|---|---|---|
   | T0 locks | none | B-4a's gate: take `<data>/cell.lock` and `<data>/transition.lock` exclusively, non-blocking, and hold both until exit; only then read the state file and inspect the layout | none | a held lock: refuse, change nothing |
-  | T1 guard | `begin{id}`, `id` 128 random bits | (a) refuse if `upgrade-cache.json` names another unfinished transition. (b) Write `rahi-upgrade-cache <id>` to `<legacy>/state_machine/.rahi-guard-<id>`, fsync it, and `link(2)` it to `<legacy>/state_machine/lock`, then fsync the directory and unlink the temporary: the marker appears whole or not at all. `EEXIST` refuses: a pre-043 node is live or stopped uncleanly (the message says which from (c)'s probe); the existing marker is never modified. (c) **Quiescence**, after the marker is durable: `<legacy>/logs/lock.hql` and `<legacy>/logs_cache/lock.hql` are not held (a non-blocking probe that opens existing files only and creates none; an absent file reads as not held), and `<legacy>/state_machine/db/` holds no `-wal` and no `-shm` file (a pre-043 node closes SQLite after it releases both WAL locks and removes its marker, D-P12). (d) The marker still has the identity `link` gave it and its content is this `id` (a pre-043 start truncates the marker path in place with `File::create`, and a pre-043 clean stop unlinks it, D-P11). A failure of (c) or (d) refuses and **leaves the marker where it is**: while it carries this `id` a pre-043 start panics on it, and a marker a pre-043 node has truncated is that node's own. (e) Install the supervisor fence (B-5). (f) Read `instant` from the wall clock | `guarded{instant, marker identity}` | a marker with this `id`: resume at (c) (the content proves provenance; `link` never publishes a partial file); no marker: redo (b); a marker with other content, including empty: refuse as in (b), and name the state as interrupted by a pre-043 node |
+  | T1 guard | `begin{id}`, `id` 128 random bits | (a) refuse if `upgrade-cache.json` names another unfinished transition. (b) Write `rahi-upgrade-cache <id>` to `<legacy>/state_machine/.rahi-guard-<id>`, fsync it, and `link(2)` it to `<legacy>/state_machine/lock`, then fsync the directory and unlink the temporary: the marker appears whole or not at all. `EEXIST` refuses: a pre-043 node is live or stopped uncleanly (the message says which from (c)'s probe); the existing marker is never modified. (c) **Quiescence**, after the marker is durable: `<legacy>/logs/lock.hql` and `<legacy>/logs_cache/lock.hql` are not held (a non-blocking probe that opens existing files only and creates none; an absent file reads as not held), and `<legacy>/state_machine/db/` holds no `-wal` and no `-shm` file (a pre-043 node closes SQLite after it releases both WAL locks and removes its marker, D-P12; SQLite removes them only when the last connection closes, the writer's and every connection of hiqlite's read pool, `state_machine.rs:117,317-330`, so their absence covers the whole pool). (d) The marker still has the identity `link` gave it and its content is this `id` (a pre-043 start truncates the marker path in place with `File::create`, and a pre-043 clean stop unlinks it, D-P11). A failure of (c) or (d) refuses and **leaves the marker where it is**: while it carries this `id` a pre-043 start panics on it, and a marker a pre-043 node has truncated is that node's own. (e) Install the supervisor fence (B-5). (f) Read `instant` from the wall clock | `guarded{instant, marker identity}` | a marker with this `id`: resume at (c) (the content proves provenance; `link` never publishes a partial file); no marker: redo (b); a marker with other content, including empty: refuse as in (b), and name the state as interrupted by a pre-043 node |
   | T1a verify | `verifying` | verify the archive with 030's read-only verification | `verified{digest}` | rerun; nothing on disk changed |
   | T2 relocate | `relocating{target, plan}` with `target` = `<app store>/pre-upgrade-<instant>/` and `plan` = every entry to move with its source path, destination path and identity, listed once | refuse, before recording the intent, when: the app store exists and is not an empty directory (`first-boot`'s layout creates it empty); any planned entry, or `<legacy>`, `<legacy>/state_machine` or `<data>`, is a symbolic link; any planned entry's `st_dev` differs from `<legacy>`'s; or `<legacy>` and `<data>` are on different devices. Then move, in the plan's order, every child of `<legacy>` except `state_machine`, and every child of `<legacy>/state_machine` except `lock`, into the app store at the same relative path, except `logs_cache` and `state_machine_cache`, which go into `target`, `state_machine_cache` before `logs_cache` (hiqlite F-130); fsync both parents after each rename. Debris that appears under `<legacy>` after the plan was recorded is moved to `<data>/upgrade-cache/evidence/<id>/` once every planned entry has moved | `relocated`; `<legacy>` is now the fence | per planned entry, by identity and never by existence: the planned identity at the source means not moved (move it); at the destination means moved; a source path holding another identity beside a moved destination is debris (to evidence, never deleted, never merged); a destination holding an identity the plan does not name, or a planned identity found at neither path, refuses and changes nothing (the volume was modified outside this verb) |
   | T3 floor | `flooring` | open the app store in-process with 0.15, which binds its configured loopback addresses since hiqlite has no start mode without listeners (the verb holds no hiqlite lock of its own; `transition.lock` keeps every attaching verb away, B-4a); in one `txn` upsert the transition row, raise the floor (B-6b) to `before = floor(instant)` in whole seconds, and raise the prune horizon; shut the store down and require `Ok` | `floored` | an empty `<app store>/state_machine/lock` is this step's own unclean stop, because only a process holding `cell.lock` and `transition.lock` while the state is `flooring` can have opened the app store (B-4a): the verb requires the app store's `hiqlite-owner.lock` to be free, moves the marker into `<data>/upgrade-cache/evidence/<id>/t3-marker-<n>` and reruns T3; a marker with any other content is refused as foreign (a defensive branch: hiqlite writes only empty markers and T2 never relocates the guard, so only AC-5's synthetic case reaches it) |
@@ -262,7 +264,9 @@ Terms.
   and held for the process's life; ownership passes inward and nothing in
   the same process opens them a second time.
 
-  Two locks, because two questions: `cell.lock` says who owns the app
+  Every lock is taken non-blocking and a process that cannot take one
+  refuses rather than waits, so no two entry points can deadlock. Two
+  locks, because two questions: `cell.lock` says who owns the app
   store's node, and `transition.lock` says whether the layout may change.
   Only `upgrade-cache`, `--abort` and `restore` change the layout and take
   `transition.lock` exclusively; every other entry point takes it shared,
@@ -329,8 +333,12 @@ Terms.
   *Pre-043 supervisors against Rauthy's directory:* the supervisor fence.
   Every published pre-043 `supervise` (v0.1.0, v0.2.0) reads
   `<data>/rauthy/rauthy.env` with `read_to_string` before it spawns
-  Rauthy and exits when the read fails; a directory at that path fails it,
-  and every pre-043 `first-boot` skips a path that exists. T1 (e) installs
+  Rauthy and exits when the read fails; a directory at that path fails it.
+  A pre-043 `first-boot` whose keys already exist skips a path that exists
+  (executed on v0.2.0, D-P14); one that generates keys (`force`, an empty
+  key directory, which an upgraded volume never has) tries to write the
+  file over the directory and fails, so its entrypoint stops before
+  `supervise` (source, not executed). T1 (e) installs
   it after the guard and before anything moves: write the rendered
   environment to `<data>/rauthy-env/rauthy.env` (temporary, fsync,
   rename), build `FENCE` in a temporary directory beside it, move the old
