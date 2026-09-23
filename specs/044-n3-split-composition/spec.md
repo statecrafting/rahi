@@ -240,7 +240,28 @@ evidence.
 None. D-14 is an owner decision recorded in the hiqlite repository and is
 this spec's fixed input, not one of its decisions.
 
+**Blocking governance conflict (found 2026-09-23).** Spec 000 freezes the
+`one-deployment-unit` anchor as `unamendable`: "A governed cell is one
+container, one volume, one public origin; rauthy is inside it and reached
+only through the app's origin", restated as constitution principle VI. The
+constitution's amendment clause allows ordinary specs to amend it only
+where the amendment "does not contradict a `specs/000` `unamendable`
+anchor". An N=3 cell of two StatefulSets with Rauthy outside rahi's
+container and volume contradicts that anchor as written, and nothing in
+this spec's mechanism can honor both. This spec therefore cannot be
+approved through the ordinary flow. What would unblock it is an owner act
+at the bootstrap tier that scopes the anchor to the N=1 profile (for
+example: the anchor governs the N=1 cell; an N=3 cell is one namespace and
+one public origin, with Rauthy reached only through the app's origin by
+users and only through an internal, encrypted, policy-restricted Service
+by rahi). Whether spec 000's freeze surface can be changed at all, and by
+what instrument, is the owner's to decide; this draft proposes no text for
+spec 000 and changes nothing there. The rest of this spec is drafted so it
+is ready once that question is answered.
+
 Still open before approval:
+
+- the bootstrap-tier question above (blocking);
 
 - P-1 to P-4 below;
 - whether B-11's coherent export waits for a hiqlite release carrying the
