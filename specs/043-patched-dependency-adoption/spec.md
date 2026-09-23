@@ -159,7 +159,7 @@ by the same function.
 
   | step | intent recorded | action | completion recorded | recovery if interrupted after the intent |
   |---|---|---|---|---|
-  | T0 lock | none | acquire non-blocking, and hold until exit: `<data>/cell.lock` (B-5), the app store's `hiqlite-owner.lock`, `logs/lock.hql` and `logs_cache/lock.hql`, and Rauthy's `logs/lock.hql` and `logs_cache/lock.hql` (P-6) | none; the locks are held, not recorded | a lock held by another process: refuse and change nothing |
+  | T0 lock | none | acquire non-blocking, and hold until exit: `<data>/cell.lock` (B-5), the app store's `hiqlite-owner.lock`, `logs/lock.hql` and `logs_cache/lock.hql`, and Rauthy's `logs/lock.hql` and `logs_cache/lock.hql` (P-6); a lock file a clean stop removed is created empty to be locked and removed at release | none; the locks are held, not recorded | a lock held by another process: refuse and change nothing |
   | T1 begin | `begin{id, instant, archive}`; `instant` is the wall clock read after T0 | refuse if the app store holds `state_machine/lock` (0.14's unclean-stop marker); verify the archive with 030's read-only verification | `verified{digest}` | rerun T1; nothing on disk changed |
   | T2 move | `moving{target}` with `target` = `<app store>/pre-upgrade-<instant>/` | rename `logs_cache` and `state_machine_cache` into `target`; fsync `target` and the store directory | `moved` | per directory: already in `target` is done, still in place is renamed; a completed move is never reversed |
   | T3 floor | `flooring` | open the app store in-process with 0.15 and no listener; write in one `txn` the transition row and the revocation floor (B-6b) with `before = instant`; shut the store down and require `Ok` (B-10's confirmed completion) | `floored` | rerun T3: both rows are keyed by `id` and written by upsert, so a repeat is a no-op |
@@ -410,13 +410,19 @@ Still open before approval: P-6 and P-7.
 
 - **P-6 (holding Rauthy's WAL lock files).** T0 acquires and holds a
   non-blocking `flock` on Rauthy's `logs/lock.hql` and
-  `logs_cache/lock.hql`, opening each file only to lock it and never
-  reading or writing its content or any other path under Rauthy's
-  directory. Without it the verb cannot prove an old Rauthy is stopped (a
-  0.2.0 supervisor runs Rauthy for up to sixty seconds before its serve
-  takes the app store's locks), and exclusion rests on an operator
-  precondition. Proposed reading: holding a lock is not opening the store,
-  so 011 B-7 and spec 000's `store-separation` anchor hold.
+  `logs_cache/lock.hql`. A live Rauthy holds both; a cleanly stopped one
+  has removed both (D-P3). So on a stopped volume the verb creates each as
+  an empty file, locks it, never writes content, and removes it at release;
+  it touches no other path under Rauthy's directory and never opens
+  Rauthy's database. A leftover empty lock file after a verb crash is
+  harmless: hiqlite warns that the start is not clean and proceeds when the
+  file is not locked. Without P-6 the verb cannot prove an old Rauthy is
+  stopped (a 0.2.0 supervisor runs Rauthy for up to sixty seconds before
+  its serve takes the app store's locks), and exclusion falls back to an
+  operator precondition that the cell container is stopped. Proposed
+  reading: creating and locking an empty lock file is not opening the
+  store, so 011 B-7 and spec 000's `store-separation` anchor hold; the
+  owner decides whether that reading is acceptable.
 - **P-7 (the restore floor).** B-6c's floor is written by every restore, so
   access-token revocations taken after the archive instant are not lost.
   Cost: every access token issued before the restore is refused for V,
@@ -461,8 +467,13 @@ Still open before approval: P-6 and P-7.
   locks held by another process, a 0.14 start and a 0.15 start with and
   without consent each failed before any change. Both versions refuse to
   start while `state_machine/lock` exists; 0.15 does so by panicking, and
-  only after its consent move has run. Rauthy's embedded 0.14 is assumed to
-  use the same lock files, a source finding until AC-5 runs it.
+  only after its consent move has run. The real upstream
+  `ghcr.io/sebadob/rauthy:0.36.2` image (the 0.2.0 cell's Rauthy), probed
+  from a second container on the same volume: while live it holds `flock`
+  on `logs/lock.hql` and `logs_cache/lock.hql` and has no
+  `hiqlite-owner.lock`; after `docker stop` (exit 0) both lock files are
+  gone and `state_machine/lock` is removed. AC-5 still runs this against a
+  whole v0.2.0 cell.
 - **D-P4 (stop probe, 2026-09-23).** Five runs of a real single-node
   `serve` on the patched graph, SIGTERM during a concurrent 200-denial
   burst, no stream, no Rauthy: exit `0` every run, 0.37 to 0.73 s from
