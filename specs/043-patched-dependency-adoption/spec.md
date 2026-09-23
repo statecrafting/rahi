@@ -60,7 +60,8 @@ summary: >
   exactly those two artifacts for the N=1 cell under a narrow,
   provenance-pinned exception to 011's no-fork rule, makes the one
   incompatible boundary between them (the cache raft log) crossable only
-  with an explicit, resumable, backed-up operator consent, moves bearer
+  with an explicit, resumable operator consent that requires a pre-upgrade
+  archive and lets Rauthy move its own cache, moves bearer
   revocation out of the cache so that crossing it, a restore, or a
   disaster recovery does not resurrect a revoked token, turns a proven
   terminal storage failure into a bounded exit instead of an indefinitely
@@ -101,8 +102,8 @@ subject-wide revocation instant (025, 038, amending); a new operator verb
 `upgrade-cache` in `rahi-ops` (`src/upgrade.rs`, new) and its CLI wiring
 (030, additive); restore's reset list and its cache-loss record (030,
 amending); `serve`'s terminal-failure exit and stop sequence (030, 035,
-amending); the supervisor's Rauthy environment and exit policy (031,
-amending); both Dockerfiles' Rauthy pin (031, 039, amending); the
+amending); the supervisor's Rauthy environment (the one-boot consent)
+and exit policy (031, amending); both Dockerfiles' Rauthy pin (031, 039, amending); the
 operator README and the StatefulSet grace (032, amending); the live
 workflow's upgrade leg (037, additive).
 
@@ -137,26 +138,35 @@ workflow's upgrade leg (037, additive).
   environment to Rauthy, and `serve` ignores it for the app store: a value
   present in rahi's environment is a startup error naming B-4's verb, so
   the hiqlite variable never becomes part of rahi's operator contract.
-- **B-4 (one consent, one verb).** `rahi upgrade-cache` runs with the cell
-  stopped and is the only supported crossing. In order, each step recorded
-  in `<data>/upgrade-cache.state` (fsynced) before the next begins:
-  (1) refuse unless no process holds either data directory's
-  `hiqlite-owner.lock` and 0.14 cache logs are present; (2) take a local
-  pre-upgrade backup of both stores with the key set, as 030 B-5's archive
-  (the backup runs the old on-disk format and is restorable by the old
-  image); (3) move `logs_cache` and `state_machine_cache` of the app store
-  and of Rauthy's store into `pre-upgrade-<unix seconds>/` beside each, with
-  fsync of both parent directories; (4) write the transition row B-6
-  consumes; (5) mark the state `done`. A rerun after any interruption
-  resumes from the recorded step and never reverses a completed move. The
-  verb touches Rauthy's cache directories as files on the cell volume the
-  chassis owns (031 B-1); it never opens Rauthy's database (011 B-7).
-- **B-5 (rollback).** `rahi upgrade-cache --rollback` moves both stores'
-  current cache directories aside (it never deletes) so the old image
-  starts on an empty cache, and prints the pre-upgrade backup's path. The
-  README states: an old image started over a 0.15 cache without this step
-  can destroy the SQLite raft metadata (D-P2's evidence), and the recovery
-  is restoring the pre-upgrade backup, not reusing the volume.
+- **B-4 (one consent, one verb).** `rahi upgrade-cache --backup <archive>`
+  runs with the cell stopped and is the only supported crossing. The
+  archive is an ordinary 030 B-5 backup taken by the **old** image before
+  the swap; the verb verifies it and refuses without it. In order, each
+  step recorded in `<data>/upgrade-cache.state` (fsynced) before the next
+  begins: (1) refuse unless no process holds the app store's
+  `hiqlite-owner.lock`, the archive verifies, and a 0.14 cache log is
+  present in the app store; (2) move the app store's `logs_cache` and
+  `state_machine_cache` into `pre-upgrade-<unix seconds>/` beside them, with
+  fsync of both parent directories; (3) write the transition row B-6
+  consumes; (4) arm a **one-boot consent for Rauthy**: on the next
+  `supervise`, and only that one, the supervisor adds
+  `HQL_CACHE_LEGACY_MOVE_ASIDE=true` to the Rauthy child's environment, so
+  Rauthy moves its own cache; the arm is cleared once Rauthy reports ready,
+  and a boot after that never sets it; (5) mark the state `done` after that
+  boot. A rerun after any interruption resumes from the recorded step and
+  never reverses a completed move. The chassis never renames, reads or
+  copies anything under Rauthy's data directory (011 B-7 and the
+  `store-separation` anchor of spec 000); Rauthy performs its own
+  transition, which its producer qualified (Rauthy leg J).
+- **B-5 (rollback).** The supported rollback is restoring B-4's
+  pre-upgrade archive into a fresh volume and starting the old image (030
+  B-6's restore, single-shot). `rahi upgrade-cache --rollback` exists only
+  for the app store: it moves the app store's current cache aside (never
+  deletes) so the old image can start on it; Rauthy's cache is Rauthy's,
+  and the README gives the producer's manual step for it. The README
+  states: an old image started over a 0.15 cache without the move can
+  destroy the SQLite raft metadata (D-P2's evidence), and the recovery then
+  is the pre-upgrade archive, not the volume.
 
 ### What survives cache loss
 
@@ -245,16 +255,19 @@ patched Rauthy image; none substitutes a mock for storage or identity.
   image's `/usr/local/bin/rauthy` hashes to the platform binary recorded in
   D-P1.
 - **AC-3 (upgrade, disposable volumes).** A volume written by the v0.2.0
-  image: the new image without consent exits non-zero and moves nothing;
-  `upgrade-cache` produces the pre-upgrade backup and moves all four cache
-  directories; the first start is ready; a second start is ready with no
+  image and a backup archive it took: the new image without consent exits
+  non-zero and moves nothing; `upgrade-cache` without a verifying archive
+  refuses; with it, the app store's cache is moved, the first `supervise`
+  gives Rauthy the one-boot consent and Rauthy moves its own cache; the
+  first start is ready; the arm is cleared; a second start is ready with no
   consent; app rows, the principal `sub` of a logged-in user, the ledger
   chain (`ledger verify --full`) and the key set are unchanged.
 - **AC-4 (interruption).** With a fault injected after each of B-4's steps
   in turn, a rerun completes the transition and AC-3's end state holds.
-- **AC-5 (rollback).** `upgrade-cache --rollback` then the v0.2.0 image
-  boots and serves the pre-upgrade data; restoring the pre-upgrade backup
-  into a fresh volume boots the v0.2.0 image.
+- **AC-5 (rollback).** Restoring the pre-upgrade archive into a fresh
+  volume boots the v0.2.0 image with the pre-upgrade data; separately,
+  `upgrade-cache --rollback` plus the producer's manual Rauthy step lets the
+  v0.2.0 image boot the upgraded volume.
 - **AC-6 (revocation).** A bearer token revoked by `jti`, and another
   revoked by subject, before (a) the upgrade, (b) a restart, (c) a restore
   from a backup taken after the revocation, and (d) a deletion of the cache
