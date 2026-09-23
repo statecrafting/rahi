@@ -1,12 +1,12 @@
 # Patched adoption: delivery plan
 
-Version 1, 2026-09-23. Owned by `specs/043-patched-dependency-adoption/spec.md`
-(draft, revision 2). Maintained by the rahi owner. It replaces the scratchpad
-note `043-implementation-plan.md` of the 2026-09-23 session and follows 043
-revision 2, not revision 1.
+Version 2, 2026-09-23. Owned by `specs/043-patched-dependency-adoption/spec.md`
+(draft, revision 3). Maintained by the rahi owner. It follows 043 revision 3;
+version 1 followed revision 2.
 
 **Nothing here starts before the owner approves the exact 043 revision**
-named in `06-owner-decision-packet-2026-09-23.md`. Publication is a
+named in `07-owner-decision-packet-rev3-2026-09-23.md` (which supersedes
+`06-...`). Publication is a
 separate, later approval (section 4).
 
 ## 1. Dependency graph and what stays outside
@@ -32,19 +32,20 @@ commit.
 |---|---|---|---|
 | 1 | Flip 043 `approved` to `in-progress`. Record 011 D-13 (the dependency exception, verbatim from 043 D-1) and the 037 section 6 cross-reference. These two are the only edits to other specs' text, and the approval authorizes them. | specs 043, 011, 037 | approval |
 | 2 | Graph: the aliased dependency, drop `[patch]` and the hiqlite allow-git, FR-001's test; 016's extension test asserts the refusal as an error. | `Cargo.toml`, `Cargo.lock`, `deny.toml` (010); `rahi-store/tests/blob.rs` (016); `rahi-store/tests/dependency_identity.rs` (new) | 1 |
-| 3 | Store: `NodeFailed` as a terminal error; the revocation, floor, `L*` and transition tables, chassis-created like `lease_fence`. | `rahi-store/src/error.rs`, `store.rs`, `lib.rs` (011) | 2 |
-| 4 | Layout and gate: `Config::hiqlite_dir()` answers `app-store`, a `legacy_hiqlite_dir()` names the fence path; `cell_lock.rs`; the one B-4a gate function; every entry point calls it; FR-008's enumeration test; update the CLI tests that assert on `<data>/hiqlite` to assert on the app store (the ledger tests name the directory only in their own temporary configs and need no change). | `rahi-types/src/config.rs` (010); `rahi-ops/src/lib.rs`, `cell_lock.rs` (new); `rahi-cli/src/lib.rs`, `serve.rs`, `tests/cli.rs` (030); `rahi-cli/tests/shutdown.rs` (035); `rahi-ops/src/supervise.rs`, `first_boot.rs` (031: the fence on a fresh volume, before the layout creates the app store); `rahi-ops/tests/cell_lock.rs` (new) | 3 |
-| 5 | Revocation: SQL `jti` and subject rows in the revocation's `txn`; the floor; the lifetime ceiling and missing-`iat` refusal at the bearer; pruning at `revoked_at + V(L*)`; `L*` raised at boot; tests for AC-6 (a) to (d). | `rahi-idp/src/revoke.rs` (038), `bearer.rs` (025), `lib.rs` (021); `rahi-idp/tests/revocation_durable.rs` (new) | 3 |
-| 6 | The verb: T0 to T3, `--abort`, fault points after every intent, action and single rename; the verb in 030's `VERBS`. | `rahi-ops/src/upgrade.rs` (new), `lib.rs` (030); `rahi-cli/src/lib.rs`, `verbs.rs` (030); `rahi-ops/tests/upgrade.rs` (new) | 4, 5 |
+| 3 | Store: `NodeFailed` as a terminal error; the revocation, floor, prune-horizon and transition tables, chassis-created like `lease_fence`. | `rahi-store/src/error.rs`, `store.rs`, `lib.rs` (011) | 2 |
+| 4 | Layout and gate: `Config::hiqlite_dir()` answers `app-store`, a `legacy_hiqlite_dir()` names the fence path; the rendered Rauthy environment at `<data>/rauthy-env/rauthy.env` (P-10); `cell_lock.rs` with `cell.lock` and `transition.lock`, exclusive and shared, close-on-exec; the no-replace rename helper (FR-011) and the whole-file `link` publisher; the one B-4a gate function, locks before reads; every entry point, `first-boot` included, calls it; both fences on a fresh volume; debris accepted and reported; FR-008's enumeration test; update the CLI tests that assert on `<data>/hiqlite` to assert on the app store. | `rahi-types/src/config.rs` (010); `rahi-ops/src/lib.rs`, `cell_lock.rs` (new); `rahi-cli/src/lib.rs`, `serve.rs`, `tests/cli.rs` (030); `rahi-cli/tests/shutdown.rs` (035); `rahi-ops/src/supervise.rs`, `first_boot.rs`, `rauthy_env.rs` (031); `rahi-ops/tests/cell_lock.rs` (new) | 3 |
+| 5 | Revocation: SQL `jti` and subject rows in the revocation's `txn`; the floor; the admission refusals (no `iat`, `exp < iat` by checked subtraction, `exp - iat > L`, future `iat`); pruning at `revoked_at + V(L_max)`; the horizon raised at boot; P-11 only if accepted; tests for AC-6 (a) to (d) and (f). | `rahi-idp/src/revoke.rs` (038), `bearer.rs` (025), `lib.rs` (021); `rahi-idp/tests/revocation_durable.rs` (new) | 3 |
+| 6 | The verb: T0 to T3 with T1's guard, quiescence and identity checks and the supervisor fence, T2's identity plan and recovery, `--abort` with its named side effects; fault points after every intent, action, single rename and fence step; FR-012's pre-043 interleaving helper; the verb in 030's `VERBS`. | `rahi-ops/src/upgrade.rs` (new), `lib.rs` (030); `rahi-cli/src/lib.rs`, `verbs.rs` (030); `rahi-ops/tests/upgrade.rs` (new) | 4, 5 |
 | 7 | Supervisor consent (T4) and `serve`'s `done` (T5); the refusal of an operator's `HQL_CACHE_LEGACY_MOVE_ASIDE`. | `supervise.rs` (031), `serve.rs` (030) | 6 |
 | 8 | Stop: `stop.json`, phase timings, the outcome and its reasons, the next-boot classification and `rahi_previous_stop{outcome,cause}`; exit status carried through every path (FR-009); graces to 40 s and 50 s; the composition test. | `rahi-ops/src/stop.rs` (new), `supervise.rs` (031), `serve.rs` (030), `deploy/k8s/statefulset.yaml` (032); `rahi-cli/tests/stop_budget.rs`, `stop_outcome.rs` (new) | 4 |
 | 9 | Terminal: `serve` on `NodeFailed`. | `serve.rs` (030); `rahi-cli/tests/terminal.rs` (new) | 3, 8 |
 | 10 | Restore: the fence before the reset; refuse a volume with a legacy store; the pending floor in the marker for a pre-043 archive always, for every archive if P-7 is accepted; the first open raises it before `/readyz`. | `rahi-ops/src/restore.rs` (030) | 4, 5 |
 | 11 | Image: the patched Rauthy pin in both Dockerfiles, version and hash assertions on both architectures. | `docker/Dockerfile` (031), `docker/runtime.Dockerfile` (039), `.github/workflows/image.yml` (031) | 2 |
-| 12 | Live: an upgrade leg that prepares a volume and an archive with the v0.2.0 image by digest, then runs AC-3, AC-3a on a fresh volume, AC-4 (d) at every persistent state, AC-5's v0.2.0 legs and AC-9, strict, zero skipped required legs, on both architectures the workflow builds. | `.github/workflows/live.yml` (037) | 6, 7, 10, 11 |
+| 12 | Live: an upgrade leg that prepares a volume and an archive with the v0.2.0 image by digest, then runs AC-3, AC-3a on a fresh volume, AC-4 (d) at every persistent state including direct `supervise`, AC-4 (g) recorded, AC-5's v0.2.0 legs including the stop and start races, and AC-9, strict, zero skipped required legs, on both architectures the workflow builds. | `.github/workflows/live.yml` (037) | 6, 7, 10, 11 |
 | 13 | Docs: README upgrade procedure and precondition, the fence, `--abort` and rollback, the floor's consequence and clock assumption, the restore boundary, the graces, `deploy/n3` unqualified, the cache-group correction; consumer contract. | `deploy/README.md` (032), `docs/design/01-consumer-contract.md` | all |
 | 14 | AC-7's workload series and AC-7a, recorded with per-run phases. | tests of step 8, run in CI | 8, 11 |
-| 15 | Flip 043 `complete`; independent review over base..head; remediate; PR; CI green on the final head; merge; `make verify SPEC=043` on the merged revision. | | all |
+| 15 | Independent review over base..head; remediate; PR; CI green on the final head. The PR can merge with 043 at `in-progress` (implemented, AC-4 (g) recorded as not met). | | all |
+| 16 | **Release gate (B-4b).** When a hiqlite-patched release with 035 B-5 and a Rauthy image rebuilt on it are published: record their identities as D-P1 was recorded, prepare the governed repin amendment of B-1 and B-2 with the exact artifacts and evidence, and put it to the owner. Only after that decision: repin, rerun AC-1, AC-2, AC-4 (g) and AC-9, flip 043 `complete`, merge, `make verify SPEC=043` on the merged revision. | specs 043 (and 011 D-13's artifact list), `Cargo.toml`, `Cargo.lock`, both Dockerfiles | 15, producer artifacts, owner decision |
 
 Parallelism: steps 2 then 3 are serial; 4 and 5 can run in parallel once 3
 is committed; 6 needs both; 8 can start after 4; 11 after 2. Agents own
@@ -58,6 +59,7 @@ step 2, and documents.
   not patch-level. Recheck immediately before tagging that `0.3.0` is unused
   on crates.io for all nine chassis crates, on GHCR for `rahi`,
   `rahi-runtime` and `rahi-hello-cell`, and as a git tag.
+- **Gate.** No candidate before step 16 completes.
 - **Candidate evidence.** `make ci` on the release commit; the live workflow
   strict on both architectures with zero skipped required legs; the image
   workflow on both architectures; AC-3 to AC-9 records with run ids.

@@ -51,6 +51,11 @@
         "code": "W-001",
         "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-store/tests/dependency_identity.rs' does not exist",
         "path": "crates/rahi-store/tests/dependency_identity.rs"
+      },
+      {
+        "code": "W-002",
+        "message": "spec '043-patched-dependency-adoption' file unit 'docs/design/07-owner-decision-packet-rev3-2026-09-23.md' does not exist",
+        "path": "docs/design/07-owner-decision-packet-rev3-2026-09-23.md"
       }
     ]
   },
@@ -126,6 +131,10 @@
       },
       {
         "path": "crates/rahi-ops/src/preflight.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/rauthy_env.rs",
         "source": "spec-edge"
       },
       {
@@ -453,6 +462,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-ops/src/rauthy_env.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_env.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-ops/src/restore.rs"
           }
         ],
@@ -670,11 +692,20 @@
           "kind": "file",
           "path": "docs/design/06-owner-decision-packet-2026-09-23.md"
         }
+      },
+      {
+        "locations": [],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/07-owner-decision-packet-rev3-2026-09-23.md"
+        }
       }
     ],
     "specId": "043-patched-dependency-adoption",
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "1ec12977cf2dfcbef291260d082f6da1b195014c023104a93cf104dc41393a04"
+  "shardHash": "af47e45019ea5f908b6b684bfde177cd245a5826a1c2e68accc4626af5737543"
 }

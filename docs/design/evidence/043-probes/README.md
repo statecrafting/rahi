@@ -68,3 +68,36 @@ blocked in attach after three minutes; the process list held only
 The diff showed new `keys/`, `backups/`, `rauthy/config.toml` and
 `rauthy/rauthy.env` (first-boot's absent-only writes) and nothing under
 `hiqlite/`. Limitation: a fresh volume, the default entrypoint, arm64 only.
+
+## Revision 3 (2026-09-23)
+
+`common.rs` now reads the raft and API ports from `PR` and `PA`, and
+`race.py` allocates them per start. Build as above; building both probes
+took 65 s.
+
+### G3: T1 against a pre-043 node stopping and starting (`race.py`), D-P12, D-P13
+
+`race.py tl <dir>` samples one clean 0.14 stop. `race.py s2 <dir> <offsets>`
+runs T1 (whole-file guard by `link`, WAL-lock probe, SQLite `-wal`/`-shm`
+check, identity re-check) at offsets in tenths of a millisecond after the
+stop begins, and diffs the legacy tree after any accepting verdict.
+`race.py s1 <dir> <offsets>` runs T1 at offsets after a 0.14 start and
+records whether the old node served.
+
+| probe | runs | result |
+|---|---|---|
+| timeline | 1 | cache WAL lock released 0.51 ms, raft WAL lock 1.27 ms, marker removed 1.57 ms, `-shm` 1.9 ms, `-wal` 2.18 ms, exit 3.06 ms |
+| stop race | 2 x 10 | 6 `EEXIST`; 1 case with both locks free and SQLite still open (revision 2 accepts, revision 3 refuses); 13 accepted, none followed by a change under the legacy store, guard untouched |
+| start race | 15 | 1 accepted then the old node panicked on the guard; 3 refused on the held WAL lock, old node panicked; 11 `EEXIST`; never accepted while the old node served |
+
+### G4: published verbs on a fenced volume (`img.sh`), D-P14
+
+`serve` and `ledger verify` panic on the marker, `restore` and `preflight`
+refuse, the app store is unchanged; `serve` leaves non-empty WAL debris
+under the fence path. Direct `supervise` spawns Rauthy within a second.
+With a directory at `rauthy/rauthy.env`, `supervise` exits 3 before the
+spawn; with an unparseable `restore.marker`, it exits 1 before the spawn
+(twice). Those two runs were done by hand after `img.sh`, on the same
+volume, as recorded in D-P14.
+
+Total runtime probing in this pass: about eight minutes.

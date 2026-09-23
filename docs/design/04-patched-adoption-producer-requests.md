@@ -1,7 +1,8 @@
 # Patched adoption: producer requests and the hiqlite reconciliation
 
-Version 1, 2026-09-23. Owned by `specs/043-patched-dependency-adoption/spec.md`
-(draft, revision 2). Maintained by the rahi owner. Stable references: the
+Version 2, 2026-09-23. Owned by `specs/043-patched-dependency-adoption/spec.md`
+(draft, revision 3). Version 1 answered revision 2; version 2 re-reads every
+request against revision 3 and hiqlite `8e4ec4b`. Maintained by the rahi owner. Stable references: the
 request ids below (`H-n`, `R-n`, `C-n`) are cited by 043 and by
 `06-owner-decision-packet-2026-09-23.md`, and are never renumbered; a
 withdrawn request keeps its id and says so.
@@ -15,12 +16,15 @@ request marked non-blocking; each says what changes if it arrives.
 **Blocking classes.**
 
 - **N1-blocking**: 043 cannot be approved or cannot complete without it.
+- **N1-release-blocking**: 043 is implemented without it, but cannot be
+  flipped `complete` or qualified for release, because an acceptance
+  criterion requires the behavior it provides (043 B-4b).
 - **Claim-blocking**: 043 ships without it, but a named claim stays out of
   rahi's documents until it arrives.
 - **Non-blocking**: an improvement a later change adopts.
 - **N3-only**: belongs to Track S7 or spec 044, never to 043.
 
-No request below is N1-blocking.
+No request below is N1-blocking. One, H-8, is N1-release-blocking.
 
 ## 1. Requests to the hiqlite-patched producer
 
@@ -28,31 +32,35 @@ Owner: the `bartekus/hiqlite` maintainer. Consumer: rahi spec 043, and
 through Rauthy's image every Rauthy consumer. Evidence: 043 D-P2, D-P3,
 D-P6, D-P7 and `evidence/043-probes/`.
 
-### H-1. Exclude before moving (the live-old-version cache-move hazard)
+### H-1. Continuous exclusion before and through the move (the live-old-version hazard)
 
 **Problem.** With `HQL_CACHE_LEGACY_MOVE_ASIDE=true`, a 0.15 start against a
 data directory a live 0.14 node is using renamed the live node's
 `logs_cache` and `state_machine_cache` into `pre-upgrade-<secs>/` and only
-then failed on the 0.14 WAL lock (`hiqlite-wal-patched log_store.rs:49`). The
-live node then panicked at shutdown and the directory needed manual repair
-(043 D-P3). This is an N=1 hazard of the consent path, and it is **not** part
-of N=3 qualification: it concerns two processes on one directory, which the
-N=3 work does not change.
+then failed on the 0.14 WAL lock (043 D-P3; hiqlite F-126, reproduced as
+035's P-2, where the live node then wrote into the moved WAL). This is an
+N=1 hazard of the consent path and is not part of N=3 qualification.
 
-**Requested.** Before `ensure_cache_log_format` moves anything, and after
-taking `hiqlite-owner.lock`, test the legacy WAL locks (`logs/lock.hql`,
-`logs_cache/lock.hql`) with a non-blocking `flock` on existing files only;
-if either is held, return `StorageInUse` and change nothing.
+**Requested.** Exclusion that is **continuous**, not a momentary probe: the
+owner lock and each existing legacy WAL lock are acquired and **held** from
+before the first rename or storage write until the component that uses the
+directory stops, handed to the log stores rather than released and taken
+again, and re-established on the new `logs_cache` before the lock that
+followed the renamed inode is released. This is hiqlite 035 B-1 and B-2 at
+`8e4ec4b`; rahi asks for that contract as written, including B-2's
+unlink-while-held at clean stop (F-133), and for its X-1, X-4 and X-5
+acceptance on Linux.
 
-**Acceptance.** A live 0.14 node, then a 0.15 start with consent on the same
-directory: refused, every path and content hash unchanged except
-`hiqlite-owner.lock`, and the 0.14 node stops cleanly.
+**Acceptance.** hiqlite 035's X-1 (live 0.14, then the candidate with
+consent: refused at B-1 step 2, the 0.14 node writes, stops `Ok` and
+restarts with every row) and X-4 (ten racing launches per run, exactly one
+proceeds), release builds, both Linux architectures.
 
-**Class.** Claim-blocking. Until it ships in a release rahi pins, 043 B-5
-states the precondition (old container stopped and removed before the new
-image starts) as the operator's, and rahi claims no mechanical exclusion of
-an old Rauthy. When it ships, the Rauthy image rebuilt on it closes the case
-for Rauthy's directory too, and a later rahi change may say so.
+**Class.** Claim-blocking. rahi's own app store never uses the consent path
+(043 B-4), and every published pre-043 rahi supervisor is stopped before it
+spawns Rauthy (043 B-5, P-10), so the remaining case is a Rauthy started
+outside rahi on the volume. Until a release rahi pins carries this, 043
+claims no mechanical exclusion of such a process.
 
 ### H-2. Check the unclean-stop marker before the move, and refuse without panicking
 
@@ -89,70 +97,104 @@ machine's panic (D-P7).
 warning. **Acceptance.** The entries exist on a published branch.
 **Class.** Non-blocking.
 
-### H-5. A downgrade fence in the 0.15 format
+### H-5. A downgrade boundary the old binary actually meets
 
 **Problem.** Nothing in a 0.15 directory makes a 0.14 binary refuse it, and
-a 0.14 binary over it can destroy its raft metadata (D-P2). rahi fences its
-own app store by relocating it (043 P-8), but cannot fence Rauthy's
-directory without opening it (spec 000 `store-separation`), so an old Rauthy
-started on a post-upgrade volume is protected only by the operator
-precondition.
+a 0.14 binary over it can destroy its raft metadata (043 D-P2; hiqlite F-129,
+3 of 3 panics and 2 of 3 destructive in 035's P-6). A check added to 0.15
+code is never executed by a 0.14 binary, so it cannot be the answer.
 
-**Requested.** A persistent marker in every 0.15 data directory that every
-0.14 build refuses before touching storage, for example a permanent
-`state_machine/lock` with a content tag while 0.15 keeps its own unclean-stop
-marker under a new name.
+**Requested.** One of two, stated in the consumer handoff:
 
-**Acceptance.** 0.14 against a 0.15 directory refuses, and every path and
-content hash under the directory's raft and state-machine subdirectories is
-unchanged (the probe method of `evidence/043-probes/g2.sh`).
+1. A **producer-owned layout fence**: a 0.15 directory arranged so that
+   the unmodified 0.14 binary refuses before it writes anything, for
+   example the arrangement 043 uses for rahi's app store (the store moved
+   to a path 0.14 never opens, and a permanent `state_machine/lock` with a
+   content tag at the path it does open), demonstrated against the real
+   0.14 binary at `8f3b9bd` with 035's method (entries, identities, sizes
+   and bytes before and after). 043 D-P7 and D-P14 show that 0.14's racing
+   WAL task still writes files beside such a marker; the demonstration
+   says where.
+2. An **explicit unsupported-downgrade boundary**: the handoff says a 0.14
+   binary on a directory any 0.15 build has written is unsupported, that
+   the pre-upgrade archive restored into a fresh volume is the only way
+   back, and that a manual move-aside is not shown safe. hiqlite 035 B-4 at
+   `8e4ec4b` already requires this statement; rahi asks that it reach the
+   published consumer handoff.
 
-**Class.** Claim-blocking, for the claim that an old Rauthy cannot damage a
-post-upgrade volume; non-blocking for 043's delivery.
+**Acceptance.** For 1, the demonstration on both Linux architectures; for 2,
+the statement in the consumer handoff on a published ref.
+
+**Class.** Claim-blocking, for the claim that an old Rauthy started outside
+rahi cannot damage a post-upgrade volume. Non-blocking for 043's delivery.
 
 ### H-6. Publish the N=3 reconciliation
 
 **Problem.** The hiqlite reconciliation with rahi's decision packet,
-`ec8fc6d` ("docs(033): reconcile the N=3 proposal with Rahi's
-patched-adoption packet"), is on the local branch `proposal/033-n3-topology`
-and no remote ref contained it on 2026-09-23. Section 2 below cites it.
+`ec8fc6d`, and the N=1 repair contract and second reconciliation on top of
+it, `8e4ec4b` ("docs(035): the N=1 upgrade-exclusion repair contract, and a
+second N=3 reconciliation with Rahi 043"), are on the local branch
+`proposal/033-n3-topology`; at 2026-09-23T20:30Z the remote held `main`
+(`52122ae`) and two `spec/*` branches, none containing either commit.
+Sections 2 and 2.1 cite them.
 
-**Requested.** Push the branch or merge it. **Acceptance.** `ec8fc6d` is
-reachable from a ref of `bartekus/hiqlite`. **Class.** Non-blocking; section
-2 records what was read.
+**Requested.** Push the branch or merge it. **Acceptance.** `8e4ec4b` is
+reachable from a ref of `bartekus/hiqlite`. **Class.** Non-blocking; sections
+2 and 2.1 record what was read.
 
-### H-7. Review revision 2's fence route
+### H-7. Review revision 3's fence route
 
-**Problem.** The hiqlite working tree after `ec8fc6d` (section 2.1) concludes
-that no public-API rearrangement keeps lock-based exclusion continuous from
-rahi's locks into a 0.15 start, and offers rahi two routes: wait for its
-draft `035` B-6 handle, or rely on an operator precondition. 043 revision 2
-takes a third route that draft did not examine: pre-043 binaries are
-excluded by a persistent marker at a path they are the only readers of, and
-the live store is relocated to a path they never open (043 B-4, P-8, D-P7).
+**Problem.** hiqlite's handoff at `8e4ec4b` answers 043 as reviewed at
+`5707f60` (revision 1): it confirms that no public-API rearrangement keeps
+lock-based exclusion continuous from rahi's locks into a 0.15 start, and
+offers two routes (wait for 035 B-6's handle, or an operator precondition).
+Revision 3 takes a third route for rahi's app store, and its T1 now depends
+on specific 0.14 behavior rahi read from source and probed once.
 
-**Requested.** An adversarial reading against 0.14 (`8f3b9bd`) and
-`0.15.0-patched.1` source: does any 0.14 path, without `auto-heal`, remove
-or bypass `state_machine/lock` before failing; is a 0.14 data directory
-relocated entry by entry to a new `data_dir` path sound for 0.15 (membership
-names addresses, not paths); what else 0.14's racing WAL task can write.
+**Requested.** A written, adversarial answer, against 0.14 at `8f3b9bd` and
+`0.15.0-patched.1`, to five questions:
 
-**Acceptance.** A written answer on a published branch, or a finding.
+1. Can any 0.14 path without `auto-heal`, starting or stopping, remove,
+   truncate or bypass `state_machine/lock` other than D-P11's two (a start
+   between its `File::open` check and its `File::create`, which holds
+   `logs/lock.hql` throughout; its own clean stop, which unlinks by path)?
+2. Does a 0.14 node ever write under its data directory after its SQLite
+   `-wal` file is removed at a clean stop (D-P12's timeline)? Is "`-wal`
+   and `-shm` absent, both WAL locks free, marker absent" sufficient
+   evidence that no 0.14 process has the directory open, with the default
+   and with any configuration a 0.14 consumer could use?
+3. Is a 0.14 data directory relocated entry by entry to a new `data_dir`
+   path sound for 0.15 (membership names addresses, not paths)?
+4. What can 0.14's racing WAL task write under a marker-refused start
+   beyond what D-P7 and D-P14 saw (a non-empty WAL and `meta.hql`)?
+5. Does anything in 0.15 treat an unknown directory entry under its
+   `data_dir` (rahi's evidence and `pre-upgrade-*` directories) as its own?
+
+**Acceptance.** A written answer on a published branch, or findings.
 **Class.** Non-blocking; the owner may ask for it before approving.
 
-### H-8. An interrupted consent move (F-130)
+### H-8. The interrupted consent move (F-130), on the normal crash path
 
-**Problem.** The uncommitted register entry F-130 (source-read) says a crash
-between the consent move's two renames can leave a 0.14 cache snapshot that
-the next start restores without refusal. rahi never uses consent on the app
-store and orders its own two renames to avoid the case (043 T2), but
-Rauthy's T4 move is hiqlite's consent path.
+**Problem.** hiqlite F-130 (`defect`, confidence `medium`, committed at
+`8e4ec4b`, source-read): `move_legacy_cache_aside` renames `logs_cache`
+before `state_machine_cache`, and the legacy check keys on `.wal` files in
+`logs_cache` only, so a crash between the renames can leave a 0.14 cache
+snapshot that the next start restores without refusal and without consent.
+Rauthy's cache move at 043 T4 is this path, so the crash is on the cell
+transition's normal crash path, and 043 AC-4 requires every interruption
+to resume cleanly.
 
-**Requested.** Move `state_machine_cache` first, or make the legacy check
-look at snapshots too. **Acceptance.** A crash injected between the renames,
-then a start: refused or completed, never a restored 0.14 snapshot.
-**Class.** Claim-blocking for "an interrupted Rauthy move recovers cleanly";
-043 states it as the producer's (B-4, T4).
+**Requested.** hiqlite 035 B-5 as written at `8e4ec4b` (`state_machine_cache`
+first, so the legacy evidence moves last; no state leaves a 0.14 cache log
+or snapshot where a 0.15 cache raft opens it), with its U-7 and X-5
+acceptance; a published `hiqlite-patched` release carrying it; and a
+patched Rauthy image rebuilt on that release, published with its own
+provenance, whose own leg J includes a crash between the two renames.
+
+**Acceptance.** Those three artifacts exist; rahi's owner then decides the
+repin (043 B-4b, P-12). **Class.** **N1-release-blocking.** 043 is
+implemented on the current pins; it is not flipped `complete` and 0.3.0 is
+not qualified until this lands and is adopted. It is not an N=3 item.
 
 ## 2. Reconciliation with the hiqlite handoff at `ec8fc6d`
 
@@ -164,7 +206,7 @@ Read: `standards/spec/n3-rahi-reconciliation-handoff.md`,
 Nothing there authorizes rahi work; its section 1 records D-14 as decided
 and every other hiqlite decision as pending.
 
-| hiqlite handoff at `ec8fc6d` | rahi's position after 043 revision 2 |
+| hiqlite handoff at `ec8fc6d` | rahi's position after 043 revision 3 |
 |---|---|
 | §2 packet D2: the `iat` floor should use the **reported** maximum bearer lifetime, not the packet's 600 s constant; 038 records a Rauthy default of 1800 s | **Superseded.** The floor no longer depends on any lifetime: it never lifts (043 B-6b, P-9). Every admitted token is bounded by the manifest's lifetime L, enforced at the bearer (B-6), so Rauthy's default does not enter; preflight still reports Rauthy's configured value against L (038 B-6). |
 | §2 packet D2: the Rauthy-side move-aside lifts every IP ban, including manual ones, and resets failed-login counters (proposal §14.1) | **Adopted as a stated consequence.** The 043 README and release notes list it; R-2 asks Rauthy's maintainer to confirm the full list. |
@@ -182,26 +224,22 @@ and every other hiqlite decision as pending.
 | §5: a planned clean-stop marker (034 B-7) | When it ships, a later rahi change may use it to confirm the store's stop in B-10; 043 does not wait. |
 | F-124, F-125 (committed log id not persisted; applied id persisted only at snapshots and clean exit) | N3-only (export currency). Noted because B-10's `store_timeout` is exactly the case where the applied id may not have been persisted. |
 
-### 2.1 The hiqlite working tree after `ec8fc6d` (uncommitted, 2026-09-23)
+### 2.1 hiqlite `8e4ec4b` (committed locally, 2026-09-23)
 
-Observed, not citable as a revision: a concurrent hiqlite session had, on top
-of `ec8fc6d` and uncommitted, a draft `specs/035-n1-upgrade-exclusion`, a
-revised handoff and new findings F-126 to F-133. As observed, it accepts H-1
-to H-4 (widened: the live 0.14 node also wrote into the moved WAL, F-126),
-reproduces revision 1's T0 to T3 self-contention independently (rahi's
-D-P6), notes that hiqlite has no start mode without listeners (043 T3 now
-says so), and asks rahi (its F10) to wait for a public exclusion handle or
-rely on an operator precondition. rahi's answer is revision 2's fence (H-7),
-which needs neither for the app store; the precondition remains for Rauthy's
-directory only (043 B-5). It also records F-130 (H-8) and that a clean WAL
-stop releases its lock before unlinking the file (F-133), which T1's probe
-tolerates: a released lock reads as not held. When that work is committed,
-this section is updated to cite its revision.
-
-What the earlier conversational handoff said and this replaces: the lifetime
-figure used for the floor (above), the forced-exit classification (above),
-and "the guard is installed after the floor", which D-P7 disproved (043
-section 7.3).
+What version 1 of this document described as an uncommitted working tree
+is now the local commit `8e4ec4b` (not on a remote ref, H-6): spec
+`035-n1-upgrade-exclusion` (draft, the repair contract: B-1 held exclusion
+before any mutation, B-2 lock handoff and unlink-while-held, B-3 refusals as
+errors naming what they left, B-4 the unsupported downgrade, B-5 the
+interruption-safe move order, B-6 an optional public exclusion handle under
+pending owner decision D-17), findings F-126 to F-131 and F-133, and
+`standards/spec/n3-rahi-reconciliation-handoff.md`. That handoff answers
+043 as of `5707f60` (revision 1) and asks rahi (its F10) to wait for B-6's
+handle or state an operator precondition. rahi's answer is revision 3: the
+app store needs neither (fence, whole-file guard, quiescence check,
+identity-planned relocation), published rahi supervisors are fenced
+(P-10), and the precondition remains only for a Rauthy started outside
+rahi. H-7 asks hiqlite to review that route; H-8 is 035 B-5.
 
 ## 3. Requests to the Rauthy patched-release producer
 
@@ -252,27 +290,14 @@ which of these a plain restart already loses.
 upgrade consequences; the README ships with the known list and says it is
 the known list.
 
-### R-3. Attach the release assets
+### R-3. Release assets (closed 2026-09-23)
 
-**Problem.** Release `v0.36.2-patched.2` has zero assets (authenticated and
-anonymous REST API, 2026-09-23), while `RELEASE-LEDGER.md` section 7 on
-`patched/0.36.2` says the publish run created eight and `RELEASE-HANDOFF.md`
-tells consumers to pin from the attached `RELEASE-PROVENANCE.md`.
-
-**Requested.** Attach `RELEASE-PROVENANCE.md`, `SHA256SUMS`, the binaries and
-the other listed assets, or correct the ledger and handoff.
-
-**Acceptance.** An anonymous read of the release lists the assets and their
-hashes agree with 043 D-P1: index
-`sha256:ea114a8bb743d578dea6d7800916ee43550939c749a2cf586f9abdc0d0c52478`;
-`linux/amd64` `sha256:6774d28c9f611777dc4ad2243a8f4cb1fa0df3d94caca1aeaf052cc10d9e5658`;
-`linux/arm64` `sha256:6ae9225a9243a7e660f6c407d07f81258d06f456470dfb4b6c899a6db13146f8`;
-`/app/rauthy` `742b18ba3717a92577a2ae0d517546a64ef6967c86e2847b50b10a22ab8dfc59`
-(amd64), `5e498c31ef23ebc27a6d2dbdbf73f6d6f48129f541fced92d48a53b87d61e312`
-(arm64).
-
-**Class.** Claim-blocking for "pinned from the release's provenance file";
-rahi pins from the registry and the ledger meanwhile and says so (D-P1).
+Closed. Version 1 said release `v0.36.2-patched.2` had no assets; that was
+wrong. At 2026-09-23T20:27:33Z authenticated and anonymous reads listed eight
+assets uploaded between 09:14:48Z and 09:14:51Z, and the anonymously
+downloaded `SHA256SUMS`, `RELEASE-PROVENANCE.md` and `image-index.txt` agree
+with 043 D-P1 on the index digest, both platform digests, both binary hashes,
+the upstream base and the source commit (043 D-P15). Nothing is requested.
 
 ### R-4. Refuse an older Rauthy on an upgraded directory
 
@@ -280,10 +305,15 @@ rahi pins from the registry and the ledger meanwhile and says so (D-P1).
 0.15-based Rauthy has written can destroy its raft metadata (043 D-P2), and
 rahi may not open Rauthy's directory to prevent it.
 
-**Requested.** Ship H-5 in the next patched Rauthy, or an equivalent check in
-Rauthy's own startup. **Acceptance.** As H-5, with the upstream 0.36.2 image
-against a directory the patched image has written. **Class.**
-Claim-blocking, as H-5.
+**Requested.** One of H-5's two answers for Rauthy's own directory: a layout
+fence the unmodified upstream `ghcr.io/sebadob/rauthy:0.36.2` image refuses
+before it writes, demonstrated against that image on a directory the
+patched image has written; or the unsupported-downgrade boundary stated in
+`RELEASE-HANDOFF.md`. A startup check in the patched build is not an answer:
+the old image never runs it. **Acceptance.** As H-5. **Class.**
+Claim-blocking, as H-5. rahi already stops its own published supervisors
+from spawning an old Rauthy (043 P-10); this covers a Rauthy started outside
+rahi.
 
 ### R-5. Forwarded: the DPoP nonce observation
 
@@ -299,9 +329,11 @@ assessment. **Class.** Non-blocking for 043, which does not use DPoP.
 
 Owner: the rahi owner. Consumers: `statecrafting/hqgit`, `statecrafting/aicortex`
 and any out-of-tree app on the runtime image. What changes at 0.3.0 if 043 is
-approved as revision 2: `Config::hiqlite_dir()` answers `<data>/app-store`;
-`<data>/hiqlite` is a permanent fence; a v0.2.0 volume needs
-`rahi upgrade-cache` once; a pre-043 image on a post-043 volume waits in
-`migrate`. **Acceptance.** The release notes and the consumer contract carry
+approved as revision 3: `Config::hiqlite_dir()` answers `<data>/app-store`;
+`<data>/hiqlite` is a permanent fence; the rendered Rauthy environment moves
+to `<data>/rauthy-env/rauthy.env` and `<data>/rauthy/rauthy.env` becomes a
+directory (if P-10 is accepted); a v0.2.0 volume needs `rahi upgrade-cache`
+once; a pre-043 image on a post-043 volume waits in `migrate`, and a
+pre-043 `supervise` run directly exits before spawning Rauthy. **Acceptance.** The release notes and the consumer contract carry
 it, and a consumer that hard-codes the path is named in the 0.3.0
 qualification record. **Class.** Non-blocking for 043; delivered with 0.3.0.

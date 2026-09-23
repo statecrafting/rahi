@@ -9,7 +9,7 @@ impl hiqlite::CacheVariants for Cache {
 pub fn cfg(dir: &str) -> NodeConfig {
     let mut c = NodeConfig {
         node_id: 1,
-        nodes: vec![Node { id: 1, addr_raft: "127.0.0.1:28471".into(), addr_api: "127.0.0.1:28472".into() }],
+        nodes: vec![Node { id: 1, addr_raft: format!("127.0.0.1:{}", std::env::var("PR").unwrap()).into(), addr_api: format!("127.0.0.1:{}", std::env::var("PA").unwrap()).into() }],
         listen_addr_api: Cow::Borrowed("127.0.0.1"),
         listen_addr_raft: Cow::Borrowed("127.0.0.1"),
         data_dir: Cow::Owned(dir.to_string()),
