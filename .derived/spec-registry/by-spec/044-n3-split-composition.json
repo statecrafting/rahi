@@ -1,0 +1,148 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-23",
+    "dependsOn": [
+      "020-edge-server",
+      "021-idp-proxy-and-discovery",
+      "030-operational-verbs",
+      "031-single-container-packaging",
+      "032-cluster-topology",
+      "036-manifest-and-schema-evolution",
+      "037-identity-recovery-and-live-proof"
+    ],
+    "domain": "ops",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "deploy/n3-split/"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-cli/tests/split.rs"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "020-edge-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/probes.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "021-idp-proxy-and-discovery",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/config.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "021-idp-proxy-and-discovery",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/discovery.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/backup.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_api.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_env.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "032-cluster-topology",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/k8s-validate.sh"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "032-cluster-topology",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/README.md"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 3
+    },
+    "id": "044-n3-split-composition",
+    "implementation": "pending",
+    "kind": "feature",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-consumer-contract.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-operational-prerequisites.md"
+        }
+      }
+    ],
+    "risk": "critical",
+    "sectionHeadings": [
+      "044: N=3 split composition",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "Proposed amendments to complete specs (N=3 only)",
+      "Routing and trust (replaces loopback)",
+      "Readiness and liveness (replaces die-together)",
+      "Disruption and storage",
+      "Backup (replaces the single-volume cut)",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Proposals (2026-09-23)",
+      "Verification"
+    ],
+    "specPath": "specs/044-n3-split-composition/spec.md",
+    "status": "draft",
+    "summary": "The owner decided on 2026-09-23 (hiqlite proposal D-14, recorded at bartekus/hiqlite@da4c910) that an N=3 cell is one namespace holding two StatefulSets, rahi and rauthy, three replicas each, one hiqlite node per pod, and that the single-container supervised composition of spec 031 stays the N=1 profile. This spec is rahi's share of that decision. It amends 031 and 032 for N=3 only: rahi starts without rauthy, reaches it only through the internal ClusterIP Service rauthy-internal.<namespace>.svc.cluster.local over Rauthy's TLS or a mesh's mTLS, fails readiness and never liveness while rauthy is unavailable, and keeps peer discovery independent of readiness. It carries the proposal's routing, NetworkPolicy, per-StatefulSet disruption and storage requirements, and backup obligations. It changes no dependency and claims no N=3 support: that follows only from recorded qualification on a named release.\n",
+    "title": "N=3 split composition: two StatefulSets, rahi and rauthy, one hiqlite node per pod, rahi reaching rauthy only through an encrypted internal Service and losing readiness, never liveness, without it"
+  },
+  "shardHash": "529a8b185445d505610a1159375ac8187750e2be2365fa37ebfbb1d92c33db45",
+  "specVersion": "1.3.0"
+}
