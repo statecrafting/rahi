@@ -1,0 +1,239 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-23",
+    "dependsOn": [
+      "010-workspace-and-core-types",
+      "011-store-hiqlite",
+      "012-store-coordination",
+      "016-store-binary-values-and-extensions",
+      "025-api-tokens-and-resource-server",
+      "026-streaming-responses",
+      "030-operational-verbs",
+      "031-single-container-packaging",
+      "032-cluster-topology",
+      "035-denials-survive-shutdown",
+      "037-identity-recovery-and-live-proof",
+      "038-native-clients-and-bearer-revocation",
+      "039-release-and-out-of-tree-packaging"
+    ],
+    "domain": "ops",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/src/upgrade.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/tests/upgrade.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-cli/tests/terminal.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-cli/tests/stop_budget.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-idp/tests/revocation_durable.rs"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "010-workspace-and-core-types",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "010-workspace-and-core-types",
+        "unit": {
+          "kind": "file",
+          "path": "deny.toml"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "011-store-hiqlite",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/store.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "011-store-hiqlite",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/error.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "016-store-binary-values-and-extensions",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/blob.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "025-api-tokens-and-resource-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/bearer.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "038-native-clients-and-bearer-revocation",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/revoke.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/lib.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/restore.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/lib.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/supervise.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "docker/Dockerfile"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/image.yml"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "039-release-and-out-of-tree-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "docker/runtime.Dockerfile"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "032-cluster-topology",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/README.md"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "032-cluster-topology",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/statefulset.yaml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "037-identity-recovery-and-live-proof",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/live.yml"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 3
+    },
+    "id": "043-patched-dependency-adoption",
+    "implementation": "pending",
+    "kind": "feature",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-consumer-contract.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-operational-prerequisites.md"
+        }
+      }
+    ],
+    "risk": "critical",
+    "sectionHeadings": [
+      "043: Patched dependency adoption",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "Identities",
+      "Crossing the cache boundary",
+      "What survives cache loss",
+      "Terminal storage failure",
+      "Stopping",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Proposals (2026-09-23)",
+      "Evidence recorded for the proposals",
+      "Verification"
+    ],
+    "specPath": "specs/043-patched-dependency-adoption/spec.md",
+    "status": "draft",
+    "summary": "rahi's application store runs hiqlite 0.14.0 through a root git patch that registry consumers never inherit, and its co-deployed identity provider runs upstream Rauthy 0.36.2. Published downstream builds now exist for both: hiqlite-patched 0.15.0-patched.1 and rauthy-patched 0.36.2-patched.2, each qualified by its producer at N=1. This spec adopts exactly those two artifacts for the N=1 cell under a narrow, provenance-pinned exception to 011's no-fork rule, makes the one incompatible boundary between them (the cache raft log) crossable only with an explicit, resumable, backed-up operator consent, moves bearer revocation out of the cache so that crossing it, a restore, or a disaster recovery does not resurrect a revoked token, turns a proven terminal storage failure into a bounded exit instead of an indefinitely erroring process, and replaces the stacked shutdown numbers with a measured bound that distinguishes graceful completion from forced termination. It changes no topology and claims no N=3 support.\n",
+    "title": "Patched dependency adoption: the N=1 cell runs the published, provenance-pinned hiqlite and Rauthy builds, crosses their cache boundary only with consent, keeps revocations through it, and stops within a measured bound"
+  },
+  "shardHash": "336be79b96035c73dd978bf84d64cef2ab1c84cece0d412ed5403ac390d94b69",
+  "specVersion": "1.3.0"
+}
