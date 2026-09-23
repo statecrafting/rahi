@@ -9,6 +9,7 @@
       "011-store-hiqlite",
       "012-store-coordination",
       "016-store-binary-values-and-extensions",
+      "021-idp-proxy-and-discovery",
       "025-api-tokens-and-resource-server",
       "026-streaming-responses",
       "030-operational-verbs",
@@ -27,6 +28,10 @@
       },
       {
         "kind": "file",
+        "path": "crates/rahi-ops/src/stop.rs"
+      },
+      {
+        "kind": "file",
         "path": "crates/rahi-ops/tests/upgrade.rs"
       },
       {
@@ -40,6 +45,10 @@
       {
         "kind": "file",
         "path": "crates/rahi-idp/tests/revocation_durable.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-store/tests/dependency_identity.rs"
       }
     ],
     "extends": [
@@ -76,6 +85,14 @@
         }
       },
       {
+        "nature": "additive",
+        "spec": "011-store-hiqlite",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/lib.rs"
+        }
+      },
+      {
         "nature": "amending",
         "spec": "016-store-binary-values-and-extensions",
         "unit": {
@@ -101,10 +118,26 @@
       },
       {
         "nature": "additive",
+        "spec": "021-idp-proxy-and-discovery",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
         "spec": "030-operational-verbs",
         "unit": {
           "kind": "file",
           "path": "crates/rahi-ops/src/lib.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/preflight.rs"
         }
       },
       {
@@ -218,7 +251,7 @@
       "3. Behavior",
       "Identities",
       "Crossing the cache boundary",
-      "What survives cache loss",
+      "Revocation across cache loss",
       "Terminal storage failure",
       "Stopping",
       "4. Functional requirements",
@@ -226,14 +259,14 @@
       "6. Out of scope",
       "7. Resolved decisions",
       "Proposals (2026-09-23)",
-      "Evidence recorded for the proposals",
+      "Evidence recorded for the decisions",
       "Verification"
     ],
     "specPath": "specs/043-patched-dependency-adoption/spec.md",
     "status": "draft",
-    "summary": "rahi's application store runs hiqlite 0.14.0 through a root git patch that registry consumers never inherit, and its co-deployed identity provider runs upstream Rauthy 0.36.2. Published downstream builds now exist for both: hiqlite-patched 0.15.0-patched.1 and rauthy-patched 0.36.2-patched.2, each qualified by its producer at N=1. This spec adopts exactly those two artifacts for the N=1 cell under a narrow, provenance-pinned exception to 011's no-fork rule, makes the one incompatible boundary between them (the cache raft log) crossable only with an explicit, resumable operator consent that requires a pre-upgrade archive and lets Rauthy move its own cache, moves bearer revocation out of the cache so that crossing it, a restore, or a disaster recovery does not resurrect a revoked token, turns a proven terminal storage failure into a bounded exit instead of an indefinitely erroring process, and replaces the stacked shutdown numbers with a measured bound that distinguishes graceful completion from forced termination. It changes no topology and claims no N=3 support.\n",
-    "title": "Patched dependency adoption: the N=1 cell runs the published, provenance-pinned hiqlite and Rauthy builds, crosses their cache boundary only with consent, keeps revocations through it, and stops within a measured bound"
+    "summary": "rahi's application store runs hiqlite 0.14.0 through a root git patch that registry consumers never inherit, and its co-deployed identity provider runs upstream Rauthy 0.36.2. Published downstream builds exist for both, hiqlite-patched 0.15.0-patched.1 and rauthy-patched 0.36.2-patched.2, each qualified by its producer at N=1. This spec adopts exactly those two artifacts for the N=1 cell under a narrow recorded exception to 011's no-fork rule. It crosses the one incompatible on-disk boundary (the cache raft log) only through a resumable transition that proves no old or new process holds the stores, requires a verified pre-upgrade archive, and lets Rauthy move its own cache. It keeps every revocation accepted before the upgrade effective for the full accepted-token validity window, moves future revocations to SQL, states the restore boundary, turns a proven terminal storage failure into a bounded exit, and validates the shutdown budget from its phases and from a measured workload. It changes no topology and claims no N=3 support.\n",
+    "title": "Patched dependency adoption: the N=1 cell runs the published, provenance-pinned hiqlite and Rauthy builds, crosses their cache boundary only through a resumable, excluded, backed-up transition, keeps every accepted revocation through it, and stops within a validated budget"
   },
-  "shardHash": "151405326fac6b947d95524a43b9b302a5591f16c9c668beba3ea5132bf53af0",
+  "shardHash": "23320567188ef5f503e5a35593bb8696073f5df45d33caa6958df8f5010c71b0",
   "specVersion": "1.3.0"
 }

@@ -9,6 +9,11 @@
       },
       {
         "code": "W-001",
+        "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-ops/src/stop.rs' does not exist",
+        "path": "crates/rahi-ops/src/stop.rs"
+      },
+      {
+        "code": "W-001",
         "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-ops/tests/upgrade.rs' does not exist",
         "path": "crates/rahi-ops/tests/upgrade.rs"
       },
@@ -26,6 +31,11 @@
         "code": "W-001",
         "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-idp/tests/revocation_durable.rs' does not exist",
         "path": "crates/rahi-idp/tests/revocation_durable.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-store/tests/dependency_identity.rs' does not exist",
+        "path": "crates/rahi-store/tests/dependency_identity.rs"
       }
     ]
   },
@@ -35,6 +45,7 @@
       "011-store-hiqlite",
       "012-store-coordination",
       "016-store-binary-values-and-extensions",
+      "021-idp-proxy-and-discovery",
       "025-api-tokens-and-resource-server",
       "026-streaming-responses",
       "030-operational-verbs",
@@ -71,11 +82,19 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-idp/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-idp/src/revoke.rs",
         "source": "spec-edge"
       },
       {
         "path": "crates/rahi-ops/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/preflight.rs",
         "source": "spec-edge"
       },
       {
@@ -88,6 +107,10 @@
       },
       {
         "path": "crates/rahi-store/src/error.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/src/lib.rs",
         "source": "spec-edge"
       },
       {
@@ -153,6 +176,15 @@
         "sourceField": "establishes",
         "unit": {
           "kind": "file",
+          "path": "crates/rahi-ops/src/stop.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
           "path": "crates/rahi-ops/src/upgrade.rs"
         }
       },
@@ -163,6 +195,15 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-ops/tests/upgrade.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/dependency_identity.rs"
         }
       },
       {
@@ -246,6 +287,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-idp/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-idp/src/revoke.rs"
           }
         ],
@@ -267,6 +321,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-ops/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/preflight.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/preflight.rs"
         }
       },
       {
@@ -306,6 +373,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-store/src/error.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-store/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/lib.rs"
         }
       },
       {
@@ -430,5 +510,5 @@
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "ca92b6c13896101016deba53ec27c1f07e7fc528d35a72f15fdf6f635776aa61"
+  "shardHash": "077bd32a7516cdfeca12e51a3a64211131f15843bfdfda13a0da9fd2e5165c21"
 }
