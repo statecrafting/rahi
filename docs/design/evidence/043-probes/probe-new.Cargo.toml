@@ -1,0 +1,9 @@
+[package]
+name = "probe-new"
+version = "0.0.0"
+edition = "2024"
+[dependencies]
+hiqlite = { package = "hiqlite-patched", version = "=0.15.0-patched.1", default-features = false, features = ["sqlite", "cache", "counters", "dlock", "listen_notify_local", "backup", "s3"] }
+tokio = { version = "1", features = ["full"] }
+libc = "0.2"
+[workspace]

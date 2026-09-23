@@ -9,6 +9,11 @@
       },
       {
         "code": "W-001",
+        "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-ops/src/cell_lock.rs' does not exist",
+        "path": "crates/rahi-ops/src/cell_lock.rs"
+      },
+      {
+        "code": "W-001",
         "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-ops/src/stop.rs' does not exist",
         "path": "crates/rahi-ops/src/stop.rs"
       },
@@ -19,6 +24,11 @@
       },
       {
         "code": "W-001",
+        "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-ops/tests/cell_lock.rs' does not exist",
+        "path": "crates/rahi-ops/tests/cell_lock.rs"
+      },
+      {
+        "code": "W-001",
         "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-cli/tests/terminal.rs' does not exist",
         "path": "crates/rahi-cli/tests/terminal.rs"
       },
@@ -26,6 +36,11 @@
         "code": "W-001",
         "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-cli/tests/stop_budget.rs' does not exist",
         "path": "crates/rahi-cli/tests/stop_budget.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-cli/tests/stop_outcome.rs' does not exist",
+        "path": "crates/rahi-cli/tests/stop_outcome.rs"
       },
       {
         "code": "W-001",
@@ -82,6 +97,14 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-cli/tests/cli.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/tests/shutdown.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-idp/src/bearer.rs",
         "source": "spec-edge"
       },
@@ -126,6 +149,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-types/src/config.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "deny.toml",
         "source": "spec-edge"
       },
@@ -162,6 +189,15 @@
         "sourceField": "establishes",
         "unit": {
           "kind": "file",
+          "path": "crates/rahi-cli/tests/stop_outcome.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
           "path": "crates/rahi-cli/tests/terminal.rs"
         }
       },
@@ -180,6 +216,15 @@
         "sourceField": "establishes",
         "unit": {
           "kind": "file",
+          "path": "crates/rahi-ops/src/cell_lock.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
           "path": "crates/rahi-ops/src/stop.rs"
         }
       },
@@ -190,6 +235,15 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-ops/src/upgrade.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/cell_lock.rs"
         }
       },
       {
@@ -286,6 +340,32 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-cli/src/verbs.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/tests/cli.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/cli.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/tests/shutdown.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/shutdown.rs"
         }
       },
       {
@@ -434,6 +514,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-types/src/config.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-types/src/config.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "deny.toml"
           }
         ],
@@ -521,11 +614,50 @@
           "kind": "file",
           "path": "docs/design/02-operational-prerequisites.md"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/04-patched-adoption-producer-requests.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/04-patched-adoption-producer-requests.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/05-patched-adoption-delivery-plan.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/05-patched-adoption-delivery-plan.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/06-owner-decision-packet-2026-09-23.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/06-owner-decision-packet-2026-09-23.md"
+        }
       }
     ],
     "specId": "043-patched-dependency-adoption",
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "f3ad88fc4f4432e4abef1fbc50744b5f2405abf86804e241bb37d4d238ab7482"
+  "shardHash": "b940ef760ce0ddb8249e218361b736553943374582e8620dc0d1f165e982826b"
 }

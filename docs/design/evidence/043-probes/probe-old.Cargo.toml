@@ -1,0 +1,12 @@
+[package]
+name = "probe-old"
+version = "0.0.0"
+edition = "2024"
+[dependencies]
+hiqlite = { version = "0.14", default-features = false, features = ["sqlite", "cache", "counters", "dlock", "listen_notify_local", "backup", "s3"] }
+tokio = { version = "1", features = ["full"] }
+libc = "0.2"
+[patch.crates-io]
+hiqlite = { git = "https://github.com/sebadob/hiqlite", rev = "8f3b9bde9454d563d604f49c527e1527e193c4ab" }
+hiqlite-wal = { git = "https://github.com/sebadob/hiqlite", rev = "8f3b9bde9454d563d604f49c527e1527e193c4ab" }
+[workspace]
