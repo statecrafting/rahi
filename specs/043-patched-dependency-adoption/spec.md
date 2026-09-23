@@ -46,6 +46,7 @@ extends:
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/preflight.rs", nature: amending }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/restore.rs", nature: amending }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/lib.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/verbs.rs", nature: amending }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/serve.rs", nature: amending }
   - { spec: "031-single-container-packaging", unit: "crates/rahi-ops/src/supervise.rs", nature: amending }
   - { spec: "031-single-container-packaging", unit: "docker/Dockerfile", nature: amending }
@@ -105,7 +106,9 @@ amending); the store's error mapping and the SQL tables this spec adds
 error swallowing (amending); the bearer check and the revocation store
 (025, 038, amending; 021's crate root, additive); the new transition verb
 and the stop record in `rahi-ops` (`src/upgrade.rs`, `src/stop.rs`, new)
-with CLI wiring (030, additive); preflight's accepted-validity figure and
+with CLI wiring, including the new verb in 030's argv parser
+(`verbs.rs`, amending: per 030 D-9, extending `VERBS` belongs to the spec
+that adds the verb, and 030 AC-2's required set is derived from it); preflight's accepted-validity figure and
 restore's floor (030, amending); `serve`'s gating, terminal exit and stop
 sequence (030, 035, amending); the supervisor's cell lock, Rauthy consent
 and stop recording (031, amending); both Dockerfiles' Rauthy pin (031, 039,
@@ -159,32 +162,47 @@ by the same function.
 
   | step | intent recorded | action | completion recorded | recovery if interrupted after the intent |
   |---|---|---|---|---|
-  | T0 lock | none | acquire non-blocking, and hold until exit: `<data>/cell.lock` (B-5), the app store's `hiqlite-owner.lock`, `logs/lock.hql` and `logs_cache/lock.hql`, and Rauthy's `logs/lock.hql` and `logs_cache/lock.hql` (P-6); a lock file a clean stop removed is created empty to be locked and removed at release | none; the locks are held, not recorded | a lock held by another process: refuse and change nothing |
-  | T1 begin | `begin{id, instant, archive}`; `instant` is the wall clock read after T0 | refuse if the app store holds `state_machine/lock` (0.14's unclean-stop marker); verify the archive with 030's read-only verification | `verified{digest}` | rerun T1; nothing on disk changed |
+  | T0 lock | none | acquire non-blocking, and hold until exit: `<data>/cell.lock` (B-5), the app store's `hiqlite-owner.lock`, `logs/lock.hql` and `logs_cache/lock.hql` (a lock file a clean 0.14 stop removed is created empty in the app store to be locked); nothing under Rauthy's directory | none; the locks are held, not recorded | a lock held by another process: refuse and change nothing |
+  | T1 begin | `begin{id, instant, archive}`; `instant` is the wall clock read after T0 | refuse if the app store holds a `state_machine/lock` that is not this transition's own marker (0.14's unclean-stop marker); verify the archive with 030's read-only verification | `verified{digest}` | rerun T1; nothing on disk changed |
   | T2 move | `moving{target}` with `target` = `<app store>/pre-upgrade-<instant>/` | rename `logs_cache` and `state_machine_cache` into `target`; fsync `target` and the store directory | `moved` | per directory: already in `target` is done, still in place is renamed; a completed move is never reversed |
   | T3 floor | `flooring` | open the app store in-process with 0.15 and no listener; write in one `txn` the transition row and the revocation floor (B-6b) with `before = instant`; shut the store down and require `Ok` (B-10's confirmed completion) | `floored` | rerun T3: both rows are keyed by `id` and written by upsert, so a repeat is a no-op |
-  | T4 arm | `armed` | none; the record is the arm | `armed` | nothing to repair |
+  | T4 arm | `arming` | write the app store's `state_machine/lock` with content `rahi-upgrade-cache <id>` (the guard, B-5), fsync it and its directory | `armed` | rewrite the guard; it is idempotent |
   | T5 Rauthy | written by `supervise` | on the next boot, while the state is `armed`, `supervise` adds `HQL_CACHE_LEGACY_MOVE_ASIDE=true` to the Rauthy child's environment and Rauthy moves its own cache | `rauthy-done`, once Rauthy answers ready | a boot while still `armed` passes the consent again; once Rauthy's own format marker exists the variable is a no-op (hiqlite source and probe; for Rauthy, a source finding until AC-4 runs it) |
-  | T6 serve | written by `supervise` | `serve` starts normally | `done`, after the first `/readyz` 200; the file is kept as history | none needed |
+  | T6 serve | written by `serve` | before opening the store, and only when the state is `rauthy-done` and the guard's content names this transition, `serve` removes the guard and fsyncs; then it starts normally | `done`, after the first `/readyz` 200; the file is kept as history | a guard still present with state `rauthy-done` is removed at the next start |
 
   `serve` refuses to start, before opening the store, while the file is in
   any state before `rauthy-done`, and `supervise` refuses to spawn Rauthy
   while the file is in any state before `armed`. So normal serving never
-  starts between the cache move and the floor write. The verb never
-  renames, reads, copies or writes anything under Rauthy's data directory;
-  it only holds Rauthy's WAL lock files (T0, P-6). Rauthy's own transition
+  starts between the cache move and the floor write. The verb never opens,
+  locks, renames, reads, copies or writes anything under Rauthy's data
+  directory (011 B-7, spec 000 `store-separation`). Rauthy's own transition
   is the producer's (its leg J).
-- **B-5 (exclusion).** The proof that no process holds the volume is the
-  set of locks T0 takes, and it covers both versions (D-P3). A running
-  hiqlite 0.14 node holds `flock` on `logs/lock.hql` and
-  `logs_cache/lock.hql` and **not** on `hiqlite-owner.lock`; a 0.15 node
-  holds `hiqlite-owner.lock`. While the verb holds all of them, a 0.14
-  start fails on the WAL lock and a 0.15 start fails with `StorageInUse`,
-  both before any cache move, with or without consent. `supervise` takes
-  `<data>/cell.lock` as its first act and holds it for its life, so a
-  new-image cell cannot boot while the verb runs and the verb cannot start
-  while a new-image cell runs. A 0.2.0 cell takes no `cell.lock`; its
-  exclusion is the WAL locks of its app store and of its Rauthy.
+- **B-5 (exclusion).** Two windows, two mechanisms (D-P3, D-P5).
+  *During the verb:* the proof that no process holds the app store is the
+  set of locks T0 takes. A running hiqlite 0.14 node holds `flock` on
+  `logs/lock.hql` and `logs_cache/lock.hql` and **not** on
+  `hiqlite-owner.lock`; a 0.15 node holds `hiqlite-owner.lock`. While the
+  verb holds all three, a 0.14 start fails on the WAL lock and a 0.15 start
+  fails with `StorageInUse`, both before any cache move, with or without
+  consent. *From `armed` until `serve` starts:* the verb has exited, and the
+  guard T4 wrote is what excludes. A 0.14 serve (a v0.2.0 image) refuses to
+  start while `state_machine/lock` exists and changes no file; its
+  supervisor then ends its Rauthy (031 B-3's serve-failure path). A
+  new-image cell is excluded by `cell.lock`, which `supervise` takes as its
+  first act and holds for its life, and by the state file, which `serve`
+  and `supervise` read before opening anything; a second run of the verb
+  reads the state and resumes (from `armed` it has nothing left to do).
+  *What rahi cannot prove:* that no old Rauthy process is live on Rauthy's
+  directory, because that would mean opening a path under it. The verb does
+  not need it: an old Rauthy on its own, still 0.14, directory is unharmed
+  by the verb. The one hazard is a new Rauthy started with T5's consent
+  while an old Rauthy is live on the same directory, since hiqlite 0.15
+  performs the consent move before it detects the live 0.14 node (D-P3).
+  That requires two cells running on one volume at once, which the
+  one-deployment-unit invariant already excludes; the README states it as
+  an operator precondition (the old container is stopped and removed before
+  the new image first starts), and a hiqlite producer request asks for the
+  exclusion check to precede the move.
 - **B-5a (rollback).** The supported rollback is restoring B-4's verified
   pre-upgrade archive into a fresh volume and starting the old image (030
   restore, single-shot). `upgrade-cache --rollback` exists only for the app
@@ -212,8 +230,11 @@ by the same function.
   at or before `before` is refused `401` with 025 B-6's challenge, and a
   token with no `iat` is refused: the comparison 038 B-5 already applies
   per subject, applied to every subject. `instant` is read after T0 proved
-  no process holds either store, so no token accepted before the upgrade
-  can carry a later `iat`. The floor is active until `before + V`, with V
+  no rahi process holds the app store, so no old revocation can be
+  recorded after it; a token Rauthy issues after `instant` is a new token
+  that no lost revocation named (a subject revocation also ended the
+  subject's Rauthy sessions, 038 D-8), so the floor needs no claim about
+  Rauthy's process. The floor is active until `before + V`, with V
   from L read back from Rauthy at the first boot after the transition;
   until that read succeeds the floor stays active (fail closed). It lives
   in SQL, so a restart inside the window keeps it. Consequence, stated in
@@ -329,10 +350,12 @@ patched Rauthy image; none substitutes a mock for storage or identity.
   and T6, reaches AC-3's end state, and at no point does `serve` answer a
   request before `floored`.
 - **AC-5 (exclusion, against the real old version).** With a live v0.2.0
-  cell (its serve and its Rauthy) the verb refuses at T0 and changes
-  nothing; with the verb holding T0, a v0.2.0 cell and a new-image cell
-  each fail to start and change nothing; `state_machine/lock` present
-  refuses at T1.
+  cell the verb refuses at T0 and changes nothing; with the verb holding
+  T0, a v0.2.0 cell and a new-image cell each fail to start and change
+  nothing in the app store; after the verb exits at `armed`, a v0.2.0 cell
+  fails to start, changes no file in the app store, and ends its Rauthy,
+  and a second run of the verb changes nothing; a foreign
+  `state_machine/lock` refuses at T1.
 - **AC-6 (revocation, not weakened).** A token revoked by `jti` and one by
   subject: (a) revoked before the upgrade, in the 0.14 cache, are refused
   after it by the floor for V from `instant`; (b) revoked after the
@@ -404,25 +427,18 @@ which is a producer request and not a prerequisite.
 
 These record direction. Approval of this text is a separate owner act.
 
-Still open before approval: P-6 and P-7.
+Still open before approval: P-7.
 
 ### Proposals (2026-09-23)
 
-- **P-6 (holding Rauthy's WAL lock files).** T0 acquires and holds a
-  non-blocking `flock` on Rauthy's `logs/lock.hql` and
-  `logs_cache/lock.hql`. A live Rauthy holds both; a cleanly stopped one
-  has removed both (D-P3). So on a stopped volume the verb creates each as
-  an empty file, locks it, never writes content, and removes it at release;
-  it touches no other path under Rauthy's directory and never opens
-  Rauthy's database. A leftover empty lock file after a verb crash is
-  harmless: hiqlite warns that the start is not clean and proceeds when the
-  file is not locked. Without P-6 the verb cannot prove an old Rauthy is
-  stopped (a 0.2.0 supervisor runs Rauthy for up to sixty seconds before
-  its serve takes the app store's locks), and exclusion falls back to an
-  operator precondition that the cell container is stopped. Proposed
-  reading: creating and locking an empty lock file is not opening the
-  store, so 011 B-7 and spec 000's `store-separation` anchor hold; the
-  owner decides whether that reading is acceptable.
+- **P-6 (withdrawn 2026-09-23, after independent review).** An earlier
+  draft had T0 lock Rauthy's WAL lock files, which means opening, and on a
+  cleanly stopped volume creating, files under Rauthy's directory; that
+  contradicts the plain words of spec 000's frozen `store-separation`
+  anchor ("separate storage that app code never opens") and 011 B-7, and no
+  ordinary approval can grant an exception to a frozen anchor. B-5 now
+  excludes without touching Rauthy's directory and states the residual
+  case.
 - **P-7 (the restore floor).** B-6c's floor is written by every restore, so
   access-token revocations taken after the archive instant are not lost.
   Cost: every access token issued before the restore is refused for V,
@@ -474,6 +490,16 @@ Still open before approval: P-6 and P-7.
   `hiqlite-owner.lock`; after `docker stop` (exit 0) both lock files are
   gone and `state_machine/lock` is removed. AC-5 still runs this against a
   whole v0.2.0 cell.
+- **D-P5 (the guard, 2026-09-23).** After a 0.14 write and a 0.15
+  transition on a disposable store, `state_machine/lock` was written with
+  this spec's content. A 0.14 start panicked on it ("Lock file already
+  exists") and **no file changed** (content hashes of every file before and
+  after). A 0.15 start also refused, but only after rewriting
+  `hiqlite-owner.lock` and creating `logs/lock.hql` and `logs/meta.hql~`,
+  which is why `serve` checks the state and removes the guard before it
+  opens the store. `SHUTDOWN_WAIT` (15 s, B-9's H) is
+  `hiqlite-patched-0.15.0-patched.1/src/client/mgmt.rs:592`, applied by
+  `Client::shutdown` at `:278`, which returns an error when it elapses.
 - **D-P4 (stop probe, 2026-09-23).** Five runs of a real single-node
   `serve` on the patched graph, SIGTERM during a concurrent 200-denial
   burst, no stream, no Rauthy: exit `0` every run, 0.37 to 0.73 s from

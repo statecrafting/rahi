@@ -78,6 +78,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-cli/src/verbs.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-idp/src/bearer.rs",
         "source": "spec-edge"
       },
@@ -269,6 +273,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/verbs.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/verbs.rs"
         }
       },
       {
@@ -510,5 +527,5 @@
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "05167ec3b82ba3e97d96d71325d34a520ac82aceabdafdbfe7599316b71c9e3f"
+  "shardHash": "f3ad88fc4f4432e4abef1fbc50744b5f2405abf86804e241bb37d4d238ab7482"
 }
