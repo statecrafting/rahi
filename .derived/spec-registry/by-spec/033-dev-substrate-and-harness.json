@@ -59,6 +59,18 @@
     "implementation": "complete",
     "kind": "tooling",
     "risk": "medium",
+    "sectionDigests": {
+      "033-the-dev-substrate-and-the-harness": "e22556df575663a716a6d0bba3d05693b5caedc444075d9926755572209729a7",
+      "1-purpose": "03dfe2fb8bca79ebd8e1e842fb063e7bea64909399f780cac56d6d1528b3f766",
+      "2-territory": "bf18748886466ef87d7dfaacba43b13f8cda30c707523fd54610db4d81a4a80e",
+      "3-behavior": "798f5a72ce90c072187f27961fec6c2aeb832bca7ec9de41b514941e1306fc26",
+      "4-functional-requirements": "65117768de7e4de5b9bc05dd079d6f50c6de543a782d3e2a2040affd846f93c6",
+      "5-acceptance-criteria": "0314be489f40b45fc128ccda5b747b92677412762cbb6a6af16172260ae3f42e",
+      "6-out-of-scope": "40675ac88f1c3d589bc078d8ddab6d1cc9f08fddd09b18ac9b45b1173643ed7a",
+      "7-resolved-decisions": "14964f053dd054c9c3dadce33055a159e8dd9c6bf66d111db6b9113da46362b9",
+      "8-status": "b0d05d2465a5fa542cb0ec9363a1703a7041259073e6ac6973354df05e6b5c78",
+      "verification": "5db4cf11abd9ffe07c49225595e1e6b969b480fdbe841cc82fdab103bc4e26aa"
+    },
     "sectionHeadings": [
       "033: The dev substrate and the harness",
       "1. Purpose",
@@ -77,5 +89,5 @@
     "title": "The dev substrate and the harness: compose for N=1, boot the real binary, wait on /readyz, a cookie jar"
   },
   "shardHash": "31a3ca79a5688adf9604c25d1a770ed56b34f91562784c05cc474f292f83357f",
-  "specVersion": "1.3.0"
+  "specVersion": "1.8.0"
 }

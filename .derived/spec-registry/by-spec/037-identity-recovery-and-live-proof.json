@@ -231,6 +231,19 @@
       }
     ],
     "risk": "high",
+    "sectionDigests": {
+      "037-identity-recovery-and-the-live-proof": "9c8e47281f42086eee7a44406a79beee0232456efbc2d8ff5e46ec90f067caa6",
+      "1-purpose": "17a73acda85c1491707513ad521243f042d931f43129417fb8a51a5cd4d32d4d",
+      "2-territory": "b33e57007a560da785088dfc50c3fde84c1c31a7fe24e5600fc37c49b1e14a0c",
+      "3-behavior": "245a68eefcd4eb2c7c646ac65240750efcb0290f4b226841c10c39d477a6bf15",
+      "4-functional-requirements": "f2a48a131a1717d4fb450ce36285b7d48be11aeab0f3a163181d24088d1d5bce",
+      "5-acceptance-criteria": "c522ecde0b0a5229722f46fc80ee857c29f71c0bc87a5b724c5d70c6d8464152",
+      "6-out-of-scope": "134a2816c79d1a43961e6f4ac498e43d8b0bf99d3207f2086134b47e2de32173",
+      "7-resolved-decisions": "b441d2b3f611dcb509eb7f4a9c230c17f3ad06b771395719692cff604d05e1e2",
+      "evidence-and-proposals-2026-09-12": "37a9d1637921deaf05a087d9c73089035206e8e1c139e4b1e87ec8fb35e57fe2",
+      "status": "6c55c7d94535844a6b0c4f7ed7074de467e5dd96d5be4f358260905d1768edc6",
+      "verification": "ef943017a0a3f745b630667ab9999adb763e3b3ae6cbde94d4c14b16419b3b57"
+    },
     "sectionHeadings": [
       "037: Identity recovery and the live proof",
       "1. Purpose",
@@ -250,5 +263,5 @@
     "title": "Identity recovery and the live proof: a backup a real rauthy answers, a restore that brings the users back, and CI that runs against the pinned release"
   },
   "shardHash": "40086010900379e82f3cb7fdd104b12a192b65cad5366c02e63dd0582fc86198",
-  "specVersion": "1.3.0"
+  "specVersion": "1.8.0"
 }

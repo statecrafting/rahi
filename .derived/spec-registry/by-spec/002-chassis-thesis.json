@@ -60,6 +60,16 @@
       }
     ],
     "risk": "critical",
+    "sectionDigests": {
+      "002-chassis-thesis": "163569c15930fbfeaed1f366f18e46211fec4787f1bfb69d57ea40024a579b4b",
+      "1-purpose": "218b3aa66d2bbb4115b329aef131e24488e884a40165ebd2b9cdbf6384e9de2b",
+      "2-the-seven-responsibilities": "9268ebe7bac1ab66e01ba1d7551cc85207a0d6055796411f4b6fee93faa2f2ce",
+      "3-the-deployment-unit": "52efe5296ccd0fd22a40d00919a3180fa9f0236718c1d2e5948d7a25e14dd111",
+      "4-crate-topology-and-dependency-direction": "8e517e102470ffae51c45a1e6b849b44ae09e2c922889974c036451c1ceac5a1",
+      "5-build-order": "173637ef47cdec879c45ea646054ef2d7602abc5976aa8c4ad008ae61430b634",
+      "6-what-the-thesis-refuses": "ba03eef97c24d5e5573ee4db7b33e053ca18030cde467f43ab131e74d3b7ce54",
+      "7-resolved-decisions": "8d826af429426f0595bde28dd4b2fc0d14e127e99f55891c6e533f8009fc5d00"
+    },
     "sectionHeadings": [
       "002: Chassis thesis",
       "1. Purpose",
@@ -76,5 +86,5 @@
     "title": "Chassis thesis: seven responsibilities, one deployment unit, a library not a template"
   },
   "shardHash": "4884443b82d8469baa66971d74f18a339643ad5b37f18db955b1a51b1ac1871f",
-  "specVersion": "1.3.0"
+  "specVersion": "1.8.0"
 }

@@ -4,6 +4,13 @@
 # design, and the code under crates/ and apps/ arrives one spec per driven
 # session (AGENTS.md, "Working the backlog"). Every knob below is deliberate.
 
+[meta]
+# A floor, not the pin (spec 001 D-14). The pin is stated once, in the
+# Makefile, and CI reads it there (B-3). This line makes every older reader
+# refuse the corpus by name at exit 3 instead of judging 1.8.0 shards it
+# cannot read, whichever binary a hook resolves first.
+required_version = ">=0.24.0"
+
 [manifest]
 # Cargo `[package.metadata.spec-spine].spec` names each crate's founding spec.
 metadata_namespace = "spec-spine"

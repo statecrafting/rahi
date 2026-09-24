@@ -88,6 +88,18 @@
     "implementation": "complete",
     "kind": "kernel",
     "risk": "critical",
+    "sectionDigests": {
+      "021-rauthy-behind-a-same-origin-proxy": "f77e117a40cdbe628e49032a92f14ab9bdd25951d17f72f6e24126ef93482525",
+      "1-purpose": "c9f3754c8283d5614bbc6460cfa425fb03eead44327885fc8f4902e3ddab2574",
+      "2-territory": "26f8183b29f1bea2dd329328c03dd80d100398f9e247cb7ebe5f526c0ddde062",
+      "3-behavior": "d8b9b580a1d14af5db95a3a8cffedf738d0a75cda2e4a27e6936a1a51bea4b66",
+      "4-functional-requirements": "8de7e141af5a96415a95ae80f289b9d605efc75cec2f6661bcfec3900b2c77fb",
+      "5-acceptance-criteria": "d9a505b8a5f834eefb05340fa42bba45879632e4580794da57cbb07b37bcdf4c",
+      "6-out-of-scope": "fa1308481756e8938be5f5a0508e18d1c119c3381b3daa5a95821079311acb5b",
+      "7-resolved-decisions": "f976dc6b985013fdac4c9c66e305a4009c23cf630ef28834e9cbd79af326e1cd",
+      "8-status": "003e10176445b12b6f24fa6f52158eeffce8f817187f1e56d966679aa076b10d",
+      "verification": "f33b7f296db6dc42bb4258f46ef88bb08586d0d15b87dc56ae161e7abdb679fa"
+    },
     "sectionHeadings": [
       "021: rauthy behind a same-origin proxy",
       "1. Purpose",
@@ -106,5 +118,5 @@
     "title": "rauthy behind a same-origin proxy: the raw /auth/* route, discovery, JWKS, client bootstrap"
   },
   "shardHash": "79281924bd83b427a8ae665250a8418ed4a8385aac23df52d18bb471f8596487",
-  "specVersion": "1.3.0"
+  "specVersion": "1.8.0"
 }

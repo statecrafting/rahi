@@ -149,6 +149,18 @@
       }
     ],
     "risk": "high",
+    "sectionDigests": {
+      "035-denials-survive-a-graceful-shutdown": "776f52469a42d105794d83d8c44aaeef9362c7457319e34fea4f863d8535b3df",
+      "1-purpose": "f1565df258470b3972aacd843b2dcff3d7f5b6334244aea6d809777d789f2e21",
+      "2-territory": "aa53a20aabf8de2f7ca83b8eb64145ebb7f3c3f2841219dbd9cada05cc53f0f0",
+      "3-behavior": "e1ecc77beb31fbe160006ed56bd5e186d24bc0b868c77f6fadd39ff8404b6bad",
+      "4-functional-requirements": "580acf06fd4e05498d965de49921cd2565d9d9ca6959d4c3402c64fccee6ab23",
+      "5-acceptance-criteria": "08397a5dea296dd4c5261fc1d96d3e88888919dcb3095224de1686ebc11164d0",
+      "6-out-of-scope": "6b4fedc6075584ad36a013bd5f52bb0f6913b5694e41631d89a43146120500cf",
+      "7-resolved-decisions": "e4597f5a93dcc740e7aa3799c7238f28c7777b30e1c6175cede55b5ab037c0f2",
+      "proposals-for-the-owner-2026-09-12": "406dd70b861e4a738b0c88ccc99b8141b554929c52c1a3780f8cedf9012c24be",
+      "verification": "e3f703bfcc5c0373910dbc020491eaf268ec0cd7ae12a4155b85ddf2d06aaf6c"
+    },
     "sectionHeadings": [
       "035: Denials survive a graceful shutdown",
       "1. Purpose",
@@ -167,5 +179,5 @@
     "title": "Denials survive a graceful shutdown, and every lost denial is counted by its cause"
   },
   "shardHash": "9ab8bfb82d64a74bdb1cd680c7397e9bab4e6b8f882dbad26975acfb2f04d8c4",
-  "specVersion": "1.3.0"
+  "specVersion": "1.8.0"
 }

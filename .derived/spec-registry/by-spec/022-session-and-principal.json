@@ -110,6 +110,18 @@
     "implementation": "complete",
     "kind": "kernel",
     "risk": "critical",
+    "sectionDigests": {
+      "022-sessions-and-the-principal": "ddcf9fd735d90dac3ff9dc6e03a955c3af6d71056f6260646b56c3ab0e7933af",
+      "1-purpose": "cce0a5751e0da75b2cad4fdba7d23b403915c5e884f1251e3888916edfb79646",
+      "2-territory": "f63837315a81ee35516db16633d68c99c2172cbbbb56d494041aebc14f726f52",
+      "3-behavior": "b38679333fe882dd4a1f8c98d6a133033dbec7e7814896992751cc338661ae9f",
+      "4-functional-requirements": "a1a199187324807cd34e631b11d1773be08acc275a9396e4f003a8caffd00bdd",
+      "5-acceptance-criteria": "98b45902770275753fbbaabdd6b25a1914748a35ad9fe03a7dbda3ef2e4d8def",
+      "6-out-of-scope": "e1a682018b248fb3e4834280ec537db405d0644d057a79e4d54e90f5cfa52ff9",
+      "7-resolved-decisions": "dcafc79d1d963183421edcdc0a2781437b4ca4911a59ec14416d7d0ba762f75b",
+      "8-status": "bda4a443316566d315331cbfcdae41732a492143e7c067e2d384ee38be21e01b",
+      "verification": "4d970e7de03aeb313069f0f1affc8643e23a35f52559ccf8b05cb9ad1658fa96"
+    },
     "sectionHeadings": [
       "022: Sessions and the principal",
       "1. Purpose",
@@ -128,5 +140,5 @@
     "title": "Sessions and the principal: the signed envelope, renewal as a round-trip, the IdP subject as the only id"
   },
   "shardHash": "116bfd59f4a39029d7b495284c8888daf11623b0b348e9596eb4021c1694b82f",
-  "specVersion": "1.3.0"
+  "specVersion": "1.8.0"
 }

@@ -124,6 +124,18 @@
     "implementation": "complete",
     "kind": "tooling",
     "risk": "critical",
+    "sectionDigests": {
+      "031-single-container-packaging": "f4c3a1855946084f445af45cd0aa62ca8ed99fe1047763aa895fe7daf911d1d6",
+      "1-purpose": "98e0d1083598f1ed6eaff3042ae305202a1e58d9727c1e30c2111220bcaed215",
+      "2-territory": "c18962ea5a375c2690f71cf601be38b6b3bbc7caa8e4fd96b14128312a477c58",
+      "3-behavior": "e7a01e1bf81e23c3e0553f86bc6d086ec679f3d97d689c928496a9ee0cafd45f",
+      "4-functional-requirements": "bb4cff77d2d4bffc2177678829622df3f0ba40b66bcb23447433f47bcd724647",
+      "5-acceptance-criteria": "8ce14eb84babab045dcdc19168c6eb56cebe34e9b383ec2786eb73c9512d170c",
+      "6-out-of-scope": "547addd80665fc97c341148aa1d94d12e556bdcb5e9ae66beec97ad854443010",
+      "7-resolved-decisions": "f66016ca6284b30248d5c9e52ed73e13ad7753b558c7c1c4ba1c45d156ff7837",
+      "8-status": "9da92bb4d054b404567c2be18da0af3a413d521889bbd84b6af469723b0d4aaa",
+      "verification": "c9fbb536a4114f68ed1666775905e6d22d9f9ab90fbe53d5f5d3031babdc6e30"
+    },
     "sectionHeadings": [
       "031: Single-container packaging",
       "1. Purpose",
@@ -142,5 +154,5 @@
     "title": "Single-container packaging: one image, one volume, first boot, keys, die-together supervision"
   },
   "shardHash": "e68f13dd4b163adc2e966b72db58dd3e223f25f60a4e429d61eae5c3b91e5d1a",
-  "specVersion": "1.3.0"
+  "specVersion": "1.8.0"
 }
