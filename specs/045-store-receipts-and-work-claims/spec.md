@@ -12,6 +12,7 @@ wave: 3
 depends_on:
   - "011-store-hiqlite"
   - "012-store-coordination"
+  - "023-observability"
   - "036-manifest-and-schema-evolution"
 establishes:
   - { kind: file, path: "crates/rahi-store/src/receipt.rs", planned: true }
@@ -21,8 +22,9 @@ establishes:
   - { kind: file, path: "crates/rahi-store/tests/receipt_recovery.rs", planned: true }
 extends:
   - { spec: "011-store-hiqlite", unit: "crates/rahi-store/src/lib.rs", nature: additive }
+  - { spec: "023-observability", unit: "crates/rahi-edge/src/obs/metrics.rs", nature: additive }
 refines:
-  - { aspect: "a work claim that outlives the lease TTL is a chassis row fenced by its own token (012 D-10)", unit: { kind: symbol, id: "rahi_store::lock::Lease" } }
+  - { aspect: "a work claim that outlives the lease TTL is a chassis row created and renewed under a short-held lease and fenced by its own token (012 D-10)", unit: { kind: symbol, id: "rahi_store::lock::Lease" } }
 references:
   - { unit: { kind: file, path: "docs/design/02-operational-prerequisites.md" }, role: context }
   - { unit: { kind: file, path: "docs/design/01-consumer-contract.md" }, role: context }
@@ -53,8 +55,12 @@ obligations:
     anchor: "3-5-work-reservation"
   - id: "I-7"
     kind: invariant
-    text: "An erased receipt keeps a tombstone that classifies a redelivery of the erased item as erased, never as first seen."
+    text: "An erased receipt keeps a tombstone holding only its key digest, which classifies a redelivery of the erased item as erased, never as first seen, and no call re-accepts an erased identity."
     anchor: "3-6-retention-and-erasure"
+  - id: "I-8"
+    kind: invariant
+    text: "Every work metric the chassis exports is a count labelled by processor and state only; no tenant, namespace, key, or digest is ever a label."
+    anchor: "3-5-work-reservation"
   - id: "V-1"
     kind: verification
     text: "Classification, atomic staging, claims, retry, dead letter, retention, erasure, and every crash point in the recovery table are exercised against a real single-node store."
@@ -63,6 +69,7 @@ obligations:
       - "cargo test -p rahi-store --locked --test receipt"
       - "cargo test -p rahi-store --locked --test work"
       - "cargo test -p rahi-store --locked --test receipt_recovery"
+      - "cargo test -p rahi-edge --locked --test obs"
 summary: >
   Every product that ingests from an outside source rebuilds the same
   table: a key, a body digest, the first outcome, and a rule for a repeat
@@ -76,10 +83,12 @@ summary: >
   into the caller's TxnBuilder beside the domain writes and Outbox::stage.
   Processing is identified separately (receipt revision plus processor and
   its policy revision) so a correction or a new policy reprocesses. Work
-  is reserved by a fenced claim row with attempt history, bounded retry, a
-  visible dead-letter state, and reclaim after expiry; sweeps run under
-  the existing Lease. Retention and erasure are staged calls, and a
-  crash-point table states recovery at every boundary.
+  is reserved under the existing Lease into a fenced claim row with
+  attempt history, bounded retry, a visible dead-letter state, and reclaim
+  after expiry; queue counts reach /metrics redacted. Retention compacts to
+  a tombstone, erasure keeps only the key digest and is never undone, and
+  a crash-point table states recovery at every boundary. Owner decisions
+  of 2026-09-24 are recorded.
 ---
 
 # 045: Receipts and work claims
@@ -107,7 +116,10 @@ own table, with its own gaps:
 The first consumer of this spec is travel-memory, a domain service on rahi
 at N=1 ingesting email: a mailbox redelivers, a provider rewrites headers,
 a message can arrive without a `Message-ID`, and extraction policy changes
-over time and must be rerun over messages already accepted.
+over time and must be rerun over messages already accepted. travel-memory
+links aicortex as a library in the same cell, so one intake or completion
+batch carries travel-memory's receipt and domain writes, aicortex's claim
+writes, and `Outbox::stage` together in one `TxnBuilder` (B-9, D-13).
 
 The primitive serves thesis responsibility 2 (replicated state) and holds
 constitution IX: the receipt is a row, it commits in the caller's `txn`,
@@ -137,8 +149,9 @@ and notify stays a hint.
   transition that consumers must hear about is announced by the caller
   staging an envelope in the same builder. This spec adds no outbox and no
   drain loop.
-- `StoreHandle::lease`, `Lease`, and `fenced_txn` (012 B-1, B-2): the sweep
-  of 3.5 and 3.6 runs under a lease and writes through `fenced_txn`.
+- `StoreHandle::lease`, `Lease`, and `fenced_txn` (012 B-1, B-2): every
+  reservation and renewal of 3.5 and the sweep of 3.5 and 3.6 run under a
+  short-held lease and write through `fenced_txn` (D-5).
 - `FenceToken` (010) is the claim token's type, and the batch abort that a
   superseded token provokes is 012 D-3's technique, applied to the claim
   row instead of `lease_fence`.
@@ -156,9 +169,13 @@ and notify stays a hint.
   migration.
 - `Lease` (012) is refined, not changed: 012 D-10 refused a renewable
   lease and recommended an application claim row
-  (`key`, `holder`, `fence`, `expires_at`) renewed through a fenced write.
-  This spec makes that row a chassis row with one shape, and leaves B-1's
-  ten-second, non-renewable lease exactly as 012 states it.
+  (`key`, `holder`, `fence`, `expires_at`) created and renewed through
+  `fenced_txn` under a short-held lease. This spec makes that row a
+  chassis row with one shape, follows that recommendation literally (D-5),
+  and leaves B-1's ten-second, non-renewable lease exactly as 012 states
+  it.
+- `crates/rahi-edge/src/obs/metrics.rs` (023) gains one gauge of redacted
+  work counts (B-17, D-12).
 
 No approved spec's text changes.
 
@@ -167,9 +184,10 @@ No approved spec's text changes.
 ### 3.1 Receipt identity
 
 - **B-1 (the key).** `ReceiptKey { tenant, namespace, key }`. `tenant` is
-  an opaque, non-empty application string the chassis never interprets
-  (tenancy stays with the consumer, note 02 section 6.4); a single-tenant
-  cell passes one constant. `namespace` names the source and the provider
+  an opaque, required, non-empty application string the chassis never
+  interprets (tenancy stays with the consumer, note 02 section 6.4); a
+  single-tenant cell passes one constant; an empty tenant is
+  `Error::Validation` (D-6). `namespace` names the source and the provider
   account (`email:imap:acct-7`, `statecraft.intake`), non-empty, at most
   256 bytes. `key` is the source's own identifier for the item
   (`Message-ID`, a webhook delivery id, a client idempotency key), at most
@@ -205,7 +223,7 @@ No approved spec's text changes.
   - `Redelivered { revision, is_head, outcome }`: the digest equals a
     recorded accepted revision's digest. `is_head` is false when the
     source has redelivered an older version (content A, then B, then A
-    again). `outcome` is the reference recorded for that revision, if any,
+    again); that is a redelivery, never a new revision (D-7). `outcome` is the reference recorded for that revision, if any,
     so a caller can replay its first answer, including a refusal
     (statecraft 003 B-22).
   - `Changed { head_revision, head_digest }`: rows exist and no accepted
@@ -213,6 +231,8 @@ No approved spec's text changes.
   - `CollisionRedelivered { revision }`: the digest equals a recorded
     collision's digest.
   - `Erased { erased_at }`: the identity carries an erasure tombstone.
+  A retention tombstone (B-20) answers as the live rows did, with every
+  `outcome` absent.
 - **B-6 (staging a decision).** A classification is turned into writes by
   exactly one staging call on the caller's builder, each carrying the head
   revision it was classified against:
@@ -227,7 +247,7 @@ No approved spec's text changes.
   - `stage_seen(txn, key, revision, now)` optionally bumps `last_seen_at`
     and `seen_count` on a redelivery. It is optional because it costs a
     Raft write per redelivery; an unrecorded redelivery loses a counter,
-    never content.
+    never content (D-8).
   `meta` carries `now`, `retain_until` (B-20), and an optional `outcome`
   reference of at most 4 KiB, which is a reference (ids, a status code, a
   digest) and never the item's body.
@@ -255,7 +275,13 @@ No approved spec's text changes.
   processor that must run (B-11), and the caller's `Outbox::stage`
   envelope. Either all commit or none does; there is no helper that writes
   a receipt outside the caller's batch, because a receipt committed without
-  the work it records is exactly the gap this spec closes.
+  the work it records is exactly the gap this spec closes. The builder is
+  shared with any library the cell links: travel-memory links aicortex in
+  the same cell, and aicortex's claim writes are statements in the same
+  `TxnBuilder` as travel-memory's receipt, its domain rows, and
+  `Outbox::stage`, so all of them commit in one `txn` (D-13). A library
+  that wants to take part stages into a builder it is handed and never
+  submits one of its own for the same decision.
 - **B-10 (reads are outside the batch).** hiqlite's `txn` takes statements,
   not an interactive transaction, so classification is a read before the
   batch and every decision the read informed is re-checked inside the
@@ -286,16 +312,29 @@ No approved spec's text changes.
 ### 3.5 Work reservation
 
 - **B-14 (the claim).** `Work::reserve(store, &ProcessingKey, holder,
-  hold_for, now) -> Option<Claim>` is one conditional `UPDATE` on the
-  processing row: it succeeds when the row is `pending`, or `claimed` with
-  `expires_at <= now` (reclaim), or `failed` with `next_attempt_at <= now`;
-  it increments the row's `fence`, sets `holder` and `expires_at = now +
-  hold_for`, increments `attempt`, and opens a row in
-  `rahi_processing_attempt`. `Claim { key, token: FenceToken, attempt,
-  expires_at }` carries the fence it minted. A reclaim closes the prior
-  attempt as `expired`. `Work::next(store, namespace, processor, holder,
-  hold_for, now, limit)` reserves the oldest eligible rows, one statement
-  each.
+  hold_for, now) -> Option<Claim>` follows 012 D-10 literally (D-5): it
+  takes `StoreHandle::lease("rahi.work/" + namespace + "/" + processor)`,
+  and under that lease submits, through `fenced_txn`, a conditional
+  `UPDATE` on the processing row that succeeds when the row is `pending`,
+  or `claimed` with `expires_at <= now` (reclaim), or `failed` with
+  `next_attempt_at <= now`; it increments the row's own `fence`, sets
+  `holder` and `expires_at = now + hold_for`, increments `attempt`, and
+  opens a row in `rahi_processing_attempt`; then it releases the lease.
+  `Claim { key, token: FenceToken, attempt, expires_at }` carries the row
+  fence it minted, which guards every later write (B-15) after the
+  ten-second lease is gone. A reclaim closes the prior attempt as
+  `expired`. `Work::next(store, namespace, processor, holder, hold_for,
+  now, limit)` reserves up to `limit` of the oldest eligible rows under one
+  lease acquisition. The lease key is per `(namespace, processor)`, not per
+  item, so `lease_fence` gains one row per queue rather than one per item.
+- **B-14a (the cost, stated).** A reservation costs a lock acquisition,
+  a token mint (a write and a `query_consistent` read, 012 B-1), and the
+  fenced write: three Raft round trips where a bare conditional `UPDATE`
+  would take one, and reservations on one queue are serialised by its
+  lease. `Work::next` amortises the first two over a batch. A reservation
+  by a single conditional `UPDATE` without the lease (its row fence alone
+  deciding the race) remains a possible later optimisation; it needs its
+  own amendment and evidence, and is not part of this spec (D-5).
 - **B-15 (every write under a claim is fenced).** `Work::guard(txn,
   &Claim, now)` prefixes the caller's batch with a statement that aborts it
   unless the row still has `fence = claim.token`, `state = claimed`, and
@@ -303,8 +342,9 @@ No approved spec's text changes.
   as `Error::Conflict`. `Work::complete(txn, &Claim, outcome, now)` stages
   the guard, the move to `done`, and the attempt's close, beside the
   caller's domain writes and outbox rows. `Work::renew(store, &Claim,
-  hold_for, now)` is the same guard plus an `expires_at` update, which is
-  012 D-10's renewal of the application row, now a chassis call. A zombie
+  hold_for, now)` takes the queue's lease like B-14 and submits, through
+  `fenced_txn`, the same guard plus an `expires_at` update, which is 012
+  D-10's renewal of the application row, now a chassis call. A zombie
   holder, whose claim expired and was reclaimed, commits nothing (I-5).
 - **B-16 (bounded retry and the dead letter).** `Work::fail(txn, &Claim,
   error, &RetryPolicy, now)` records the attempt's error class and a
@@ -320,10 +360,14 @@ No approved spec's text changes.
   `query_paged`, and `Work::requeue(txn, &ProcessingKey, now)` moves a dead
   row back to `pending` with its attempt count kept and a `requeued`
   attempt recorded, so an operator's retry is history, not an erasure of
-  it. The chassis exposes counts of pending, claimed, failed, and dead rows
-  per `(namespace, processor)` as a read; a metric over them carries those
-  two names only, never a key, a digest, or a tenant (041 B-10's bounded
-  signals).
+  it. `Work::counts(store, now)` reads the number of pending, claimed,
+  failed, and dead rows per `processor`, aggregated over every tenant and
+  namespace. rahi-edge's `/metrics` (023) exports them as the gauge
+  `rahi_work_items{processor, state}`, which the cell sets from its sweep
+  tick (the chassis runs no loop, B-19). The export is redacted counts
+  only (D-12): `processor` is a name the cell's code declares, and no
+  tenant, namespace, key, or digest is ever a label or a value (I-8, the
+  bounded signals of 041 B-10).
 - **B-18 (no SQL clock).** `now` is a `UnixSeconds` parameter on every
   call. No statement uses `unixepoch()`, `CURRENT_TIMESTAMP`, or
   `random()`: hiqlite replicates statements, and a function evaluated on
@@ -342,29 +386,39 @@ No approved spec's text changes.
 
 ### 3.6 Retention and erasure
 
-- **B-20 (retention).** Every receipt row carries `retain_until`, set by
-  the caller at staging time from its per-namespace policy. The sweep
-  deletes a receipt's rows, and its processing and attempt rows, once
-  `retain_until <= now` and every processing row of that receipt is `done`
-  or `dead`. A deleted receipt is forgotten: a redelivery after retention
-  classifies as `FirstSeen`. The consumer therefore sets retention at or
-  above its source's redelivery horizon; the default for a namespace with
-  no stated horizon is no expiry (`retain_until` null).
+- **B-20 (retention compacts to a tombstone).** Every receipt row carries
+  `retain_until` and `tombstone_until`, set by the caller at staging time
+  from its per-namespace policy (`tombstone_until` at or after
+  `retain_until`). Once `retain_until <= now` and every processing row of
+  that receipt is `done` or `dead`, the sweep compacts it (D-9): it
+  deletes the processing and attempt rows, clears `key`, `outcome`, and
+  the per-delivery metadata, and keeps a compact tombstone of the head row
+  and, per revision, the revision number, its disposition, and its content
+  digest. A late redelivery against that tombstone is still recognised
+  (B-5): the same content is `Redelivered` with no outcome, different
+  content is `Changed`. Only when `tombstone_until <= now` does the sweep
+  delete the tombstone, after which a redelivery is `FirstSeen`. The
+  default for a namespace with no stated horizon is no expiry (both
+  null).
 - **B-21 (erasure is staged).** `Receipts::stage_erasure(txn, scope, now)`,
   where `scope` is one identity, a namespace within a tenant, or a whole
   tenant, appends statements that clear `key`, `outcome`, and attempt
-  details, delete processing and attempt rows, and leave per identity one
-  tombstone row holding `key_digest`, the digests of its revisions, and
-  `erased_at`. The caller stages its own domain erasure and an
+  details, delete processing and attempt rows and every revision row, and
+  leave per identity one tombstone row holding only `key_digest` and
+  `erased_at` (D-10). No content digest survives an erasure, because a
+  digest of a low-entropy item can confirm a guess at it. For a synthetic
+  key derived from content (B-3) the key digest is itself derived from
+  that content; the consumer that chose content as the key parts accepted
+  that when it chose them. The caller stages its own domain erasure and an
   `Outbox::stage` envelope of kind `rahi.receipt.erased` in the same
   builder, which is the hook: every derived store that listens re-reads
   and erases its copy, and polls the watermark as every consumer must.
-- **B-22 (no resurrection).** Classification of a tombstoned identity is
-  `Erased` whatever the digest, and `stage_first` against a tombstoned
-  identity aborts the batch (the B-8 guard sees the head). A consumer that
-  must accept an item after erasure (a user re-sends it deliberately) says
-  so by `stage_unerase(txn, key, digest, meta)`, which records the
-  decision as a new revision; it is never the default path.
+- **B-22 (no resurrection).** Classification of an erased identity is
+  `Erased` whatever the digest, and every staging call of B-6 against it
+  aborts the batch (the B-8 guard sees the erased head). There is no call
+  that re-accepts an erased identity (D-11): an erased item is never
+  accepted again under the same identity, and an erasure tombstone is
+  never removed by retention.
 
 ### 3.7 Crash-point recovery
 
@@ -410,9 +464,16 @@ directory, and asserts the stated end state.
 - **FR-007.** No statement text issued by `receipt.rs` or `work.rs`
   contains a SQL time or random function (a test over the statement
   builders).
-- **FR-008.** Retention deletes only receipts whose processing rows are
-  all terminal; erasure leaves a tombstone that classifies as `Erased` and
-  refuses `stage_first`.
+- **FR-008.** Retention compacts only receipts whose processing rows are
+  all terminal; a compacted receipt still classifies a late redelivery
+  until `tombstone_until`; erasure leaves a tombstone holding only the key
+  digest that classifies as `Erased` and refuses every staging call.
+- **FR-010.** A reservation and a renewal hold the queue's lease and write
+  through `fenced_txn`; a reservation whose lease was superseded commits
+  nothing.
+- **FR-011.** `/metrics` renders `rahi_work_items` with the labels
+  `processor` and `state` only, and a test asserts no tenant, namespace,
+  or key string from the fixture appears in the rendered text.
 - **FR-009.** Every row of the table in 3.7 holds on a single-node store
   restarted over its data directory.
 
@@ -422,6 +483,8 @@ directory, and asserts the stated end state.
   `tests/receipt.rs`, `tests/work.rs`, and `tests/receipt_recovery.rs`.
 - **AC-2.** `cargo test -p rahi-store --locked --test outbox` and `--test
   lock` pass unchanged: nothing in 012's surface moved.
+- **AC-2a.** `cargo test -p rahi-edge --locked --test obs` passes with
+  the new gauge.
 - **AC-3.** `coordination_migration`'s SQL, and therefore its recorded
   checksum, is byte for byte what it was before this spec.
 
@@ -465,6 +528,41 @@ directory, and asserts the stated end state.
 - **D-4 (2026-09-24, owner decision).** Consumer migration is out of
   scope and recorded as follow-up (below).
 
+- **D-5 (2026-09-24, owner decision; open question 1).** A reservation
+  and a renewal hold a short-held lease, following 012 D-10: B-14 and B-15
+  as written. The per-reservation cost is stated in B-14a. A reservation
+  by a single conditional update without the lease stays a possible later
+  optimisation, not part of this spec. Rejected for now: the lease-free
+  conditional update this draft first proposed.
+- **D-6 (2026-09-24, owner decision; open question 2).** `tenant` is a
+  required, non-empty string (B-1). Rejected: an `Option` as
+  `Envelope.tenant` has.
+- **D-7 (2026-09-24, owner decision; open question 3).** A redelivery of
+  an older revision is `Redelivered { is_head: false }`, never a new
+  revision (B-5).
+- **D-8 (2026-09-24, owner decision; open question 4).** Redelivery
+  counting through `stage_seen` is optional, as drafted (B-6).
+- **D-9 (2026-09-24, owner decision; open question 5).** After retention
+  a receipt compacts to a tombstone kept until `tombstone_until` (B-20).
+  Rejected: deleting the receipt outright when retention ends.
+- **D-10 (2026-09-24, owner decision; open question 6).** An erasure
+  tombstone keeps only the key digest (B-21). Rejected: keeping content
+  digests, and keying them with a per-tenant secret.
+- **D-11 (2026-09-24, owner decision; open question 7).** An erased item
+  is never accepted again: there is no un-erase call (B-22). Rejected:
+  the `stage_unerase` this draft first proposed.
+- **D-12 (2026-09-24, owner decision; open question 8).** Queue counts are
+  exported on the chassis `/metrics`, as redacted counts only (B-17, I-8).
+  This adds the dependency on 023 and the additive edge on its
+  `metrics.rs`.
+- **D-13 (2026-09-24, owner statement).** travel-memory, the first
+  consumer, links aicortex as a library in the same cell, so its receipt
+  writes, aicortex's claim writes, and `Outbox::stage` share one
+  transaction (B-9).
+- **D-14 (2026-09-24, ordinal).** 043 and 044 are drafts in flight on
+  their own branches, so this draft takes 045 and none of the three
+  collide.
+
 ### Follow-up: statecraft-platform's `sc_idempotency`
 
 Recorded for statecraft's own corpus; nothing here changes that
@@ -482,33 +580,6 @@ statecraft migration once the tenant of each key is derivable; keys whose
 tenant is not derivable stay in `sc_idempotency` until their retention
 ends. aicortex's claim rows are the same kind of follow-up against B-14.
 
-### Open questions for the owner
-
-1. **Reserve without the lease (B-14).** This draft reserves a claim with
-   one conditional `UPDATE` whose token is the processing row's own fence,
-   and uses `Lease` only for the sweep. 012 D-10's recommendation reads as
-   "created and renewed by `fenced_txn` under a short-held lease", which
-   would cost a lock, a token mint, and a write per reservation. Is the
-   single-statement claim acceptable, or must every reserve hold a lease?
-2. **Tenant shape (B-1).** Required non-empty string, or `Option` as
-   `Envelope.tenant` is?
-3. **Older-revision redelivery (B-5).** `Redelivered { is_head: false }`
-   (proposed), or a new revision recording the reversion?
-4. **Redelivery bookkeeping (B-6).** Is `stage_seen` optional (proposed),
-   or must every redelivery be counted at the cost of a write?
-5. **Retention floor (B-20).** Delete the receipt outright after retention
-   (proposed), or keep a compact tombstone (key digest and digests) for a
-   second, longer period so a very late redelivery is still recognized?
-6. **Erasure tombstone contents (B-21).** Content digests of low-entropy
-   items can confirm a guess. Keep them (proposed, needed for B-22), keep
-   only the key digest, or key them with a per-tenant secret?
-7. **Un-erase (B-22).** Keep `stage_unerase`, or refuse re-acceptance of
-   an erased identity entirely at the chassis?
-8. **Metrics (B-17).** Should rahi-edge's `/metrics` export the counts, or
-   is the read enough and the cell exports its own?
-9. **Ordinal.** 043 and 044 are drafts in flight on their own branches;
-   this draft takes 045 so none of the three collide.
-
 ## Verification
 
 Planned: none of these files exists until the spec is built.
@@ -519,4 +590,5 @@ cargo test -p rahi-store --locked --test work
 cargo test -p rahi-store --locked --test receipt_recovery
 cargo test -p rahi-store --locked --test outbox
 cargo test -p rahi-store --locked --test lock
+cargo test -p rahi-edge --locked --test obs
 ```

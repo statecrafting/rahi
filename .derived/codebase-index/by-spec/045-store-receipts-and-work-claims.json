@@ -3,9 +3,14 @@
     "dependsOn": [
       "011-store-hiqlite",
       "012-store-coordination",
+      "023-observability",
       "036-manifest-and-schema-evolution"
     ],
     "implementingPaths": [
+      {
+        "path": "crates/rahi-edge/src/obs/metrics.rs",
+        "source": "spec-edge"
+      },
       {
         "path": "crates/rahi-store/src/lib.rs",
         "source": "spec-edge"
@@ -59,6 +64,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-store/tests/work.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/obs/metrics.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/obs/metrics.rs"
         }
       },
       {
@@ -122,5 +140,5 @@
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "dcbdaa4f4b676850a577d9d74f8627ba279043f9aad1632f99d3607ba99e13cc"
+  "shardHash": "59d20295fa623c731a79c4b737175f4b255d3bbcdd35136afc70f7ceb71c4c80"
 }
