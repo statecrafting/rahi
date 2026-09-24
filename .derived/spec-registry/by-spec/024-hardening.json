@@ -60,6 +60,17 @@
     "implementation": "complete",
     "kind": "feature",
     "risk": "high",
+    "sectionDigests": {
+      "024-hardening": "f831bbeb538c2b2e975bc6a536d388756628c13e550b3d39fcc06e51aecd2b67",
+      "1-purpose": "fd443a614e0867621d85cb98501d1bca9b274d524a5f216022c94b79bf357ca0",
+      "2-territory": "cc1c0aee0f48cf16dd6c71036ffcfe76908f73c99e4d0ef4e949a49a5115d95d",
+      "3-behavior": "f73724b173ac9f1ce0ba782c0a8483f922694254162c0611e1ff2b26d6aaf1f1",
+      "4-functional-requirements": "b224a698ae16f7fecf26162f37274a581080076ba63599643a107540e5fd5523",
+      "5-acceptance-criteria": "0f2beb1064e4699a2106afac2a0a43c7263218c59d6f136209ffb4970bbdc924",
+      "6-out-of-scope": "536c4d22018832f598bb7ea6a9cfaec252076f24d1f2f050d55ad1f8b1f04457",
+      "7-resolved-decisions": "44e01286360f82350542ddf989a23fe0651c3a272bb395d44f2621e128aa435d",
+      "verification": "c668925f46b0d67edb7294db0a531161d077894d21f26876caacd2e93b5d39eb"
+    },
     "sectionHeadings": [
       "024: Hardening",
       "1. Purpose",
@@ -77,5 +88,5 @@
     "title": "Hardening: trusted client identity, the operator role gate, exposure review of every route"
   },
   "shardHash": "d8f6c0ca637de90843d228b752ffca1ac4872189cb545742a7c106579ee918ed",
-  "specVersion": "1.3.0"
+  "specVersion": "1.8.0"
 }

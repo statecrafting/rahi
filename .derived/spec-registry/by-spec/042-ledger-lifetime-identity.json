@@ -192,6 +192,19 @@
       }
     ],
     "risk": "critical",
+    "sectionDigests": {
+      "042-lifetime-identity": "c3199009b4defdc4534880f3e316253bc9841de195e4b9fe46f9e3ccc7bda0b9",
+      "1-purpose": "584fc602a49c25316486378a2a4283614c0599748e30423143f3e97669a8d1b9",
+      "2-territory": "3f4b75123eeaa75247d7e05d0dbda02516b52fc0db926975f5070a623fbc2788",
+      "3-behavior": "7a76429f95106b7d7c29626780fdf3cca09201cebc8134b0d9ac6bf4090ddeab",
+      "4-functional-requirements": "c19c5f75eac099a9aa5cf8e5d296b33f9a650c1fabf007bac8a896ea988e763f",
+      "5-acceptance-criteria": "b3984d9e01ec490785f046ce0ffc537bd8c98bd580ea29798030cdbf9507f2b4",
+      "6-out-of-scope": "44ca5764623b0d86bf6fb474b58ae24a0d4d124c6c343d0f4db59ef8fc9ca3c9",
+      "7-resolved-decisions": "fcb45c72e5d1fb2de347e8fde5919e80ec3ced6fafa68ca12ee771969cd22457",
+      "8-owner-decisions-answered": "2484f522ae98d77192e007ce39e1582dc4c659a33bd24a5e4f04614534f96655",
+      "verification": "7b2d677d4e59c6140777620237f92c7b0c47dd7f43d046b0bd0d4d4247837b3a",
+      "what-is-reserved-and-what-it-does-not-block": "ee94f68fa3ec96fb4a1df99134e31fdf2f1696d0078418649ce4fe639f651ecc"
+    },
     "sectionHeadings": [
       "042: Lifetime identity",
       "1. Purpose",
@@ -211,5 +224,5 @@
     "title": "Lifetime identity: one id names one decision for the life of the chain, and absence is proven rather than assumed"
   },
   "shardHash": "888783cfd6092142df3f427ef831800d0749e9c22bdabe6a0769c92b7a12eeff",
-  "specVersion": "1.3.0"
+  "specVersion": "1.8.0"
 }

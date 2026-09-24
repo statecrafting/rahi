@@ -68,6 +68,17 @@
     "implementation": "complete",
     "kind": "feature",
     "risk": "high",
+    "sectionDigests": {
+      "014-ledger-sealing-and-archive": "571d103106d4c130e87c33341f0ed1057defa2d9d06068960d0c695ed8fce513",
+      "1-purpose": "9f6f163d9311f6cd45ea6943f905f9db8283942ebd2480dc371df6e3ff3f6cff",
+      "2-territory": "2b4fab7a63bb760755429860b4c8f07c651b0b26dd055b6ad604fdcb9215c23f",
+      "3-behavior": "547b684c5294c8c8efae63af04f0edff37ceb81667cfe2ccf87af96cce527d04",
+      "4-functional-requirements": "bd66da51133a0a2e95e9aae285968985636b343dcf350734cf477a5b31b99a3e",
+      "5-acceptance-criteria": "989d2d7ea0e56b2dc79f369a48e776c980e2224fbf99ea02c8811e9c2c083534",
+      "6-out-of-scope": "6dca1a88e8549269f93d1c59e6c1ee8a2b4382f263ec112facd6ec6fcf9031c6",
+      "7-resolved-decisions": "7d04a76ef1d389b3a1bc14b95abc93c63b516444ad75b3aca8ccc86bd57d87fc",
+      "verification": "3c30e24e2e783670e16a0903284171959c121e767814065252104d6699eb446f"
+    },
     "sectionHeadings": [
       "014: Ledger sealing and archive",
       "1. Purpose",
@@ -85,5 +96,5 @@
     "title": "Ledger sealing: a resident hot window, immutable segments archived to object storage"
   },
   "shardHash": "5f415dba7517ee4125b03226c4ff0dc8fea450f445cf6e7fbf4f431ef11d385b",
-  "specVersion": "1.3.0"
+  "specVersion": "1.8.0"
 }

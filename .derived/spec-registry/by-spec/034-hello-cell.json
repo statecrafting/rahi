@@ -121,6 +121,18 @@
     "implementation": "complete",
     "kind": "feature",
     "risk": "medium",
+    "sectionDigests": {
+      "034-hello-cell": "a8354065f1c18819db1016145c07314d1fa960e468bbcbb50996161de9d4c987",
+      "1-purpose": "02eaf41e911612d88bf70049e1d3007effd4a0c9aaade0085d60785efefb4973",
+      "2-territory": "49f4792268e4a63f861a608c20565cf49b0c3814f41cff613893fe83380aced0",
+      "3-behavior": "be865799ac11d5f985a10e41f114807e69706348ad0c085b6d8d6c933cfa08eb",
+      "4-functional-requirements": "f3ab2fe56b7cac97757c18c84932eab29287ae20ec472e3151d5cd54fc8f943b",
+      "5-acceptance-criteria": "8729da6a2bff2ffb0cf7fc350cec896c7606ea8789f5c9a4c4859c754dd1af72",
+      "6-out-of-scope": "3373feeefe59b5df4202c19f148a5918f5aafb3f031bf7ef7db9c909dd1dace4",
+      "7-resolved-decisions": "9e602160ec065b98b508e8931552961a609b1fb513ef92355dd0b4930da64e56",
+      "8-status": "d9ff530a0b747a3901029b8f0c59d4db36f9538dbe4c2db4204ea52698eda609",
+      "verification": "ad287db8ffb1b6616a818d687dd6077f7f52e41eeb30a06e408189f8309f9ef1"
+    },
     "sectionHeadings": [
       "034: hello-cell",
       "1. Purpose",
@@ -139,5 +151,5 @@
     "title": "hello-cell: the reference app that composes every crate and proves the chassis end to end"
   },
   "shardHash": "5b6c13d65cf33cf74c14af3d6486f11e3bb746e2527babcf3b895d922700b5d3",
-  "specVersion": "1.3.0"
+  "specVersion": "1.8.0"
 }
