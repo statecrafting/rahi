@@ -339,6 +339,27 @@
       }
     ],
     "risk": "critical",
+    "sectionDigests": {
+      "043-patched-dependency-adoption": "ba58ce483b9af9b706fb71b935cda655335e022b0d743362e800203a8bf464d6",
+      "1-purpose": "ce9362b0087b7937b6194295f1fb22e8773c027309835ecc4fa7fccb8db2aea2",
+      "2-territory": "c3cb4e4c58f1a5c3793550b39e0b8678ea0953d6b16bd7728470a63bd2a6cc83",
+      "3-behavior": "587c3c185d033ca8b535be26f75b1975fb8735b28acb7f2d217b608a3a8ea6a2",
+      "4-functional-requirements": "fd2f03dcac833f1ddd561eaab14c67e75fdd1feed9c5bfd6bd8a1975f2019193",
+      "5-acceptance-criteria": "8ea62af7b1d7b57b75b8245d88c7a93307c3326e3987f5f7982b0d00f550149a",
+      "6-out-of-scope": "6d283d55bcc5c333e812d728b1cda1a3d3a952fedf5bd6dfb82641aab08d948b",
+      "7-1-proposals-2026-09-23": "48a48afa8f6a63437c46b3d3edbe09218840c06f6328ca9e151a71a169865072",
+      "7-2-evidence-recorded-for-the-decisions": "3964812bc6ed6db7b9aeadd4e09487c91c246e9cb67b2facc5c214f14452aa0c",
+      "7-3-revision-2-corrections-2026-09-23": "b2df166aeaea61500e034dd00d6a95bae99d7f6ef051ac2fcedcda3a834b310c",
+      "7-4-revision-3-corrections-2026-09-23": "82f140cd33dd28b04401552026c8646274eb3820bcc2503dfb6fad97a4a0f81e",
+      "7-5-revision-4-corrections-2026-09-23": "03662c461a24ffd9bb9b335a88c9645040f3f9a641d010f6b534ad83c0ce6ab5",
+      "7-resolved-decisions": "0cf67b231e4dba1fca2aee3d921b9559d192fcf0353eced7939601a012812005",
+      "crossing-the-cache-boundary": "d3c5d543014fb276f19da3105b9c74c40a314fdd124089acf60ab1d634c847ef",
+      "identities": "512e69a12a4197d490d6791c522521872b259db30759d9ee3161d3eda86a3939",
+      "revocation-across-cache-loss": "a659c63ba58d6b02335f343d04c34edb9237bca931b9ba498f9bd342aac79809",
+      "stopping": "7863675d09d827faffb79c8d296c935deb9eed1c41569ee549aac35cebb6329e",
+      "terminal-storage-failure": "03324187452f6c56b98e72136b9a664ba62ed1adb51ec1d8be2334d419000b5c",
+      "verification": "5e044d604e5394834fa5f8e3dbdffe0cb0b6efa44880de9b7c3a351c8e597d0b"
+    },
     "sectionHeadings": [
       "043: Patched dependency adoption",
       "1. Purpose",
@@ -366,5 +387,5 @@
     "title": "Patched dependency adoption: the N=1 cell runs the published, provenance-pinned hiqlite and Rauthy builds, crosses their cache boundary only through a fenced, resumable, backed-up transition, keeps every accepted revocation through it, and stops within a validated budget with an honest outcome"
   },
   "shardHash": "eadd9eed54baf56aec03670ffe084cf2fc8add159d22f7b44048efc9cf71b15e",
-  "specVersion": "1.3.0"
+  "specVersion": "1.8.0"
 }
