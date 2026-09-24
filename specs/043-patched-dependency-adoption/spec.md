@@ -1,7 +1,7 @@
 ---
 id: "043-patched-dependency-adoption"
 title: "Patched dependency adoption: the N=1 cell runs the published, provenance-pinned hiqlite and Rauthy builds, crosses their cache boundary only through a fenced, resumable, backed-up transition, keeps every accepted revocation through it, and stops within a validated budget with an honest outcome"
-status: draft
+status: approved
 kind: feature
 domain: ops
 created: "2026-09-23"
@@ -976,7 +976,54 @@ that carries them out, is a separate owner act; the packet is
 `docs/design/09-owner-decision-packet-rev4-2026-09-23.md`, which supersedes
 06 and 07.
 
-Still open before approval: P-7, P-8, P-9, P-10, P-11, P-12.
+None remains open: D-7 to D-13 record the owner's approval and choices.
+
+- **D-7 (2026-09-23, owner decision; the implementation contract).** The
+  owner approves this spec as committed at
+  `344782571d179e3f138afb0bebe04bf3c9dd197d` (git blob
+  `6cf02a3363db1cd14eb68198a4a823a35666cbd0`), revision 4, as the
+  implementation contract, on packet
+  `docs/design/09-owner-decision-packet-rev4-2026-09-23.md`. The approval
+  includes revision 4's design corrections (7.5), B-4's operational
+  preconditions, B-6b's transition limitation, and B-6c's stated open
+  boundary. 043 is `approved`. Recording it changes that blob only by the
+  status, the line above that listed P-7 to P-12 as open, and D-7 to D-13. A separately
+  authorized build records 011 D-13 and 037 D-10 with the text of packet 06
+  section 1.2 at build step 1; this entry records neither.
+- **D-8 (2026-09-23, owner decision; P-7 accepted).** Every restore raises
+  B-6c's floor, as P-7 states, with its cost.
+- **D-9 (2026-09-23, owner decision; P-8 accepted as written in revision
+  4).** The app store relocates to `<data>/app-store` and `<data>/hiqlite`
+  becomes a permanent fence, with B-4 T1's whole-file guard and quiescence
+  check and T2's identity plan.
+- **D-10 (2026-09-23, owner decision; P-9 option (i)).** B-6 (i) is the
+  mechanism: every revocation row is retained and none is pruned. B-6 (ii)
+  and its watermark are not built. The owner accepts unbounded storage
+  growth with its rate currently unmeasured. The lifetime ceiling, the hard
+  86,400-second maximum, checked arithmetic, the required `iat`, the
+  future-`iat` refusal and the inclusive permanent floor stand. Any later
+  pruning requires a separate governed change.
+- **D-11 (2026-09-23, owner decision; P-10 accepted).** B-5's second fence
+  at `<data>/rauthy/rauthy.env` is adopted. The owner reads spec 000's
+  `store-separation` anchor as governing Rauthy's storage, not rahi's own
+  rendered configuration beside it; spec 000 is not altered. The
+  limitation stands: a pre-043 supervisor that opened the path before T1
+  (e)'s move and has yet to spawn is not stopped by the fence (D-P18), and
+  B-4's first precondition covers it.
+- **D-12 (2026-09-23, owner decision; P-11 declined for this increment).**
+  No signing-key rotation is added at T4. B-6b's backward-clock gap at the
+  transition is preserved and stated; this spec establishes no
+  clock-independent revocation guarantee. Before release approval is
+  requested, the transition clock gap and the stale-restore
+  refresh-credential revival (B-6c) are resurfaced explicitly to the owner,
+  each with its evidence and a proposed disposition; neither is closed by
+  D-7.
+- **D-13 (2026-09-23, owner decision; P-12 option 1).** Implementation
+  proceeds after D-7. Flipping 043 `complete` and qualifying 0.3.0 require
+  a published repaired hiqlite-patched release and a Rauthy image rebuilt
+  on it, and a separate owner approval of an exact repin naming them.
+  Spec 044, the port-race repair, publication, consumer repins and
+  deployment are outside this approval.
 
 ### 7.1 Proposals (2026-09-23)
 

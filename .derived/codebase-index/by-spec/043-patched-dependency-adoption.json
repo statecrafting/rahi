@@ -716,8 +716,8 @@
       }
     ],
     "specId": "043-patched-dependency-adoption",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "9f151790fc8b394b8e1146494006ea69ecd8d28e886318302f5e603a1816f7fe"
+  "shardHash": "8c7514cd78397adea3bff921462d194948f899c1b36afc78bdf9ac89568acd4d"
 }
