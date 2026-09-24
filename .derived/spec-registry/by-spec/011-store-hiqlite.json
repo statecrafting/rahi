@@ -102,6 +102,17 @@
     "implementation": "complete",
     "kind": "kernel",
     "risk": "critical",
+    "sectionDigests": {
+      "011-the-store": "9d2e39a7f9265d972bce0770f14e6ccc50d67ab50b2d445844d0f614d01b10e7",
+      "1-purpose": "bfc10f2a4d87da3759007499e04f33fd3bc0b715253984823c1ea01202abad67",
+      "2-territory": "986b375d38755ac7a522ce5b5217b30bc50c4b6d47a4841dc9f545ae02dc1423",
+      "3-behavior": "61e81f9aaf19edc40eb5538148dfe83239824f02babf91e2af6281152eddfa49",
+      "4-functional-requirements": "7baa8816f45f18dbf45e3df5f3c5e43d036b2e3b38a3d862f8d7db204206be8a",
+      "5-acceptance-criteria": "2947b452196de79055d30111cc043918c21a78f13d6a095124abb246a32c03ee",
+      "6-out-of-scope": "61529adeb4fbc6e9613d58009254889026b5b0411f8b633d99e9cdcee6d7576d",
+      "7-resolved-decisions": "fdd930f568bbec70f069cf3b4f450ff3f22af510098f6c2d534982ed719c414e",
+      "verification": "72c2e9b0a3a8997d1a662ce3bae55823f86b133828dc33a93ff70e3d7c35271d"
+    },
     "sectionHeadings": [
       "011: The store",
       "1. Purpose",
@@ -119,5 +130,5 @@
     "title": "The store: hiqlite in-process with txn, two read calls, migrations, and backup"
   },
   "shardHash": "940bd618abbe4a5646368c326b430b425797964844f809a9167ee831da4fc86a",
-  "specVersion": "1.3.0"
+  "specVersion": "1.8.0"
 }

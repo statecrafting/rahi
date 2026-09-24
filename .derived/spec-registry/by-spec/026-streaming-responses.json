@@ -89,6 +89,18 @@
     "implementation": "complete",
     "kind": "kernel",
     "risk": "medium",
+    "sectionDigests": {
+      "026-streaming-responses": "9bba5490eced5de05a9dc94998d97cfb41ee49e49aa4d156b293af7ce9f1a90d",
+      "1-purpose": "d027d5ce195457b694b603266db5b5280b7018842de2e005a06a8251bb853771",
+      "2-territory": "d3edf04e96781dfb668bd2477451258bbdd65d0492759b4a83b98e196e42cc80",
+      "3-behavior": "d8bdcfd01af8c4b5e126705fa9c89bd44378d25a90a5cb15cd62ab255a8175a6",
+      "4-functional-requirements": "bf0111cbf263d507d386c1b0f0ff14d2211384b653e0e86fe11e6523bb390ff5",
+      "5-acceptance-criteria": "c46f05079a1c668dfd05d74b0ff32473f4cd80f1f87b09b8db69ededad931bde",
+      "6-out-of-scope": "b59042dc843fc4ebfb481bf737afbb8d47c25fe6691672eaa7387cc9c9b54d92",
+      "7-resolved-decisions": "67f0aae284e3cbfbd915041e095de6cd894ab25bb48f07bfd158f7ce1e75ff09",
+      "8-status": "b92aa35859bfd9d85a09cc610b9c583c8a5c67abf97458eb5c9c03a0860efb5b",
+      "verification": "ca17fe47009cf251a1218d49719f9803286e337979edc92949714d74c90299d1"
+    },
     "sectionHeadings": [
       "026: Streaming responses",
       "1. Purpose",
@@ -107,5 +119,5 @@
     "title": "Streaming responses: server-sent events as the one mechanism, declared per route, bounded and cancellable"
   },
   "shardHash": "89fe166f56952a18f305f1f67fb895136c41fe6e40c80307a5dfaa7bd769c5b9",
-  "specVersion": "1.3.0"
+  "specVersion": "1.8.0"
 }
