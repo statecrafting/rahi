@@ -1,7 +1,8 @@
-# Probes behind spec 043 revision 2
+# Probes behind spec 043 revisions 2 to 4
 
 Owned by `specs/043-patched-dependency-adoption/spec.md` (draft), which cites
-these as D-P6 and D-P7; D-P8 was a direct image run, recorded below. They are
+these as D-P6, D-P7 and D-P12 to D-P14, and the revision 4 models as
+D-P17 to D-P19; D-P8 was a direct image run, recorded below. They are
 disposable probes, not tests: they authorize nothing, qualify nothing, and
 AC-4 and AC-5 re-run the same questions on Linux against the real images.
 
@@ -101,3 +102,20 @@ spawn; with an unparseable `restore.marker`, it exits 1 before the spawn
 volume, as recorded in D-P14.
 
 Total runtime probing in this pass: about eight minutes.
+
+## Revision 4 models (2026-09-23)
+
+Deterministic models, stdlib Python 3.14 on macOS arm64, each in a
+temporary directory it removes. They run no rahi code and no hiqlite or
+Rauthy binary; they check the rules revision 4 states, and each carries a
+negative control that fails on the rule it replaces. None of the earlier
+runtime probes was repeated.
+
+| script | spec | result |
+|---|---|---|
+| `clock_model.py` | D-P17, FR-014 | revision 3's pruning admits the post-prune rollback counterexample (by `jti` and by subject); retention and the persisted watermark refuse it, the watermark across a restart; a volatile watermark admits it (control); grid of 74,880 cases per policy: revision 3 admits a revoked token in 5,031, all with the clock below its last prune, the other two in none; well under a second |
+| `supervisor_race.py` | D-P18 | a command prepared before the fence still spawns after it and after a T4 stand-in; a read after the fence fails `EISDIR` (control); under 0.1 s, 60 s alarm |
+| `evidence_names.py` | D-P19, FR-013 | no-replace refuses onto a file and onto empty and non-empty directories, a plain rename replaces the empty one (control); revision 3's fixed name stalls on a second occurrence without overwriting; per-occurrence names take three occurrences with interruptions to three names, recover by identity, and refuse a foreign identity |
+
+Run each with `python3 <script>`; exit `0` means every expectation,
+including each control's failure, held.

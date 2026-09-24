@@ -1,8 +1,10 @@
 # Patched adoption: producer requests and the hiqlite reconciliation
 
-Version 2, 2026-09-23. Owned by `specs/043-patched-dependency-adoption/spec.md`
-(draft, revision 3). Version 1 answered revision 2; version 2 re-reads every
-request against revision 3 and hiqlite `8e4ec4b`. Maintained by the rahi owner. Stable references: the
+Version 3, 2026-09-23. Owned by `specs/043-patched-dependency-adoption/spec.md`
+(draft, revision 4). Version 1 answered revision 2; version 2 re-read every
+request against revision 3 and hiqlite `8e4ec4b`; version 3 records each
+request's state against hiqlite pull request #37 (`26e2fa0`) and Rauthy's
+local `51e7328`, and changes no request's class (section 0). Maintained by the rahi owner. Stable references: the
 request ids below (`H-n`, `R-n`, `C-n`) are cited by 043 and by
 `06-owner-decision-packet-2026-09-23.md`, and are never renumbered; a
 withdrawn request keeps its id and says so.
@@ -25,6 +27,34 @@ request marked non-blocking; each says what changes if it arrives.
 - **N3-only**: belongs to Track S7 or spec 044, never to 043.
 
 No request below is N1-blocking. One, H-8, is N1-release-blocking.
+
+## 0. State at version 3 (2026-09-23)
+
+State only; each class below is as it was. Sources: hiqlite pull request
+#37 (open), head `26e2fa0a15b8b94dcc0ef2b733f6cec70922f9df`, code
+`048fcecd5bdab7d4d12b2207b69f46bf31aa9c99`,
+`standards/spec/n3-rahi-reconciliation-handoff.md` (043 D-P20); Rauthy
+branch `work/0.36.2-patched.3` at `51e732802ba48133fb430303f9cc20f5e62bf133`,
+local and unpublished, `RELEASE-PRODUCER-RESPONSES.md` and
+`RELEASE-STATE-INVENTORY.md` (043 D-P21). Evidence classes are the
+producers' own: nothing below is released or qualified.
+
+| request | class (unchanged) | state |
+|---|---|---|
+| H-1 | claim-blocking | implemented in the unreleased candidate `048fcec`, candidate-tested |
+| H-2 | non-blocking | implemented in the candidate |
+| H-3 | non-blocking | implemented in the candidate |
+| H-4 | non-blocking | recorded (F-129; H-7 answer) |
+| H-5 | claim-blocking | option 2 stated in 035 B-4, to reach the consumer handoff at release; option 1 a separate proposal, not built |
+| H-6 | non-blocking | **done**: the branch is pushed and `8e4ec4b` is reachable from pull request #37 |
+| H-7 | non-blocking | **answered**, source only, with limits; its findings are adopted by 043 revision 4 (7.5 items 1 and 4); its F11 is answered by stating the exclusions, not by detection |
+| H-8 | **N1-release-blocking** | implemented in the unreleased candidate; no `hiqlite-patched` release carries it and no Rauthy image is built on it, so B-4b's gate is unchanged |
+| R-1 | non-blocking | implemented and tested locally on Rauthy `51e7328`, unreleased |
+| R-2 | claim-blocking | answered from source (the inventory); a normal release restart loses none of the cache-only items. 043 revision 4 carries the list (B-6b); the stale-restore obligation it exposes stays open (B-6c) |
+| R-3 | closed | closed at version 2; the producer re-verified it |
+| R-4 | claim-blocking | route 2 (the unsupported-downgrade statement) taken in the unpublished handoff; route 1 not attempted |
+| R-5 | non-blocking | answered by the maintainer on the unpublished branch; its handling is the maintainer's, and rahi records no further detail |
+| C-1 | non-blocking | unchanged; revision 4 adds nothing consumers see beyond revision 3 |
 
 ## 1. Requests to the hiqlite-patched producer
 
@@ -140,7 +170,8 @@ Sections 2 and 2.1 cite them.
 
 **Requested.** Push the branch or merge it. **Acceptance.** `8e4ec4b` is
 reachable from a ref of `bartekus/hiqlite`. **Class.** Non-blocking; sections
-2 and 2.1 record what was read.
+2 and 2.1 record what was read. **State (version 3).** Done: pull request
+#37 carries `8e4ec4b`.
 
 ### H-7. Review revision 3's fence route
 
@@ -192,7 +223,9 @@ patched Rauthy image rebuilt on that release, published with its own
 provenance, whose own leg J includes a crash between the two renames.
 
 **Acceptance.** Those three artifacts exist; rahi's owner then decides the
-repin (043 B-4b, P-12). **Class.** **N1-release-blocking.** 043 is
+repin (043 B-4b, P-12). **State (version 3).** The first exists as an
+unreleased candidate (`048fcec`, pull request #37); the release and the
+Rauthy image do not exist. **Class.** **N1-release-blocking.** 043 is
 implemented on the current pins; it is not flipped `complete` and 0.3.0 is
 not qualified until this lands and is adopted. It is not an N=3 item.
 
@@ -251,6 +284,10 @@ discussion, a pull-request description, or directly. rahi edits nothing in
 that repository and does not wait for any item.
 
 ### R-1. A machine-readable terminal-storage signal
+
+**State (version 3).** Implemented and tested locally (Rauthy `51e7328`,
+`storage` on `/auth/v1/health`: `ok`, `degraded`, `terminal`, `unknown`),
+unreleased. 043 adopts nothing from it (B-8).
 
 **Problem.** `GET /auth/v1/ready` answers `503` both when the health watcher's
 last sample found storage unreachable (transient) and after a terminal

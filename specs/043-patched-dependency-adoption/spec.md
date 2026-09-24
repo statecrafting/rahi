@@ -70,6 +70,7 @@ references:
   - { unit: { kind: file, path: "docs/design/05-patched-adoption-delivery-plan.md" }, role: context }
   - { unit: { kind: file, path: "docs/design/06-owner-decision-packet-2026-09-23.md" }, role: context }
   - { unit: { kind: file, path: "docs/design/07-owner-decision-packet-rev3-2026-09-23.md" }, role: context }
+  - { unit: { kind: file, path: "docs/design/09-owner-decision-packet-rev4-2026-09-23.md" }, role: context }
 summary: >
   rahi's application store runs hiqlite 0.14.0 through a root git patch that
   registry consumers never inherit, and its co-deployed identity provider
@@ -81,15 +82,22 @@ summary: >
   raft log) by relocating the app store behind a permanent fence that every
   pre-043 binary refuses at its old path, installed whole and verified
   quiescent before anything moves, and a second fence at rahi's rendered
-  Rauthy environment that stops every published pre-043 supervisor before
-  it spawns Rauthy; every new-binary entry point takes its locks before it
+  Rauthy environment that makes every published pre-043 supervisor that
+  reads it afterwards exit before it spawns Rauthy; it names what neither
+  fence can stop
+  (an old process already past its read or its lock-free start phase, and
+  the two destructive hiqlite variables in an old process's environment) as
+  preconditions the operator establishes by stopping and removing every old
+  process first. Every new-binary entry point takes its locks before it
   reads the state file; Rauthy moves its own cache under consent, and the
   resumable upgrade is released only on a Rauthy build whose interrupted
   move is repaired. It keeps every revocation accepted before the upgrade
   refused by a permanent issued-at floor that needs no historical lifetime,
-  bounds every admitted token by an enforced lifetime ceiling, prunes
-  durable revocations against the manifest's hard lifetime maximum, states
-  the restore boundary, turns a proven terminal storage failure into a
+  bounds every admitted token by an enforced lifetime ceiling and a hard
+  86,400-second maximum, keeps durable revocations against a backward clock
+  step after any prune (retained, or pruned under a persisted watermark, by
+  owner choice), states the restore boundary, including what a stale Rauthy
+  restore revives, turns a proven terminal storage failure into a
   bounded exit, and reports every stop's observed outcome with a non-zero
   exit when completion is not confirmed. It changes no topology and claims
   no N=3 support.
@@ -118,7 +126,8 @@ take and how its outcome is observed and reported (B-9, B-10). An N=3
 composition (spec 044, draft) is separate and consumes whatever release is
 later qualified at N=3.
 
-This is revision 3 of the draft. Revision 1 (`5707f60`, draft PR #75)
+This is revision 4 of the draft; section 7.5 records what changed from
+revision 3 (`abd66fd`) and why. Revision 1 (`5707f60`, draft PR #75)
 held hiqlite's own lock files in the transition verb and armed an
 old-version guard only after the cache move; section 7.3 records why both
 were wrong. Revision 2 (`95622f1`) could proceed while a stopping pre-043
@@ -126,7 +135,10 @@ node still had its database open, trusted a destination's existence as
 proof of a move, read its state before taking its lock, pruned revocations
 by a lifetime a later deploy could raise, and left a directly started
 pre-043 supervisor free to spawn Rauthy; section 7.4 records those and what
-replaced them.
+replaced them. Revision 3 claimed the supervisor fence excluded every
+pre-043 supervisor, left the two hiqlite variables that act before any
+lock or marker unstated, and pruned revocations in a way a backward clock
+step after the prune undoes.
 
 ## 2. Territory
 
@@ -166,10 +178,12 @@ Terms.
   (FR-006).
 - **L_max** is `MAX_ACCESS_TOKEN_LIFETIME_SECS` (86,400), the upper bound
   the manifest's validation enforces on L (`rahi-kernel` `manifest.rs`,
-  rauthy's own client limit). No build of this version admits a token
-  whose `exp - iat` exceeds it. **The prune horizon** is `V(L_max)` =
-  86,520 seconds, kept in SQL and raised (never lowered) at each boot to
-  the running build's value.
+  rauthy's own client limit). The bearer check refuses a token whose `exp
+  - iat` exceeds it as a separate, hard-coded check that does not read the
+  manifest (B-6), so no build of this version admits one whatever L a
+  manifest declares. **The prune horizon**, used only under P-9 option
+  (ii) (B-6), is `V(L_max)` = 86,520 seconds, kept in SQL and raised (never
+  lowered) at each boot to the running build's value.
 - **The legacy path** is `<data>/hiqlite`, where every pre-043 binary
   (v0.1.0, v0.2.0) opens the app store. **The app store** is
   `<data>/app-store`, where this version opens it. **The fence** is the
@@ -184,6 +198,21 @@ Terms.
   This version renders that environment at `<data>/rauthy-env/rauthy.env`
   instead (B-5, P-10).
 - **Identity** of a file or directory is its `(st_dev, st_ino)` pair.
+- **The aside directory** is `<data>/upgrade-cache/aside/<id>/`, where
+  T2 puts the app store's two 0.14 caches. It is outside the app store,
+  so no hiqlite version inspects it (hiqlite reserves `pre-upgrade-*`
+  names inside its own data directory, D-P20).
+- **An evidence name** is `<data>/upgrade-cache/evidence/<id>/<seq>-<step>/<path>`:
+  `seq` is a six-digit counter kept in `upgrade-cache.json`, allocated in
+  the intent record of the move that uses it and never reused, `step` names
+  the step (`t1e`, `t2`, `t3`, `abort`), and `<path>` is the entry's path
+  relative to the directory it left. Every entry this version moves to
+  evidence gets a fresh name, so a second occurrence of the same debris
+  never meets the first (D-P19).
+- **An old process** is any process running a pre-043 rahi binary, and any
+  Rauthy such a process spawned, on this volume: a container, a `docker
+  exec` or `docker run --entrypoint rahi` invocation, a supervisor started
+  directly, and a restart policy that brings any of them back.
 
 ### Identities
 
@@ -211,7 +240,14 @@ Terms.
   by hiqlite, and rahi adds nothing that bypasses it.
   `HQL_CACHE_LEGACY_MOVE_ASIDE` present in rahi's own environment is a
   startup error naming B-4's verb; the supervisor never forwards an
-  operator's value to Rauthy. This version never opens a store at the
+  operator's value to Rauthy. `HQL_DANGER_RAFT_STATE_RESET` and
+  `HQL_BACKUP_RESTORE` present in rahi's own environment are startup errors
+  too (B-4a step (1)): hiqlite 0.15 reads both from the process
+  environment when rahi opens the app store in process (`init.rs:29`,
+  `backup.rs:74` of `0.15.0-patched.1`), and the first would delete the
+  raft logs and snapshots of the store T3 or `serve` is opening. This check
+  covers the process that makes it and says nothing about any other process
+  (B-4's preconditions). This version never opens a store at the
   legacy path: a volume whose legacy path holds anything other than the
   fence and debris is refused by every entry point with an error naming
   B-4's verb, before anything is opened, written or spawned.
@@ -230,13 +266,47 @@ Terms.
   to a plain `rename` (FR-011). The data directory is a mounted volume
   (031, 032), never the container's overlay layer.
 
+  **Preconditions the verb cannot establish.** The operator establishes
+  them before T0, the verb prints them before T1, and the README states
+  them (D-P18, D-P20):
+
+  1. Every old process is stopped, and the old container is removed with
+     every restart source that could bring it back disabled (a restart
+     policy, a unit file, a controller). This includes a pre-043
+     supervisor started directly and every Rauthy it spawned.
+  2. No old process on the volume, in any state, has
+     `HQL_DANGER_RAFT_STATE_RESET` or `HQL_BACKUP_RESTORE` in its
+     environment. hiqlite 0.14 acts on both before it takes any lock or
+     meets the marker: the first sleeps ten seconds holding nothing and
+     then deletes `logs/`, `logs_cache/` and both snapshot directories; the
+     second removes the database, the snapshots and `logs/` (and on a node
+     id other than 1 the whole data directory, the fence with it) (hiqlite
+     H-7 answer, Q1 and Q2). In that phase the process holds no lock, has
+     no marker and no SQLite file open, so T1 (c) sees nothing. Every
+     published pre-043 rahi entry point refuses `HQL_BACKUP_RESTORE` before
+     it opens the app store (`refuse_env_restore`, v0.1.0 and v0.2.0
+     source) and none refuses `HQL_DANGER_RAFT_STATE_RESET`; a pre-043
+     supervisor passes `HQL_BACKUP_RESTORE` to the Rauthy it spawns when a
+     restore is pending (v0.2.0, 037 B-3), where it acts on Rauthy's
+     directory. B-3's check of the new process's own environment cannot
+     prove any of this about another process.
+
+  T1 (c)'s quiescence check proves that no hiqlite 0.14 node that has
+  reached its log store's start, running or stopping, has the legacy path
+  open (hiqlite's H-7 answer calls this sufficient for a stopping node).
+  It does not see an old process before that point, and the two fences
+  stop only an old process whose read of the fenced path comes after the
+  fence exists (B-5). The preconditions cover the rest; nothing in this
+  version detects a violation of them, and no public hiqlite exclusion
+  interface is required for them.
+
   | step | intent recorded | action | completion recorded | recovery if interrupted after the intent |
   |---|---|---|---|---|
   | T0 locks | none | B-4a's gate: take `<data>/cell.lock` and `<data>/transition.lock` exclusively, non-blocking, and hold both until exit; only then read the state file and inspect the layout | none | a held lock: refuse, change nothing |
-  | T1 guard | `begin{id}`, `id` 128 random bits | (a) refuse if `upgrade-cache.json` names another unfinished transition. (b) Write `rahi-upgrade-cache <id>` to `<legacy>/state_machine/.rahi-guard-<id>`, fsync it, and `link(2)` it to `<legacy>/state_machine/lock`, then fsync the directory and unlink the temporary: the marker appears whole or not at all. `EEXIST` refuses: a pre-043 node is live or stopped uncleanly (the message says which from (c)'s probe); the existing marker is never modified. (c) **Quiescence**, after the marker is durable: `<legacy>/logs/lock.hql` and `<legacy>/logs_cache/lock.hql` are not held (a non-blocking probe that opens existing files only and creates none; an absent file reads as not held), and `<legacy>/state_machine/db/` holds no `-wal` and no `-shm` file (a pre-043 node closes SQLite after it releases both WAL locks and removes its marker, D-P12; SQLite removes them only when the last connection closes, the writer's and every connection of hiqlite's read pool, `state_machine.rs:117,317-330`, so their absence covers the whole pool). (d) The marker still has the identity `link` gave it and its content is this `id` (a pre-043 start truncates the marker path in place with `File::create`, and a pre-043 clean stop unlinks it, D-P11). A failure of (c) or (d) refuses and **leaves the marker where it is**: while it carries this `id` a pre-043 start panics on it, and a marker a pre-043 node has truncated is that node's own. (e) Install the supervisor fence (B-5). (f) Read `instant` from the wall clock | `guarded{instant, marker identity}` | a marker with this `id`: resume at (c) (the content proves provenance; `link` never publishes a partial file); no marker: redo (b); a marker with other content, including empty: refuse as in (b), and name the state as interrupted by a pre-043 node |
+  | T1 guard | `begin{id}`, `id` 128 random bits | (a) refuse if `upgrade-cache.json` names another unfinished transition. (b) Write `rahi-upgrade-cache <id>` to `<legacy>/state_machine/.rahi-guard-<id>`, fsync it, and `link(2)` it to `<legacy>/state_machine/lock`, then fsync the directory and unlink the temporary: the marker appears whole or not at all. `EEXIST` refuses: a pre-043 node is live or stopped uncleanly (the message says which from (c)'s probe); the existing marker is never modified. (c) **Quiescence**, after the marker is durable: `<legacy>/logs/lock.hql` and `<legacy>/logs_cache/lock.hql` are not held (a non-blocking probe that opens existing files only and creates none; an absent file reads as not held), and `<legacy>/state_machine/db/` holds no `-wal` and no `-shm` file (a pre-043 node closes SQLite after it releases both WAL locks and removes its marker, D-P12; SQLite removes them only when the last connection closes, the writer's and every connection of hiqlite's read pool, `state_machine.rs:117,317-330`, so their absence covers the whole pool). (d) The marker still has the identity `link` gave it and its content is this `id` (a pre-043 start truncates the marker path in place with `File::create`, and a pre-043 clean stop unlinks it, D-P11). A failure of (c) or (d) refuses and **leaves the marker where it is**: while it carries this `id` a pre-043 start panics on it, and a marker a pre-043 node has truncated is that node's own. (e) Install the supervisor fence (B-5); the old rendered file goes to a fresh evidence name (step `t1e`). (f) Read `instant` from the wall clock | `guarded{instant, marker identity}` | a marker with this `id`: resume at (c) (the content proves provenance; `link` never publishes a partial file); no marker: redo (b); a marker with other content, including empty: refuse as in (b), and name the state as interrupted by a pre-043 node |
   | T1a verify | `verifying` | verify the archive with 030's read-only verification | `verified{digest}` | rerun; nothing on disk changed |
-  | T2 relocate | `relocating{target, plan}` with `target` = `<app store>/pre-upgrade-<instant>/` and `plan` = every entry to move with its source path, destination path and identity, listed once | refuse, before recording the intent, when: the app store exists and is not an empty directory (`first-boot`'s layout creates it empty); any planned entry, or `<legacy>`, `<legacy>/state_machine` or `<data>`, is a symbolic link; any planned entry's `st_dev` differs from `<legacy>`'s; or `<legacy>` and `<data>` are on different devices. Then move, in the plan's order, every child of `<legacy>` except `state_machine`, and every child of `<legacy>/state_machine` except `lock`, into the app store at the same relative path, except `logs_cache` and `state_machine_cache`, which go into `target`, `state_machine_cache` before `logs_cache` (hiqlite F-130); fsync both parents after each rename. Debris that appears under `<legacy>` after the plan was recorded is moved to `<data>/upgrade-cache/evidence/<id>/` once every planned entry has moved | `relocated`; `<legacy>` is now the fence | per planned entry, by identity and never by existence: the planned identity at the source means not moved (move it); at the destination means moved; a source path holding another identity beside a moved destination is debris (to evidence, never deleted, never merged); a destination holding an identity the plan does not name, or a planned identity found at neither path, refuses and changes nothing (the volume was modified outside this verb) |
-  | T3 floor | `flooring` | open the app store in-process with 0.15, which binds its configured loopback addresses since hiqlite has no start mode without listeners (the verb holds no hiqlite lock of its own; `transition.lock` keeps every attaching verb away, B-4a); in one `txn` upsert the transition row, raise the floor (B-6b) to `before = floor(instant)` in whole seconds, and raise the prune horizon; shut the store down and require `Ok` | `floored` | an empty `<app store>/state_machine/lock` is this step's own unclean stop, because only a process holding `cell.lock` and `transition.lock` while the state is `flooring` can have opened the app store (B-4a): the verb requires the app store's `hiqlite-owner.lock` to be free, moves the marker into `<data>/upgrade-cache/evidence/<id>/t3-marker-<n>` and reruns T3; a marker with any other content is refused as foreign (a defensive branch: hiqlite writes only empty markers and T2 never relocates the guard, so only AC-5's synthetic case reaches it) |
+  | T2 relocate | `relocating{target, plan}` with `target` = the aside directory `<data>/upgrade-cache/aside/<id>/` and `plan` = every entry to move with its source path, destination path and identity, listed once | refuse, before recording the intent, when: the app store exists and is not an empty directory (`first-boot`'s layout creates it empty); `target` exists; any planned entry, or `<legacy>`, `<legacy>/state_machine`, `<data>` or `<data>/upgrade-cache`, is a symbolic link; any planned entry's `st_dev` differs from `<legacy>`'s; or `<legacy>`, `<data>/upgrade-cache` and `<data>` are not all on one device. Then move, in the plan's order, every child of `<legacy>` except `state_machine`, and every child of `<legacy>/state_machine` except `lock`, into the app store at the same relative path, except `logs_cache` and `state_machine_cache`, which go into `target`, `state_machine_cache` before `logs_cache` (hiqlite F-130); fsync both parents after each rename. Debris that appears under `<legacy>` after the plan was recorded is moved once every planned entry has moved, each entry to a fresh evidence name recorded, with its identity, in an intent before its rename | `relocated`; `<legacy>` is now the fence | per planned entry, by identity and never by existence: the planned identity at the source means not moved (move it); at the destination means moved; a source path holding another identity beside a moved destination is debris (to a fresh evidence name, never deleted, never merged); a destination holding an identity the plan does not name, or a planned identity found at neither path, refuses and changes nothing (the volume was modified outside this verb). Per evidence move, the same rule on its recorded intent: its identity at the evidence name means moved, at the source means move it, at neither, or another identity at the evidence name, refuses |
+  | T3 floor | `flooring` | open the app store in-process with 0.15, which binds its configured loopback addresses since hiqlite has no start mode without listeners (the verb holds no hiqlite lock of its own; `transition.lock` keeps every attaching verb away, B-4a); in one `txn` upsert the transition row, raise the floor (B-6b) to `before = floor(instant)` in whole seconds, and raise the prune horizon; shut the store down and require `Ok` | `floored` | an empty `<app store>/state_machine/lock` is this step's own unclean stop, because only a process holding `cell.lock` and `transition.lock` while the state is `flooring` can have opened the app store (B-4a): the verb requires the app store's `hiqlite-owner.lock` to be free, moves the marker to a fresh evidence name (step `t3`) and reruns T3; a marker with any other content is refused as foreign (a defensive branch: hiqlite writes only empty markers and T2 never relocates the guard, so only AC-5's synthetic case reaches it) |
   | T4 Rauthy | written by `supervise` | while the state is `floored`, `supervise` adds `HQL_CACHE_LEGACY_MOVE_ASIDE=true` to the Rauthy child's environment and Rauthy moves its own cache | `rauthy-done`, once Rauthy answers ready | a boot while still `floored` passes the consent again; once Rauthy's own format marker exists the variable is a no-op. An interruption inside Rauthy's own two renames is on this transition's normal crash path: with `hiqlite-patched 0.15.0-patched.1`, which renames `logs_cache` before `state_machine_cache`, it can leave a 0.14 cache snapshot that the next start restores without refusal (hiqlite F-130, committed at `8e4ec4b`; repair contract hiqlite 035 B-5). This spec does not repair it; it gates the release on it (B-4b) |
   | T5 serve | written by `serve` | at `floored` or `rauthy-done`, `serve` starts normally | `done`, after the first `/readyz` 200; the file is kept as history | none needed; `serve` is idempotent here |
 
@@ -252,7 +322,9 @@ Terms.
 - **B-4a (entry points, locks and gating).** Every entry point of this
   version that can open, attach to or reset the app store, or spawn Rauthy,
   passes one gate in this order, before it opens, writes or spawns
-  anything: (1) refuse `HQL_CACHE_LEGACY_MOVE_ASIDE` in its environment;
+  anything: (1) refuse `HQL_CACHE_LEGACY_MOVE_ASIDE`,
+  `HQL_DANGER_RAFT_STATE_RESET` and `HQL_BACKUP_RESTORE` in its own
+  environment (B-3);
   (2) take its locks as the table says, non-blocking; (3) only then read
   `upgrade-cache.json` and inspect the legacy path, the supervisor fence
   and the app store, so every decision is made on a layout no other
@@ -318,7 +390,11 @@ Terms.
   with its own provenance, and an owner decision amends B-1 and B-2 to
   those exact artifacts with the evidence of D-P1's kind. Nothing here
   selects those versions; the owner direction to adopt patched builds is
-  not that decision. The N=3 work (spec 044) is not part of this gate.
+  not that decision. The N=3 work (spec 044) is not part of this gate. The
+  state on 2026-09-23 (D-P20, D-P21): hiqlite's repair exists as an
+  unreleased candidate (`048fcec`, pull request #37 at `26e2fa0`), no
+  `hiqlite-patched` release carries it, and no Rauthy image is built on it;
+  the gate is unchanged by a candidate.
 - **B-5 (exclusion).** Four populations, four mechanisms.
   *Pre-043 binaries against the app store:* the guard written at T1, whole
   and verified quiescent before any change, and kept as the fence. A
@@ -330,10 +406,24 @@ Terms.
   a fenced volume from the v0.2.0 image: `serve` and `ledger verify` panic
   on the marker, `restore` and `preflight` refuse on it, and the default
   entrypoint's `migrate` waits in attach (D-P8, D-P14).
-  *Pre-043 supervisors against Rauthy's directory:* the supervisor fence.
-  Every published pre-043 `supervise` (v0.1.0, v0.2.0) reads
-  `<data>/rauthy/rauthy.env` with `read_to_string` before it spawns
-  Rauthy and exits when the read fails; a directory at that path fails it.
+  *Pre-043 supervisors against Rauthy's directory:* the supervisor fence,
+  for every supervisor whose read comes after it exists. Every published
+  pre-043 `supervise` (v0.1.0, v0.2.0) reads `<data>/rauthy/rauthy.env`
+  with `read_to_string` before it spawns Rauthy and exits when the read
+  fails; a directory at that path fails it. **It is not a universal
+  exclusion.** The read and the spawn are separate: `prepare_rauthy`
+  (v0.1.0: `rauthy_command`) reads the file into an in-memory `Command`,
+  and `supervise_with` spawns that `Command` later without reading the
+  volume again (v0.2.0 `rahi-cli/src/lib.rs` `supervise`). A supervisor that
+  read the file before T1 (e) and is delayed, paused or descheduled before
+  its spawn can spawn upstream Rauthy after T1, after T4, or at any later
+  point, and the fence cannot invalidate a command already built (D-P18).
+  B-4's first precondition covers it: every old supervisor and child is
+  stopped before T0. The residual guarantee is exactly this: **a pre-043
+  `supervise` whose read of `<data>/rauthy/rauthy.env` begins after T1
+  (e)'s rename fails that read and exits before it spawns Rauthy.** This
+  does not replace, and is not evidence against, the stopped-and-removed
+  procedure; it narrows what a mistake in it can do.
   A pre-043 `first-boot` whose keys already exist skips a path that exists
   (executed on v0.2.0, D-P14); one that generates keys (`force`, an empty
   key directory, which an upgraded volume never has) tries to write the
@@ -342,21 +432,24 @@ Terms.
   it after the guard and before anything moves: write the rendered
   environment to `<data>/rauthy-env/rauthy.env` (temporary, fsync,
   rename), build `FENCE` in a temporary directory beside it, move the old
-  file into `<data>/upgrade-cache/evidence/<id>/rauthy.env`, and no-replace
-  rename the directory into place; a crash between the last two leaves the
+  file to a fresh evidence name (step `t1e`), and no-replace rename the
+  directory into place; a crash between the last two leaves the
   path absent, which a pre-043 `supervise` also refuses, and the resume
   completes it. The v0.2.0 image's `supervise` run directly on such a
   volume exits `3` before spawning Rauthy and leaves Rauthy's directory
   unchanged (D-P14); v0.1.0's is established from source only.
   *This version against itself:* `cell.lock`, `transition.lock` and the
   state file (B-4a).
-  *What rahi does not exclude:* a pre-043 Rauthy started outside any rahi
+  *What rahi does not exclude:* an old process already past its read of
+  the fenced path or inside hiqlite 0.14's lock-free start phase (B-4's
+  preconditions); either hiqlite variable of B-4's second precondition in
+  an old process's environment; a pre-043 Rauthy started outside any rahi
   binary (a bare `ghcr.io/sebadob/rauthy:0.36.2` container or binary
-  pointed at the volume), and a new Rauthy given T4's consent while such a
+  pointed at the volume); and a new Rauthy given T4's consent while such a
   process is live (D-P3). From T4 on, Rauthy's directory is in 0.15 format
   and a hiqlite 0.14 process over it can destroy its raft metadata (D-P2).
-  The README states the precondition for this case only: no Rauthy outside
-  the cell is started on the volume. The producer requests H-1, H-5 and
+  The README states B-4's preconditions and, for the last two cases, that
+  no Rauthy outside the cell is started on the volume. The producer requests H-1, H-5 and
   R-4 (`docs/design/04-patched-adoption-producer-requests.md`) ask for
   mechanisms the producer can demonstrate against the old binary.
 - **B-5a (abandoning and rolling back).** Before `flooring`,
@@ -371,7 +464,8 @@ Terms.
   the verb's output and the README: `upgrade-cache.json` (state `aborted`,
   kept as history), `<data>/upgrade-cache/` with its evidence,
   `cell.lock`, `transition.lock`, `<data>/rauthy-env/` (read by nothing
-  pre-043), and changed directory timestamps. From `flooring` on, the
+  pre-043), and changed directory timestamps; the emptied aside directory
+  stays under `<data>/upgrade-cache/`. From `flooring` on, the
   app store has been opened by 0.15, and the supported rollback is B-4's
   verified pre-upgrade archive restored into a fresh volume with the old
   image (030 restore, single-shot). The README states that an old binary
@@ -391,33 +485,76 @@ Terms.
   ledger decision, and read on every bearer check. An in-process lookaside
   may accelerate reads; a miss falls through to SQL and never admits.
   **Admission.** Besides 025's and 038's refusals, the bearer check refuses
-  a token: with no `iat`; with `exp < iat`, computed as a checked
-  subtraction on the integer claims (no wrapping, no saturation); with
-  `exp - iat > L`; and with `iat > now + LEEWAY_SECONDS` (a token from the
-  future, the same leeway 025 grants `nbf`). Of these, today's validator
+  a token: with no `iat`, or an `iat` or `exp` that is not an integer in
+  `0..=u64::MAX`; with `exp < iat`, computed as a checked subtraction (no
+  wrapping, no saturation); with `exp - iat > L_max`, a hard-coded check
+  of the constant 86,400 that reads no manifest; with `exp - iat > L`; and
+  with `iat > now + LEEWAY_SECONDS` (a token from the future, the same
+  leeway 025 grants `nbf`). Every sum on the claims and the clock is a
+  checked addition, and an overflow refuses. Of these, today's validator
   enforces none: it checks `exp + LEEWAY_SECONDS > now` (saturating), `nbf`
   when present, and reads `iat` only for the subject deny-list, which
   treats a missing `iat` as issued before a revocation (D-P16). So every
-  admitted token satisfies `iat <= now + LEEWAY_SECONDS` and validates at
-  most until `iat + L + LEEWAY_SECONDS`.
-  **Pruning.** A row is pruned only after `revoked_at + V(L_max)`, with
-  `V(L_max)` the prune horizon, never by the current L. Why that bound
-  holds under every L this version accepts, lowered or raised: a revoked
-  token has `iat <= revoked_at + LEEWAY_SECONDS` (a self-revocation
-  presents a token the check just admitted; an operator names a `jti` of a
-  token that existed, and a subject row is by definition about tokens
-  issued before `revoked_at`), and `exp - iat <= L <= L_max`, so it cannot
-  validate after `revoked_at + L_max + 2 * LEEWAY_SECONDS`. Revision 2
-  pruned at `V(L*)`, the largest L declared so far, which fails when L
-  rises after a prune (7.4 item 4). A later build that raises `L_max`
-  raises the horizon at its first boot and, in the same `txn`, raises the
-  floor (B-6b) to that boot's instant, since rows pruned under the old
-  horizon cannot be recovered. A cache loss of any cause (this upgrade, a
-  lost cache directory, a restart) removes nothing a check relies on.
-  **The clock.** The argument assumes the one host clock did not step
-  backwards between a token's issue and its revocation; a subject
-  revocation fails safe under a backward step after it (tokens issued
-  afterwards carry a smaller `iat` and are refused).
+  admitted token satisfies `iat <= now + LEEWAY_SECONDS` and `exp - iat <=
+  min(L, L_max)`, and validates at most until `iat + L + LEEWAY_SECONDS`.
+  **Why a revocation row stops mattering.** A revoked token has `iat <=
+  revoked_at + LEEWAY_SECONDS` (a self-revocation presents a token the
+  check just admitted; an operator names a `jti` of a token that existed,
+  and a subject row is by definition about tokens issued before
+  `revoked_at`), and `exp - iat <= L_max`, so at a clock reading at or
+  after `revoked_at + V(L_max)` = `revoked_at + L_max + 2 *
+  LEEWAY_SECONDS` it is refused as expired, whatever L a later deploy
+  declares. Revision 2 pruned at `V(L*)`, the largest L declared so far,
+  which fails when L rises after a prune (7.4 item 4). **That argument
+  holds only while the clock does not go back.** Revision 3 pruned at
+  `revoked_at + V(L_max)`, and a backward step after the prune brings the
+  token back: with no floor, a token `iat = 100`, `exp = 700`, L = 600,
+  revoked at 200, its row pruned at 86,721, and the clock then set to 300,
+  is admitted until 760, because its deny row is gone and nothing else
+  refuses it (D-P17; 7.5 item 3). The floor does not help: a floor
+  protects only tokens issued at or before it, and P-11 acts once, at the
+  transition, so neither covers a token issued and revoked afterwards.
+  **Retention or pruning (P-9, the owner chooses one of two exact
+  texts).**
+  - **(i) Retain (recommended).** This version never deletes a revocation
+    row and stores no prune horizon. A revoked `jti` is refused for the
+    life of the volume, whatever the clock does after the revocation.
+    Cost: storage grows without bound, one row per `jti` revocation
+    (each `POST /session/token/revoke` and each operator revocation by
+    `jti`, 038 B-5) and at most one row per subject (operator revocations
+    by `sub` and browser logouts under `logout_revokes_bearer`),
+    each holding the key, `revoked_at` and SQLite's per-row overhead;
+    lookups stay keyed reads on the primary key. The growth was not
+    measured; the README states it and the metric
+    `rahi_revocation_rows{kind}` reports it. Introducing pruning later is
+    its own governed change and needs (ii)'s guard or an equivalent.
+  - **(ii) Prune under a watermark.** A prune, at clock reading `P`,
+    deletes the rows with `revoked_at + V(L_max) <= P` and, in the same
+    `txn`, raises a durable `prune_watermark` to `P`; the watermark only
+    rises and lives in SQL, so a restart, a cache loss and a lifetime change
+    keep it, and a restore returns it together with the rows it describes.
+    While `now < prune_watermark` the bearer check refuses every token
+    `401` with 025 B-6's challenge and the process logs the gap and
+    exports `rahi_clock_behind_prune_watermark_seconds`. Why it is enough:
+    a token whose row was pruned at `P` is refused as expired at every
+    `now >= P` (the argument above), and every token is refused at `now <
+    P`. Cost: a clock that ran ahead and was then corrected refuses every
+    bearer token until it catches up with the watermark, and the operator
+    has no lever but waiting or restoring; the horizon of the Terms is kept
+    and raised as they say, and a later build that raises `L_max` raises it
+    at its first boot and, in the same `txn`, raises the floor (B-6b) to
+    that boot's instant, since rows pruned under the old horizon cannot be
+    recovered.
+
+  Under either, a cache loss of any cause (this upgrade, a lost cache
+  directory, a restart) removes nothing a check relies on.
+  **The clock, what remains.** A subject row covers tokens with `iat <=
+  revoked_at`; a backward step between a token's issue and its subject's
+  revocation leaves that token admitted until its own expiry, at most `L +
+  LEEWAY_SECONDS` after its `iat`, and a subject revocation fails safe
+  under a backward step after it (tokens issued afterwards carry a smaller
+  `iat` and are refused). A `jti` row does not depend on the clock under
+  (i), and under (ii) only through the fail-closed watermark.
 - **B-6a (revocations that exist only in the old cache).** They cannot be
   carried: the 0.14 cache is unreadable by 0.15 by design, no backup holds
   it, and 0.2.0 has no export. B-6b replaces them conservatively.
@@ -445,7 +582,9 @@ Terms.
   LEEWAY_SECONDS`: at most Δ + L + 60 seconds of clock time after the
   upgrade. The README states the assumption and the consequence. P-11 is
   the conservative, clock-independent alternative, offered for the owner's
-  choice and not part of this text unless accepted.
+  choice and not part of this text unless accepted. Retaining revocation
+  rows (B-6 (i)) does not narrow this gap: the revocations it concerns were
+  in the old cache and never in SQL, so no row exists to retain.
   Consequence, stated in the README and the release notes: every bearer
   access token issued before the upgrade is refused from the transition on;
   a native client must refresh; a refresh presented before the refresh
@@ -453,7 +592,23 @@ Terms.
   that user's sessions and tokens, so the user logs in again; browser
   sessions keep their Rauthy session and pay 022's renewal round trip.
   Revocations Rauthy enforces itself (038 D-8's session end) are in
-  Rauthy's database and survive the move-aside.
+  Rauthy's database and survive the move-aside: sessions, refresh tokens
+  (browser and device) and `issued_tokens.revoked` are SQL-backed, with the
+  session's cache entry only a copy (D-P21).
+  **What Rauthy's cache move loses, stated in the README and the release
+  notes (D-P21, the producer's inventory, read from source).** Rauthy's
+  cache is disk-backed by default, and a normal restart of a release build
+  keeps everything in it except its HTML and application caches; so these
+  are new losses at the upgrade, not losses the cell already has at every
+  restart: authorization and ToS-await codes, device codes, WebAuthn and
+  MFA-modification challenges, proof-of-work challenges, DPoP nonces, every
+  IP ban, manual and automatic alike (Rauthy records no difference),
+  failed-login counters, credential-stuffing windows, rate-limit windows,
+  upstream-provider callback state, and a client's previous secret during
+  its rotation window. Logins and challenges in progress restart. Bans can
+  be carried by the operator: list them with `GET /auth/v1/blacklist`
+  before the upgrade and re-apply each with `POST /auth/v1/blacklist` and
+  the same expiry after it; failed-login counters cannot be carried.
 - **B-6c (the restore boundary).** A restore returns both databases to the
   archive's instant, so revocations taken after that instant are absent
   from the restored SQL and from Rauthy's restored database. Always: a
@@ -469,19 +624,40 @@ Terms.
   ended after the archive instant) comes back with Rauthy's restore, and
   that refresh token can mint new access tokens, issued after the floor and
   admitted, until it expires or is revoked again.
-  **What a restore forgets, and what compensates.** The floor, the prune
-  horizon and the revocation rows return to the archive's values. Lost with
+  **What a restore forgets, and what compensates.** The floor, the
+  revocation rows and, under B-6 (ii), the prune horizon and the watermark
+  return to the archive's values. Lost with
   the archive: revocation rows written after its instant, and any floor
   raise after it (only a restore raises the floor after T3). The pending
   floor compensates for both when it is raised (always for a pre-043
   archive; for every archive if P-7 is accepted), because the restore
-  instant is later than every lost raise and every lost revocation; the
-  first boot then raises the horizon to the running build's value. Without
+  instant is later than every lost raise and every lost revocation; under
+  B-6 (ii) the first boot then raises the horizon to the running build's
+  value. Without
   P-7 a token revoked after the archive instant, or covered only by a lost
   raise, is admitted until its own expiry, at most L + 60 seconds after
   its `iat` (B-6). The restore instant is read after the archive is
   verified and before the first byte of the volume changes; B-6b's clock
   assumption applies to it.
+  **What Rauthy's restore revives, and what no rahi floor stops (D-P21,
+  the producer's reading of its source; not executed by rahi).** Rauthy's
+  restored database is older than the state it replaces, so it revives
+  what was removed after the archive instant: deleted or expired sessions,
+  deleted refresh tokens (browser and device), `issued_tokens` revocations,
+  disabled users and clients, deleted API keys and upstream providers, and
+  superseded client secrets and password hashes; it forgets users, clients
+  and keys created after the archive. A revived refresh credential can mint
+  a new access token at Rauthy; that token's `iat` is after the floor, so
+  rahi's floor and deny rows admit it, and no other relying party is
+  covered by either. When the volume already holds Rauthy's cache (a
+  restore in place rather than into a fresh volume), Rauthy applies the
+  hand-off of 037 B-3 in that directory and keeps its cache, which is then
+  newer than the restored SQL: a cached session copy wins over the restored
+  row for up to four hours, and bans and counters survive. This
+  obligation is **open**: 043 states it and does not close it. The
+  producer has proposed an offline invalidation step for a restored
+  instance (its `restore-invalidate`, not implemented, awaiting its own
+  owner's policy decision); adopting one is a later change.
 
 ### Terminal storage failure
 
@@ -554,18 +730,21 @@ Terms.
 - **FR-003.** The transition is a library function with an injectable fault
   point after every intent and every action of B-4, including after each
   single rename of T2, after the guard's temporary write, its fsync, the
-  `link`, the directory fsync and the `guarded` record, and after each of
-  the supervisor fence's four steps, run against real stores in temporary
-  directories.
+  `link`, the directory fsync and the `guarded` record, after each of
+  the supervisor fence's four steps, and after the intent and after the
+  rename of every move to an evidence name, run against real stores in
+  temporary directories.
 - **FR-004.** The bearer check reads revocation state and the floor through
   the store handle, so a test can delete the cache directories and observe
   refusals hold.
 - **FR-005.** `NodeFailed` is produced in tests by a real storage fault
   (the data directory made unwritable under a running node, or a torn WAL
   record), never by a mocked client.
-- **FR-006.** V has one implementation (`denylist_ttl`), used by preflight,
-  pruning and every test; pruning reads it only as `V(L_max)`; no floor
-  reads V.
+- **FR-006.** V has one implementation (`denylist_ttl`), used by preflight
+  and every test, and by pruning under B-6 (ii), which reads it only as
+  `V(L_max)`; no floor reads V. Under B-6 (i) no code path deletes a
+  revocation row, and a test asserts the tables only grow across a
+  simulated day of revocations, a restart and a backward clock step.
 - **FR-007.** The composition check of B-9 is a unit test over the
   constants and the shipped manifests.
 - **FR-008.** B-4a's gate is one function in `rahi-ops`, called by every
@@ -596,6 +775,20 @@ Terms.
   `File::create`; unlinking it; leaving `-wal` and `-shm` beside the
   database after releasing both WAL locks (D-P11, D-P12). The live
   workflow repeats the real-binary interleavings of D-P12 and D-P13.
+- **FR-013.** Every move to evidence goes through one helper that
+  allocates `seq` in the intent it records, creates the evidence name's
+  step directory, and renames through FR-011's helper. A test repeats the
+  same debris three times with interruptions after the intent and after
+  the rename (D-P19's sequence) and asserts three distinct names, each
+  holding its own bytes, recovery by identity, a refusal when the evidence
+  name holds an identity the intent does not name, and that nothing is
+  ever replaced.
+- **FR-014.** A deterministic clock test drives the bearer check and the
+  revocation store (not a model) through D-P17's timelines: the post-prune
+  rollback counterexample, 7.4 item 4's lifetime increase, the future-`iat`
+  and overflow boundaries, and, under B-6 (ii), a restart between the prune
+  and the backward step. The same test run against revision 3's pruning
+  rule must fail on the counterexample.
 
 ## 5. Acceptance criteria
 
@@ -645,7 +838,11 @@ storage or identity. A required leg that did not execute fails its job.
   a symbolic link among the planned entries, an entry on another device, a
   destination that holds an identity the plan does not name, and a planned
   identity found at neither path; a duplicate source with content beside a
-  moved destination goes to evidence with its bytes intact. (g) With the
+  moved destination goes to evidence with its bytes intact, and the same
+  debris recreated by two further refused v0.2.0 starts goes to two further
+  evidence names, nothing replaced (FR-013); after T2 the app store holds
+  no entry named `pre-upgrade-*` and both 0.14 caches are in the aside
+  directory. (g) With the
   pinned Rauthy build, a crash injected between Rauthy's two cache renames
   is run and its outcome recorded; the criterion passes only on a build
   that meets B-4b.
@@ -667,27 +864,39 @@ storage or identity. A required leg that did not execute fails its job.
   before its locks. A marker in the app store with foreign content refuses
   T3. A normal start over a fence with debris starts, reports the debris
   and changes none of it; over a legacy path with a database file it
-  refuses.
+  refuses. Every entry point of B-4a with `HQL_CACHE_LEGACY_MOVE_ASIDE`,
+  `HQL_DANGER_RAFT_STATE_RESET` or `HQL_BACKUP_RESTORE` in its own
+  environment refuses before it takes a lock and changes nothing. The
+  verb's output and the README carry B-4's preconditions word for word.
+  B-4's preconditions themselves are not tested as enforced: no test
+  claims to detect an old process past its read or in its lock-free start
+  phase.
 - **AC-6 (revocation, not weakened).** A token revoked by `jti` and one by
   subject: (a) revoked before the upgrade, in the 0.14 cache, are refused
   after it, and still refused at `instant + V`, `instant + 2V` and after a
   restart; (b) revoked after the upgrade, are refused across a restart,
-  across deletion of both cache directories, and until `revoked_at +
-  V(L_max)`, including after a deploy that lowers L and after one that
-  raises it (7.4 item 4's timeline: L = 600, a token with `exp - iat =
-  3600` revoked at `r`, L raised to 3600 at `r + 1000`: refused until its
-  expiry); (c) the boundaries hold: `iat == before` refused, `iat == before
-  + 1` accepted, no `iat` refused, `exp < iat` refused, a token with `exp -
-  iat == L` accepted and `L + 1` refused, `iat == now + 60` accepted and
-  `now + 61` refused, and claims near `u64::MAX` refused without overflow;
+  across deletion of both cache directories, and until its own expiry,
+  including after a deploy that lowers L and after one that raises it (7.4
+  item 4's timeline: L = 600, a token with `exp - iat = 3600` revoked at
+  `r`, L raised to 3600 at `r + 1000`: refused until its expiry), and after
+  a backward clock step that follows the point at which revision 3 would
+  have pruned its row (D-P17's counterexample, FR-014): under B-6 (i) by
+  its retained row, under B-6 (ii) by the watermark, including across a
+  restart between the prune and the step; (c) the boundaries hold: `iat ==
+  before` refused, `iat == before + 1` accepted, no `iat` refused, `exp <
+  iat` refused, a token with `exp - iat == L` accepted and `L + 1` refused,
+  `exp - iat == 86,401` refused with L at its maximum, `iat == now + 60`
+  accepted and `now + 61` refused, and claims near `u64::MAX` refused
+  without overflow;
   (d) a restore of
   a v0.2.0 archive by the new image refuses a token issued before the
   restore; (e) if P-7 is accepted, a token revoked after a backup point is
   refused after restoring that backup, and the floor after any restore is
   at least the archive's; (f) if P-11 is accepted, a token signed under a
   key published before the transition is refused whatever its `iat`.
-  B-6c's Rauthy-side boundary and B-6b's backward-step consequence are
-  documented, not tested as closed.
+  B-6c's Rauthy-side boundary (including a revived refresh credential and
+  an in-place restore's surviving cache) and B-6b's backward-step
+  consequence are documented, not tested as closed.
 - **AC-7 (stop, graceful).** FR-007 passes. Then a bounded series under the
   declared workload (streams open up to 026's per-identity limit, a
   200-denial backlog in flight, Rauthy running) records per run each
@@ -724,7 +933,10 @@ versions B-4b waits for (a later owner decision); enabling hiqlite's
 `auto-heal`; S3 upload outcome reporting; replacing 030 D-2's file-level
 restore with hiqlite's repaired restore; a Rauthy terminal-storage signal
 and a producer-side downgrade fence, which are producer requests and not
-prerequisites; an in-place rollback after `flooring`.
+prerequisites; an in-place rollback after `flooring`; detecting an old
+process before its first read or lock (B-4's preconditions), and a public
+hiqlite exclusion interface for it (hiqlite D-17); invalidating Rauthy
+sessions and refresh credentials after a stale restore (B-6c).
 
 ## 7. Resolved decisions
 
@@ -755,7 +967,8 @@ prerequisites; an in-place rollback after `flooring`.
 
 These record direction. Approval of this text, the implementation contract
 that carries them out, is a separate owner act; the packet is
-`docs/design/06-owner-decision-packet-2026-09-23.md`.
+`docs/design/09-owner-decision-packet-rev4-2026-09-23.md`, which supersedes
+06 and 07.
 
 Still open before approval: P-7, P-8, P-9, P-10, P-11, P-12.
 
@@ -781,25 +994,38 @@ Still open before approval: P-7, P-8, P-9, P-10, P-11, P-12.
   `migrate` step instead of serving. Revision 3 keeps it and adds B-4 T1's
   whole-file guard and quiescence check and T2's identity plan (7.4).
   Rejected alternatives in 7.3.
-- **P-9 (the lifetime ceiling, the permanent floor and the prune horizon,
-  revision 3).** The bearer check refuses a token without `iat`, with `exp
-  < iat`, with `exp - iat` above L, or with `iat` more than the leeway in
-  the future; the floor never lifts; revocation rows are pruned at
-  `revoked_at + V(L_max)`, 86,520 seconds, not at `V(L*)`. Cost: a Rauthy
-  misconfigured above the manifest's lifetime is refused at the bearer
-  instead of only failing preflight; a token without `iat` is always
-  refused (Rauthy 0.36.2 always sets it, D-P10); revocation rows live about
-  24 hours instead of 12 minutes, one row per revocation. Rejected
-  alternatives in 7.3 and 7.4.
-- **P-10 (the supervisor fence, revision 3).** B-5's second fence: the
+- **P-9 (the lifetime ceiling, the permanent floor, and retention or a
+  pruning watermark, revision 4).** The bearer check refuses a token
+  without `iat`, with a claim outside `0..=u64::MAX`, with `exp < iat`,
+  with `exp - iat` above the hard 86,400 or above L, or with `iat` more
+  than the leeway in the future, all by checked arithmetic; the floor
+  never lifts and is inclusive. Revision 3's pruning at `revoked_at +
+  V(L_max)` is withdrawn (7.5 item 3). The owner chooses one of B-6's two
+  exact texts: **(i) retain** every revocation row and never prune
+  (recommended; cost: unbounded growth, one row per `jti` revocation and
+  at most one per subject, not measured), or **(ii) prune under a
+  persisted watermark** that refuses every token while the clock is below
+  the last prune (cost: a clock that ran ahead and was corrected locks
+  every bearer out until it catches up). Other costs as revision 3: a
+  Rauthy misconfigured above the manifest's lifetime is refused at the
+  bearer instead of only failing preflight; a token without `iat` is
+  always refused (Rauthy 0.36.2 always sets it, D-P10). Neither option
+  narrows B-6b's backward-step gap at the transition; P-11 is the choice
+  that does.
+- **P-10 (the supervisor fence, revision 4).** B-5's second fence: the
   rendered Rauthy environment moves from `<data>/rauthy/rauthy.env` to
   `<data>/rauthy-env/rauthy.env`, and the old path becomes a directory
-  holding `FENCE`, so every published pre-043 `supervise` exits before it
-  spawns Rauthy (D-P14 for v0.2.0; source for v0.1.0). It touches one path
+  holding `FENCE`, so every published pre-043 `supervise` whose read of
+  that path begins after T1 (e) exits before it spawns Rauthy (D-P14 for
+  v0.2.0; source for v0.1.0; D-P18 for the one it cannot stop). It touches one path
   under `<data>/rauthy`, a file rahi itself renders there (031 B-1), and
   none of Rauthy's storage; the owner decides whether that reading of
   spec 000's `store-separation` ("separate storage that app code never
-  opens") holds. Alternative: an unparseable `<data>/restore.marker`, which
+  opens") holds: that the anchor governs Rauthy's storage and not rahi's
+  own rendered configuration file beside it. Revision 4 narrows the claim
+  (7.5 item 2): the fence stops every published pre-043 supervisor whose
+  read begins after T1 (e), not one that read the file earlier and has yet
+  to spawn; B-4's first precondition covers that one. Alternative: an unparseable `<data>/restore.marker`, which
   v0.2.0's `supervise` also reads before spawning (D-P14), lies wholly
   outside `<data>/rauthy`, but does not stop v0.1.0's `supervise`, which
   never reads it. Without either, a directly started pre-043 `supervise`
@@ -1013,6 +1239,108 @@ Still open before approval: P-7, P-8, P-9, P-10, P-11, P-12.
   `rahi-kernel/src/manifest.rs` validates `10 <= L <=
   MAX_ACCESS_TOKEN_LIFETIME_SECS` (86,400).
 
+- **D-P17 (the post-prune clock rollback, model, 2026-09-23; revision
+  4).** `docs/design/evidence/043-probes/clock_model.py`, a deterministic
+  model of B-6's admission rules and four pruning policies (Python 3.14,
+  stdlib, macOS arm64; a model, no rahi code). Revision 3's rule admits the
+  counterexample (floor 0, `iat = 100`, `exp = 700`, L = 600, revoked at
+  200, pruned at 86,721, clock at 300) by `jti` and by subject; retention
+  and the persisted watermark refuse it, the watermark across a restart
+  through a real file; a watermark kept only in memory admits it after the
+  restart (the persistence control); revision 2's rule admits 7.4 item 4's
+  lifetime increase and revision 3's refuses it. A bounded grid of 74,880
+  cases per policy (L in {600, 3600, 86,400}, 13 instants each for issue,
+  revocation, prune and admission): revision 3 admitted a revoked token in
+  5,031, every one with the clock below its last prune; retention and the
+  watermark in none. The boundaries of AC-6 (c), the hard maximum and the
+  `u64::MAX` claims behave as B-6 says. Cost case: a prune at a clock that
+  ran ahead to 1,000,000 leaves every token refused at 400. Limitation: a
+  model of the rules as written here, not of the bearer code; FR-014 is
+  the product test.
+- **D-P18 (a pre-043 supervisor between its read and its spawn, source
+  and model, 2026-09-23; revision 4).** Source: v0.2.0
+  `crates/rahi-cli/src/lib.rs` `supervise` calls `sup::prepare_rauthy`,
+  which reads `<data>/rauthy/rauthy.env` with `read_to_string` into a
+  `Command` (`crates/rahi-ops/src/supervise.rs` `prepare_rauthy`), then
+  builds the admin client and calls `sup::supervise`, whose
+  `supervise_with` calls `rauthy.spawn()` with no further read of the
+  volume; v0.1.0 is the same with `rauthy_command`. Model:
+  `evidence/043-probes/supervisor_race.py`, one scenario in a disposable
+  directory under a 60-second alarm, macOS arm64: prepare, then B-5's fence
+  installation, then a stand-in for T4's 0.15 cache, then spawn: the real
+  child process spawned; the control, fence then prepare, failed the read
+  with `EISDIR` and spawned nothing. The published binary was not paused
+  between its read and its spawn; the window in it is the time from the
+  read to the spawn, which an ordinary run keeps short and a paused,
+  frozen or descheduled process keeps open indefinitely.
+- **D-P19 (evidence names and no-replace, 2026-09-23; revision 4).**
+  `evidence/043-probes/evidence_names.py`, real `renamex_np(RENAME_EXCL)`
+  calls through ctypes on macOS arm64 (the script uses
+  `renameat2(RENAME_NOREPLACE)` on Linux; not run there). No-replace onto
+  a file, an empty directory and a non-empty directory each failed
+  `EEXIST` and changed nothing; a plain `rename` replaced the empty
+  directory (the control). Revision 3's fixed name, `evidence/<id>/logs`,
+  met its own first occurrence when a second refused start recreated
+  `logs/`: the rename refused, the first occurrence's bytes stayed intact,
+  and the second stayed at the source, so the verb could not finish T2.
+  Revision 4's names, with `seq` in a durably recorded intent, took three
+  occurrences to three names with their own bytes, recovered by identity
+  after an interruption after the intent (redo) and after the rename
+  (done), and refused, changing nothing, when the evidence name held
+  another identity. Limitation: a model of the naming and recovery rules,
+  not the verb.
+- **D-P20 (hiqlite's answer to H-7, and its repair candidate, 2026-09-23;
+  revision 4).** `bartekus/hiqlite` pull request #37 (open), head
+  `26e2fa0a15b8b94dcc0ef2b733f6cec70922f9df`, branch
+  `fix/035-n1-upgrade-exclusion`; code `048fcecd5bdab7d4d12b2207b69f46bf31aa9c99`
+  (`3b11e4a` with its review fixes), and `8e4ec4b` is reachable from it.
+  `standards/spec/n3-rahi-reconciliation-handoff.md` section 3, source
+  only: revision 3's route is sound for pre-043 rahi binaries (0.14
+  without `auto-heal`, node id 1) under configuration exclusions revision 3
+  did not state: `HQL_DANGER_RAFT_STATE_RESET` (`init.rs:28-69`: a 10 s
+  sleep holding nothing, then `logs/`, `logs_cache/` and both snapshot
+  directories deleted, the marker kept) and `HQL_BACKUP_RESTORE`
+  (`start.rs:52`, `backup.rs:273-287`: on node 1 the database, snapshots
+  and `logs/` removed and the restored database written under the fence
+  before the marker panic; on another node id `remove_dir_all` of the data
+  directory) act before any lock or marker; T1 (c)'s evidence is
+  sufficient for a stopping node and says nothing about a starting one
+  before `LogStore::start`; relocation entry by entry is sound for 0.15
+  with `filename_db` unchanged, `state_machine/db` moved whole and the
+  marker never relocated (B-4 T2 meets all three); debris names must be
+  unique per occurrence; `pre-upgrade-*` inside the data directory is
+  hiqlite's namespace, and its repaired build inspects completed
+  `pre-upgrade-*` directories, though only one holding `logs_cache` without
+  `state_machine_cache`, so revision 3's two-cache directory never matched
+  it and no corruption from it is claimed. It also records that 0.14 with
+  `auto-heal` deletes the database at a marker and serves; no rahi build
+  has that feature. Candidate state: H-1, H-2, H-3 and H-8 implemented and
+  candidate-tested (macOS arm64 debug builds and the Linux legs its 035
+  section 5.1 names), unreleased; H-5 option 2 stated; the public exclusion
+  handle (D-17) and a downgrade fence (D-19) not built. hiqlite 0.15
+  (`0.15.0-patched.1`) reads both variables at start (`init.rs:29`,
+  `backup.rs:74`). rahi source: every pre-043 app-store open passes
+  `refuse_env_restore` first (`Booted::boot`, `serve.rs:226` at v0.1.0 and
+  v0.2.0; preflight), and nothing refuses `HQL_DANGER_RAFT_STATE_RESET`.
+- **D-P21 (Rauthy's inventory and candidate, 2026-09-23; revision 4).**
+  `bartekus/rauthy` local worktree, branch `work/0.36.2-patched.3`, commit
+  `51e732802ba48133fb430303f9cc20f5e62bf133`, unpublished:
+  `RELEASE-STATE-INVENTORY.md` (read from source at `513bcc98`, the tree of
+  `v0.36.2-patched.2` plus documentation, nothing measured) and
+  `RELEASE-PRODUCER-RESPONSES.md`. Disk-backed cache by default, TTLs kept
+  as absolute expiries, a release restart clearing only the HTML and
+  application caches; sessions, refresh tokens (browser and device),
+  `issued_tokens.revoked`, signing keys and API keys in SQL; the cache-only
+  items B-6b lists; a stale database restore reviving the credentials and
+  security configuration B-6c lists; an in-place `HQL_BACKUP_RESTORE`
+  keeping the cache, newer than the restored SQL; a consumer's access-token
+  floor unable to stop a revived refresh credential. R-1 (a `storage` field
+  on `/auth/v1/health`: `ok`, `degraded`, `terminal`, `unknown`) implemented
+  and tested locally, unreleased; R-4 answered by the unsupported-downgrade
+  statement (route 2); a Rauthy build on hiqlite's repair not started, since
+  at the time of writing no candidate commit existed for it. None of this is
+  released, and 043 relies on none of it as a mechanism.
+
 ### 7.3 Revision 2 corrections (2026-09-23)
 
 What revision 1 (`5707f60`) got wrong, and what replaced it.
@@ -1117,6 +1445,70 @@ What revision 2 (`95622f1`) got wrong or left open, and what replaced it.
     recovery. B-4b now gates completion and qualification on a repaired
     producer build (P-12).
 11. **R-3.** The release assets exist and agree (D-P15).
+
+### 7.5 Revision 4 corrections (2026-09-23)
+
+What revision 3 (`abd66fd`, spec blob `d2fd7bf`) got wrong or left open,
+and what replaced it. Items 1 to 3 are design corrections; items 4 and 5
+are precision; item 6 is state. None reopens D-1 to D-6.
+
+1. **Old invocations that act before any lock or marker.** Revision 3's
+   T1 (c) proves that no 0.14 node past its log store's start has the
+   legacy path open, and revision 3 read that as proof that no old process
+   could act. A 0.14 process with `HQL_DANGER_RAFT_STATE_RESET` or
+   `HQL_BACKUP_RESTORE` in its environment acts destructively before it
+   takes any lock or meets the marker, where no check of the directory can
+   see it (hiqlite's H-7 answer, Q1 and Q2, D-P20). B-4 now states both as
+   preconditions on every old process on the volume, beside the stopped
+   and removed old container with its restart sources disabled, which is
+   kept. B-3 and B-4a now also refuse both variables in this version's own
+   environment, since 0.15 reads them when rahi opens the app store in
+   process; that check says nothing about another process's environment.
+2. **The supervisor fence is not a universal exclusion.** Revision 3 said
+   every published pre-043 `supervise` exits before spawning Rauthy. One
+   that read `rauthy.env` before T1 (e) holds a built `Command` the fence
+   cannot invalidate and spawns it whenever it resumes, after T4 included
+   (D-P18). B-5 now states the exact residual guarantee (a read that begins
+   after T1 (e)'s rename fails before the spawn) and B-4's first
+   precondition requires every old supervisor and child stopped, direct
+   invocations included. This does not contradict the stopped-container
+   procedure, which it narrows; no public hiqlite exclusion interface is
+   asked for.
+3. **Pruning under a backward clock step.** Revision 3 pruned at
+   `revoked_at + V(L_max)`. The hard maximum fixed revision 2's
+   lifetime-increase failure, but a clock set back after a prune brings a
+   revoked token back with its row gone (B-6's counterexample, D-P17), and
+   neither the floor nor P-11 covers tokens issued after the transition.
+   Revision 3's pruning is withdrawn; P-9 now offers retention (recommended)
+   or a persisted pruning watermark with fail-closed admission below it, as
+   two exact texts for the owner's choice. The admission refusals stay, the
+   hard maximum is now explicitly a check that reads no manifest, claims
+   outside `u64` and every overflow refuse, and the floor stays inclusive
+   and permanent. B-6b's transition gap under a backward step is unchanged
+   by either option; P-11 remains the owner's separate choice.
+4. **Evidence names, and the aside directory.** Revision 3 already forbade
+   replacing anything, so a second occurrence of the same debris could not
+   overwrite the first; it would have stalled T2 at a no-replace refusal
+   (D-P19). Every move to evidence now gets a name unique per occurrence,
+   allocated in its recorded intent, with recovery by identity. The app
+   store's 0.14 caches now go to the aside directory, outside the app store,
+   instead of `<app store>/pre-upgrade-<instant>/`, which is inside
+   hiqlite's reserved namespace. H-7 shows no corruption from revision 3's
+   complete two-cache directory; the move is namespace hygiene for later
+   hiqlite versions, not a repair.
+5. **Rauthy's cache and restore.** Revision 3 listed IP bans and
+   failed-login counters as the upgrade's losses and stated the stale
+   refresh boundary in one sentence. With the producer's inventory (D-P21),
+   B-6b lists every cache-only item the move loses and notes that a normal
+   restart loses none of them, and B-6c lists what a stale restore revives,
+   including a refresh credential that mints tokens rahi's floor admits and
+   an in-place restore that keeps a cache newer than the restored database.
+   The obligation stays open.
+6. **Producer state.** H-6 is done, H-7 answered with its limits, H-1, H-2,
+   H-3 and H-8 implemented in an unreleased hiqlite candidate, R-1
+   implemented in an unreleased Rauthy branch, R-2 answered from source,
+   R-3 closed (D-P20, D-P21). No request's class changes: H-8 stays
+   N1-release-blocking and B-4b's gate is unchanged.
 
 ## Verification
 
