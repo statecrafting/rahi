@@ -82,6 +82,17 @@
     "implementation": "complete",
     "kind": "kernel",
     "risk": "critical",
+    "sectionDigests": {
+      "013-the-decision-chain": "d0c1c7aae6e8c623f3656a3b3a085c24a7b089693f4d539e3f75cebdfd45b31e",
+      "1-purpose": "3f9bc2c644ce5395e7831c28e35bb6693f451e10776d2dfab939766d4220f289",
+      "2-territory": "0341e40e674bd10d5a1e8aeb6ffc3cf41487e7b8dbe43c5d6120e4c7e2de697f",
+      "3-behavior": "b47a843d1e632b9f78237434408514ec087dba476ea21ca373791944506a400b",
+      "4-functional-requirements": "bcf74dddede505256d95d30569cb7f780c7669ef5687848895240fe652c00245",
+      "5-acceptance-criteria": "8552cfc7a03e0ce7bbab64e3b2f3bec64e88e495d970672100bfd9d6dade9f4b",
+      "6-out-of-scope": "da56f71eefe28378c89d42ea5e163785ddb80092ccc61cb7d8fe061a32dfb90f",
+      "7-resolved-decisions": "0688f682d984146c91838219ba8a6f48c2ce49b4041eab05a1f8eca5261d6d9e",
+      "verification": "0704ac0a656aaa66c522acdcd8d5bc023b2dd88862c7637998924816217f6be6"
+    },
     "sectionHeadings": [
       "013: The decision chain",
       "1. Purpose",
@@ -99,5 +110,5 @@
     "title": "The decision chain: hash-linked records, CAS append, verification at boot"
   },
   "shardHash": "1934c65ea0c8c1f2f43e460b23fac5fdbddf905e98186e17859f31adad13708a",
-  "specVersion": "1.3.0"
+  "specVersion": "1.8.0"
 }

@@ -643,6 +643,61 @@ and tracking them would claim text no author wrote. Whether rahi wants
 generated non-Claude trees at all is recorded as an open decision for the
 owner, not settled here.
 
+D-14 (2026-09-23, owner decision; spec-spine 0.24.0 adoption). The pin
+moves from 0.20.0 to 0.24.0 in every site that states it as the pin
+(`Makefile`, which CI reads, plus the prose in `AGENTS.md`, `README.md` and
+the architect agent), and D-13's verification line is replaced by this
+entry's. The owner chose 0.24.0 over 0.23.0. 0.22.0 was never published: its
+candidate was frozen upstream, and the list on crates.io and the GitHub
+releases goes from 0.21.0 straight to 0.23.0, so no CI install could reach
+it. A local 0.22.0 build had been sitting in the shared `~/.cargo/bin`. The
+sites D-13 kept on purpose are still kept, and so is every dated record
+naming 0.20.0 (`CHANGELOG.md`, which 039 owns, `docs/design/01`, `03`, and
+`AGENTS.md`'s "since 0.20.0" sentence about an unresolved claim). All three
+release notes were read (0.21.0, 0.23.0 and 0.24.0), along with
+spec-spine's `docs/adopter-migration.md` at v0.23.0, because a 0.20.0
+adopter crosses all of them.
+
+**What moved, measured on `b815b18`.** The registry shards go from
+`specVersion` 1.3.0 to 1.8.0 and gain `sectionDigests`: 30 of 30 shards,
++389/-30. A bare bump moves no index shard; in this change all 41 move by
+their `shardHash` alone, because the `Makefile`, `AGENTS.md` and
+`spec-spine.toml` are hashed inputs. The formats are mutually exclusive:
+each version reads the other's shards as stale at exit 2. That is why the
+pin and the shards move in one change and nothing else rides with it. With
+0.24.0 on its own shards, `check`, `lint`, `index coverage`
+(161 of 161 claimed), `couple` and `spec-dag` all exit 0.
+
+**One addition: a floor.** `[meta] required_version = ">=0.24.0"` in
+`spec-spine.toml`, the upgrade checklist's item 3 and what the 0.24.0 notes
+ask of a corpus that uses a 0.24.0 member. It is a floor, not the pin; B-3
+is unchanged, and the pin is still stated only in the `Makefile`. It is here
+because of a measured hazard. The pre-commit hook and three session hooks
+resolve their binary as `$SPEC_SPINE_BIN`, then `target/release`, then
+`PATH`. The merge driver and `scripts/spec-dag.sh` read `PATH`. None of them
+reads the pin. In the measurement for this entry, a stray 0.22.0 on `PATH`
+refused a correct 0.24.0 shard tree as stale. Under the floor, 0.20.0,
+0.22.0 and 0.23.0 each refuse at exit 3 and name the requirement, instead
+of judging shards they cannot read. The floor does not make the resolvers
+pick the right binary; it makes a wrong pick fail by name. An exact
+`=0.24.0` was rejected: it would state the pin a second time, which is
+against B-3.
+
+**Nothing turns red, checked and not assumed.** Spec 100 makes `couple`
+refuse history it cannot read, and both `govern.yml` jobs already check out
+with `fetch-depth: 0`. `moves` and `intent` are now typed keys, and
+`[frontmatter] extra_known_keys` declares only `wave`. Spec 116 only lets
+`lint` pass more; it reports zero warnings both before and after.
+
+**Left open for the owner, not settled here.** B-5 requires every skill to
+be byte-identical to "the spec-spine kit's copy", and 0.23.0 removed the kit
+upstream (its spec 092); the migration note calls a local harness copy
+"yours" to maintain. 0.21.0 also asked adopters to re-copy four kit files
+(`Makefile`, `govern.yml`, `AGENTS.md`, the shepherd skill), and rahi never
+ran 0.21.0. Neither is adopted here, because either would be protocol
+substance riding on a version bump. What B-5's reference means now that the
+kit is gone is for the owner to decide.
+
 ## Verification
 
 ```verify:cli
@@ -698,8 +753,8 @@ sh -c '! grep -qE "git (-C [^ ]+ )?add" .githooks/pre-commit'
 # B-10 / D-13: the flag is local-only. CI's coupling verdict must not depend
 # on the state of a runner's working tree (spec-spine spec 102 3.4).
 sh -c '! grep -rq -- "--include-uncommitted" .github/workflows/'
-# D-13: the pin is 0.20.0 wherever the pin is stated.
-sh -c 'test "$(sed -n "s/^SPEC_SPINE_VERSION ?= //p" Makefile)" = 0.20.0'
+# D-14 (replacing D-13's line): the pin is 0.24.0 wherever the pin is stated.
+sh -c 'test "$(sed -n "s/^SPEC_SPINE_VERSION ?= //p" Makefile)" = 0.24.0'
 # D-13: spec-dag reads the versioned read document (spec-spine spec 093).
 grep -q 'schemaVersion' scripts/spec-dag.sh
 ```
