@@ -121,6 +121,23 @@
       }
     ],
     "risk": "critical",
+    "sectionDigests": {
+      "044-n-3-split-composition": "021424313a7c08da30ec477604910f13e4880128c915970e41222c1ba5540740",
+      "1-purpose": "bd08d27f4cd841320c48bfd5b745de6847c2ee7e479c88e20dedbe15c33e3bde",
+      "2-territory": "78172f8753a422b645191aa7c28262196812402ffc9afda3274f167db226cd57",
+      "3-behavior": "1f2954aa7251e56d6f61966e42a46d1e5384b8971d3a931898a391227044b570",
+      "4-functional-requirements": "aa892115c426725986e6cef91ac25fc1e8cd44bc1a1273fefbeba9b05c51156a",
+      "5-acceptance-criteria": "169f7fcf21df69f38314017790f8c25070fb0fe386637e8475d6a8806099164e",
+      "6-out-of-scope": "9c4c3f29934883c9865be3bb7f11d9749a7bf42e502d39d7ee9628deef6006d3",
+      "7-resolved-decisions": "54612d8a1fe897ff1974b32b4192eb62e365d4bf6efbde595e95fe29fe9b9676",
+      "backup-replaces-the-single-volume-cut": "685f344b219cca435b68b80884464829f0cef1ce8ca0e115228119d0517e9e43",
+      "disruption-and-storage": "30913a289f56c751bd82704d56dd15ed2c8e77c3993c797ef1cbd6f51352e8bf",
+      "proposals-2026-09-23": "9da1287a49d6af22b7484012f6e6f35e560762b1ced2e393750ccac33a32208e",
+      "proposed-amendments-to-complete-specs-n-3-only": "b96c7ee65670d4232002f8de61bccdc614ea8516605fb9d438036c640c2751e0",
+      "readiness-and-liveness-replaces-die-together": "6a24778a8a75dcf481525abce13213bfc1e02871d3e305402d5f125bd9e75add",
+      "routing-and-trust-replaces-loopback": "b979778d74fd1ae4216072a0cbfef31042bd6516e75d91f6cf5971e93aee3895",
+      "verification": "3790ad6b249d804ade30f9034c1f5c985cb0bcb9fd674a6d41eb0fcb39d972b1"
+    },
     "sectionHeadings": [
       "044: N=3 split composition",
       "1. Purpose",
@@ -144,5 +161,5 @@
     "title": "N=3 split composition: two StatefulSets, rahi and rauthy, one hiqlite node per pod, rahi reaching rauthy only through an encrypted internal Service and losing readiness, never liveness, without it"
   },
   "shardHash": "548388d46c91ee4e3841c4aa545b005d806114b5a28d300fdd572dc9487d2f40",
-  "specVersion": "1.3.0"
+  "specVersion": "1.8.0"
 }
