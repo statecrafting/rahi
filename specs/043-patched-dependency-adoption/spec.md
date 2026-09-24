@@ -306,7 +306,7 @@ Terms.
   | T1 guard | `begin{id}`, `id` 128 random bits | (a) refuse if `upgrade-cache.json` names another unfinished transition. (b) Write `rahi-upgrade-cache <id>` to `<legacy>/state_machine/.rahi-guard-<id>`, fsync it, and `link(2)` it to `<legacy>/state_machine/lock`, then fsync the directory and unlink the temporary: the marker appears whole or not at all. `EEXIST` refuses: a pre-043 node is live or stopped uncleanly (the message says which from (c)'s probe); the existing marker is never modified. (c) **Quiescence**, after the marker is durable: `<legacy>/logs/lock.hql` and `<legacy>/logs_cache/lock.hql` are not held (a non-blocking probe that opens existing files only and creates none; an absent file reads as not held), and `<legacy>/state_machine/db/` holds no `-wal` and no `-shm` file (a pre-043 node closes SQLite after it releases both WAL locks and removes its marker, D-P12; SQLite removes them only when the last connection closes, the writer's and every connection of hiqlite's read pool, `state_machine.rs:117,317-330`, so their absence covers the whole pool). (d) The marker still has the identity `link` gave it and its content is this `id` (a pre-043 start truncates the marker path in place with `File::create`, and a pre-043 clean stop unlinks it, D-P11). A failure of (c) or (d) refuses and **leaves the marker where it is**: while it carries this `id` a pre-043 start panics on it, and a marker a pre-043 node has truncated is that node's own. (e) Install the supervisor fence (B-5); the old rendered file goes to a fresh evidence name (step `t1e`). (f) Read `instant` from the wall clock | `guarded{instant, marker identity}` | a marker with this `id`: resume at (c) (the content proves provenance; `link` never publishes a partial file); no marker: redo (b); a marker with other content, including empty: refuse as in (b), and name the state as interrupted by a pre-043 node |
   | T1a verify | `verifying` | verify the archive with 030's read-only verification | `verified{digest}` | rerun; nothing on disk changed |
   | T2 relocate | `relocating{target, plan}` with `target` = the aside directory `<data>/upgrade-cache/aside/<id>/` and `plan` = every entry to move with its source path, destination path and identity, listed once | refuse, before recording the intent, when: the app store exists and is not an empty directory (`first-boot`'s layout creates it empty); `target` exists; any planned entry, or `<legacy>`, `<legacy>/state_machine`, `<data>` or `<data>/upgrade-cache`, is a symbolic link; any planned entry's `st_dev` differs from `<legacy>`'s; or `<legacy>`, `<data>/upgrade-cache` and `<data>` are not all on one device. Then move, in the plan's order, every child of `<legacy>` except `state_machine`, and every child of `<legacy>/state_machine` except `lock`, into the app store at the same relative path, except `logs_cache` and `state_machine_cache`, which go into `target`, `state_machine_cache` before `logs_cache` (hiqlite F-130); fsync both parents after each rename. Debris that appears under `<legacy>` after the plan was recorded is moved once every planned entry has moved, each entry to a fresh evidence name recorded, with its identity, in an intent before its rename | `relocated`; `<legacy>` is now the fence | per planned entry, by identity and never by existence: the planned identity at the source means not moved (move it); at the destination means moved; a source path holding another identity beside a moved destination is debris (to a fresh evidence name, never deleted, never merged); a destination holding an identity the plan does not name, or a planned identity found at neither path, refuses and changes nothing (the volume was modified outside this verb). Per evidence move, the same rule on its recorded intent: its identity at the evidence name means moved, at the source means move it, at neither, or another identity at the evidence name, refuses |
-  | T3 floor | `flooring` | open the app store in-process with 0.15, which binds its configured loopback addresses since hiqlite has no start mode without listeners (the verb holds no hiqlite lock of its own; `transition.lock` keeps every attaching verb away, B-4a); in one `txn` upsert the transition row, raise the floor (B-6b) to `before = floor(instant)` in whole seconds, and raise the prune horizon; shut the store down and require `Ok` | `floored` | an empty `<app store>/state_machine/lock` is this step's own unclean stop, because only a process holding `cell.lock` and `transition.lock` while the state is `flooring` can have opened the app store (B-4a): the verb requires the app store's `hiqlite-owner.lock` to be free, moves the marker to a fresh evidence name (step `t3`) and reruns T3; a marker with any other content is refused as foreign (a defensive branch: hiqlite writes only empty markers and T2 never relocates the guard, so only AC-5's synthetic case reaches it) |
+  | T3 floor | `flooring` | open the app store in-process with 0.15, which binds its configured loopback addresses since hiqlite has no start mode without listeners (the verb holds no hiqlite lock of its own; `transition.lock` keeps every attaching verb away, B-4a); in one `txn` upsert the transition row, raise the floor (B-6b) to `before = floor(instant)` in whole seconds, and, under B-6 (ii) only, raise the prune horizon; shut the store down and require `Ok` | `floored` | an empty `<app store>/state_machine/lock` is this step's own unclean stop, because only a process holding `cell.lock` and `transition.lock` while the state is `flooring` can have opened the app store (B-4a): the verb requires the app store's `hiqlite-owner.lock` to be free, moves the marker to a fresh evidence name (step `t3`) and reruns T3; a marker with any other content is refused as foreign (a defensive branch: hiqlite writes only empty markers and T2 never relocates the guard, so only AC-5's synthetic case reaches it) |
   | T4 Rauthy | written by `supervise` | while the state is `floored`, `supervise` adds `HQL_CACHE_LEGACY_MOVE_ASIDE=true` to the Rauthy child's environment and Rauthy moves its own cache | `rauthy-done`, once Rauthy answers ready | a boot while still `floored` passes the consent again; once Rauthy's own format marker exists the variable is a no-op. An interruption inside Rauthy's own two renames is on this transition's normal crash path: with `hiqlite-patched 0.15.0-patched.1`, which renames `logs_cache` before `state_machine_cache`, it can leave a 0.14 cache snapshot that the next start restores without refusal (hiqlite F-130, committed at `8e4ec4b`; repair contract hiqlite 035 B-5). This spec does not repair it; it gates the release on it (B-4b) |
   | T5 serve | written by `serve` | at `floored` or `rauthy-done`, `serve` starts normally | `done`, after the first `/readyz` 200; the file is kept as history | none needed; `serve` is idempotent here |
 
@@ -420,8 +420,11 @@ Terms.
   point, and the fence cannot invalidate a command already built (D-P18).
   B-4's first precondition covers it: every old supervisor and child is
   stopped before T0. The residual guarantee is exactly this: **a pre-043
-  `supervise` whose read of `<data>/rauthy/rauthy.env` begins after T1
-  (e)'s rename fails that read and exits before it spawns Rauthy.** This
+  `supervise` whose read of `<data>/rauthy/rauthy.env` opens that path at
+  or after T1 (e)'s move of the old file to evidence fails that read
+  (the path is absent, then a directory) and exits before it spawns
+  Rauthy.** A read that opened the file before that move completes on the
+  already open descriptor and is not stopped. This
   does not replace, and is not evidence against, the stopped-and-removed
   procedure; it narrows what a mistake in it can do.
   A pre-043 `first-boot` whose keys already exist skips a path that exists
@@ -600,7 +603,10 @@ Terms.
   cache is disk-backed by default, and a normal restart of a release build
   keeps everything in it except its HTML and application caches; so these
   are new losses at the upgrade, not losses the cell already has at every
-  restart: authorization and ToS-await codes, device codes, WebAuthn and
+  restart. The list below omits the producer's ATProto and PAM entries,
+  which rahi's rendered configuration does not name; if either is in use,
+  its cache-only state is lost too: authorization and ToS-await codes,
+  device codes, WebAuthn and
   MFA-modification challenges, proof-of-work challenges, DPoP nonces, every
   IP ban, manual and automatic alike (Rauthy records no difference),
   failed-login counters, credential-stuffing windows, rate-limit windows,
@@ -841,8 +847,8 @@ storage or identity. A required leg that did not execute fails its job.
   moved destination goes to evidence with its bytes intact, and the same
   debris recreated by two further refused v0.2.0 starts goes to two further
   evidence names, nothing replaced (FR-013); after T2 the app store holds
-  no entry named `pre-upgrade-*` and both 0.14 caches are in the aside
-  directory. (g) With the
+  no entry named `pre-upgrade-*` and the app store's two 0.14 caches are in
+  the aside directory. (g) With the
   pinned Rauthy build, a crash injected between Rauthy's two cache renames
   is run and its outcome recorded; the criterion passes only on a build
   that meets B-4b.
@@ -1015,8 +1021,9 @@ Still open before approval: P-7, P-8, P-9, P-10, P-11, P-12.
 - **P-10 (the supervisor fence, revision 4).** B-5's second fence: the
   rendered Rauthy environment moves from `<data>/rauthy/rauthy.env` to
   `<data>/rauthy-env/rauthy.env`, and the old path becomes a directory
-  holding `FENCE`, so every published pre-043 `supervise` whose read of
-  that path begins after T1 (e) exits before it spawns Rauthy (D-P14 for
+  holding `FENCE`, so every published pre-043 `supervise` whose read
+  opens that path at or after T1 (e)'s move of the old file to evidence
+  exits before it spawns Rauthy (D-P14 for
   v0.2.0; source for v0.1.0; D-P18 for the one it cannot stop). It touches one path
   under `<data>/rauthy`, a file rahi itself renders there (031 B-1), and
   none of Rauthy's storage; the owner decides whether that reading of
@@ -1024,8 +1031,8 @@ Still open before approval: P-7, P-8, P-9, P-10, P-11, P-12.
   opens") holds: that the anchor governs Rauthy's storage and not rahi's
   own rendered configuration file beside it. Revision 4 narrows the claim
   (7.5 item 2): the fence stops every published pre-043 supervisor whose
-  read begins after T1 (e), not one that read the file earlier and has yet
-  to spawn; B-4's first precondition covers that one. Alternative: an unparseable `<data>/restore.marker`, which
+  read opens the path at or after T1 (e)'s move of the old file, not one
+  that opened it earlier and has yet to spawn; B-4's first precondition covers that one. Alternative: an unparseable `<data>/restore.marker`, which
   v0.2.0's `supervise` also reads before spawning (D-P14), lies wholly
   outside `<data>/rauthy`, but does not stop v0.1.0's `supervise`, which
   never reads it. Without either, a directly started pre-043 `supervise`
@@ -1302,7 +1309,8 @@ Still open before approval: P-7, P-8, P-9, P-10, P-11, P-12.
   directories deleted, the marker kept) and `HQL_BACKUP_RESTORE`
   (`start.rs:52`, `backup.rs:273-287`: on node 1 the database, snapshots
   and `logs/` removed and the restored database written under the fence
-  before the marker panic; on another node id `remove_dir_all` of the data
+  before the marker panic (the marker's survival rests on a `remove_dir_all`
+  failing on a file, checked by hiqlite on macOS with rustc 1.95 only); on another node id `remove_dir_all` of the data
   directory) act before any lock or marker; T1 (c)'s evidence is
   sufficient for a stopping node and says nothing about a starting one
   before `LogStore::start`; relocation entry by entry is sound for 0.15
@@ -1419,7 +1427,7 @@ What revision 2 (`95622f1`) got wrong or left open, and what replaced it.
    it is revoked at `r = 100`, and its row is pruned at `820`; at `1000` a
    deploy raises L to 3600; the token now passes the ceiling and is admitted
    until `3660`. Pruning now uses `L_max`, which no deploy of this version
-   can exceed.
+   can exceed. (Revision 4 withdraws this pruning too: 7.5 item 3.)
 5. **Admission checks.** `exp < iat`, a future `iat`, and overflow in `exp
    - iat` were unspecified; today's validator enforces none (D-P16). They
    are now refusals.
@@ -1454,8 +1462,8 @@ are precision; item 6 is state. None reopens D-1 to D-6.
 
 1. **Old invocations that act before any lock or marker.** Revision 3's
    T1 (c) proves that no 0.14 node past its log store's start has the
-   legacy path open, and revision 3 read that as proof that no old process
-   could act. A 0.14 process with `HQL_DANGER_RAFT_STATE_RESET` or
+   legacy path open; revision 3 stated no precondition for an old process
+   that acts before that point. A 0.14 process with `HQL_DANGER_RAFT_STATE_RESET` or
    `HQL_BACKUP_RESTORE` in its environment acts destructively before it
    takes any lock or meets the marker, where no check of the directory can
    see it (hiqlite's H-7 answer, Q1 and Q2, D-P20). B-4 now states both as
@@ -1468,8 +1476,9 @@ are precision; item 6 is state. None reopens D-1 to D-6.
    every published pre-043 `supervise` exits before spawning Rauthy. One
    that read `rauthy.env` before T1 (e) holds a built `Command` the fence
    cannot invalidate and spawns it whenever it resumes, after T4 included
-   (D-P18). B-5 now states the exact residual guarantee (a read that begins
-   after T1 (e)'s rename fails before the spawn) and B-4's first
+   (D-P18). B-5 now states the exact residual guarantee (a read that opens
+   the path at or after T1 (e)'s move of the old file fails before the
+   spawn) and B-4's first
    precondition requires every old supervisor and child stopped, direct
    invocations included. This does not contradict the stopped-container
    procedure, which it narrows; no public hiqlite exclusion interface is
