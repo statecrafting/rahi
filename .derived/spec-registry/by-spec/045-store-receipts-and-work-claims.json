@@ -1,0 +1,190 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-24",
+    "dependsOn": [
+      "011-store-hiqlite",
+      "012-store-coordination",
+      "036-manifest-and-schema-evolution"
+    ],
+    "domain": "store",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "crates/rahi-store/src/receipt.rs",
+        "planned": true
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-store/src/work.rs",
+        "planned": true
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-store/tests/receipt.rs",
+        "planned": true
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-store/tests/work.rs",
+        "planned": true
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-store/tests/receipt_recovery.rs",
+        "planned": true
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "011-store-hiqlite",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/lib.rs"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 3
+    },
+    "id": "045-store-receipts-and-work-claims",
+    "implementation": "pending",
+    "kind": "kernel",
+    "obligations": [
+      {
+        "anchor": "3-1-receipt-identity",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "A receipt identity is (tenant, namespace, key digest); one identity has at most one row per content revision, and revision numbers for one identity are dense and strictly increasing."
+      },
+      {
+        "anchor": "3-2-classification-outcomes",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "Content that differs from every recorded revision of an identity is never discarded: it is recorded as a new accepted revision or as a collision row before the caller can acknowledge the source."
+      },
+      {
+        "anchor": "3-3-atomic-participation",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "A receipt row, its processing rows, the domain writes they describe, and their outbox rows commit in one txn or not at all."
+      },
+      {
+        "anchor": "3-4-processing-identity",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "A processing identity (receipt identity, receipt revision, processor, processor revision) reaches done at most once; a new receipt revision or a new processor revision is a new processing identity and may be processed again."
+      },
+      {
+        "anchor": "3-5-work-reservation",
+        "id": "I-5",
+        "kind": "invariant",
+        "text": "Every write made under a work claim is guarded by the claim's fence token, and a holder whose claim was reclaimed, completed, or dead-lettered commits nothing."
+      },
+      {
+        "anchor": "3-5-work-reservation",
+        "id": "I-6",
+        "kind": "invariant",
+        "text": "No replicated statement this spec issues evaluates a clock or random function in SQL; every time and every jitter is a bound parameter."
+      },
+      {
+        "anchor": "3-6-retention-and-erasure",
+        "id": "I-7",
+        "kind": "invariant",
+        "text": "An erased receipt keeps a tombstone that classifies a redelivery of the erased item as erased, never as first seen."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "cargo test -p rahi-store --locked --test receipt",
+          "cargo test -p rahi-store --locked --test work",
+          "cargo test -p rahi-store --locked --test receipt_recovery"
+        ],
+        "kind": "verification",
+        "text": "Classification, atomic staging, claims, retry, dead letter, retention, erasure, and every crash point in the recovery table are exercised against a real single-node store."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-operational-prerequisites.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-consumer-contract.md"
+        }
+      }
+    ],
+    "refines": [
+      {
+        "aspect": "a work claim that outlives the lease TTL is a chassis row fenced by its own token (012 D-10)",
+        "unit": {
+          "id": "rahi_store::lock::Lease",
+          "kind": "symbol"
+        }
+      }
+    ],
+    "risk": "critical",
+    "sectionDigests": {
+      "045-receipts-and-work-claims": "7231db043b02a1491f871f380669ce5420ddf020321dd35322c35a61cf42d820",
+      "1-purpose": "12f18672e00eee2aadad59150ee42e1e3f826d9818fcb400fdc276a4c555553a",
+      "2-1-what-is-new": "fafe8fd5be300c4a5d7db4a1c29c8bc8f646f1499ee1ac532812ef912b0e53a3",
+      "2-2-what-is-reused-unchanged": "15ef6786081f69bb4c0dfba6311d7f7863a9157db33b934b635abb04a50e836a",
+      "2-3-what-is-extended": "f756cf360b544fa520d51e932e486d4e82c38163a35aa167fee34414649863a8",
+      "2-territory": "325e007986e5d73fdee0aae6dae705de09b75321a04743c105f41b61adde73bb",
+      "3-1-receipt-identity": "235cef1dfb1f2e4e4e551b6473cb88266eca0d120014d57f628adff65fdc354b",
+      "3-2-classification-outcomes": "1f859c5e7279897d912b57e7a9046cca99e7d447615fc1c49fc6de985407934f",
+      "3-3-atomic-participation": "01c8f7703b12f1ed5acaf46afb48fc5154b8b68f413e66e99aa07fa91db17c83",
+      "3-4-processing-identity": "f7cbb40d2391e23e77c99bfb83736c4c9f853aed385e9a4f875f2943c871ec94",
+      "3-5-work-reservation": "d0cbdb475b032fc91dfac21e5a73d1e51b966921927c185db7522fac7d887e27",
+      "3-6-retention-and-erasure": "9bde773e28a2b6c3de26aacfced62de6a902bc01f4992f2d24346b42b0fa5168",
+      "3-7-crash-point-recovery": "f57bf4d23d1aa11e5df0ccbb9ab309616e81791985ae1e17d57b68005fed3f57",
+      "3-behavior": "5b42be26ca414b29de211061505d13977082d9ca73a9af93051642c2018da11e",
+      "4-functional-requirements": "0cf9a01d5ec11ea0410b4b8148541139607b8e69047ec6fc7dee914790307dfc",
+      "5-acceptance-criteria": "abdd2045f6c00df764ec80300074d362ed074a7b806b8e76e25fdae0a97ea48a",
+      "6-out-of-scope": "7ef7a59127548826a1c36804f26fa18553e1415c17aeb4f3f0052685dd69b6b3",
+      "7-resolved-decisions": "a3b3515283e53849ab28dbfe8608cd7d8f79ad14be832e874b745da197270755",
+      "follow-up-statecraft-platform-s-sc-idempotency": "c8c46ebbfea97948329a14d0e943b2499710c2f1eb11eecd3ab89b94c92bd240",
+      "open-questions-for-the-owner": "59d5ef377783bd1ce6a2243a01642ea9282e8bfb89182fda102f3acb3a0fc631",
+      "verification": "4cf704f27ecbc85d6a9533fff4e138056cbd0d4e42590083c08f9e11723d9a10"
+    },
+    "sectionHeadings": [
+      "045: Receipts and work claims",
+      "1. Purpose",
+      "2. Territory",
+      "2.1 What is new",
+      "2.2 What is reused unchanged",
+      "2.3 What is extended",
+      "3. Behavior",
+      "3.1 Receipt identity",
+      "3.2 Classification outcomes",
+      "3.3 Atomic participation",
+      "3.4 Processing identity",
+      "3.5 Work reservation",
+      "3.6 Retention and erasure",
+      "3.7 Crash-point recovery",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Follow-up: statecraft-platform's `sc_idempotency`",
+      "Open questions for the owner",
+      "Verification"
+    ],
+    "specPath": "specs/045-store-receipts-and-work-claims/spec.md",
+    "status": "draft",
+    "summary": "Every product that ingests from an outside source rebuilds the same table: a key, a body digest, the first outcome, and a rule for a repeat (statecraft-platform's `sc_idempotency`; aicortex's work-claim rows over the Lease and the Outbox). This spec puts one primitive in rahi-store. A receipt names an inbound item by tenant, source namespace, and external key (or a synthetic key when the source has none) and records a digest of its content; classification distinguishes first seen, exact redelivery, changed content under the same key (recorded as a new revision or a collision, never dropped), and erased. Receipt rows stage into the caller's TxnBuilder beside the domain writes and Outbox::stage. Processing is identified separately (receipt revision plus processor and its policy revision) so a correction or a new policy reprocesses. Work is reserved by a fenced claim row with attempt history, bounded retry, a visible dead-letter state, and reclaim after expiry; sweeps run under the existing Lease. Retention and erasure are staged calls, and a crash-point table states recovery at every boundary.\n",
+    "title": "Receipts and work claims: an inbound item is recorded once per content revision, processed once per processor revision, and never silently dropped"
+  },
+  "shardHash": "0552b06651726f3a11dec6c945aff3eb6eb999e64a039733913b0e003ae5c766",
+  "specVersion": "1.8.0"
+}
