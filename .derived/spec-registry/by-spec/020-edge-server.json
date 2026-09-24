@@ -88,6 +88,17 @@
     "implementation": "complete",
     "kind": "kernel",
     "risk": "high",
+    "sectionDigests": {
+      "020-the-edge": "32c6534cc5e44a7458e975e23aef112e3c88291e1f6c510febb38b79dbc37479",
+      "1-purpose": "0f01e59a2d39ead0fda179784393ec9a1b5f840d4c70b617c5d572effa21b2c1",
+      "2-territory": "7f647e0bb13c3919ff69f6d1e619912a3a2bbf950eabc5734dbaa62723c10671",
+      "3-behavior": "65db31c09376ab27002279a9b479b9ffdb3ae889f911f1792cf52a44207ae72e",
+      "4-functional-requirements": "3f56ab8b957b97c67227a720d342ca38a7feb7fa855cb527394046066544518b",
+      "5-acceptance-criteria": "e5f8a61cbeb93132b503653e5f3890c314da9a68694d6978d0997b5d63ebe435",
+      "6-out-of-scope": "132c1ce61b36a7260568cbe774603e3b8188902a4eb7a3ccaf946eea3d7ea535",
+      "7-resolved-decisions": "394dae76979129624e96acbf9b10764e4d2b8d3753ae43a348ab823e237c7de9",
+      "verification": "f00bb2ae9c2d0d1725a4391141b9b55538d4f332f71c5f2cc9b4fb64766d05eb"
+    },
     "sectionHeadings": [
       "020: The edge",
       "1. Purpose",
@@ -105,5 +116,5 @@
     "title": "The edge: axum router, middleware chain, probes, static slot, error mapping"
   },
   "shardHash": "ddbd4c637e767937b2194e659abe46f0041d7aa671411fa262aa40727eb9f0d2",
-  "specVersion": "1.3.0"
+  "specVersion": "1.8.0"
 }

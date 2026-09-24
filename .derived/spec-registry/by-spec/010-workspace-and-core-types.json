@@ -61,6 +61,17 @@
     "implementation": "complete",
     "kind": "kernel",
     "risk": "high",
+    "sectionDigests": {
+      "010-cargo-workspace-and-the-core-types": "3f8b6a255ed7e79445b4b5198d2a987b3190abef285e2b25727c13665026fb85",
+      "1-purpose": "b8950e66fa126cd9a1c8357856cfe23d2f0853356ede1fc4b59594d76bd3ecd4",
+      "2-territory": "76fff6abd16bcadc9deb584019026ad6fbe2c3b31519a5eeb617a9bcb2eb264f",
+      "3-behavior": "412f8825e79434520d9ae09edb582cb2f33354e01af0bdb2acbd81060fbed8cc",
+      "4-functional-requirements": "78ac6d6799d48e4e67fb76f289ded469fb6ad61e8861a9f93e29804811a4fff4",
+      "5-acceptance-criteria": "34af5be1559f8fb743f4d1a2858ffb5f2a4b4a6d7a0b13833e3f42948b76547a",
+      "6-out-of-scope": "f2362369f36cc2d5d180da7172fe4b992a65db93242677b9e7ae7b024f8105ae",
+      "7-resolved-decisions": "f8cc309658741a3384b60be7019b9368fa20a5dc30f30a86b6a5d743702635d2",
+      "verification": "c070da32b04b717770b335bfd844d57525b6a95678ccc707a060a0c87c62f187"
+    },
     "sectionHeadings": [
       "010: Cargo workspace and the core types",
       "1. Purpose",
@@ -78,5 +89,5 @@
     "title": "Cargo workspace and the core types: Error, Principal, Revision, FenceToken, Config"
   },
   "shardHash": "4c64f7b96704bb88c455aeaa2791d0de285113d9d4f6068c467c29fe70c05d85",
-  "specVersion": "1.3.0"
+  "specVersion": "1.8.0"
 }

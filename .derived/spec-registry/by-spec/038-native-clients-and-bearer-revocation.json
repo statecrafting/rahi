@@ -245,6 +245,18 @@
       }
     ],
     "risk": "high",
+    "sectionDigests": {
+      "038-native-clients-and-bearer-revocation": "43416a9ae8e9821b485bddcfd6936c2783d732197bb57f4ffb64f2e64260759f",
+      "1-purpose": "7ff9494e9f7109961f1b0b68b020630605e81440d39767760ca6631516cc6b89",
+      "2-territory": "177394a13e3b4ba9fe4ac8b8619e5cf640dcac30ae96b2ae81fa639a7e605842",
+      "3-behavior": "f0b58b68af8affb90a3ef083a42e783ee60d6cd6ada6696100e0cf1ce137cb2a",
+      "4-functional-requirements": "4ed09786c4ccda25856b0ef1ff3239e6769dfdd45e30ac089ad09a1fc5ed8b7c",
+      "5-acceptance-criteria": "d0b4759d2ee413af2cdac70dadfe14551a2aec093dd3511829dc96a9bb71d643",
+      "6-out-of-scope": "0c3fd24790ef87001ce3a57dcda2b2b53fd5c690c7b71f04ad54909c879b5e95",
+      "7-resolved-decisions": "924dce09006df92b404170053f825bc68753f8fc7bb3532fb2353cab8d6e75b1",
+      "evidence-and-proposals-2026-09-12": "8698c850c9afcd7a8efd7febd9337f176f90cc19d53383ebb2b853697fcd99e5",
+      "verification": "af5793814d706547dc5a5321dbd8a45e8061ee8f271d4f3eff43ddeaa9cf8cbb"
+    },
     "sectionHeadings": [
       "038: Native clients and bearer revocation",
       "1. Purpose",
@@ -263,5 +275,5 @@
     "title": "Native clients and bearer revocation: the CSRF exemption wired, a public client for a CLI declared in the manifest, token lifetimes set, and a token that can be revoked"
   },
   "shardHash": "07e7d77a1b3dac296eb6a622c86010d607742456c5b30e274d2626ae1166ed4f",
-  "specVersion": "1.3.0"
+  "specVersion": "1.8.0"
 }

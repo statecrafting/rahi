@@ -108,6 +108,17 @@
     "implementation": "complete",
     "kind": "feature",
     "risk": "medium",
+    "sectionDigests": {
+      "023-observability": "7badd7a1d0fcaf4baa87f861247df53e8f5563f9d800c19be9e65b6db0262155",
+      "1-purpose": "e1eeecb1b556d987622ea831cd0d87e4dc438c3078096307f4cda6617300f8af",
+      "2-territory": "836a35179c552696159b33d59c391c95c1ed18b2b5e424dd390493a4f94d8f87",
+      "3-behavior": "34d2abadfbb61f5bd6d562d78ecaf5b56e82af7bb1c67f7abe3af7f526fac4b2",
+      "4-functional-requirements": "0287b8d8e6c50f23ad214e0aa62517cb4baf63221fed35a3ff761a98add86761",
+      "5-acceptance-criteria": "b4ca2ba280b07595177f1ea32dc3a91f0b6843ddfc4e0799e09a0ee23437b767",
+      "6-out-of-scope": "1b3839128292830055813230b2950f63cc4a99ac53f651d7fd3aaabb7f8f26ed",
+      "7-resolved-decisions": "ec67b855b5ed268c3c46ab4c7a1d10d6c98f775d642600595e89c2e661b28cc5",
+      "verification": "263919dc2d21e42811f207e48f853455d38e2549bee3de3d3dc96a7e19317e65"
+    },
     "sectionHeadings": [
       "023: Observability",
       "1. Purpose",
@@ -125,5 +136,5 @@
     "title": "Observability: /metrics always on, an in-process OTel tracer with a ring buffer, decisions on spans"
   },
   "shardHash": "f37bb9c9442173bfda81183db5bfccfcecaeca8a5abefefd97da90de949a5ff8",
-  "specVersion": "1.3.0"
+  "specVersion": "1.8.0"
 }

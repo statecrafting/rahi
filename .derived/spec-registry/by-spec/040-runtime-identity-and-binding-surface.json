@@ -172,6 +172,18 @@
       }
     ],
     "risk": "medium",
+    "sectionDigests": {
+      "040-runtime-identity-and-the-binding-surface": "e71aef463abf85465f23570cf3c51070d5e8eb445b6c0f9d252daf92aa499565",
+      "1-purpose": "4ab308cdc04aa95138ce3b5043c90ae908dd13d93f447be719d6a860185431d9",
+      "2-territory": "ee4832a64d6e2d7c3b58a15115f68991453085c46bf3293a96bea8c0c254c775",
+      "3-behavior": "9105166c89bc471296447dc6bb0ce16f11e88479a2a3c204178f00344ee1c4d3",
+      "4-functional-requirements": "f884b172807071afa653c016a74afaabb06213ce32f283723cda3a1a5bd810cd",
+      "5-acceptance-criteria": "4b445bd3bad6bac97fbc12141bcfbe8bca0be90da37e9982d624976df25e2566",
+      "6-out-of-scope": "9bd4336367985d2cf2d551362fd7d9d7c86885c4972901262fd4d9a9c55aa38c",
+      "7-resolved-decisions": "a0d6caca964642328eaefb9488e74dbc7de26a6da2ba0f4e402f984cb69e4eda",
+      "proposals-2026-09-12": "2cda525d3ec2e2cb013427f642738d1388e53eb4d885a173ae47ce04acea1340",
+      "verification": "3dfa13beac6fd70bf1d0c8f885c23b4beda70986691029c28d2f1bd7cf90b5d9"
+    },
     "sectionHeadings": [
       "040: Runtime identity and the binding surface",
       "1. Purpose",
@@ -190,5 +202,5 @@
     "title": "Runtime identity: a replica states which bits it runs, which ceiling it enforces, and which instance it is, with every value's basis named, on bounded surfaces"
   },
   "shardHash": "26b2d3906e01812dc5b6b8417bbeee068f5a4db3a4ae6a91e4ec3514d94bd126",
-  "specVersion": "1.3.0"
+  "specVersion": "1.8.0"
 }

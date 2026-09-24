@@ -79,6 +79,18 @@
     "implementation": "complete",
     "kind": "kernel",
     "risk": "critical",
+    "sectionDigests": {
+      "025-the-resource-server": "a377cb722d8c901c17b9985a946455aa2e53beac0e97084b9f92e9a74b1acccd",
+      "1-purpose": "1f7e5209f6049961bab8eb6b19268bd0b779e68c196f79c3853637e8a7334c78",
+      "2-territory": "7a7d88104ee92d368d2d2d5a42fc7919f09daddf3f1b59b5f8ac4cba442dd6f3",
+      "3-behavior": "daadffff23db3bc700c021977216b481ba9b92f3f750638025958f7958eaa716",
+      "4-functional-requirements": "2f23d98800f47752688d0623346bd2855847a13b9e72d3235c4ac7b09b40bbfc",
+      "5-acceptance-criteria": "57b803fcb8fa0f4150cfec05313e5af787d5a3df859f1772fa1922cb60cb099c",
+      "6-out-of-scope": "cb2a523a46e5e48605cab743919c889436a0b17c3fef1ec81d14483b22be1271",
+      "7-resolved-decisions": "bcbda58df252e7a7848ebc80675ab9dc64408dbf2e11fefabfda05e150d6a9b0",
+      "8-status": "d6c7acec8ddd1e915f6eebb83697e2a482e333b3ea95b2ce3a83109b5ff7deeb",
+      "verification": "aca831244a3a2e6d70b7dc93d638a4cdec9afcc1c678960aec44146b22a097eb"
+    },
     "sectionHeadings": [
       "025: The resource server",
       "1. Purpose",
@@ -97,5 +109,5 @@
     "title": "The resource server: bearer tokens rauthy issued, audience bound, scope gated, never app minted"
   },
   "shardHash": "ad40f4472268cc2da1b2268803649987ce1e3c0bb268a2d5e143ed0fd0081cc2",
-  "specVersion": "1.3.0"
+  "specVersion": "1.8.0"
 }
