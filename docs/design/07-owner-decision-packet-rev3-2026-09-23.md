@@ -1,5 +1,11 @@
 # Owner decision packet, 2026-09-23: spec 043 revision 3
 
+**Superseded by `09-owner-decision-packet-rev4-2026-09-23.md`.** Revision 3
+(`abd66fd`, blob `d2fd7bf`) is not offered for approval and the approval
+text below is void: revision 4 withdraws its pruning and narrows its
+supervisor-fence claim (043 section 7.5). 06 section 1.2's text for 011 and
+037 is still cited by 09.
+
 Version 1. Owned by `specs/043-patched-dependency-adoption/spec.md` (draft).
 Prepared for the rahi owner. It supersedes
 `06-owner-decision-packet-2026-09-23.md`, whose approval reference
