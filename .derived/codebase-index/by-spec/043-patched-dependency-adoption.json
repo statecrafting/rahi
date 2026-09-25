@@ -78,6 +78,14 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-idp/tests/bearer.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/tests/native.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-idp/tests/revocation_durable.rs",
         "source": "spec-edge"
       },
@@ -468,6 +476,32 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-idp/tests/bearer.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/bearer.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/tests/native.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/native.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-ops/Cargo.toml"
           }
         ],
@@ -795,5 +829,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "2e1546cc03aafe50e6b172265312216cf5de498864ece000ab39655d82d1260a"
+  "shardHash": "4513482da6dacd332e1304f2c22019524d397cf3fdbf9512022d1a6731865608"
 }

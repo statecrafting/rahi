@@ -66,9 +66,8 @@ pub use receipt::{
     Receipts, receipt_set,
 };
 pub use store::{
-    Cache, PRUNE_HORIZON_TABLE_SQL, REVOCATION_FLOOR_TABLE_SQL, REVOCATION_JTI_TABLE_SQL,
-    REVOCATION_SUB_TABLE_SQL, Store, StoreHandle, UPGRADE_TRANSITION_TABLE_SQL,
-    ensure_chassis_tables,
+    Cache, REVOCATION_FLOOR_TABLE_SQL, REVOCATION_JTI_TABLE_SQL, REVOCATION_SUB_TABLE_SQL, Store,
+    StoreHandle, UPGRADE_TRANSITION_TABLE_SQL, ensure_chassis_tables,
 };
 pub use txn::{ExecuteResult, Statement};
 pub use watermark::Watermark;

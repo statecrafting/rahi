@@ -44,6 +44,17 @@
 //! `src/api/src/sessions.rs::delete_sessions_for_user`). A cell that was
 //! given no admin token revokes the access tokens and says so in the answer
 //! rather than implying the grant is over.
+//!
+//! ## Durable, and retained (spec 043 B-6, D-10)
+//!
+//! Since 043 both lists are SQL tables in the app store, not cache entries:
+//! `rahi_revocation_jti` and `rahi_revocation_sub`, each row carrying
+//! `revoked_at`. A restart, a lost cache directory or the cache boundary's
+//! transition removes nothing a check relies on, and the bearer check reads
+//! them on every token. No code path deletes a row (043 D-10's retention):
+//! a revoked `jti` is refused for the life of the volume, whatever the clock
+//! does afterwards. [`denylist_ttl`] remains the accepted validity V, which
+//! preflight reports and the revocation answer states; no row expires by it.
 
 use std::time::Duration;
 
@@ -108,17 +119,43 @@ pub struct RevokedSubject {
     pub before: UnixSeconds,
 }
 
-/// Deny-list every token `sub` holds now, remembering it for `ttl`.
+/// Deny-list every token `sub` holds now (spec 043 B-6): a durable subject
+/// row whose `revoked_at` only rises, so a later revocation covers every
+/// token an earlier one did. The row is retained (043 D-10); `_ttl` is the
+/// accepted validity 038 named, kept in the signature for its callers.
 ///
 /// # Errors
 ///
-/// The store's error when the cache group refuses the write.
-pub async fn deny_subject(store: &StoreHandle, sub: &str, now: u64, ttl: Duration) -> Result<()> {
-    let entry = RevokedSubject {
-        before: UnixSeconds::new(now),
-    };
-    let seconds = u32::try_from(ttl.as_secs()).unwrap_or(u32::MAX);
-    store.kv_put(&subject_key(sub), &entry, Some(seconds)).await
+/// The store's error when the write is refused.
+pub async fn deny_subject(store: &StoreHandle, sub: &str, now: u64, _ttl: Duration) -> Result<()> {
+    record_subject(store, sub, now).await
+}
+
+/// Record a subject revocation at `revoked_at` (spec 043 B-6).
+///
+/// # Errors
+///
+/// The store's error when the write is refused.
+pub async fn record_subject(store: &StoreHandle, sub: &str, revoked_at: u64) -> Result<()> {
+    store.record_subject_revocation(sub, revoked_at).await
+}
+
+/// Record a `jti` revocation at `revoked_at` (spec 043 B-6).
+///
+/// # Errors
+///
+/// The store's error when the write is refused.
+pub async fn record_jti(store: &StoreHandle, jti: &str, revoked_at: u64) -> Result<()> {
+    store.record_jti_revocation(jti, revoked_at).await
+}
+
+/// Whether `jti` has a revocation row (spec 043 B-6).
+///
+/// # Errors
+///
+/// The store's error when the table cannot be read.
+pub async fn is_jti_revoked(store: &StoreHandle, jti: &str) -> Result<bool> {
+    Ok(store.jti_revoked_at(jti).await?.is_some())
 }
 
 /// Whether a token for `sub` issued at `issued_at` is deny-listed.
@@ -138,11 +175,10 @@ pub async fn is_subject_denied(
     sub: &str,
     issued_at: Option<u64>,
 ) -> Result<bool> {
-    let entry: Option<RevokedSubject> = store.kv_get(&subject_key(sub)).await?;
-    let Some(entry) = entry else {
+    let Some(before) = store.subject_revoked_at(sub).await? else {
         return Ok(false);
     };
-    Ok(issued_at.is_none_or(|iat| iat <= entry.before.get()))
+    Ok(issued_at.is_none_or(|iat| iat <= before))
 }
 
 /// What an operator asked to revoke: a token, or everything a person holds.

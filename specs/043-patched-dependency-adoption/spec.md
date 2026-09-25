@@ -46,6 +46,8 @@ extends:
   - { spec: "011-store-hiqlite", unit: "crates/rahi-store/src/lib.rs", nature: additive }
   - { spec: "016-store-binary-values-and-extensions", unit: "crates/rahi-store/tests/blob.rs", nature: amending }
   - { spec: "025-api-tokens-and-resource-server", unit: "crates/rahi-idp/src/bearer.rs", nature: amending }
+  - { spec: "025-api-tokens-and-resource-server", unit: "crates/rahi-idp/tests/bearer.rs", nature: amending }
+  - { spec: "038-native-clients-and-bearer-revocation", unit: "crates/rahi-idp/tests/native.rs", nature: amending }
   - { spec: "038-native-clients-and-bearer-revocation", unit: "crates/rahi-idp/src/revoke.rs", nature: amending }
   - { spec: "021-idp-proxy-and-discovery", unit: "crates/rahi-idp/src/lib.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/lib.rs", nature: amending }
@@ -1102,6 +1104,33 @@ None remains open: D-7 to D-13 record the owner's approval and choices.
   is the operator act B-5a calls unsupported. (e) Debris is reported on
   stderr at every gate; its metric waits for the step that adds B-10's
   metric (step 8), since both live in 023's registry.
+
+- **D-18 (2026-09-25, build decisions; where B-6's rows are written and
+  read).** Two requirements meet here. 022 FR-004 (complete) keeps SQL out
+  of `rahi-idp` entirely, and its test refuses any `INSERT INTO` or
+  `CREATE TABLE` in that crate's sources; B-6 and FR-004 of this spec
+  require the bearer check to read SQL revocation rows and the floor
+  through the store handle. Both hold with the SQL in `rahi-store`: the
+  tables are chassis-created with `lease_fence` (step 3), the reads and
+  writes are `StoreHandle` methods (`record_jti_revocation`,
+  `record_subject_revocation`, `jti_revoked_at`, `subject_revoked_at`,
+  `revocation_rows`, `revocation_floor`, `raise_revocation_floor`), every
+  admission read goes through the leader (`query_consistent`, so a failed
+  read is an error and never an empty answer that admits), and
+  `rahi-idp` calls them. Rejected: an exception to 022's test (a complete
+  spec's criterion outranks this text). Second, B-6 says the row is
+  written "in the same `txn` as the revocation's ledger decision"; no such
+  decision exists. A revocation is an admitted request, and 015 B-6
+  ledgers denials only, so 038's revocation routes append nothing to the
+  chain. The row is therefore written in its own statement, durable before
+  the route answers; what B-6 relies on (the row outlives every cache and
+  is read on every check) holds. Ledgering revocations is its own change
+  to 013's append path and is not made here; this is surfaced for the
+  owner. Third, the fixtures of 025's and 038's tests that encoded the old
+  behavior now carry `iat <= exp`, the manifest's lifetime, and a
+  retained row (the deny entry no longer lapses after V): those tests
+  change under this spec's amending edges, and their assertions about
+  what is refused are kept.
 
 ### 7.1 Proposals (2026-09-23)
 
