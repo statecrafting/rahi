@@ -355,14 +355,14 @@
     ],
     "risk": "medium",
     "sectionDigests": {
-      "039-releases-and-out-of-tree-packaging": "8fbc3acd45318d0a3667808ebcfdd8d19629b696eb5e5bc6966d3ed75381c7a0",
+      "039-releases-and-out-of-tree-packaging": "64f6c78a917c59d38b06398702cc4476dde396369e9c47e52d9562cc7d9c67a7",
       "1-purpose": "b45455ae12686098976b557ea50e6bb62e54182ad4935adba6581a1676d580bb",
       "2-territory": "4105e2553002560cd6eedf3593a3a24d3fab35613010a9d406dfc556f7849e75",
       "3-behavior": "cb8a2d51109d65a308ddac3eabe60d2fbc39bdc11b5d605c63a05f52f122b4a0",
       "4-functional-requirements": "09145d07f56bee6ca0b8d2542b08d9da2ec068794c3d55c13bc9dbe46e6a78e5",
       "5-acceptance-criteria": "efac1fe9b94ee09beb91354f983d083015f77f7b5d977bc45aaa6e331b20dc02",
       "6-out-of-scope": "81d3523421696030ce9b69fca438ab5e8ace53324efe061c8b21920b3125198a",
-      "7-resolved-decisions": "580a1bb40b989bb65ee0203dffbdc2e914113bd6242ce840a8f5a1fe2a40a113",
+      "7-resolved-decisions": "a1b22d11b263d68a39fd2e8a725157b5d648381d4435025581505e5624c2edd0",
       "verification": "e472e7992ea2646eb74f7d6a20d8bdb6ded9e8223a56c059f4eb501733181826"
     },
     "sectionHeadings": [
@@ -381,6 +381,6 @@
     "summary": "The thesis says consumers depend on published crates and pin a version (002 D5), and nothing is published: no tag, no release, no crate, no image. The one route that works is a git dependency pinned to a sha. cargo package fails on rahi-ops because it includes a template from outside the crate, which also blocks rahi-cli, the crate that carries Cell. The deploy manifests name ghcr.io/bartekus/rahi:latest, a namespace and a tag no workflow produces. The image recipe builds only a package of this workspace, and a cell's static directory named under CARGO_MANIFEST_DIR does not exist in the image (hello-cell's page answers 404 there). This spec defines the version and the release, publishes the images a tag builds under the names the manifests use, adds a runtime image an out-of-tree cell builds on, makes static assets exist in the image, makes the crates packageable, and proves the consumer stanza on every release.\n",
     "title": "Releases and out-of-tree packaging: a tagged version a consumer pins, images that exist under the names the manifests use, and a runtime image a cell in another repository builds on"
   },
-  "shardHash": "01000e28e690bbe2c8d16975c4f7b7b0bb73f4a256bb0211e562d337f3816c93",
+  "shardHash": "6cde6d5c6c216a93bbfbecedd99240ca73ce56292522d2dbc4dd9b5304feb40e",
   "specVersion": "1.8.0"
 }
