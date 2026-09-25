@@ -1,23 +1,15 @@
 # The consumer contract, as built
 
-**Current release preparation, reconciled 2026-09-20:** 0.2.0 is an
-unpublished candidate under approved spec 039. It carries completed specs
-**037** (identity recovery and the live proof), **036** (manifest and
-schema evolution), and **042** (lifetime identity for decisions), plus the
-2026-09-20 corrections to 026's stream gauge and 033's boot-budget
-measurement. The 2026-09-17 preparation named only 037 from
-`ea6d0da125aaafe0927570410a8a1b0ee9d1286e`, which described a tree that
-`main` has since moved past; that reading is superseded here and kept below
-as historical evidence. Section 2.0 is the current consumer guidance; the
-dated readings below remain historical evidence.
-The final release revision is not known inside this preparation commit.
-The prospective in-repository release identity is
-[`v0.2.0` source](https://github.com/statecrafting/rahi/tree/v0.2.0): after
-publication, the release revision is the tested merged `main` commit to
-which the annotated `v0.2.0` tag resolves (039 B-2). This link does not
-assert that the tag or release exists yet. The coordinator must record the
-exact SHA and release date in forge metadata to supplement this identity.
-A version declaration is not publication or downstream adoption.
+**Current release, 2026-09-25:** 0.3.0 under approved spec 039. It
+carries completed specs **038** (native clients, token lifetimes, and bearer
+revocation), **045** (receipts and work claims) and **046** (named migration
+sets) on top of 0.2.0. Section 2.0 is the current consumer guidance; the
+dated readings below remain historical evidence. The release identity is
+[`v0.3.0` source](https://github.com/statecrafting/rahi/tree/v0.3.0): the
+annotated tag names the tested squash merge on `main` (039 B-2, D-18), and
+this document is updated to that commit. A version declaration is not
+publication or downstream adoption: registry availability is proven only by
+the tag's `consumer-registry` job, and is recorded in the release notes.
 
 Version 0, 2026-09-11, for review; revised the same day with the runtime
 binding of section 11. This note is a consumer's view of the chassis: how
@@ -85,7 +77,46 @@ nothing in the chassis distributes jobs to workers.
 
 ## 2. Consuming today
 
-### 2.0 The 0.2.0 candidate and its compatibility boundary
+### 2.0 The 0.3.0 release and its compatibility boundary
+
+All nine inherited chassis versions and internal requirements are 0.3.0.
+It is a minor bump under 039 B-1, not a compatible patch to 0.2.0: the
+`Cell` trait gains the defaulted `migration_sets()` (046), the manifest's
+`[auth]` gains token lifetimes and `[[auth.native_clients]]` (038), a backup
+of a store that records a named set is archive format 2, which a 0.2.x
+binary refuses (046), and `rahi_store` gains receipts and work claims
+(045). `rahi_store::Migration` and `rahi_kernel::manifest::Auth` gain public
+fields, so struct-literal construction must add them. The full list is
+[CHANGELOG.md](../../CHANGELOG.md#030-released-2026-09-25).
+
+Once `consumer-registry` passes for the tag, the registry stanza is:
+
+```toml
+[dependencies]
+rahi-cli    = "=0.3.0"
+rahi-edge   = "=0.3.0"
+rahi-idp    = "=0.3.0"
+rahi-kernel = "=0.3.0"
+rahi-ledger = "=0.3.0"
+rahi-ops    = "=0.3.0"
+rahi-store  = "=0.3.0"
+rahi-types  = "=0.3.0"
+
+[dev-dependencies]
+rahi-harness = "=0.3.0"
+```
+
+Use the same release for every chassis dependency. hiqlite stays 0.14.0
+from the registry; section 2.0.1 still applies. Rolling a store back to a
+0.2.x binary after a named set is recorded is not supported (046): restore
+the pre-upgrade archive instead.
+
+SQL sent through `rahi_store` must use numbered `?NNN` placeholders in any
+statement that reuses or reorders parameters: SQLite numbers `$n` by first
+appearance while hiqlite binds by position, so a reordered `$n` binds the
+wrong values silently (045 D-23).
+
+### 2.0a The 0.2.0 release and its compatibility boundary (historical)
 
 All nine inherited chassis versions and internal requirements are 0.2.0.
 Spec 039 B-1 permits a consumer-contract change only at a minor bump before
