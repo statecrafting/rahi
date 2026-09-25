@@ -12,8 +12,8 @@
 use std::time::Duration;
 
 use prometheus::{
-    Histogram, HistogramOpts, HistogramVec, IntCounter, IntCounterVec, IntGauge, Opts, Registry,
-    TextEncoder,
+    Histogram, HistogramOpts, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec, Opts,
+    Registry, TextEncoder,
 };
 use rahi_kernel::observe::Cause;
 use rahi_types::{Error, Result};
@@ -44,6 +44,9 @@ pub const STREAM_DURATION: &str = "rahi_stream_duration_seconds";
 pub const STREAM_EVENTS: &str = "rahi_stream_events_total";
 /// Streams closed, by outcome (spec 026 B-9).
 pub const STREAMS_CLOSED: &str = "rahi_streams_closed_total";
+/// Work items per processor and state, redacted counts only: never a
+/// tenant, namespace, key, or digest (spec 045 B-17, I-8).
+pub const WORK_ITEMS: &str = "rahi_work_items";
 
 /// The buckets a stream's lifetime falls into, in seconds: a stream lives
 /// seconds to hours, not milliseconds.
@@ -72,6 +75,7 @@ pub struct Metrics {
     stream_duration: Histogram,
     stream_events: IntCounter,
     streams_closed: IntCounterVec,
+    work_items: IntGaugeVec,
 }
 
 impl Metrics {
@@ -189,6 +193,17 @@ impl Metrics {
         registry
             .register(Box::new(streams_closed.clone()))
             .map_err(config)?;
+        // Spec 045 B-17: one gauge, set from the cell's own sweep tick. The
+        // chassis runs no loop (B-19), so nothing here writes to it but a
+        // caller through `set_work_items`.
+        let work_items = IntGaugeVec::new(
+            Opts::new(WORK_ITEMS, "Work items per processor and state"),
+            &["processor", "state"],
+        )
+        .map_err(config)?;
+        registry
+            .register(Box::new(work_items.clone()))
+            .map_err(config)?;
         register_process_collector(&registry)?;
 
         Ok(Self {
@@ -205,6 +220,7 @@ impl Metrics {
             stream_duration,
             stream_events,
             streams_closed,
+            work_items,
         })
     }
 
@@ -301,6 +317,22 @@ impl Metrics {
     #[must_use]
     pub fn streams_open(&self) -> i64 {
         self.streams_open.get()
+    }
+
+    /// Set the count of work items on `processor` in `state` (spec 045
+    /// B-17). `processor` is a name the cell's code declares; `state` is
+    /// one of `pending`, `claimed`, `failed`, or `dead`. Never a tenant,
+    /// namespace, key, or digest (I-8).
+    pub fn set_work_items(&self, processor: &str, state: &str, count: i64) {
+        self.work_items
+            .with_label_values(&[processor, state])
+            .set(count);
+    }
+
+    /// The current value of a work item gauge, for a test or a probe.
+    #[must_use]
+    pub fn work_items(&self, processor: &str, state: &str) -> i64 {
+        self.work_items.with_label_values(&[processor, state]).get()
     }
 
     /// The current value of a request counter, for a test or a probe.
