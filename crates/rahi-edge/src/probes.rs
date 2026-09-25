@@ -48,6 +48,12 @@ async fn healthz() -> Response {
 /// the verified chain is still reachable.
 async fn readyz(State(state): State<AppState>) -> Response {
     if let Err(err) = state.store().health().await {
+        // Spec 043 D-15: while hiqlite is still applying the log it held at
+        // start it answers `Recovering`; the cell reports that as its own
+        // state, never as a store that is down, and accepts no work.
+        if rahi_store::is_recovering(&err) {
+            return recovering(&err);
+        }
         return not_ready("store", &err);
     }
     if let Err(err) = state.ledger().head().await {
@@ -56,6 +62,20 @@ async fn readyz(State(state): State<AppState>) -> Response {
     json_response(
         StatusCode::OK,
         &json!({ "status": "ready", "store": "up", "ledger": "verified" }),
+    )
+}
+
+/// The 503 of a store still in startup recovery (spec 043 D-15): not ready,
+/// and not down.
+fn recovering(error: &Error) -> Response {
+    json_response(
+        StatusCode::SERVICE_UNAVAILABLE,
+        &json!({
+            "status": "recovering",
+            "component": "store",
+            "store": "recovering",
+            "message": error.message(),
+        }),
     )
 }
 

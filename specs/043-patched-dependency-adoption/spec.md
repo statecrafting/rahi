@@ -39,6 +39,8 @@ extends:
   - { spec: "010-workspace-and-core-types", unit: "Cargo.toml", nature: amending }
   - { spec: "010-workspace-and-core-types", unit: "deny.toml", nature: amending }
   - { spec: "010-workspace-and-core-types", unit: "crates/rahi-types/src/config.rs", nature: amending }
+  - { spec: "010-workspace-and-core-types", unit: "crates/rahi-types/tests/config.rs", nature: amending }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-ops/Cargo.toml", nature: additive }
   - { spec: "011-store-hiqlite", unit: "crates/rahi-store/src/store.rs", nature: amending }
   - { spec: "011-store-hiqlite", unit: "crates/rahi-store/src/error.rs", nature: amending }
   - { spec: "011-store-hiqlite", unit: "crates/rahi-store/src/lib.rs", nature: additive }
@@ -63,6 +65,7 @@ extends:
   - { spec: "032-cluster-topology", unit: "deploy/README.md", nature: amending }
   - { spec: "032-cluster-topology", unit: "deploy/k8s/statefulset.yaml", nature: amending }
   - { spec: "037-identity-recovery-and-live-proof", unit: ".github/workflows/live.yml", nature: additive }
+  - { spec: "020-edge-server", unit: "crates/rahi-edge/src/probes.rs", nature: amending }
 references:
   - { unit: { kind: file, path: "docs/design/01-consumer-contract.md" }, role: context }
   - { unit: { kind: file, path: "docs/design/02-operational-prerequisites.md" }, role: context }
@@ -1065,6 +1068,40 @@ None remains open: D-7 to D-13 record the owner's approval and choices.
   resurfacing before a release approval stands. Where a B-n or D-P entry
   names `0.15.0-patched.1` or `.2`, it is the record of what was measured
   then, not the pin.
+
+- **D-16 (2026-09-25, build decision; where "recovering" is answered).**
+  D-15 requires the cell's readiness to report hiqlite's recovery as
+  "recovering", not "down". `Store::open` already waits in
+  `wait_until_healthy_db` until the log applied at start is applied, so an
+  owning process accepts no work before recovery completes; the answer
+  that can still meet `Error::Recovering` is `/readyz` (020 B-6), which
+  reads `StoreHandle::health` on every call and would otherwise report the
+  store as a failed component. The edge maps that one error, through
+  `rahi_store::is_recovering`, to a 503 whose body says `status:
+  recovering` and `store: recovering`; every other store error keeps 020's
+  `not_ready` body. Hence the amending edge on
+  `crates/rahi-edge/src/probes.rs`: the status code and 020's contract are
+  unchanged, and only the body of this one case is new. Rejected: a new
+  `Error` variant (widens 010's four-code contract, which B-7 forbids); a
+  readiness flag cached at open (readiness re-reads the real dependency,
+  020 B-6).
+
+- **D-17 (2026-09-25, build decisions; B-4a's gate where the text is
+  silent).** (a) Attaching is decided by `cell.lock`: a verb that may
+  attach attaches exactly when another process holds it, replacing 032
+  B-5's probe of hiqlite's lock file, which a stale marker could satisfy.
+  030's attach test now holds the lock as `serve` does. (b) `preflight`
+  reports the gate as its own check, `cell`, second in its list, and skips
+  the checks that touch the volume when it refuses: a preflight that
+  cannot take the cell still prints every check (030 B-3) and exits `1`.
+  (c) The gate creates the fences only for entry points other than
+  `upgrade-cache` and `--abort`; the verb decides what a volume without a
+  legacy path means. (d) A volume whose legacy path is absent while a
+  transition record exists is refused, not re-fenced: B-4a step (4) creates
+  fences only when both are absent, and a fence removed after a transition
+  is the operator act B-5a calls unsupported. (e) Debris is reported on
+  stderr at every gate; its metric waits for the step that adds B-10's
+  metric (step 8), since both live in 023's registry.
 
 ### 7.1 Proposals (2026-09-23)
 

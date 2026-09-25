@@ -29,6 +29,7 @@ tempfile = { workspace = true }
 tar = { workspace = true }
 rusqlite = { workspace = true }
 age = { workspace = true }
+rustix = { workspace = true }
 tokio = { workspace = true, features = ["fs", "macros", "net", "process", "signal", "time"] }
 
 [dev-dependencies]

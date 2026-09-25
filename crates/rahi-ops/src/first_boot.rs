@@ -39,6 +39,10 @@ pub enum Outcome {
 pub async fn run(env: &dyn EnvReader, app_name: &str) -> Result<Outcome> {
     let config = Config::from_env(env)?;
     let ports = HqlPorts::from_env(env)?;
+    // Spec 043 B-4a: the locks before anything reads or writes the volume,
+    // and on a fresh volume both fences before the layout creates the app
+    // store. First boot opens neither store.
+    let _gate = crate::cell_lock::gate(&config, crate::cell_lock::Entry::FirstBoot)?;
     layout(&config)?;
     let keys = KeySet::of(&config);
 
@@ -74,7 +78,9 @@ pub fn mint_backup_passkey(config: &Config, keys: &KeySet) -> Result<()> {
 }
 
 /// The volume layout (B-1): the four directories, the key directory at
-/// [`KEY_DIR_MODE`].
+/// [`KEY_DIR_MODE`], and the rendered environment's directory (spec 043 B-5).
+/// The app store's directory is created empty; it never creates the legacy
+/// path, which only B-4a's gate writes, as the fence.
 ///
 /// # Errors
 ///
@@ -86,6 +92,7 @@ pub fn layout(config: &Config) -> Result<()> {
         crate::rauthy_dir(config),
         config.keys_dir(),
         config.data_dir.join(BACKUPS_DIR),
+        config.data_dir.join(rauthy_env::ENV_DIR),
     ] {
         std::fs::create_dir_all(&dir)
             .map_err(|err| Error::Io(format!("{} cannot be created: {err}", dir.display())))?;
@@ -95,7 +102,8 @@ pub fn layout(config: &Config) -> Result<()> {
     if !crate::is_read_only_dir(&config.keys_dir()) {
         crate::set_mode(&config.keys_dir(), KEY_DIR_MODE)?;
     }
-    crate::set_mode(&crate::rauthy_dir(config), KEY_DIR_MODE)
+    crate::set_mode(&crate::rauthy_dir(config), KEY_DIR_MODE)?;
+    crate::set_mode(&config.data_dir.join(rauthy_env::ENV_DIR), KEY_DIR_MODE)
 }
 
 impl KeySet {

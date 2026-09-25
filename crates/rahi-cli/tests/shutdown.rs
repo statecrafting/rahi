@@ -827,7 +827,11 @@ fn a_denial_drain_timeout_that_is_not_seconds_is_refused_before_the_store_opens(
         run.logs()
     );
     assert!(
-        !node.data_dir.join("hiqlite").exists(),
+        !node
+            .data_dir
+            .join("app-store")
+            .join("state_machine")
+            .exists(),
         "the node was never opened"
     );
 }

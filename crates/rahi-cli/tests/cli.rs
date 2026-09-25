@@ -470,7 +470,11 @@ fn serve_with_a_static_directory_that_is_absent_is_exit_3_before_the_store_opens
     );
     assert!(run.stderr.contains("404"), "{}", run.stderr);
     assert!(
-        !volume.path().join("hiqlite").exists(),
+        !volume
+            .path()
+            .join("app-store")
+            .join("state_machine")
+            .exists(),
         "no node was opened"
     );
 }
@@ -545,7 +549,11 @@ fn migrate_on_a_bad_restore_env_is_refused_before_the_node_opens() {
     assert_eq!(run.code, 3, "{}", run.stderr);
     assert!(run.stderr.contains("HQL_BACKUP_RESTORE is set"));
     assert!(
-        !volume.path().join("hiqlite").exists(),
+        !volume
+            .path()
+            .join("app-store")
+            .join("state_machine")
+            .exists(),
         "the node was never opened"
     );
 }
@@ -576,7 +584,11 @@ fn preflight_with_the_restore_env_set_refuses_to_open_the_node() {
     assert!(run.stdout.contains("SKIP engine:"));
     assert!(run.stdout.contains("SKIP ledger:"));
     assert!(
-        !volume.path().join("hiqlite").exists(),
+        !volume
+            .path()
+            .join("app-store")
+            .join("state_machine")
+            .exists(),
         "the node was never opened"
     );
 }
@@ -749,7 +761,7 @@ fn backup_and_restore_round_trip_through_the_binary() {
     let snapshots: Vec<String> = std::fs::read_dir(
         source
             .path()
-            .join("hiqlite")
+            .join("app-store")
             .join("state_machine")
             .join("backups"),
     )
@@ -816,6 +828,9 @@ fn backup_inside_a_running_replica_attaches_to_its_node_instead_of_opening_a_sec
     // runs in another process against the same volume (spec 032 B-5).
     let env: BTreeMap<String, String> = volume.env.iter().cloned().collect();
     let config = rahi_types::Config::from_env(&env).unwrap();
+    // Spec 043 B-4a: the process that owns the node holds `cell.lock`, as
+    // `serve` does; that lock, not hiqlite's own, is what a verb attaches to.
+    let _owner = rahi_ops::cell_lock::gate(&config, rahi_ops::cell_lock::Entry::Serve).unwrap();
     let secrets = KeySet::of(&config).store_secrets().unwrap();
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
@@ -878,7 +893,7 @@ fn backup_inside_a_running_replica_attaches_to_its_node_instead_of_opening_a_sec
         run.stdout
     );
     assert!(
-        !job.path().join("hiqlite").exists(),
+        !job.path().join("app-store").join("state_machine").exists(),
         "a client opens no node of its own"
     );
     runtime.block_on(store.shutdown()).unwrap();
@@ -1330,4 +1345,99 @@ fn ledger_reindex_is_a_verb_of_its_own_and_says_it_mutates() {
     let run = bare(&["ledger", "reindex"]);
     assert_eq!(run.code, 1);
     assert!(run.stderr.contains("ledger reindex needs an archive"));
+}
+
+/// The argv that runs `verb` of [`VERBS`] against `volume`. A verb this does
+/// not know fails the test, so a new verb cannot skip spec 043 FR-008.
+fn argv_of(verb: &str, volume: &Path) -> Vec<String> {
+    let archive = volume
+        .join("backups")
+        .join("none.age")
+        .display()
+        .to_string();
+    let words: Vec<String> = match verb {
+        "serve" | "preflight" | "migrate" | "backup" | "supervise" | "first-boot" => {
+            vec![verb.to_owned()]
+        }
+        "restore" => vec!["restore".to_owned(), archive],
+        "ledger verify" => vec!["ledger".to_owned(), "verify".to_owned()],
+        "ledger export" => vec![
+            "ledger".to_owned(),
+            "export".to_owned(),
+            volume.join("export.jsonl").display().to_string(),
+        ],
+        "ledger reindex" => vec![
+            "ledger".to_owned(),
+            "reindex".to_owned(),
+            volume.join("ledger-archive").display().to_string(),
+        ],
+        "upgrade-cache" => vec!["upgrade-cache".to_owned(), "--backup".to_owned(), archive],
+        other => panic!("spec 043 FR-008: {other:?} has no argv here; add it"),
+    };
+    words
+}
+
+/// Spec 043 FR-008: every verb of [`VERBS`] passes B-4a's gate before it
+/// reads the transition record, opens the store or spawns Rauthy. With both
+/// locks held elsewhere and a record no build can read, each one refuses at
+/// a lock (a verb that read the record first would name the record instead),
+/// creates no fence, opens no node and spawns no Rauthy.
+#[test]
+fn every_verb_locks_before_it_reads_opens_or_spawns() {
+    let volume = Volume::new();
+    let data = volume.path();
+    let record = data.join(rahi_ops::upgrade::STATE_FILE);
+    std::fs::write(&record, b"{ not a transition record").unwrap();
+    let spawned = data.join("rauthy-spawned");
+    let fake_rauthy = data.join("fake-rauthy.sh");
+    std::fs::write(
+        &fake_rauthy,
+        format!("#!/bin/sh\ntouch {}\nsleep 30\n", spawned.display()),
+    )
+    .unwrap();
+    std::fs::set_permissions(&fake_rauthy, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let cell = rahi_ops::cell_lock::try_lock(&data.join(rahi_ops::cell_lock::CELL_LOCK_FILE), true)
+        .unwrap()
+        .unwrap();
+    let layout =
+        rahi_ops::cell_lock::try_lock(&data.join(rahi_ops::cell_lock::TRANSITION_LOCK_FILE), true)
+            .unwrap()
+            .unwrap();
+    let before = std::fs::read_dir(data)
+        .unwrap()
+        .map(|e| e.unwrap().file_name())
+        .collect::<BTreeSet<_>>();
+    for verb in VERBS {
+        let argv = argv_of(verb, data);
+        let args: Vec<&str> = argv.iter().map(String::as_str).collect();
+        let mut cmd = Command::new(env!("CARGO_BIN_EXE_rahi"));
+        cmd.args(&args);
+        for (k, v) in &volume.env {
+            cmd.env(k, v);
+        }
+        cmd.env_remove(rahi_ops::RESTORE_ENV_VAR);
+        cmd.env("RAHI_RAUTHY_BIN", &fake_rauthy);
+        let run = Run::of(cmd.output().unwrap());
+        assert_ne!(run.code, 0, "{verb}: refused\n{}{}", run.stdout, run.stderr);
+        let said = format!("{}{}", run.stdout, run.stderr);
+        assert!(
+            said.contains(rahi_ops::cell_lock::CELL_LOCK_FILE)
+                || said.contains(rahi_ops::cell_lock::TRANSITION_LOCK_FILE),
+            "{verb}: refused at a lock, before reading the record:\n{}{}",
+            run.stdout,
+            run.stderr
+        );
+        assert!(!spawned.exists(), "{verb}: no Rauthy was spawned");
+        let after = std::fs::read_dir(data)
+            .unwrap()
+            .map(|e| e.unwrap().file_name())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(after, before, "{verb}: nothing was created on the volume");
+        assert_eq!(
+            std::fs::read(&record).unwrap(),
+            b"{ not a transition record",
+            "{verb}: the record is untouched"
+        );
+    }
+    drop((cell, layout));
 }

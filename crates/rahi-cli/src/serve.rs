@@ -24,6 +24,7 @@ use rahi_idp::{
 use rahi_kernel::{Kernel, KernelOptions, Manifest};
 use rahi_ledger::{FsArchive, Hash, Ledger};
 use rahi_ops::KeySet;
+use rahi_ops::cell_lock::{Entry, Gate};
 use rahi_store::Store;
 use rahi_types::{Config, EnvReader, Error, Result};
 
@@ -191,6 +192,9 @@ pub struct Booted {
     pub manifest: Manifest,
     /// Its hash: the chain's genesis parent.
     pub hash: Hash,
+    /// Spec 043 B-4a's gate: the locks this process holds while the store is
+    /// open. `None` inside `supervise`, whose own gate outlives this value.
+    gate: Option<Gate>,
 }
 
 impl Booted {
@@ -202,7 +206,33 @@ impl Booted {
     /// wrong, or when [`rahi_ops::RESTORE_ENV_VAR`] is set; a store failure
     /// as itself.
     pub async fn open<C: Cell>(env: &dyn EnvReader) -> Result<Self> {
-        Self::boot::<C>(env, false).await
+        Self::boot::<C>(env, Entry::Store { may_attach: false }).await
+    }
+
+    /// As [`Self::open`], for `serve` alone (spec 043 B-4a): the cell
+    /// exclusively and the layout shared for the process's life, at
+    /// `floored`, `rauthy-done`, `done` or no transition.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub async fn open_serve<C: Cell>(env: &dyn EnvReader) -> Result<Self> {
+        Self::boot::<C>(env, Entry::Serve).await
+    }
+
+    /// As [`Self::open`], under a gate this process already holds: the
+    /// in-process `serve` of `supervise` uses the supervisor's ownership.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub async fn open_owned<C: Cell>(env: &dyn EnvReader, gate: &Gate) -> Result<Self> {
+        if !gate.owns_cell() {
+            return Err(Error::Conflict(
+                "the supervisor's gate does not own the cell".to_owned(),
+            ));
+        }
+        Self::boot_inner::<C>(env, None).await
     }
 
     /// As [`Self::open`], for a verb that may run beside a running cluster
@@ -219,10 +249,19 @@ impl Booted {
     /// As [`Self::open`]; [`Error::Upstream`] when the running node does
     /// not answer.
     pub async fn open_or_attach<C: Cell>(env: &dyn EnvReader) -> Result<Self> {
-        Self::boot::<C>(env, true).await
+        Self::boot::<C>(env, Entry::Store { may_attach: true }).await
     }
 
-    async fn boot<C: Cell>(env: &dyn EnvReader, may_attach: bool) -> Result<Self> {
+    async fn boot<C: Cell>(env: &dyn EnvReader, entry: Entry) -> Result<Self> {
+        let config = Config::from_env(env)?;
+        // Spec 043 B-4a: the gate before the volume is read, written or
+        // opened. It decides attaching too: another process holding the
+        // cell's lock is the running node.
+        let gate = rahi_ops::cell_lock::gate(&config, entry)?;
+        Self::boot_inner::<C>(env, Some(gate)).await
+    }
+
+    async fn boot_inner<C: Cell>(env: &dyn EnvReader, gate: Option<Gate>) -> Result<Self> {
         let config = Config::from_env(env)?;
         rahi_ops::refuse_env_restore()?;
         let keys = KeySet::of(&config);
@@ -230,9 +269,13 @@ impl Booted {
         let manifest = Manifest::parse(C::manifest())?;
         let hash = manifest.hash()?;
         let store_cfg = rahi_ops::store_config(&config, env, keys.store_secrets()?)?;
+        let attached = gate.as_ref().is_some_and(|g| !g.owns_cell());
+        let may_attach = gate
+            .as_ref()
+            .is_some_and(|g| g.entry() == Entry::Store { may_attach: true });
         let store = if may_attach && rahi_ops::store_client_requested(env) {
             Store::connect(&store_cfg).await?
-        } else if may_attach && rahi_ops::app_lock_file(&config).exists() {
+        } else if attached {
             Store::attach(&store_cfg).await?
         } else {
             Store::open(&store_cfg).await?
@@ -243,7 +286,14 @@ impl Booted {
             store,
             manifest,
             hash,
+            gate,
         })
+    }
+
+    /// The gate this value holds, when it took its own.
+    #[must_use]
+    pub fn gate(&self) -> Option<&Gate> {
+        self.gate.as_ref()
     }
 
     /// Open the chain and verify it at resident depth (spec 013 B-6).
@@ -553,6 +603,14 @@ pub async fn serve<C: Cell>(env: &dyn EnvReader) -> Result<()> {
     serve_until::<C>(env, shutdown_signal()).await
 }
 
+/// Which gate a `serve` runs under (spec 043 B-4a).
+pub enum ServeGate<'a> {
+    /// `serve` alone takes its own.
+    Own,
+    /// `supervise`'s in-process `serve` uses the supervisor's.
+    Supervisor(&'a Gate),
+}
+
 /// [`serve`] that stops when `stop` resolves, and only then: under the
 /// supervisor (spec 031 B-3) `stop` is the supervisor's hand, so that one
 /// SIGTERM has one listener and one ordered shutdown. The node is shut
@@ -568,6 +626,19 @@ pub async fn serve_until<C: Cell>(
     env: &dyn EnvReader,
     stop: impl Future<Output = ()> + Send + 'static,
 ) -> Result<()> {
+    serve_gated::<C>(env, ServeGate::Own, stop).await
+}
+
+/// [`serve_until`] under `gate`.
+///
+/// # Errors
+///
+/// As [`serve`].
+pub async fn serve_gated<C: Cell>(
+    env: &dyn EnvReader,
+    gate: ServeGate<'_>,
+    stop: impl Future<Output = ()> + Send + 'static,
+) -> Result<()> {
     let addr = listen_addr(env)?;
     let streams = StreamHub::new(stream_options(env)?);
     let denial_bound = denial_drain_timeout(env)?;
@@ -575,7 +646,10 @@ pub async fn serve_until<C: Cell>(
     // one before the store is opened. `compose` resolves it again for its own
     // callers; both calls are one `is_dir`.
     static_dir::<C>(env)?;
-    let booted = Booted::open::<C>(env).await?;
+    let booted = match gate {
+        ServeGate::Own => Booted::open_serve::<C>(env).await?,
+        ServeGate::Supervisor(gate) => Booted::open_owned::<C>(env, gate).await?,
+    };
     let Composed { router, kernel } = match compose_parts::<C>(&booted, env, &streams).await {
         Ok(composed) => composed,
         Err(err) => {

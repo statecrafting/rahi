@@ -489,6 +489,11 @@ pub async fn run_sets(
         .map(|n| n.to_string_lossy().into_owned())
         .ok_or_else(|| Error::Validation(format!("{} names no file", archive_path.display())))?;
 
+    // Spec 043 B-4a: both locks exclusively before anything on the volume is
+    // read; the gate creates both fences on a volume without a legacy path
+    // and refuses one whose legacy path holds a store.
+    let _gate = crate::cell_lock::gate(config, crate::cell_lock::Entry::Restore)?;
+
     let marker_path = crate::restore_marker(config);
     if let Some(marker) = Marker::read(&marker_path)?
         && marker.archive == name

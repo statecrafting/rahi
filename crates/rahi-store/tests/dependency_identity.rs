@@ -1,5 +1,7 @@
 //! spec 043 FR-001: dependency identity and locked metadata.
 
+#![allow(clippy::expect_used, clippy::unwrap_used, clippy::indexing_slicing)]
+
 use std::path::Path;
 use std::process::Command;
 
@@ -32,22 +34,19 @@ fn dependency_identity_and_checksums() {
         let mut pkg = LockPkg::default();
         for line in block.lines() {
             let line = line.trim();
-            if let Some(rest) = line.strip_prefix("name = \"") {
-                if let Some(val) = rest.strip_suffix('"') {
-                    pkg.name = val.to_owned();
-                }
-            } else if let Some(rest) = line.strip_prefix("version = \"") {
-                if let Some(val) = rest.strip_suffix('"') {
-                    pkg.version = val.to_owned();
-                }
-            } else if let Some(rest) = line.strip_prefix("source = \"") {
-                if let Some(val) = rest.strip_suffix('"') {
-                    pkg.source = val.to_owned();
-                }
-            } else if let Some(rest) = line.strip_prefix("checksum = \"") {
-                if let Some(val) = rest.strip_suffix('"') {
-                    pkg.checksum = val.to_owned();
-                }
+            let field = |prefix: &str| {
+                line.strip_prefix(prefix)
+                    .and_then(|rest| rest.strip_suffix('"'))
+                    .map(str::to_owned)
+            };
+            if let Some(val) = field("name = \"") {
+                pkg.name = val;
+            } else if let Some(val) = field("version = \"") {
+                pkg.version = val;
+            } else if let Some(val) = field("source = \"") {
+                pkg.source = val;
+            } else if let Some(val) = field("checksum = \"") {
+                pkg.checksum = val;
             }
         }
         packages.push(pkg);

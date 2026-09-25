@@ -130,6 +130,10 @@ async fn first_boot<C: Cell>(env: &dyn EnvReader) -> Result<()> {
 async fn supervise<C: Cell>(env: &dyn EnvReader) -> Result<i32> {
     use rahi_ops::supervise as sup;
     let config = rahi_types::Config::from_env(env)?;
+    // Spec 043 B-4a: the cell exclusively and the layout shared, for the
+    // supervisor's life, before anything is read or spawned; its in-process
+    // `serve` uses this ownership rather than taking its own.
+    let gate = rahi_ops::cell_lock::gate(&config, rahi_ops::cell_lock::Entry::Supervise)?;
     let keys = rahi_ops::KeySet::of(&config);
     keys.check()?;
     let manifest = rahi_kernel::Manifest::parse(C::manifest())?;
@@ -167,7 +171,7 @@ async fn supervise<C: Cell>(env: &dyn EnvReader) -> Result<i32> {
         rauthy,
         ready,
         |stop| {
-            serve::serve_until::<C>(env, async {
+            serve::serve_gated::<C>(env, serve::ServeGate::Supervisor(&gate), async {
                 let _ = stop.await;
             })
         },

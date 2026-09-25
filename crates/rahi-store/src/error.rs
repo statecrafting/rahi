@@ -46,7 +46,7 @@ pub(crate) fn map(err: hiqlite::Error) -> Error {
 #[must_use]
 pub fn is_terminal(err: &Error) -> bool {
     match err {
-        Error::Io(msg) => msg.starts_with("NodeFailed:") || msg.contains("NodeFailed"),
+        Error::Io(msg) => msg.starts_with("NodeFailed:"),
         _ => false,
     }
 }
@@ -55,7 +55,7 @@ pub fn is_terminal(err: &Error) -> bool {
 #[must_use]
 pub fn is_recovering(err: &Error) -> bool {
     match err {
-        Error::Upstream(msg) => msg.starts_with("recovering:") || msg.contains("Recovering"),
+        Error::Upstream(msg) => msg.starts_with("recovering:"),
         _ => false,
     }
 }

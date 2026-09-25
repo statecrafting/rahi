@@ -113,6 +113,8 @@ fs4 = "1"
 # The supervisor (spec 031 B-3) sends SIGTERM to its child; std can only
 # SIGKILL, and the workspace forbids the unsafe libc call, so nix carries it.
 nix = { version = "0.31", default-features = false, features = ["signal"] }
+# Atomic no-replace rename (spec 043 FR-011): renameat2 on Linux, renamex_np on macOS.
+rustix = { version = "1.0", default-features = false, features = ["fs", "std"] }
 
 [workspace.lints.rust]
 unsafe_code = "deny"

@@ -62,6 +62,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-edge/src/probes.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-idp/src/bearer.rs",
         "source": "spec-edge"
       },
@@ -75,6 +79,10 @@
       },
       {
         "path": "crates/rahi-idp/tests/revocation_durable.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/Cargo.toml",
         "source": "spec-edge"
       },
       {
@@ -143,6 +151,10 @@
       },
       {
         "path": "crates/rahi-types/src/config.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-types/tests/config.rs",
         "source": "spec-edge"
       },
       {
@@ -404,6 +416,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-edge/src/probes.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/probes.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-idp/src/bearer.rs"
           }
         ],
@@ -438,6 +463,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-idp/src/revoke.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/Cargo.toml"
         }
       },
       {
@@ -581,6 +619,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-types/src/config.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-types/tests/config.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-types/tests/config.rs"
         }
       },
       {
@@ -744,5 +795,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "99c808226af45cb4e57c4c17cc16f7adb342d60977f898a82c14c49c408462df"
+  "shardHash": "2e1546cc03aafe50e6b172265312216cf5de498864ece000ab39655d82d1260a"
 }

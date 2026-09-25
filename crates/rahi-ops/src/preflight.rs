@@ -21,8 +21,9 @@ use crate::rauthy_api::RauthyApi;
 pub const MIN_FREE_BYTES: u64 = 512 * 1024 * 1024;
 
 /// The check names, in the order they are reported.
-pub const CHECKS: [&str; 11] = [
+pub const CHECKS: [&str; 12] = [
     "config",
+    "cell",
     "data_dir",
     "keys",
     "restore_env",
@@ -163,7 +164,36 @@ async fn run_inner(env: &dyn EnvReader, manifest_text: &str) -> Report {
         }
     };
 
-    checks.push(Check::of("data_dir", data_dir_writable(&config)));
+    // Spec 043 B-4a: the gate before anything on the volume is touched.
+    // Preflight opens the store and never attaches, so it owns the cell or
+    // reports why not; the volume checks are skipped when it cannot.
+    let gate = crate::cell_lock::gate(
+        &config,
+        crate::cell_lock::Entry::Store { may_attach: false },
+    );
+    let gated = gate.is_ok();
+    checks.push(Check::of(
+        "cell",
+        gate.as_ref()
+            .map(|g| {
+                let debris = g.debris().len();
+                if debris == 0 {
+                    "the cell's locks are held and the layout is current".to_owned()
+                } else {
+                    format!(
+                        "the cell's locks are held and the layout is current; {debris} debris \
+                         entr(ies) beside the fence, left in place"
+                    )
+                }
+            })
+            .map_err(Clone::clone),
+    ));
+
+    if gated {
+        checks.push(Check::of("data_dir", data_dir_writable(&config)));
+    } else {
+        checks.push(Check::skipped("data_dir", "the cell's gate refused"));
+    }
 
     let keys = KeySet::of(&config);
     let keys_ok = keys.check();
@@ -194,7 +224,6 @@ async fn run_inner(env: &dyn EnvReader, manifest_text: &str) -> Report {
     // restore variable at start and would apply it, and a key set that does
     // not read cannot open the store anyway.
     let store = match (&keys_ok, &restore_ok) {
-        (Ok(()), Ok(())) => open_store(&config, env, &keys).await,
         (Err(_), _) => Err(Error::Config(
             "skipped: the key set did not check".to_owned(),
         )),
@@ -202,10 +231,12 @@ async fn run_inner(env: &dyn EnvReader, manifest_text: &str) -> Report {
             "skipped: {} is set",
             crate::RESTORE_ENV_VAR
         ))),
+        _ if !gated => Err(Error::Config("skipped: the cell's gate refused".to_owned())),
+        (Ok(()), Ok(())) => open_store(&config, env, &keys).await,
     };
     match &store {
         Ok((_, detail)) => checks.push(Check::pass("hiqlite", detail.clone())),
-        Err(err) if keys_ok.is_err() || restore_ok.is_err() => {
+        Err(err) if !gated || keys_ok.is_err() || restore_ok.is_err() => {
             checks.push(Check::skipped("hiqlite", err.message()));
         }
         Err(err) => checks.push(Check::fail("hiqlite", err.to_string())),
@@ -270,6 +301,7 @@ async fn run_inner(env: &dyn EnvReader, manifest_text: &str) -> Report {
     if let Some(store) = store {
         let _ = store.shutdown().await;
     }
+    drop(gate);
     Report { checks }
 }
 

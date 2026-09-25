@@ -434,6 +434,151 @@ pub fn app_lock_file(config: &Config) -> PathBuf {
     config.hiqlite_dir().join(HIQLITE_LOCK_FILE)
 }
 
+/// The fence's marker: the one file the legacy path is reduced to (spec 043
+/// B-4), at the path every pre-043 hiqlite treats as its own lock file.
+#[must_use]
+pub fn legacy_marker(config: &Config) -> PathBuf {
+    config.legacy_hiqlite_dir().join(HIQLITE_LOCK_FILE)
+}
+
+/// fsync a directory, so that a rename or link inside it is durable.
+///
+/// # Errors
+///
+/// [`Error::Io`] naming the directory.
+pub fn fsync_dir(dir: &Path) -> Result<()> {
+    std::fs::File::open(dir)
+        .and_then(|d| d.sync_all())
+        .map_err(|err| Error::Io(format!("{} cannot be synced: {err}", dir.display())))
+}
+
+/// Rename `from` to `to` without ever replacing `to` (spec 043 FR-011):
+/// `renameat2(RENAME_NOREPLACE)` on Linux, `renamex_np(RENAME_EXCL)` on
+/// macOS. A filesystem that refuses the flag refuses the rename; there is no
+/// fallback to a plain `rename`, which would replace.
+///
+/// # Errors
+///
+/// [`Error::Conflict`] when `to` exists; [`Error::Io`] for every other
+/// failure, the unsupported flag included.
+pub fn rename_noreplace(from: &Path, to: &Path) -> Result<()> {
+    use rustix::fs::{CWD, RenameFlags, renameat_with};
+    match renameat_with(CWD, from, CWD, to, RenameFlags::NOREPLACE) {
+        Ok(()) => Ok(()),
+        Err(err) if err == rustix::io::Errno::EXIST || err == rustix::io::Errno::NOTEMPTY => {
+            Err(Error::Conflict(format!(
+                "{} cannot be renamed to {}: the destination exists and is never replaced",
+                from.display(),
+                to.display()
+            )))
+        }
+        Err(err) => Err(Error::Io(format!(
+            "{} cannot be renamed to {} without replacing: {err}",
+            from.display(),
+            to.display()
+        ))),
+    }
+}
+
+/// How [`publish_whole`] ended.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Published {
+    /// The file is now at the destination, whole.
+    Created,
+    /// Something already held the destination; it was not touched.
+    Exists,
+}
+
+/// Publish `bytes` at `dest` whole or not at all (spec 043 B-4 T1 (b)):
+/// write them to a temporary beside it, fsync it, `link(2)` it to `dest`,
+/// fsync the directory, and unlink the temporary. A destination that exists
+/// is never modified; the answer says so.
+///
+/// # Errors
+///
+/// [`Error::Io`] when a step fails.
+pub fn publish_whole(dest: &Path, temp_name: &str, bytes: &[u8]) -> Result<Published> {
+    use std::io::Write as _;
+    let dir = dest
+        .parent()
+        .ok_or_else(|| Error::Io(format!("{} has no parent directory", dest.display())))?;
+    let temp = dir.join(temp_name);
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temp)
+        .map_err(|err| Error::Io(format!("{} cannot be created: {err}", temp.display())))?;
+    file.write_all(bytes)
+        .and_then(|()| file.sync_all())
+        .map_err(|err| Error::Io(format!("{} cannot be written: {err}", temp.display())))?;
+    drop(file);
+    let linked = std::fs::hard_link(&temp, dest);
+    let outcome = match linked {
+        Ok(()) => Published::Created,
+        Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => Published::Exists,
+        Err(err) => {
+            let _ = std::fs::remove_file(&temp);
+            return Err(Error::Io(format!(
+                "{} cannot be linked to {}: {err}",
+                temp.display(),
+                dest.display()
+            )));
+        }
+    };
+    fsync_dir(dir)?;
+    std::fs::remove_file(&temp)
+        .map_err(|err| Error::Io(format!("{} cannot be removed: {err}", temp.display())))?;
+    fsync_dir(dir)?;
+    Ok(outcome)
+}
+
+/// Write `bytes` to `path` by write-to-temporary, fsync, rename, fsync of
+/// the directory, so a reader sees the whole new file or the whole old one
+/// (spec 043 B-4, B-10). The one rename that replaces on purpose: the
+/// temporary is this process's own, and the destination is a record this
+/// process rewrites.
+///
+/// # Errors
+///
+/// [`Error::Io`] when a step fails.
+pub fn write_replacing(path: &Path, bytes: &[u8]) -> Result<()> {
+    use std::io::Write as _;
+    let dir = path
+        .parent()
+        .ok_or_else(|| Error::Io(format!("{} has no parent directory", path.display())))?;
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let temp = dir.join(format!(".{name}.{}.tmp", std::process::id()));
+    let mut file = std::fs::File::create(&temp)
+        .map_err(|err| Error::Io(format!("{} cannot be created: {err}", temp.display())))?;
+    file.write_all(bytes)
+        .and_then(|()| file.sync_all())
+        .map_err(|err| Error::Io(format!("{} cannot be written: {err}", temp.display())))?;
+    drop(file);
+    std::fs::rename(&temp, path).map_err(|err| {
+        Error::Io(format!(
+            "{} cannot be moved to {}: {err}",
+            temp.display(),
+            path.display()
+        ))
+    })?;
+    fsync_dir(dir)
+}
+
+/// 128 random bits as 32 lowercase hex digits.
+///
+/// # Errors
+///
+/// [`Error::Io`] when the system refuses entropy.
+pub fn random_id() -> Result<String> {
+    let mut bytes = [0u8; 16];
+    getrandom::fill(&mut bytes)
+        .map_err(|err| Error::Io(format!("the system refused entropy: {err}")))?;
+    Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
+}
+
 /// rauthy's node's lock file, probed for existence and nothing else.
 #[must_use]
 pub fn rauthy_lock_file(config: &Config) -> PathBuf {

@@ -39,7 +39,8 @@ fn https_public_url_yields_secure_cookies_and_the_defaults() {
     assert_eq!(cfg.rauthy_base_url(), "http://127.0.0.1:8080");
     assert_eq!(cfg.trusted_proxy_hops, 0);
     assert_eq!(cfg.otlp_endpoint, None);
-    assert_eq!(cfg.hiqlite_dir(), PathBuf::from("/data/hiqlite"));
+    assert_eq!(cfg.hiqlite_dir(), PathBuf::from("/data/app-store"));
+    assert_eq!(cfg.legacy_hiqlite_dir(), PathBuf::from("/data/hiqlite"));
     assert_eq!(cfg.keys_dir(), PathBuf::from("/data/keys"));
 }
 
@@ -83,7 +84,11 @@ fn override_data_dir() {
     ]))
     .unwrap();
     assert_eq!(cfg.data_dir, PathBuf::from("/var/lib/rahi"));
-    assert_eq!(cfg.hiqlite_dir(), PathBuf::from("/var/lib/rahi/hiqlite"));
+    assert_eq!(cfg.hiqlite_dir(), PathBuf::from("/var/lib/rahi/app-store"));
+    assert_eq!(
+        cfg.legacy_hiqlite_dir(),
+        PathBuf::from("/var/lib/rahi/hiqlite")
+    );
 }
 
 #[test]
