@@ -51,6 +51,7 @@ pub mod work;
 pub use backup::{BackupId, BackupListing};
 pub use blob::{Blob, DEFAULT_PAGE_ROWS, EXTENSIONS, EngineReport, MAX_VALUE_BYTES};
 pub use config::{EncKey, EncKeys, Peer, S3Backup, StoreConfig, StoreSecrets};
+pub use error::{is_recovering, is_terminal};
 pub use lock::{FENCE_TABLE_SQL, LEASE_TTL_SECONDS, Lease};
 pub use migrate::{Migration, MigrationReport, RecordedMigration, check_checksums};
 pub use migration_set::{
@@ -64,7 +65,11 @@ pub use receipt::{
     Changed, Classification, ContentDigest, EraseScope, ReceiptKey, ReceiptMeta, ReceiptRevision,
     Receipts, receipt_set,
 };
-pub use store::{Cache, Store, StoreHandle};
+pub use store::{
+    Cache, PRUNE_HORIZON_TABLE_SQL, REVOCATION_FLOOR_TABLE_SQL, REVOCATION_JTI_TABLE_SQL,
+    REVOCATION_SUB_TABLE_SQL, Store, StoreHandle, UPGRADE_TRANSITION_TABLE_SQL,
+    ensure_chassis_tables,
+};
 pub use txn::{ExecuteResult, Statement};
 pub use watermark::Watermark;
 pub use work::{

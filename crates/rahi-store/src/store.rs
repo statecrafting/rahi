@@ -38,6 +38,55 @@ impl CacheVariants for Cache {
     }
 }
 
+/// SQL for the durable JTI revocation table (spec 043 B-6).
+pub const REVOCATION_JTI_TABLE_SQL: &str = "CREATE TABLE IF NOT EXISTS rahi_revocation_jti (\
+    jti TEXT PRIMARY KEY,\
+    revoked_at INTEGER NOT NULL\
+)";
+
+/// SQL for the durable subject revocation table (spec 043 B-6).
+pub const REVOCATION_SUB_TABLE_SQL: &str = "CREATE TABLE IF NOT EXISTS rahi_revocation_sub (\
+    sub TEXT PRIMARY KEY,\
+    revoked_at INTEGER NOT NULL\
+)";
+
+/// SQL for the durable token floor table (spec 043 B-6b).
+pub const REVOCATION_FLOOR_TABLE_SQL: &str = "CREATE TABLE IF NOT EXISTS rahi_revocation_floor (\
+    id TEXT PRIMARY KEY,\
+    before INTEGER NOT NULL\
+)";
+
+/// SQL for the prune horizon table (spec 043 B-6).
+pub const PRUNE_HORIZON_TABLE_SQL: &str = "CREATE TABLE IF NOT EXISTS rahi_prune_horizon (\
+    id TEXT PRIMARY KEY,\
+    horizon INTEGER NOT NULL\
+)";
+
+/// SQL for the cache upgrade transition table (spec 043 B-4).
+pub const UPGRADE_TRANSITION_TABLE_SQL: &str = "CREATE TABLE IF NOT EXISTS rahi_upgrade_transition (\
+    id TEXT PRIMARY KEY,\
+    instant INTEGER NOT NULL,\
+    state TEXT NOT NULL\
+)";
+
+/// Ensure that the chassis-managed tables for spec 043 exist.
+///
+/// # Errors
+///
+/// The mapped store error if creating any table fails.
+pub async fn ensure_chassis_tables(handle: &StoreHandle) -> Result<(), Error> {
+    for sql in [
+        REVOCATION_JTI_TABLE_SQL,
+        REVOCATION_SUB_TABLE_SQL,
+        REVOCATION_FLOOR_TABLE_SQL,
+        PRUNE_HORIZON_TABLE_SQL,
+        UPGRADE_TRANSITION_TABLE_SQL,
+    ] {
+        handle.execute(sql, vec![]).await?;
+    }
+    Ok(())
+}
+
 /// The running hiqlite node. Owns the lifecycle; hands out [`StoreHandle`]s.
 pub struct Store {
     handle: StoreHandle,
@@ -121,6 +170,7 @@ impl Store {
             let _ = handle.client.shutdown().await;
             return Err(refused);
         }
+        ensure_chassis_tables(&handle).await?;
         Ok(Self {
             handle,
             cfg: cfg.clone(),
@@ -259,10 +309,66 @@ impl StoreHandle {
     ///
     /// # Errors
     ///
-    /// The mapped hiqlite error of whichever group is unhealthy.
+    /// Returns [`Error::Upstream`] reporting "recovering" while hiqlite is in
+    /// startup recovery (spec 043 D-15), or the mapped error of whichever
+    /// group is unhealthy.
     pub async fn health(&self) -> Result<(), Error> {
         self.client.is_healthy_db().await.map_err(map)?;
         self.client.is_healthy_cache().await.map_err(map)
+    }
+
+    /// Whether this node is healthy and ready to accept work.
+    ///
+    /// Reports "recovering" rather than "down" while startup recovery is in
+    /// progress (spec 043 D-15), and accepts no work before recovery completes.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Upstream`] reporting "recovering: ..." if still applying logs,
+    /// or the underlying error if a Raft group is down.
+    pub async fn is_healthy(&self) -> Result<(), Error> {
+        self.health().await
+    }
+
+    /// Read the durable revocation floor in whole seconds, if any has been set (spec 043 B-6b).
+    ///
+    /// # Errors
+    ///
+    /// The mapped store error on query failure.
+    pub async fn revocation_floor(&self) -> Result<Option<u64>, Error> {
+        #[derive(serde::Deserialize)]
+        struct FloorRow {
+            before: i64,
+        }
+        let rows: Vec<FloorRow> = self
+            .query(
+                "SELECT before FROM rahi_revocation_floor WHERE id = 'default'",
+                vec![],
+            )
+            .await?;
+        Ok(rows.first().and_then(|r| {
+            if r.before >= 0 {
+                Some(r.before as u64)
+            } else {
+                None
+            }
+        }))
+    }
+
+    /// Raise the durable revocation floor to `before` seconds, only if `before`
+    /// is higher than the current floor (spec 043 B-6b).
+    ///
+    /// # Errors
+    ///
+    /// The mapped store error on execute failure.
+    pub async fn raise_revocation_floor(&self, before: u64) -> Result<(), Error> {
+        self.execute(
+            "INSERT INTO rahi_revocation_floor (id, before) VALUES ('default', ?1) \
+             ON CONFLICT(id) DO UPDATE SET before = MAX(before, excluded.before)",
+            vec![Value::from(before as i64)],
+        )
+        .await?;
+        Ok(())
     }
 
     /// Whether this node currently leads the SQL group. An attached handle
