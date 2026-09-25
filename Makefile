@@ -11,7 +11,7 @@ SPEC_SPINE ?= spec-spine
 
 # The one place the governance pin is stated. CI reads this literal out of this
 # file (spec 001 D-9), so the pin moves in exactly one place.
-SPEC_SPINE_VERSION ?= 0.24.0
+SPEC_SPINE_VERSION ?= 0.25.0
 
 # The coupling base follows the branch this repository actually has, rather
 # than being assumed to be `origin/main` (spec-spine spec 072). The same three
@@ -20,6 +20,26 @@ SPEC_SPINE_VERSION ?= 0.24.0
 # HEAD, then `main`. An explicit `BASE=` on the command line still wins.
 SPEC_SPINE_DEFAULT_BRANCH ?= $(shell git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
 BASE ?= origin/$(or $(SPEC_SPINE_DEFAULT_BRANCH),main)
+# The head side of the same question (spec 001 D-15). `HEAD` locally; CI's
+# pull-request leg passes the event's frozen head SHA, because the checked-out
+# merge ref re-resolves against the base on every run (D-9).
+HEAD ?= HEAD
+
+# The gate's three controls (spec 001 D-15, carried from the spec-spine kit's
+# gate, now spec-spine spec 094 3.3 and 3.4). Each unrecognised value is
+# refused at exit 3, never read as the default, and every skip is announced.
+#
+#   OWNERSHIP  auto (default): run `index coverage --fail-on-untraced` when the
+#              effective config's `[coupling] require_ownership` is on, which
+#              in this repository it is; 1 always; 0 never.
+#   COUPLE     1 (default): run the coupling gate; 0 is for the one caller that
+#              must not couple, CI's push and merge-queue leg, which has
+#              already merged and carries no PR body.
+#   PR_BODY    a FILE holding the PR body, passed to `couple` as `--pr-body`
+#              only when set. Never inferred from, or inferring, COUPLE.
+OWNERSHIP ?= auto
+COUPLE ?= 1
+PR_BODY ?=
 
 .PHONY: setup gate refresh spec-dag k8s ci build test lint fmt deny coverage attest verify help
 
@@ -34,7 +54,7 @@ setup:
 	fi
 	$(SPEC_SPINE) --version
 
-## gate: the governed loop, READ-ONLY throughout (check, lint, coverage, couple, dag)
+## gate: the governed loop, READ-ONLY throughout (check, lint, coverage, couple, dag); OWNERSHIP=auto|1|0 COUPLE=1|0 PR_BODY=<file>
 # A gate that writes repairs what it is meant to judge, so this uses `check`
 # and never `compile` or `index`. `check` (spec-spine spec 075) is both
 # freshness reads in one verb; `--fail-on-warn` forwards to its compile half.
@@ -44,11 +64,48 @@ setup:
 # pending spec: 57 of them today, all legitimate. spec-spine's own CI opts in
 # because that repository builds what it claims inside one PR; rahi does not,
 # and will not until the last wave lands.
+#
+# The ownership probe CAPTURES the governed read, checks its status, and only
+# then reads the text. Never `config show | grep -q`: a pipeline reports grep's
+# status and discards the read's, so a failed read would look like "ownership
+# is off" and produce a green gate. A failed read is not a skip.
 gate:
 	$(SPEC_SPINE) check --fail-on-warn
 	$(SPEC_SPINE) lint --fail-on-warn
-	$(SPEC_SPINE) index coverage --fail-on-untraced
-	$(SPEC_SPINE) couple --base $(BASE) --head HEAD
+	@run=no; why="[coupling] require_ownership is off"; \
+	cfg="$${TMPDIR:-/tmp}/rahi-gate-config.$$$$"; \
+	if test "$(OWNERSHIP)" = "1"; then \
+	  run=yes; \
+	elif test "$(OWNERSHIP)" = "0"; then \
+	  run=no; why="OWNERSHIP=0"; \
+	elif test "$(OWNERSHIP)" != "auto"; then \
+	  echo "gate: OWNERSHIP=$(OWNERSHIP) is not one of auto, 1, 0" >&2; exit 3; \
+	else \
+	  $(SPEC_SPINE) config show > "$$cfg"; st=$$?; \
+	  if test $$st -ne 0; then rm -f "$$cfg"; exit $$st; fi; \
+	  if grep -qF 'require_ownership = true' "$$cfg"; then \
+	    run=yes; \
+	  elif ! grep -qF 'require_ownership = false' "$$cfg"; then \
+	    rm -f "$$cfg"; \
+	    echo "gate: the effective config named no require_ownership setting, so the ownership decision could not be read" >&2; \
+	    exit 3; \
+	  fi; \
+	  rm -f "$$cfg"; \
+	fi; \
+	if test "$$run" = yes; then \
+	  echo "$(SPEC_SPINE) index coverage --fail-on-untraced"; \
+	  $(SPEC_SPINE) index coverage --fail-on-untraced; \
+	else \
+	  echo "gate: $$why, so whole-tree ownership was NOT verified (the --fail-on-untraced assertion did not run; set OWNERSHIP=1 to demand it)"; \
+	fi
+	@if test "$(COUPLE)" = "0"; then \
+	  echo "gate: COUPLE=0, so drift against a base was NOT checked (the coupling gate did not run)"; \
+	elif test "$(COUPLE)" != "1"; then \
+	  echo "gate: COUPLE=$(COUPLE) is not one of 1, 0" >&2; exit 3; \
+	else \
+	  echo "$(SPEC_SPINE) couple --base $(BASE) --head $(HEAD)$(if $(PR_BODY), --pr-body $(PR_BODY))"; \
+	  $(SPEC_SPINE) couple --base $(BASE) --head $(HEAD) $(if $(PR_BODY),--pr-body "$(PR_BODY)"); \
+	fi
 	scripts/spec-dag.sh
 
 ## refresh: the writing half, for a live session that can commit the shards

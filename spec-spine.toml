@@ -5,11 +5,11 @@
 # session (AGENTS.md, "Working the backlog"). Every knob below is deliberate.
 
 [meta]
-# A floor, not the pin (spec 001 D-14). The pin is stated once, in the
-# Makefile, and CI reads it there (B-3). This line makes every older reader
+# A floor, not the pin (spec 001 D-14; moved to 0.25.0 by D-15). The pin is
+# stated once, in the Makefile, and CI reads it there (B-3). This line makes every older reader
 # refuse the corpus by name at exit 3 instead of judging 1.8.0 shards it
 # cannot read, whichever binary a hook resolves first.
-required_version = ">=0.24.0"
+required_version = ">=0.25.0"
 
 [manifest]
 # Cargo `[package.metadata.spec-spine].spec` names each crate's founding spec.
@@ -88,6 +88,9 @@ extra_hashed_inputs = [
   ".claude/agents/*.md",
   ".claude/rules/*.md",
   ".claude/skills/*/*.md",
+  # The frozen reference for those skills (spec 001 D-15): one SHA-256 per
+  # file, measured against the spec-spine kit at tag v0.20.0.
+  ".claude/skills.sha256",
   ".mcp.json",
   "AGENTS.md",
   "CLAUDE.md",
@@ -143,6 +146,7 @@ governance = [
   ".claude/agents/*.md",
   ".claude/rules/*.md",
   ".claude/skills/*/*.md",
+  ".claude/skills.sha256",
   "AGENTS.md",
   "CLAUDE.md",
   ".github/workflows/*.yml",

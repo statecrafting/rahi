@@ -23,6 +23,7 @@ establishes:
   - ".claude/agents/"
   - ".claude/rules/"
   - ".claude/skills/"
+  - ".claude/skills.sha256"
   - ".github/workflows/ci.yml"
   - ".github/workflows/govern.yml"
   - ".github/dependabot.yml"
@@ -146,8 +147,11 @@ may not change the protocol's substance without an amendment.
   the protocol reaches: eight that sequence "Working the backlog" (`/prime`,
   `/setup`, `/next`, `/build <id>`, `/verify <id>`, `/spec`, `/ship`,
   `/shepherd`) and the two that graph calls (`/commit`, `/code-review`).
-  Each is byte-identical to the spec-spine kit's copy; a project fact belongs
-  in `AGENTS.md` or a path-scoped rule, never in a skill.
+  Each is frozen at the spec-spine kit's tag v0.20.0 (the kit was removed
+  upstream in 0.23.0), byte for byte, with its SHA-256 recorded in D-15 and
+  in `.claude/skills.sha256`, and changes only by owner decision until
+  Statecraft harness delivery is confirmed. A project fact belongs in
+  `AGENTS.md` or a path-scoped rule, never in a skill.
 - **B-6 (agents).** Four pipeline agents: `architect`, `explorer`,
   `implementer`, `reviewer`. The reviewer applies the chassis-invariants
   rule to any diff under the store, ledger, identity, or kernel crates.
@@ -698,6 +702,148 @@ ran 0.21.0. Neither is adopted here, because either would be protocol
 substance riding on a version bump. What B-5's reference means now that the
 kit is gone is for the owner to decide.
 
+D-15 (2026-09-24, owner decision; the frozen skill reference, the gate
+re-copy D-14 left open, and spec-spine 0.25.0 adoption). The owner settled
+both questions D-14 left open, in three parts, and moved the pin to 0.25.0,
+the family-aligned release every change below is measured against.
+
+**(a) B-5's reference is frozen at the kit's tag v0.20.0.** The kit was
+removed upstream in 0.23.0 (spec-spine spec 092), so "the spec-spine kit's
+copy" named nothing that still exists. The owner adopted the interim text:
+the ten skills are frozen at `kit/.claude/skills/` as tagged v0.20.0, with a
+SHA-256 per file recorded here, and they change only by owner decision until
+Statecraft harness delivery is confirmed. B-5's closing sentence is rewritten
+to say that, under the owner's authority; nothing else in B-5 moves.
+
+Measured, not assumed: every file under `.claude/skills/` was compared with
+`git show v0.20.0:kit/.claude/skills/<name>/SKILL.md` in the spec-spine
+repository. All ten are byte-identical to v0.20.0; none differs, and no
+skill was rewritten.
+
+| Skill | SHA-256 (identical in rahi and at spec-spine v0.20.0) |
+|---|---|
+| `build` | `b67bc87d3afb59712c95a8319a2e60127a0637303cd9531c38863069d3f60415` |
+| `code-review` | `acfd7133e580734ea3a20d037a40e0c8e5ceb4af46e43ec935587762b15d4d0f` |
+| `commit` | `f8424d82ba47124175ef431cd2bb2b16af09c709ad413ba8702716a13cf0767d` |
+| `next` | `6bd284099b2e31a18da968e66745f820a6bdc1fa6f4910a5b2b9a74c4e1e7300` |
+| `prime` | `94d127b27d53c4367053c802c4237e1792669ffa2318678e26fce68ab4c5a6a4` |
+| `setup` | `e7a849cce1473a8f706dd7e4dcefc4f349dcdf67379c29c089215d4000d64947` |
+| `shepherd` | `4f2bbbf1b7c2ad7f4b44dda3c97c456ec4d80765b4e2651ba5fafd9fc6065f06` |
+| `ship` | `9adccef05acae28e63da77d0c10e45b8549d91cc18877f373bde3f2b3dcee1e8` |
+| `spec` | `28bd59ef07dbb9dd9f4cddbb1b8af34cf7fce045309c01bb6cf916498f537c73` |
+| `verify` | `512c5b11ce3c56658ff2b7daf4f0e515fbc90e917590693fe781546d85a89a85` |
+
+The same ten lines, in `shasum -a 256` format, are `.claude/skills.sha256`,
+a new unit this spec establishes. It is named in `[index]
+extra_hashed_inputs` and the `governance` slice beside the skills it
+describes, so it is witnessed: `check` reports 157 unwitnessed claims, 157
+allowed, the same as before it existed. A verification line checks the
+recorded hashes through `sha256sum -c` where GNU coreutils has it and
+`shasum -a 256 -c` otherwise, so the check holds on BSD, macOS and GNU alike.
+Between v0.20.0 and v0.21.0 exactly one skill changed upstream, `shepherd`;
+`kit/AGENTS.md` did not change between the two tags.
+
+**(b) The gate files are rahi's own, measured against 0.25.0.** The 0.21.0
+notes asked adopters to re-copy `kit/Makefile`, `kit/govern.yml`,
+`kit/AGENTS.md` and the shepherd skill (specs 113, 114, 116). At v0.25.0,
+`docs/corpus-map.md` maps 113 to 095 with no surviving requirement, 114 to
+094 (one gate and the boundaries it holds) and 116 to 093. The owner
+authorized rahi's own change to `Makefile`, `.github/workflows/govern.yml`
+and `AGENTS.md`. What was read: spec-spine v0.25.0 specs 093 and 094, its
+own `Makefile` `gate` target, and v0.21.0's `kit/Makefile`,
+`kit/govern.yml` and `kit/AGENTS.md`.
+
+Adopted:
+
+- **The gate's controls (094 3.3, 3.4).** `OWNERSHIP ?= auto`, `COUPLE ?=
+  1`, `PR_BODY ?=` and `HEAD ?= HEAD` in the `Makefile`. `auto` asks the
+  effective configuration through `spec-spine config show`, capturing the
+  read and checking its status before reading the text, so a failed read
+  fails the gate rather than reading as "ownership is off". Any word outside
+  each control's set is refused at exit 3, and every skip prints that the
+  assertion did not run. The target echoes each governed command it runs,
+  since the recipe lines that decide are silent.
+- **Both CI legs call `make gate` (094 4.1).** `govern.yml` stops restating
+  the chain. The push and merge-queue leg runs `make gate COUPLE=0`; the
+  pull-request leg runs `make gate` with `BASE` and `HEAD` set to the event's
+  frozen SHAs and `PR_BODY` naming a file it writes under `$RUNNER_TEMP`. The
+  variable holding the body's text is renamed from `PR_BODY` to
+  `PR_BODY_TEXT`, because make imports the environment and `PR_BODY` is now
+  a path. The separate `scripts/spec-dag.sh` step is removed because the
+  target runs it; the Kubernetes step stays, because it belongs to `make ci`
+  and not to `make gate`.
+- **The protocol shape in `AGENTS.md` (the four points 113 named).** The
+  freshness verb was already `check`. Added: `spec-spine --version` as a
+  startup read, consulted before any freshness verdict; the gate spelled out
+  in order in "Working the backlog" step 6; the coupling base's resolution
+  (`$SPEC_SPINE_DEFAULT_BRANCH`, the remote's `HEAD`, then `main`); and the
+  ownership assertion's conditionality, with the announced skips. The
+  sentence on the skills now names the v0.20.0 freeze and the manifest.
+
+Kept, as rahi's legitimate differences:
+
+- `--fail-on-unresolved` stays off, for D-11's reason; both upstream gates
+  pass it.
+- `scripts/spec-dag.sh` stays the gate's last step. Upstream has no
+  equivalent.
+- The commit-boundary hook keeps its coupling read with
+  `--include-uncommitted` (B-10, D-13). 094 4.2 says spec-spine's own hook
+  must not run `couple`, because a range of commits cannot contain the
+  change being committed. Spec 102's flag exists to close exactly that gap,
+  and B-10 uses it. The flag stays local-only; no workflow passes it.
+- The pin stays in the `Makefile` and CI reads it from there (B-3). The kit
+  workflow installs whatever is latest.
+- The kit workflow's `BASE=origin/${{ github.base_ref }}` with the checked-out
+  merge ref as head is not taken. D-9 rejected it, and 094 4.1 itself now
+  requires the frozen SHAs.
+- The kit workflow's separate `probe` job and its `make build test fmt
+  clippy` job are not taken: `ci.yml`'s `has_cargo` output and cargo job
+  already serve that role, and rahi's target is `lint`, not `clippy`.
+- The v0.25.0 `Makefile`'s `spec-spine-binary` prerequisite (spec 117),
+  which resolves `./target/release` ahead of `PATH`, is not taken. It was not
+  among the files 0.21.0 asked adopters to re-copy, and it would change
+  which binary `make` governs with. The floor below already makes a wrong
+  pick fail by name.
+- Nothing is taken from the kit `AGENTS.md`'s writing gate list (`compile`
+  and `index` before the checks), its gitignored-derived variant, or its
+  `npx` route. B-2's read-only gate and the separate `make refresh` stand.
+
+**Every line of the Verification block stays true except one.** The line
+this entry replaces is D-14's pin line, which asserted `0.24.0` and now
+asserts `0.25.0`. Every other line holds as written. The B-2 lines hold
+because `gate` still runs no writing verb. The B-3 lines hold: `govern.yml`
+still carries `workflow_call` and no event trigger, still reads the pin
+with `SPEC_SPINE_VERSION ?= `, still binds `HEAD_SHA:` to the event's head
+SHA, and still has no `--head HEAD`. B-2's and B-3's text also remain true without an edit: with the
+defaults, `make gate` runs the five verbs B-2 lists in B-2's order, because
+`OWNERSHIP=auto` resolves to on here (`[coupling] require_ownership = true`)
+and `HEAD` defaults to `HEAD`. `govern.yml` still runs every verb B-3 lists,
+now through the one target. New lines assert the manifest, the controls and
+their refusals, and that both legs call the target and neither restates the
+chain.
+
+**The pin.** `SPEC_SPINE_VERSION ?= 0.25.0` in the `Makefile`, and the
+prose sites D-14 moved: `AGENTS.md`, `README.md` and the architect agent.
+The floor moves to `[meta] required_version = ">=0.25.0"`; 0.24.0 now
+refuses this tree at exit 3 and names the requirement. The dated records
+naming older versions are kept (D-13, D-14, `CHANGELOG.md`, `docs/design/`,
+and `AGENTS.md`'s "since 0.20.0" and "older than 0.18.0" sentences). The
+0.25.0 notes were read: specs 126 to 129 are path containment for derived
+output and configuration, and no schema version changed (registry 1.8.0,
+index 1.1.0). None of them turns this tree red. The spec ids are plain file
+names, `derived_dir` is the default relative path, and no shard is a
+Windows device name. Measured on `d17a638`, a bare 0.25.0 moves no shard at
+all: `check` answers fresh on both trees at exit 0. In this change the
+registry moves 1 of 30 shards (this spec's own), and all 41 index shards
+move by their `shardHash` alone, because `Makefile`, `AGENTS.md`,
+`spec-spine.toml` and a workflow are hashed inputs.
+
+**(c) The shepherd re-copy is deferred.** `.claude/skills/shepherd/SKILL.md`
+stays at its v0.20.0 bytes, recorded above. The 0.21.0 change (spec 116, now
+093: shepherd reads every reviewer, not only line-anchored comments) is not
+taken, because under (a) a skill changes only by owner decision, and the
+owner deferred this one.
+
 ## Verification
 
 ```verify:cli
@@ -753,8 +899,25 @@ sh -c '! grep -qE "git (-C [^ ]+ )?add" .githooks/pre-commit'
 # B-10 / D-13: the flag is local-only. CI's coupling verdict must not depend
 # on the state of a runner's working tree (spec-spine spec 102 3.4).
 sh -c '! grep -rq -- "--include-uncommitted" .github/workflows/'
-# D-14 (replacing D-13's line): the pin is 0.24.0 wherever the pin is stated.
-sh -c 'test "$(sed -n "s/^SPEC_SPINE_VERSION ?= //p" Makefile)" = 0.24.0'
+# D-15 (replacing D-14's line): the pin is 0.25.0 wherever the pin is stated.
+sh -c 'test "$(sed -n "s/^SPEC_SPINE_VERSION ?= //p" Makefile)" = 0.25.0'
+# D-15 / B-5: the ten skills are the frozen v0.20.0 bytes, one hash per file.
+# sha256sum where GNU coreutils has it, shasum (BSD and macOS) otherwise.
+sh -c 'test "$(grep -c . .claude/skills.sha256)" = 10'
+sh -c 'for s in build code-review commit next prime setup shepherd ship spec verify; do grep -qF "  .claude/skills/$s/SKILL.md" .claude/skills.sha256 || exit 1; done'
+sh -c 'if command -v sha256sum >/dev/null 2>&1; then sha256sum -c .claude/skills.sha256; else shasum -a 256 -c .claude/skills.sha256; fi >/dev/null'
+# D-15: the gate's controls exist, and an unrecognised word is refused by name
+# rather than read as the default.
+grep -qE '^OWNERSHIP \?= auto$' Makefile
+grep -qE '^COUPLE \?= 1$' Makefile
+grep -qE '^HEAD \?= HEAD$' Makefile
+sh -c 'make gate OWNERSHIP=yes COUPLE=0 2>&1 | grep -q "OWNERSHIP=yes is not one of auto, 1, 0"'
+sh -c 'make gate COUPLE=maybe 2>&1 | grep -q "COUPLE=maybe is not one of 1, 0"'
+# D-15: both CI legs call the target and neither restates the chain.
+grep -qF 'make gate COUPLE=0' .github/workflows/govern.yml
+grep -qF 'make gate BASE="$BASE_SHA" HEAD="$HEAD_SHA" PR_BODY="$RUNNER_TEMP/pr-body.txt"' .github/workflows/govern.yml
+sh -c '! grep -qE "^ +(- )?run: (spec-spine (check|lint|couple|index)|scripts/spec-dag)" .github/workflows/govern.yml'
+sh -c '! grep -qF "PR_BODY:" .github/workflows/govern.yml'
 # D-13: spec-dag reads the versioned read document (spec-spine spec 093).
 grep -q 'schemaVersion' scripts/spec-dag.sh
 ```
