@@ -17,6 +17,10 @@
         "source": "spec-edge"
       },
       {
+        "path": ".claude/skills.sha256",
+        "source": "spec-edge"
+      },
+      {
         "path": ".claude/skills/",
         "source": "spec-edge"
       },
@@ -115,6 +119,19 @@
         "unit": {
           "kind": "file",
           "path": ".claude/settings.json"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": ".claude/skills.sha256"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": ".claude/skills.sha256"
         }
       },
       {
@@ -317,5 +334,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "4d4457f77b9b45dea7d1bcc09cc53bb098ffc5fe2b784526bb3ec39feb87b7bf"
+  "shardHash": "b0fd07fba367e5dd3bedc718f183584a17643b4a9dc97fa8ea3938bf763eed2a"
 }
