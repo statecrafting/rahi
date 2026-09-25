@@ -195,9 +195,16 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
         Verb::Migrate {
             backup,
             adopt_manifest,
+            plan,
         } => {
             let booted = Booted::open_or_attach::<C>(env).await?;
-            let result = migrate::<C>(&booted, backup, adopt_manifest, env).await;
+            let result = if plan {
+                rahi_ops::migrate::plan_sets(&booted.store, C::migrations(), &C::migration_sets())
+                    .await
+                    .map(|steps| println!("{}", rahi_ops::migrate::render_plan(&steps)))
+            } else {
+                migrate::<C>(&booted, backup, adopt_manifest, env).await
+            };
             booted.shutdown().await;
             result
         }
@@ -228,7 +235,8 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
                 migrations: C::migrations(),
                 adopt,
             };
-            match rahi_ops::restore::run(&config, &archive, &source, &cell).await? {
+            let sets = C::migration_sets();
+            match rahi_ops::restore::run_sets(&config, &archive, &source, &cell, &sets).await? {
                 Outcome::Restored(marker, evidence) => {
                     println!(
                         "restore: applied {} ({} parts); rauthy's snapshot is at {}; marker written to {}",
@@ -327,6 +335,12 @@ async fn migrate<C: Cell>(
     if with_backup {
         backup(booted, &Destination::default_for(&booted.config), env).await?;
     }
+    let sets = C::migration_sets();
+    if !adopt_manifest && !sets.is_empty() {
+        let report = rahi_ops::migrate::run_sets(&booted.store, C::migrations(), &sets).await?;
+        println!("{}", rahi_ops::migrate::render_sets(&report));
+        return Ok(());
+    }
     if !adopt_manifest {
         let report = rahi_ops::migrate::run(&booted.store, C::migrations()).await?;
         println!("{}", rahi_ops::migrate::render(&report));
@@ -341,6 +355,19 @@ async fn migrate<C: Cell>(
     // and appends to it; opening it verifies it first, as every other verb
     // that touches the chain does.
     let ledger = booted.ledger().await?;
+    if !sets.is_empty() {
+        let (report, adoption) = rahi_ops::migrate::adopt_sets(
+            &booted.store,
+            &ledger,
+            &booted.manifest,
+            C::migrations(),
+            &sets,
+        )
+        .await?;
+        println!("{}", rahi_ops::migrate::render_sets(&report));
+        println!("{}", rahi_ops::migrate::render_adoption(&adoption));
+        return Ok(());
+    }
     let (report, adoption) =
         rahi_ops::migrate::adopt(&booted.store, &ledger, &booted.manifest, C::migrations()).await?;
     println!("{}", rahi_ops::migrate::render(&report));

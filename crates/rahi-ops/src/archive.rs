@@ -13,7 +13,7 @@
 use std::collections::BTreeMap;
 use std::io::{Read as _, Write as _};
 
-use rahi_store::RecordedMigration;
+use rahi_store::{RecordedMigration, SetName};
 use serde::{Deserialize, Serialize};
 
 use rahi_types::{Error, Result};
@@ -36,8 +36,14 @@ pub const RAUTHY_DIR: &str = "rauthy";
 /// The key material directory inside the archive.
 pub const KEYS_DIR: &str = "keys";
 
-/// The format this crate writes; a reader refuses any other.
+/// The format of an archive with no named migration set: byte-compatible
+/// with what 0.2.0 wrote (spec 046 D-10).
 pub const FORMAT: u32 = 1;
+
+/// The format of an archive that records a named migration set (spec 046
+/// B-15). A 0.2.x reader checks `format` exactly, so it refuses this one
+/// rather than restoring library schemas it would not check.
+pub const FORMAT_SETS: u32 = 2;
 
 /// One file inside the archive.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -95,6 +101,10 @@ pub struct ArchiveSchema {
     pub version: u32,
     /// Every recorded migration, oldest first.
     pub migrations: Vec<RecordedMigration>,
+    /// Every named set's history at backup time (spec 046 B-14). Absent
+    /// from an archive with none, which keeps format 1.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub sets: BTreeMap<SetName, Vec<RecordedMigration>>,
 }
 
 /// `manifest.json`: what the archive holds and what each part hashes to.
@@ -128,8 +138,13 @@ impl ArchiveManifest {
         manifest_hash: String,
         schema: Option<ArchiveSchema>,
     ) -> Self {
+        let format = if schema.as_ref().is_some_and(|s| !s.sets.is_empty()) {
+            FORMAT_SETS
+        } else {
+            FORMAT
+        };
         Self {
-            format: FORMAT,
+            format,
             created,
             versions: Versions {
                 rahi: env!("CARGO_PKG_VERSION").to_owned(),
@@ -282,9 +297,19 @@ pub fn open(
     }
     let manifest = manifest
         .ok_or_else(|| Error::Integrity("the archive carries no manifest.json".to_owned()))?;
-    if manifest.format != FORMAT {
+    // Spec 046 B-15: this build reads both formats, and a format-1 archive
+    // must record no named set, so the format is never a lie about what the
+    // archive holds.
+    let sets_recorded = manifest.schema.as_ref().is_some_and(|s| !s.sets.is_empty());
+    let readable = match manifest.format {
+        FORMAT => !sets_recorded,
+        FORMAT_SETS => true,
+        _ => false,
+    };
+    if !readable {
         return Err(Error::Validation(format!(
-            "archive format {} is not the {FORMAT} this build reads",
+            "archive format {} is not one this build reads ({FORMAT}, or {FORMAT_SETS} with named \
+             migration sets)",
             manifest.format
         )));
     }

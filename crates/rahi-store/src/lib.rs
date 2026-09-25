@@ -38,24 +38,39 @@ pub mod config;
 mod error;
 pub mod lock;
 pub mod migrate;
+pub mod migration_set;
 pub mod notify;
 pub mod outbox;
 pub mod query;
+pub mod receipt;
 pub mod store;
 pub mod txn;
 pub mod watermark;
+pub mod work;
 
 pub use backup::{BackupId, BackupListing};
 pub use blob::{Blob, DEFAULT_PAGE_ROWS, EXTENSIONS, EngineReport, MAX_VALUE_BYTES};
 pub use config::{EncKey, EncKeys, Peer, S3Backup, StoreConfig, StoreSecrets};
 pub use lock::{FENCE_TABLE_SQL, LEASE_TTL_SECONDS, Lease};
 pub use migrate::{Migration, MigrationReport, RecordedMigration, check_checksums};
+pub use migration_set::{
+    APP_SET, MigrationSet, PlannedMigration, SetHistories, SetMigrationReport, SetName,
+    SetRequirement, check_set_checksums, plan, validate_sets,
+};
 pub use notify::{Envelope, Listen, Notify};
 pub use outbox::{OUTBOX_TABLE_SQL, Outbox, TxnBuilder};
 pub use query::{Page, Value};
+pub use receipt::{
+    Changed, Classification, ContentDigest, EraseScope, ReceiptKey, ReceiptMeta, ReceiptRevision,
+    Receipts, receipt_set,
+};
 pub use store::{Cache, Store, StoreHandle};
 pub use txn::{ExecuteResult, Statement};
 pub use watermark::Watermark;
+pub use work::{
+    AttemptRecord, Claim, DeadFilter, DeadItem, FailureDetail, ProcessingKey, QueueCounts,
+    RetryPolicy, SweepReport, Work,
+};
 
 /// The coordination plane's own DDL, as one migration for the app's list.
 ///
@@ -78,6 +93,18 @@ pub use watermark::Watermark;
 /// ```
 #[must_use]
 pub fn coordination_migration(version: u32) -> Migration {
+    coordination_migration_sql(version)
+}
+
+/// The chassis set `rahi.coordination` (spec 046 B-12): version 1 is byte
+/// for byte [`coordination_migration`]'s SQL, so a store that already
+/// created the tables records it as a no-op.
+#[must_use]
+pub fn coordination_set() -> MigrationSet {
+    MigrationSet::chassis("coordination", vec![coordination_migration_sql(1)])
+}
+
+fn coordination_migration_sql(version: u32) -> Migration {
     Migration::new(
         version,
         "rahi-store coordination",

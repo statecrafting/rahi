@@ -9,12 +9,21 @@ use rahi_types::Error;
 /// hiqlite folds every rusqlite error that is not a constraint into
 /// `Sqlite`, so the storage-class SQLite conditions are told apart by
 /// their result-code names before the rest falls through to `Validation`.
+///
+/// A batch submitted through `txn` reports a failing statement's constraint
+/// violation as `H::Transaction`, not `H::ConstraintViolation` (spec 045
+/// D-16 found this: a guard's `NOT NULL` abort, and a bare primary-key
+/// collision, both surfaced this way from inside a batch). The rule this
+/// function already states for `H::ConstraintViolation` applies the same
+/// way here: a constraint failure is `Conflict` whether it is hiqlite's own
+/// variant or one folded into a transaction's.
 pub(crate) fn map(err: hiqlite::Error) -> Error {
     use hiqlite::Error as H;
     let msg = err.to_string();
     match err {
         H::Config(_) | H::Cryptr(_) => Error::Config(msg),
         H::ConstraintViolation(_) => Error::Conflict(msg),
+        H::Transaction(_) if is_constraint_failure(&msg) => Error::Conflict(msg),
         H::Sqlite(_) if is_storage_failure(&msg) => Error::Io(msg),
         H::BadRequest(_)
         | H::PrepareStatement(_)
@@ -29,6 +38,12 @@ pub(crate) fn map(err: hiqlite::Error) -> Error {
         }
         _ => Error::Upstream(msg),
     }
+}
+
+/// Whether a transaction's error names a SQL constraint (a `NOT NULL`,
+/// `UNIQUE`, or primary-key violation) rather than a bad statement.
+fn is_constraint_failure(msg: &str) -> bool {
+    msg.to_ascii_uppercase().contains("CONSTRAINT FAILED")
 }
 
 /// SQLite result codes that mean the storage, not the statement, failed.

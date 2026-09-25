@@ -6,7 +6,7 @@ kind: kernel
 domain: store
 created: "2026-09-24"
 authors: ["Bartek Kus"]
-implementation: pending
+implementation: complete
 risk: critical
 wave: 3
 depends_on:
@@ -15,14 +15,17 @@ depends_on:
   - "023-observability"
   - "036-manifest-and-schema-evolution"
 establishes:
-  - { kind: file, path: "crates/rahi-store/src/receipt.rs", planned: true }
-  - { kind: file, path: "crates/rahi-store/src/work.rs", planned: true }
-  - { kind: file, path: "crates/rahi-store/tests/receipt.rs", planned: true }
-  - { kind: file, path: "crates/rahi-store/tests/work.rs", planned: true }
-  - { kind: file, path: "crates/rahi-store/tests/receipt_recovery.rs", planned: true }
+  - { kind: file, path: "crates/rahi-store/src/receipt.rs" }
+  - { kind: file, path: "crates/rahi-store/src/work.rs" }
+  - { kind: file, path: "crates/rahi-store/tests/receipt.rs" }
+  - { kind: file, path: "crates/rahi-store/tests/work.rs" }
+  - { kind: file, path: "crates/rahi-store/tests/receipt_recovery.rs" }
 extends:
   - { spec: "011-store-hiqlite", unit: "crates/rahi-store/src/lib.rs", nature: additive }
+  - { spec: "011-store-hiqlite", unit: "crates/rahi-store/src/error.rs", nature: additive }
+  - { spec: "012-store-coordination", unit: "crates/rahi-store/src/lock.rs", nature: additive }
   - { spec: "023-observability", unit: "crates/rahi-edge/src/obs/metrics.rs", nature: additive }
+  - { spec: "023-observability", unit: "crates/rahi-edge/tests/obs.rs", nature: additive }
 refines:
   - { aspect: "a work claim that outlives the lease TTL is a chassis row created and renewed under a short-held lease and fenced by its own token (012 D-10)", unit: { kind: symbol, id: "rahi_store::lock::Lease" } }
 references:
@@ -568,6 +571,133 @@ directory, and asserts the stated end state.
   `approved`; `implementation` stays `pending` until a session builds it.
   D-1's sentence that approval is a separate human act is kept as the
   record of the draft; this entry is that act.
+- **D-16 (2026-09-24, build session).** `crates/rahi-store/src/error.rs`'s
+  `map` classified only hiqlite's own `H::ConstraintViolation` as
+  `Error::Conflict`; a constraint violation raised inside a `txn` batch
+  (012 D-3's `NOT NULL` guard technique, and a bare primary-key collision
+  alike) surfaces as `H::Transaction` instead, which fell through to
+  `Error::Validation`. That contradicts FR-002 and FR-005's `Error::Conflict`
+  and the function's own stated rule ("a constraint is Conflict"); spec
+  011's `tests/txn.rs` already hedges the exact ambiguity
+  (`Error::Conflict(_) | Error::Validation(_)`). Fixed additively (extends
+  edge above, spec 011): an `H::Transaction` whose message names a SQL
+  constraint failure now also maps to `Error::Conflict`. No text of spec 011
+  or 012 states the narrower mapping, so nothing shipped is contradicted.
+  `Receipts::stage_first` was rewritten to match: it seeds the head row at
+  revision 0 (`SEED_HEAD`, `ON CONFLICT DO NOTHING`, which never raises) and
+  then applies the same CAS `stage_revision` uses, rather than leaning on
+  the primary key's own collision.
+- **D-17 (2026-09-24, build session).** B-14 describes the claim `UPDATE`
+  and the attempt row's `INSERT` together, but `fenced_txn`'s
+  `Statement::fenced` accepts only `UPDATE` and `DELETE` (an `INSERT` has no
+  row to compare a token against, per its own doc comment), so the two
+  cannot be one `fenced_txn` call. `Work::reserve` and `Work::next` submit
+  the claim through `fenced_txn` (minting the row's fence from the lease's
+  own token, matching `tests/lock.rs`'s "the row records the lease that
+  wrote it"), then open the attempt row through a plain `StoreHandle::txn`,
+  stamped with the same token, exactly as `Statement::fenced`'s
+  documentation prescribes for an insert under a lease. This is two Raft
+  entries, not the one B-14a's "three round trips" implies for "the fenced
+  write"; the crash-point table's row 4 names the state after `reserve`
+  returns, not a crash between its two writes, so the two-write shape holds
+  the table's assertion without a hand-fenced single batch. Superseded by
+  D-21.
+- **D-18 (2026-09-24, build session).** B-19 fixes `Work::sweep`'s signature
+  at four arguments with no retry policy, yet B-16's last sentence requires
+  a chain of pure expiries (no explicit `Work::fail`) to also reach `dead`
+  once its budget is spent, and neither `Work::reserve`, `Work::next`, nor
+  B-19's literal signature carries one. `Work::sweep` takes `&RetryPolicy`
+  as a fifth argument so its own reclaim step can apply the same ceiling
+  `Work::fail` applies explicitly.
+- **D-19 (2026-09-24, build session).** B-19 says the sweep acts "through
+  fenced_txn". Most of the rows a sweep touches (`rahi_receipt`,
+  `rahi_receipt_head`, `rahi_processing_attempt`) carry no `fence` column at
+  all, so `fenced_txn`'s automatic per-statement rewrite fails them outright
+  ("no such column: fence"); the one table that does, `rahi_processing`,
+  would have that column stamped from the sweep's own lease
+  (`rahi.work.sweep/<namespace>`), a different lease key with an unrelated
+  token sequence from the reservation queue's (`rahi.work/<namespace>/
+  <processor>`), so comparing a row's existing fence against it is not a
+  meaningful check. `Work::sweep` holds the lease for mutual exclusion
+  among concurrent sweepers and writes every chunk through a plain `txn`;
+  row 9 of the crash-point table (no half-applied chunk) holds regardless,
+  since each chunk is still one Raft entry. Superseded by D-22.
+
+- **D-20 (2026-09-25, build session; a revision over a compacted
+  tombstone).** B-20 lets a late delivery with different content classify
+  as `Changed` against a retention tombstone, and B-6 then stages a new
+  revision, but neither says what becomes of the tombstone. Left as it was,
+  the head stayed `tombstoned` and keyless, and the sweep would delete the
+  new, live revision at the old `tombstone_until`, dropping content I-2
+  says is never dropped. The B-8 guard statements of `stage_revision` and
+  `stage_collision` (and `stage_first`) now also clear `tombstoned`, write
+  the raw key back, and take the new revision's `retain_until` and
+  `tombstone_until`. On a head that was never compacted they only take the
+  newest revision's horizons. `tests/receipt.rs` covers it.
+- **D-21 (2026-09-25, build session; the reservation is one batch,
+  superseding D-17).** D-17's two-entry reservation could leave a claimed
+  row with no open attempt if the process stopped between the entries,
+  which row 4 of 3.7 does not allow. A reservation is now one `txn`: the
+  queue lease's own guard statement first (012 D-3, the statement
+  `fenced_txn` runs, exposed crate-internally as `Lease::guard_statement`
+  and `Lease::superseded_error`, and `fenced_txn` now uses both, which is
+  the additive edge on 012's `lock.rs`), then the claim `UPDATE` fenced by
+  hand exactly as `Statement::fenced` would rewrite it, then the prior
+  attempt's close as `expired` on a reclaim (B-14), then the new attempt's
+  `INSERT ... SELECT`, which inserts only when the claim in the same batch
+  took the row. The claim re-checks the row's eligibility inside the batch
+  (B-10). A superseded lease aborts all of it as `Error::Conflict`
+  (FR-010). `Work::next` skips a row that moved since its read, and now
+  propagates a store error rather than swallowing it. Rejected: keeping two
+  entries and relying on the sweep, because nothing would ever open the
+  missing attempt. Evidence for FR-010's superseded half is the shared
+  guard's own test (012 `tests/lock.rs`, which now runs through
+  `guard_statement`): a reservation holds its lease for milliseconds and
+  exposes no seam where a test could supersede it.
+- **D-22 (2026-09-25, build session; the sweep is guarded, superseding
+  D-19).** D-19 wrote every sweep chunk through a plain `txn`, which a
+  superseded sweeper could still commit, contrary to row 9 of 3.7. Each
+  phase of `Work::sweep` is now one chunk of at most `limit` rows submitted
+  as one batch behind the sweep lease's guard, so a superseded sweeper
+  commits nothing and no chunk is half-applied. Every statement re-checks
+  inside the batch the condition it was read under: an expired claim that a
+  reservation took in between is neither dead-lettered nor has its attempt
+  closed; a receipt that gained open work or a new revision is not
+  compacted; a tombstone that became live is not deleted. The `failed`
+  promotion reads the budget from the policy D-18 passes
+  (`attempt >= max_attempts`). **Measured, and recorded for 012 and the
+  hiqlite work:** hiqlite's lock release is unacknowledged and lock state is
+  replayed on restart, so a lease released just before a stop, or held at a
+  crash, reads as held after the restart. It is taken over by the first
+  lease request made after `LEASE_TTL_SECONDS`, but a request queued before
+  that is never woken and times out (hiqlite expires a dead holder only on a
+  new lock request). The crash tests of rows 4 and 9 therefore wait one TTL
+  after the restart before the next reservation or sweep, which is the
+  recovery a cell's tick gives. This spec changes nothing in 012.
+- **D-23 (2026-09-25, build session; positional parameters).** SQLite reads
+  `$1` as a named parameter and numbers named parameters by their first
+  appearance, while hiqlite binds positionally, so a statement whose `$n`
+  first appear out of order binds the wrong values silently (the CAS guards
+  here reuse and reorder parameters). Every statement in `receipt.rs` and
+  `work.rs` uses SQLite's explicit `?NNN` form instead. A scan of every
+  other string literal in the workspace found no statement whose `$n` first
+  appear out of order, so nothing else is affected.
+- **D-24 (2026-09-25, build session; the requeued attempt).** B-17 records a
+  `requeued` attempt with the attempt count kept, so it shares its attempt
+  number with the attempt that went `dead`. The attempt table's primary key
+  therefore includes `outcome`, and a requeue inserts its record only when
+  the row is `dead`, so a requeue of a live row writes nothing. The attempt
+  closes (`done`, `failed`, `dead`) match only the `open` row.
+- **D-25 (2026-09-25, build session; what an erasure tombstone holds).**
+  B-21 leaves "one tombstone row holding only `key_digest` and
+  `erased_at`" per identity. The head row keeps structural columns it
+  cannot drop (`revision`, `created_at`, the flags); `tenant`, `namespace`
+  and `key_kind` are cleared to empty strings with `key`, `outcome` and the
+  digests, because a tenant or a source account can itself identify a
+  person. `stage_erasure` of one identity also inserts that tombstone when
+  the identity was never delivered, so its first delivery afterwards is
+  `Erased` (B-22). A namespace or tenant scope selects its identities
+  before the statement that clears the scope columns.
 
 ### Follow-up: statecraft-platform's `sc_idempotency`
 
@@ -587,8 +717,6 @@ tenant is not derivable stay in `sc_idempotency` until their retention
 ends. aicortex's claim rows are the same kind of follow-up against B-14.
 
 ## Verification
-
-Planned: none of these files exists until the spec is built.
 
 ```verify:cli
 cargo test -p rahi-store --locked --test receipt

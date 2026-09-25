@@ -17,7 +17,10 @@ use std::collections::BTreeSet;
 
 use rahi_kernel::Manifest;
 use rahi_ledger::{BinaryVersions, Hash, Ledger, ManifestTransition, SYSTEM_DEPLOY};
-use rahi_store::{Migration, MigrationReport, RecordedMigration, Store, check_checksums};
+use rahi_store::{
+    Migration, MigrationReport, MigrationSet, RecordedMigration, SetHistories, SetMigrationReport,
+    SetName, Store, check_checksums, check_set_checksums,
+};
 use rahi_types::{Error, Result, Sub};
 
 /// The recorded schema version of `store`, without creating anything.
@@ -136,6 +139,212 @@ pub fn check_ahead(history: &[RecordedMigration], expected: u32) -> Result<()> {
          repair is forward, never a down migration",
         blocker.version, blocker.name
     )))
+}
+
+/// The store is one this binary may serve, in every set (spec 046 B-9,
+/// B-10).
+///
+/// For the set `app` this asks [`check_current`]'s questions with its
+/// wording. The order is 036 D-13's, across sets: every set's checksums first, so an integrity
+/// failure is reported whether or not any set is also behind; then a set
+/// behind the binary is [`Error::Stale`] naming it; then every set ahead of
+/// the binary is admitted only across additive versions, and a set the
+/// store records that the binary does not carry is judged ahead from
+/// version 1 (D-8).
+///
+/// # Errors
+///
+/// [`Error::Integrity`] on a checksum mismatch in any set; [`Error::Stale`]
+/// naming the set when it is behind, or ahead across a version that is not
+/// recorded additive; a store failure as itself.
+pub async fn check_current_sets(
+    store: &Store,
+    migrations: &[Migration],
+    sets: &[MigrationSet],
+) -> Result<()> {
+    let histories = store.handle().recorded_set_migrations().await?;
+    check_histories(&histories, migrations, sets)
+}
+
+/// [`check_current_sets`]'s judgement over histories already read, so
+/// `restore` asks an archive the same questions `serve` asks a store (spec
+/// 046 B-16).
+///
+/// # Errors
+///
+/// As [`check_current_sets`].
+pub fn check_histories(
+    histories: &SetHistories,
+    migrations: &[Migration],
+    sets: &[MigrationSet],
+) -> Result<()> {
+    let carried = carried_sets(migrations, sets);
+    check_set_checksums(histories, &carried)?;
+    let empty = Vec::new();
+    for set in &carried {
+        let history = histories.get(&set.name).unwrap_or(&empty);
+        let current = history
+            .iter()
+            .map(|row| row.version)
+            .max()
+            .unwrap_or(rahi_store::migrate::BASELINE_VERSION);
+        let expected = set.last_version();
+        if current < expected {
+            return Err(Error::Stale(if set.name.is_app() {
+                format!(
+                    "schema_version is {current}, the cell expects {expected}; run: rahi migrate"
+                )
+            } else {
+                format!(
+                    "migration set {} is at version {current}, the cell expects {expected}; run: \
+                     rahi migrate",
+                    set.name
+                )
+            }));
+        }
+    }
+    check_every_ahead(histories, &carried)
+}
+
+/// What `restore` asks of an archive's histories before it replaces the
+/// destination (spec 046 B-16, I-5): every named set's checksums, then the
+/// additive rule per set, a set the cell does not carry judged ahead from
+/// version 1. A set behind the binary is restorable: `migrate` brings it
+/// forward afterwards. The set `app` is judged by 036 B-9 exactly as before
+/// this spec, on the additive rule only, so a cell with no named set
+/// restores as it did (046 AC-2, D-13); its checksums are checked by the
+/// `migrate` and `serve` that follow.
+///
+/// # Errors
+///
+/// [`Error::Integrity`] on a checksum mismatch in any set; [`Error::Stale`]
+/// naming the set when it is ahead across a version not recorded additive.
+pub fn check_restorable(
+    histories: &SetHistories,
+    migrations: &[Migration],
+    sets: &[MigrationSet],
+) -> Result<()> {
+    check_set_checksums(histories, sets)?;
+    check_every_ahead(histories, &carried_sets(migrations, sets))
+}
+
+/// 036 B-8 per set, and D-8 for a set the binary does not carry.
+fn check_every_ahead(histories: &SetHistories, carried: &[MigrationSet]) -> Result<()> {
+    let empty = Vec::new();
+    for set in carried {
+        let history = histories.get(&set.name).unwrap_or(&empty);
+        check_ahead(history, set.last_version()).map_err(|e| name_set(&set.name, e))?;
+    }
+    for (name, history) in histories {
+        if carried.iter().any(|set| &set.name == name) {
+            continue;
+        }
+        // D-8: a set this binary does not carry is ahead from version 1.
+        check_ahead(history, rahi_store::migrate::BASELINE_VERSION)
+            .map_err(|e| name_set(name, e))?;
+    }
+    Ok(())
+}
+
+/// The cell's sets, `app` first.
+fn carried_sets(migrations: &[Migration], sets: &[MigrationSet]) -> Vec<MigrationSet> {
+    let mut carried = vec![app_set(migrations)];
+    carried.extend(sets.iter().cloned());
+    carried
+}
+
+/// The host's migrations as the set `app`.
+fn app_set(migrations: &[Migration]) -> MigrationSet {
+    MigrationSet {
+        name: SetName::app(),
+        migrations: migrations.to_vec(),
+        requires: Vec::new(),
+    }
+}
+
+/// Prefix a refusal with the set it is about, `app` keeping 036's wording.
+fn name_set(name: &SetName, err: Error) -> Error {
+    if name.is_app() {
+        return err;
+    }
+    match err {
+        Error::Stale(message) => Error::Stale(format!("migration set {name}: {message}")),
+        other => other,
+    }
+}
+
+/// Run `migrations` and every named set on `store` (B-4, spec 046 B-7).
+///
+/// # Errors
+///
+/// [`Error::Stale`] on a follower; whatever `StoreHandle::migrate_sets`
+/// returns otherwise.
+pub async fn run_sets(
+    store: &Store,
+    migrations: &[Migration],
+    sets: &[MigrationSet],
+) -> Result<SetMigrationReport> {
+    refuse_follower(store).await?;
+    store.handle().migrate_sets(migrations, sets).await
+}
+
+/// The cross-set plan `migrate --plan` prints, applying nothing (spec 046
+/// B-7).
+///
+/// # Errors
+///
+/// What [`rahi_store::plan`] and the checksum check refuse; a store failure
+/// as itself.
+pub async fn plan_sets(
+    store: &Store,
+    migrations: &[Migration],
+    sets: &[MigrationSet],
+) -> Result<Vec<rahi_store::PlannedMigration>> {
+    let histories = store.handle().recorded_set_migrations().await?;
+    let carried = carried_sets(migrations, sets);
+    rahi_store::validate_sets(&carried)?;
+    check_set_checksums(&histories, &carried)?;
+    rahi_store::plan(&carried, &histories)
+}
+
+/// Render a plan the way `migrate --plan` prints it.
+#[must_use]
+pub fn render_plan(plan: &[rahi_store::PlannedMigration]) -> String {
+    if plan.is_empty() {
+        return "migrate --plan: nothing to apply".to_owned();
+    }
+    let steps: Vec<String> = plan
+        .iter()
+        .map(|step| {
+            format!(
+                "{} {} ({})",
+                step.set, step.migration.version, step.migration.name
+            )
+        })
+        .collect();
+    format!("migrate --plan: {}", steps.join(", "))
+}
+
+/// Render a set report the way the verb prints it.
+#[must_use]
+pub fn render_sets(report: &SetMigrationReport) -> String {
+    let applied = if report.applied.is_empty() {
+        "none".to_owned()
+    } else {
+        report
+            .applied
+            .iter()
+            .map(|(set, version)| format!("{set} {version}"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    let current = report
+        .current
+        .iter()
+        .map(|(set, version)| format!("{set} {version}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("migrate: sets now at {current}; applied: {applied}")
 }
 
 /// Run `migrations` on `store` (B-4).
@@ -322,6 +531,63 @@ pub async fn adopt(
         (Some(hash), added, removed, diffed)
     };
 
+    Ok((
+        report,
+        Adoption {
+            from,
+            to,
+            appended,
+            added,
+            removed,
+            diffed,
+        },
+    ))
+}
+
+/// [`adopt`] for a cell with named sets (spec 046 B-17): the same order,
+/// with every set's plan applied between the preflight and the append, and
+/// the transition recording the set `app`'s version.
+///
+/// # Errors
+///
+/// As [`adopt`], and what [`run_sets`] refuses.
+pub async fn adopt_sets(
+    store: &Store,
+    ledger: &Ledger,
+    manifest: &Manifest,
+    migrations: &[Migration],
+    sets: &[MigrationSet],
+) -> Result<(SetMigrationReport, Adoption)> {
+    refuse_follower(store).await?;
+
+    let to = manifest.hash()?;
+    let from = ledger.current_manifest().await?;
+    let predicted = expected_version(migrations).max(schema_version(store).await?);
+    if from != to {
+        let candidate = candidate(manifest, from.clone(), to.clone(), predicted)?;
+        let measured = ledger.measure_transition(&candidate)?;
+        rahi_ledger::check_fits(&candidate, measured, manifest.ledger.max_record_bytes)?;
+    }
+
+    let report = run_sets(store, migrations, sets).await?;
+    let app_version = report
+        .current
+        .get(rahi_store::APP_SET)
+        .copied()
+        .unwrap_or(rahi_store::migrate::BASELINE_VERSION);
+
+    let from = ledger.current_manifest().await?;
+    let (appended, added, removed, diffed) = if from == to {
+        (None, Vec::new(), Vec::new(), true)
+    } else {
+        let previous = previous_model(ledger).await?;
+        let (added, removed, diffed) = diff_grants(previous.as_ref(), manifest);
+        let transition = candidate(manifest, from.clone(), to.clone(), app_version)?;
+        let hash = ledger
+            .append_transition(&transition, manifest.ledger.max_record_bytes)
+            .await?;
+        (Some(hash), added, removed, diffed)
+    };
     Ok((
         report,
         Adoption {
