@@ -94,15 +94,15 @@
     "kind": "governance",
     "risk": "high",
     "sectionDigests": {
-      "001-agentic-engineering-harness": "4ab59fc4b82da663c0dd3b5ddec83483470c7779e9af8cdb1627769e642ae351",
+      "001-agentic-engineering-harness": "6741a1ae3962c0bb670efa0becc9dd426d117770bfc9ccb903bedee6b30d0332",
       "1-purpose": "e2c3d5c8c5ff899830592aca1e93274ca6258d0e3dbdbf44b5e583a93c6989df",
       "2-territory": "2c6556e33dda9064ac36c1e516323c160b278646bc61c07f5a682992ce60ccd2",
       "3-behavior": "69c0e600ce2b45de1edcf3209eec4edb8e25c22cef989f190eec7dcd0d9b5b89",
       "4-functional-requirements": "473c984c5225be6de69e1583439d663851b0a4e5ce4352792dc8fd0579a649e7",
       "5-acceptance-criteria": "69b48dc42aba77f2401c876f3070094bc4ca54ab8ada781137005351e8672472",
       "6-out-of-scope": "210d10961c22c44e55da8c30ef14e7dbfd91b815fb854d716eaf058f79df8e91",
-      "7-resolved-decisions": "29d3c3e51805c0cc7276825640fd765199ef02846a42ea07aaa53372d2e4e794",
-      "verification": "f33ce59bdb5980532883e4ffee35df16e8fd652e0832a74df365d7c39887202c"
+      "7-resolved-decisions": "99081a80fdef7b6c8cec3bc49dad0f7cd297e136eadc168db70eb83c05f07152",
+      "verification": "e9ceb478d2d1cd9662bdce33e60907967e06b15ff76544339141d0b709c33852"
     },
     "sectionHeadings": [
       "001: Agentic engineering harness",
@@ -120,6 +120,6 @@
     "summary": "The governed-development loop every human and every driven session runs inside: the cross-agent New Sessions protocol and the Working the backlog protocol in AGENTS.md, the Claude Code skills (the eight that sequence the backlog protocol, prime, setup, next, build, verify, spec, ship, shepherd, and the two it calls, commit and code-review), the four pipeline agents, the standing and path-scoped rules (including the chassis invariants checklist), the hooks that report derived-artifact freshness and block an ungated PR, the Makefile that is the one source of truth for what CI validates, and the CI workflow that re-runs the same gate. The harness is what makes the corpus buildable by claude-observatory.\n",
     "title": "Agentic engineering harness: session protocol, skills, agents, hooks, gate"
   },
-  "shardHash": "98541778809b5a6c807067ebf32765d12ddd477ce54c00ff6cde1550f5a6e284",
+  "shardHash": "943e6d124bcfcda578c1021f2bf8d47f9c7bd868fbb33a7bfd904ee210f87bfa",
   "specVersion": "1.8.0"
 }

@@ -844,6 +844,35 @@ stays at its v0.20.0 bytes, recorded above. The 0.21.0 change (spec 116, now
 taken, because under (a) a skill changes only by owner decision, and the
 owner deferred this one.
 
+
+D-16 (2026-09-25, owner decision; spec-spine 0.26.0 adoption, pinned
+exactly). The owner's decision of 2026-09-25 for every repository in the
+family: move the spec-spine pin to 0.26.0, or the latest published release
+if newer, "pinned exactly (`required_version = "=X.Y.Z"`), in its own PR,
+refreshing derived files with that binary". 0.26.0 is the latest release
+on crates.io (`spec-spine-cli`) and npm on this date.
+
+**The pin.** `SPEC_SPINE_VERSION ?= 0.26.0` in the `Makefile`, and the prose
+sites D-15 moved: `AGENTS.md`, `README.md` and the architect agent.
+`[meta] required_version` becomes `"=0.26.0"`: an exact pin, where D-14 and
+D-15 recorded a floor. The Makefile stays the place CI reads the version
+from (B-3), so the two statements must agree, and a new verification line
+asserts the manifest's. The consequence is intended: a newer binary now
+refuses this tree at exit 3 too, so a shared `~/.cargo/bin/spec-spine` that
+moves ahead of the pin is refused by name instead of silently judging.
+
+**Measured.** On `32dd58b`, a bare 0.26.0 moves no shard: `check
+--fail-on-warn` answers fresh on both trees at exit 0, with 154 unwitnessed
+claims, all allowed. In this change the registry moves this spec's shard,
+and the index shards move by their `shardHash` alone, because `Makefile`,
+`AGENTS.md`, `spec-spine.toml` and `.claude/agents/architect.md` are hashed
+inputs.
+
+**Every line of the Verification block stays true except one.** D-15's pin
+line asserted `0.25.0`; it now asserts `0.26.0`, and one line is added for
+the manifest's exact pin. No other line depends on the version. The dated
+records naming older versions are kept.
+
 ## Verification
 
 ```verify:cli
@@ -899,8 +928,10 @@ sh -c '! grep -qE "git (-C [^ ]+ )?add" .githooks/pre-commit'
 # B-10 / D-13: the flag is local-only. CI's coupling verdict must not depend
 # on the state of a runner's working tree (spec-spine spec 102 3.4).
 sh -c '! grep -rq -- "--include-uncommitted" .github/workflows/'
-# D-15 (replacing D-14's line): the pin is 0.25.0 wherever the pin is stated.
-sh -c 'test "$(sed -n "s/^SPEC_SPINE_VERSION ?= //p" Makefile)" = 0.25.0'
+# D-16 (replacing D-15's line): the pin is 0.26.0 wherever the pin is stated,
+# and spec-spine.toml states it exactly rather than as a floor.
+sh -c 'test "$(sed -n "s/^SPEC_SPINE_VERSION ?= //p" Makefile)" = 0.26.0'
+grep -qx 'required_version = "=0.26.0"' spec-spine.toml
 # D-15 / B-5: the ten skills are the frozen v0.20.0 bytes, one hash per file.
 # sha256sum where GNU coreutils has it, shasum (BSD and macOS) otherwise.
 sh -c 'test "$(grep -c . .claude/skills.sha256)" = 10'
