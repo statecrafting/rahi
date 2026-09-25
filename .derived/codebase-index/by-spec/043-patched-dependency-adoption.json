@@ -1,0 +1,723 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-ops/src/upgrade.rs' does not exist",
+        "path": "crates/rahi-ops/src/upgrade.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-ops/src/cell_lock.rs' does not exist",
+        "path": "crates/rahi-ops/src/cell_lock.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-ops/src/stop.rs' does not exist",
+        "path": "crates/rahi-ops/src/stop.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-ops/tests/upgrade.rs' does not exist",
+        "path": "crates/rahi-ops/tests/upgrade.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-ops/tests/cell_lock.rs' does not exist",
+        "path": "crates/rahi-ops/tests/cell_lock.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-cli/tests/terminal.rs' does not exist",
+        "path": "crates/rahi-cli/tests/terminal.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-cli/tests/stop_budget.rs' does not exist",
+        "path": "crates/rahi-cli/tests/stop_budget.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-cli/tests/stop_outcome.rs' does not exist",
+        "path": "crates/rahi-cli/tests/stop_outcome.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-idp/tests/revocation_durable.rs' does not exist",
+        "path": "crates/rahi-idp/tests/revocation_durable.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-store/tests/dependency_identity.rs' does not exist",
+        "path": "crates/rahi-store/tests/dependency_identity.rs"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "010-workspace-and-core-types",
+      "011-store-hiqlite",
+      "012-store-coordination",
+      "016-store-binary-values-and-extensions",
+      "021-idp-proxy-and-discovery",
+      "025-api-tokens-and-resource-server",
+      "026-streaming-responses",
+      "030-operational-verbs",
+      "031-single-container-packaging",
+      "032-cluster-topology",
+      "035-denials-survive-shutdown",
+      "037-identity-recovery-and-live-proof",
+      "038-native-clients-and-bearer-revocation",
+      "039-release-and-out-of-tree-packaging"
+    ],
+    "implementingPaths": [
+      {
+        "path": ".github/workflows/image.yml",
+        "source": "spec-edge"
+      },
+      {
+        "path": ".github/workflows/live.yml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/serve.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/verbs.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/tests/cli.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/tests/shutdown.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/bearer.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/revoke.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/first_boot.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/preflight.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/rauthy_env.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/restore.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/supervise.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/src/error.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/src/store.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/tests/blob.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-types/src/config.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deny.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/README.md",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/k8s/statefulset.yaml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "docker/Dockerfile",
+        "source": "spec-edge"
+      },
+      {
+        "path": "docker/runtime.Dockerfile",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/stop_budget.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/stop_outcome.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/terminal.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/revocation_durable.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/cell_lock.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/stop.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/upgrade.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/cell_lock.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/upgrade.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/dependency_identity.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": ".github/workflows/image.yml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/image.yml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": ".github/workflows/live.yml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/live.yml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/serve.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/verbs.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/verbs.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/tests/cli.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/cli.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/tests/shutdown.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/shutdown.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/bearer.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/bearer.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/revoke.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/revoke.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/first_boot.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/first_boot.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/preflight.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/preflight.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/rauthy_env.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_env.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/restore.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/restore.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/supervise.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/supervise.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-store/src/error.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/error.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-store/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-store/src/store.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/store.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-store/tests/blob.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/blob.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-types/src/config.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-types/src/config.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "deny.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "deny.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "deploy/README.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/README.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "deploy/k8s/statefulset.yaml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/statefulset.yaml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docker/Dockerfile"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "docker/Dockerfile"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docker/runtime.Dockerfile"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "docker/runtime.Dockerfile"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/01-consumer-contract.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-consumer-contract.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/02-operational-prerequisites.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-operational-prerequisites.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/04-patched-adoption-producer-requests.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/04-patched-adoption-producer-requests.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/05-patched-adoption-delivery-plan.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/05-patched-adoption-delivery-plan.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/06-owner-decision-packet-2026-09-23.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/06-owner-decision-packet-2026-09-23.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/07-owner-decision-packet-rev3-2026-09-23.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/07-owner-decision-packet-rev3-2026-09-23.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/09-owner-decision-packet-rev4-2026-09-23.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/09-owner-decision-packet-rev4-2026-09-23.md"
+        }
+      }
+    ],
+    "specId": "043-patched-dependency-adoption",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "2a0ee182a326ed14342c0b7251405c30b404a5c9b54509173e544f5a17dceb29"
+}

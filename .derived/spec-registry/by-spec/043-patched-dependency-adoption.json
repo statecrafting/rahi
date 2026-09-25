@@ -1,0 +1,391 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-23",
+    "dependsOn": [
+      "010-workspace-and-core-types",
+      "011-store-hiqlite",
+      "012-store-coordination",
+      "016-store-binary-values-and-extensions",
+      "021-idp-proxy-and-discovery",
+      "025-api-tokens-and-resource-server",
+      "026-streaming-responses",
+      "030-operational-verbs",
+      "031-single-container-packaging",
+      "032-cluster-topology",
+      "035-denials-survive-shutdown",
+      "037-identity-recovery-and-live-proof",
+      "038-native-clients-and-bearer-revocation",
+      "039-release-and-out-of-tree-packaging"
+    ],
+    "domain": "ops",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/src/upgrade.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/src/cell_lock.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/src/stop.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/tests/upgrade.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/tests/cell_lock.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-cli/tests/terminal.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-cli/tests/stop_budget.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-cli/tests/stop_outcome.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-idp/tests/revocation_durable.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-store/tests/dependency_identity.rs"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "010-workspace-and-core-types",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "010-workspace-and-core-types",
+        "unit": {
+          "kind": "file",
+          "path": "deny.toml"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "010-workspace-and-core-types",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-types/src/config.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "011-store-hiqlite",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/store.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "011-store-hiqlite",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/error.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "011-store-hiqlite",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/lib.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "016-store-binary-values-and-extensions",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/blob.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "025-api-tokens-and-resource-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/bearer.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "038-native-clients-and-bearer-revocation",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/revoke.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "021-idp-proxy-and-discovery",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/lib.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/lib.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/preflight.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/restore.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/lib.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/verbs.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/cli.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "035-denials-survive-shutdown",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/shutdown.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/supervise.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/first_boot.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_env.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "docker/Dockerfile"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/image.yml"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "039-release-and-out-of-tree-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "docker/runtime.Dockerfile"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "032-cluster-topology",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/README.md"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "032-cluster-topology",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/k8s/statefulset.yaml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "037-identity-recovery-and-live-proof",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/live.yml"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 3
+    },
+    "id": "043-patched-dependency-adoption",
+    "implementation": "pending",
+    "kind": "feature",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-consumer-contract.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-operational-prerequisites.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/04-patched-adoption-producer-requests.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/05-patched-adoption-delivery-plan.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/06-owner-decision-packet-2026-09-23.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/07-owner-decision-packet-rev3-2026-09-23.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/09-owner-decision-packet-rev4-2026-09-23.md"
+        }
+      }
+    ],
+    "risk": "critical",
+    "sectionDigests": {
+      "043-patched-dependency-adoption": "762b705676f988f2e1a1241996ee95fee364cf0784f6a0dbdb38a61d224af581",
+      "1-purpose": "ce9362b0087b7937b6194295f1fb22e8773c027309835ecc4fa7fccb8db2aea2",
+      "2-territory": "c3cb4e4c58f1a5c3793550b39e0b8678ea0953d6b16bd7728470a63bd2a6cc83",
+      "3-behavior": "587c3c185d033ca8b535be26f75b1975fb8735b28acb7f2d217b608a3a8ea6a2",
+      "4-functional-requirements": "fd2f03dcac833f1ddd561eaab14c67e75fdd1feed9c5bfd6bd8a1975f2019193",
+      "5-acceptance-criteria": "8ea62af7b1d7b57b75b8245d88c7a93307c3326e3987f5f7982b0d00f550149a",
+      "6-out-of-scope": "6d283d55bcc5c333e812d728b1cda1a3d3a952fedf5bd6dfb82641aab08d948b",
+      "7-1-proposals-2026-09-23": "48a48afa8f6a63437c46b3d3edbe09218840c06f6328ca9e151a71a169865072",
+      "7-2-evidence-recorded-for-the-decisions": "3964812bc6ed6db7b9aeadd4e09487c91c246e9cb67b2facc5c214f14452aa0c",
+      "7-3-revision-2-corrections-2026-09-23": "b2df166aeaea61500e034dd00d6a95bae99d7f6ef051ac2fcedcda3a834b310c",
+      "7-4-revision-3-corrections-2026-09-23": "82f140cd33dd28b04401552026c8646274eb3820bcc2503dfb6fad97a4a0f81e",
+      "7-5-revision-4-corrections-2026-09-23": "03662c461a24ffd9bb9b335a88c9645040f3f9a641d010f6b534ad83c0ce6ab5",
+      "7-resolved-decisions": "5fbcfaee9c1b142b041db8a3ed32ea5a46377a16fc83b380c85b4c6b8147fe98",
+      "crossing-the-cache-boundary": "d3c5d543014fb276f19da3105b9c74c40a314fdd124089acf60ab1d634c847ef",
+      "identities": "512e69a12a4197d490d6791c522521872b259db30759d9ee3161d3eda86a3939",
+      "revocation-across-cache-loss": "a659c63ba58d6b02335f343d04c34edb9237bca931b9ba498f9bd342aac79809",
+      "stopping": "7863675d09d827faffb79c8d296c935deb9eed1c41569ee549aac35cebb6329e",
+      "terminal-storage-failure": "03324187452f6c56b98e72136b9a664ba62ed1adb51ec1d8be2334d419000b5c",
+      "verification": "5e044d604e5394834fa5f8e3dbdffe0cb0b6efa44880de9b7c3a351c8e597d0b"
+    },
+    "sectionHeadings": [
+      "043: Patched dependency adoption",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "Identities",
+      "Crossing the cache boundary",
+      "Revocation across cache loss",
+      "Terminal storage failure",
+      "Stopping",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "7.1 Proposals (2026-09-23)",
+      "7.2 Evidence recorded for the decisions",
+      "7.3 Revision 2 corrections (2026-09-23)",
+      "7.4 Revision 3 corrections (2026-09-23)",
+      "7.5 Revision 4 corrections (2026-09-23)",
+      "Verification"
+    ],
+    "specPath": "specs/043-patched-dependency-adoption/spec.md",
+    "status": "approved",
+    "summary": "rahi's application store runs hiqlite 0.14.0 through a root git patch that registry consumers never inherit, and its co-deployed identity provider runs upstream Rauthy 0.36.2. Published downstream builds exist for both, hiqlite-patched 0.15.0-patched.1 and rauthy-patched 0.36.2-patched.2, each qualified by its producer at N=1. This spec adopts exactly those two artifacts for the N=1 cell under a narrow recorded exception to 011's no-fork rule. It crosses the one incompatible on-disk boundary (the cache raft log) by relocating the app store behind a permanent fence that every pre-043 binary refuses at its old path, installed whole and verified quiescent before anything moves, and a second fence at rahi's rendered Rauthy environment that makes every published pre-043 supervisor that reads it afterwards exit before it spawns Rauthy; it names what neither fence can stop (an old process already past its read or its lock-free start phase, and the two destructive hiqlite variables in an old process's environment) as preconditions the operator establishes by stopping and removing every old process first. Every new-binary entry point takes its locks before it reads the state file; Rauthy moves its own cache under consent, and the resumable upgrade is released only on a Rauthy build whose interrupted move is repaired. It keeps every revocation accepted before the upgrade refused by a permanent issued-at floor that needs no historical lifetime, bounds every admitted token by an enforced lifetime ceiling and a hard 86,400-second maximum, keeps durable revocations against a backward clock step after any prune (retained, or pruned under a persisted watermark, by owner choice), states the restore boundary, including what a stale Rauthy restore revives, turns a proven terminal storage failure into a bounded exit, and reports every stop's observed outcome with a non-zero exit when completion is not confirmed. It changes no topology and claims no N=3 support.\n",
+    "title": "Patched dependency adoption: the N=1 cell runs the published, provenance-pinned hiqlite and Rauthy builds, crosses their cache boundary only through a fenced, resumable, backed-up transition, keeps every accepted revocation through it, and stops within a validated budget with an honest outcome"
+  },
+  "shardHash": "2a7d84848cbb9992ef6baadb74b98cae14cd75f07c55851d42125faf58cb76bf",
+  "specVersion": "1.8.0"
+}
