@@ -300,14 +300,14 @@
     ],
     "risk": "critical",
     "sectionDigests": {
-      "036-manifest-and-schema-evolution": "b5c9705b7b0c0965c87b825393d40b545d176694ea0c9317d12dc8448b39694c",
+      "036-manifest-and-schema-evolution": "83a10737c476023f5f4a145d4a4d412e33939a14d429bf67997581fceb8b6fe8",
       "1-purpose": "48639762ce38bb81a528e1b6a29bd09e23f05e890105f9cb12494f36e4bc9fa5",
       "2-territory": "0b4674c351a393d32a39e049912f1e0a1c33f51aa6bd23d4f77498b05d041ac7",
       "3-behavior": "bc870137f58fb25865ab28f687a8cecb036e4795f844078e98fa7a7930b3067a",
       "4-functional-requirements": "b0dce1f3237b42e4de8065367e87f06072ddd41bc6c728f878f7fcb8cfad38f8",
       "5-acceptance-criteria": "29edd931024f8cb878999ca798980b1fdfec6ca6ab0c24d756f95fdf243266a3",
       "6-out-of-scope": "b3f4d86673ed8ad8a51f52ef12c058ab0d478e219a8890853270e696864f44ac",
-      "7-resolved-decisions": "40a72407148a7496f435aac13e1e100299bd6a8141dea597ed05decbd1d4d770",
+      "7-resolved-decisions": "c50b2510e6643a9f122ffb9cec3435a80acb2e4b0e8189ce83c03a6f53f696c3",
       "8-status": "05f5184884b4b1e738b579d784b84ee15bc25e6b73cd9a5371b9fa0c4bb9e13a",
       "manifests": "36e545eb46faf0f64b526df3798e702f46ad1fcbf17810b9b04cff11ad281eff",
       "migrations": "9075e0ddf65444803c11978901cb6325b070a216bc1e26c7c6ec12ecd0d98a8f",
@@ -338,6 +338,6 @@
     "summary": "Today a cell's manifest is frozen at its first boot: the manifest hash is the chain's genesis parent, Ledger::open checks the first record against the booted manifest on every open, and any change to the manifest (one added grant, otel switched on) makes serve exit 1 with an integrity error on the existing volume. Spec 015 B-8 names the missing step, \"a deploy genesis record\", and nothing defines it. Migrations have the mirror problems: serve accepts a store ahead of the binary, a changed migration under an applied version is skipped silently, and restore checks no compatibility. This spec makes a manifest change a signed transition record appended at deploy, checks the booted manifest against the chain's current manifest, records a checksum per migration, lets an older binary serve a newer schema only across migrations declared additive, and makes restore refuse an archive it cannot serve. It carries the worked consumer example for an upgrade, a rollback, and a restore.\n",
     "title": "Manifest and schema evolution: a ledgered manifest transition, a checked migration history, and a restore that refuses what it cannot serve"
   },
-  "shardHash": "b4f5609e60095257abbb0b8426d850b59189931793e12ae65c99ba6dfdd7538e",
+  "shardHash": "881b69af9a0b38be4c374bd8ada25119e564adcde30079c9ebf02be80e4d7926",
   "specVersion": "1.8.0"
 }
