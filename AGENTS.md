@@ -15,7 +15,7 @@ design, every ordinary spec is `approved` and `implementation: pending`, and
 spec ordinals are the build order. Code arrives one spec per session under
 `crates/`, `apps/`, `docker/`, and `deploy/`.
 
-Governance is `spec-spine` **0.24.0** on your `PATH` (CI pins the same
+Governance is `spec-spine` **0.26.0** on your `PATH` (CI pins the same
 version, read out of the `Makefile`). All governed reads of `.derived/` go
 through its CLI.
 
@@ -38,6 +38,10 @@ to derive its plan; anything added here is picked up on the next prime.
 
 1. **Parallel reads.** Dispatch simultaneously (nothing here mutates the
    tree, so there is no ordering):
+   - `spec-spine --version`: the binary that will answer every read below.
+     Read it before believing any exit code; `spec-spine.toml`'s `[meta]
+     required_version` floor makes an older binary refuse at exit 3, and this
+     read names which binary a stray `PATH` entry handed you
    - `CLAUDE.md`: what Claude Code needs beyond this file
    - `README.md`: project description and status
    - `standards/spec/contract.md`: the normative corpus contract
@@ -56,7 +60,9 @@ to derive its plan; anything added here is picked up on the next prime.
    one line each with the crates that exist, a `## lifecycle:` sub-section
    from the status report (approved/pending counts, and the next ready spec
    from `/next` if cheap), freshness verdicts, recent activity, and a
-   ready-to-help line.
+   ready-to-help line. Consult the `--version` read before reporting any
+   freshness verdict: a binary that is not the pin makes the codes
+   meaningless.
 
 **Read discipline:** never parse `.derived/**/*.json` directly (no `jq`,
 `python`, `awk`, `sed`); all structural and lifecycle data comes from
@@ -133,13 +139,31 @@ spec, start to finish, then stops. Specs `000`, `001`, and `002` are records
    `sub` as the only principal id, CAS append on the decision chain, deny
    by default in the kernel. A change that needs one of these relaxed is a
    human decision: stop and report.
-6. **Run the gate before every commit.** `make gate` (check
-   `--fail-on-warn`, lint `--fail-on-warn`, coverage `--fail-on-untraced`,
-   couple, spec-dag), then `make ci` (adds, once `Cargo.toml` exists, `cargo
-   build`, `test`, `clippy -D warnings`, `fmt --check`, and `deny`). All must
-   exit 0. `make gate` is read-only by design: when it reports staleness the
-   fix is `make refresh`, and the regenerated `.derived/` shards are committed
-   with the change that staled them.
+6. **Run the gate before every commit.** `make gate`, in this order and
+   read-only throughout:
+
+   ```sh
+   spec-spine check --fail-on-warn
+   spec-spine lint --fail-on-warn
+   spec-spine index coverage --fail-on-untraced   # OWNERSHIP=auto: runs, because [coupling] require_ownership is on
+   spec-spine couple --base "$BASE" --head "$HEAD"  # COUPLE=1: BASE is the resolved default branch, HEAD is HEAD
+   scripts/spec-dag.sh
+   ```
+
+   then `make ci` (adds, once `Cargo.toml` exists, `cargo build`, `test`,
+   `clippy -D warnings`, `fmt --check`, and `deny`). All must exit 0. The
+   coupling base is resolved from the repository, not assumed:
+   `$SPEC_SPINE_DEFAULT_BRANCH`, then the remote's own `HEAD`, then `main`;
+   `BASE=` on the command line still wins. The ownership assertion is
+   conditional on `OWNERSHIP` (`auto`, `1`, `0`) and the coupling step on
+   `COUPLE` (`1`, `0`); any other value is refused at exit 3, and every skip
+   prints that the assertion did **not** run, so a green gate never means a
+   step was quietly left out. CI runs this same target: the pull-request leg
+   with the event's frozen SHAs and the PR body as `PR_BODY`, the push and
+   merge-queue leg with `COUPLE=0`. `--fail-on-unresolved` is deliberately not
+   passed (spec 001 D-11). `make gate` is read-only by design: when it reports
+   staleness the fix is `make refresh`, and the regenerated `.derived/` shards
+   are committed with the change that staled them.
 7. **Satisfy Acceptance criteria verbatim.** Run the spec's `##
    Verification` block locally with `/verify <id>`, which wraps `spec-spine
    verify <id>`, the same verb the orchestrator's verify stage runs after
@@ -186,8 +210,10 @@ Two are called by the loop:
 - `/commit`: conventional commit, impact-focused, spec id in scope.
 - `/code-review`: correctness, spec-drift, and chassis-invariant review.
 
-The ten are the spec-spine kit's, byte for byte (spec-spine spec 081, which
-removed the five nothing in the loop reached). The project layer the skills
+The ten are frozen at the spec-spine kit's tag v0.20.0, byte for byte, with
+one SHA-256 per file in `.claude/skills.sha256` (spec 001 D-15; the kit
+itself was removed upstream in spec-spine 0.23.0). They change only by owner
+decision until Statecraft harness delivery is confirmed. The project layer the skills
 read lives in this file (the pin, the binary, `make gate` and `make ci` as
 the gate, the default branch) and in the path-scoped rules (the chassis
 invariants, the build commands); do not edit a skill to add a project fact,

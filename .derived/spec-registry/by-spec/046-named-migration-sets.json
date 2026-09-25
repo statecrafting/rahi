@@ -1,0 +1,242 @@
+{
+  "record": {
+    "amends": [
+      "045-store-receipts-and-work-claims"
+    ],
+    "amendsSections": [
+      "2-3-what-is-extended"
+    ],
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-24",
+    "dependsOn": [
+      "011-store-hiqlite",
+      "012-store-coordination",
+      "030-operational-verbs",
+      "036-manifest-and-schema-evolution",
+      "045-store-receipts-and-work-claims"
+    ],
+    "domain": "store",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "crates/rahi-store/src/migration_set.rs",
+        "planned": true
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-store/tests/migration_sets.rs",
+        "planned": true
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/tests/migration_sets.rs",
+        "planned": true
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "011-store-hiqlite",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/migrate.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "011-store-hiqlite",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/cell.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/verbs.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/migrate.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/backup.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/archive.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/restore.rs"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 3
+    },
+    "id": "046-named-migration-sets",
+    "implementation": "pending",
+    "kind": "kernel",
+    "obligations": [
+      {
+        "anchor": "3-1-set-identity-and-naming",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "A migration's identity is (set, version); versions are ordered only within their set, and no library's migration is ever renumbered into another set's sequence."
+      },
+      {
+        "anchor": "3-4-checksums-and-the-additive-rule",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "The checksum recorded for (set, version) is sha256 over that migration's SQL, and a recorded checksum that differs from the binary's is refused before anything is applied, in any set."
+      },
+      {
+        "anchor": "3-5-upgrading-a-single-sequence-store",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "A store written before this spec keeps every schema_version row byte for byte; that history is the set named app, and no recorded checksum changes on upgrade."
+      },
+      {
+        "anchor": "3-3-ordering-and-requirements-between-sets",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "migrate computes the whole cross-set plan, requirements included, before it applies any migration, and refuses an unsatisfiable or cyclic plan having applied nothing."
+      },
+      {
+        "anchor": "3-6-backup-restore-and-first-boot",
+        "id": "I-5",
+        "kind": "invariant",
+        "text": "Schema compatibility is established per set before a restore replaces the destination, or the restore is refused."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "cargo test -p rahi-store --locked --test migration_sets",
+          "cargo test -p rahi-ops --locked --test migration_sets",
+          "cargo test -p rahi-store --locked --test migrate",
+          "cargo test -p rahi-ops --locked --test evolution"
+        ],
+        "kind": "verification",
+        "text": "Set naming, planning, per-set checksums and the additive rule, the upgrade of a single-sequence store, and restore of archives with and without named sets are exercised against real stores."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-consumer-contract.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "CHANGELOG.md"
+        }
+      }
+    ],
+    "refines": [
+      {
+        "aspect": "the checksum is per (set, version); the unnamed history is the set named app",
+        "unit": {
+          "id": "rahi_store::migrate::check_checksums",
+          "kind": "symbol"
+        }
+      },
+      {
+        "aspect": "the additive rule is applied per set",
+        "unit": {
+          "id": "rahi_ops::migrate::check_ahead",
+          "kind": "symbol"
+        }
+      }
+    ],
+    "risk": "critical",
+    "sectionDigests": {
+      "046-named-migration-sets": "740f0ddbd672f4fcff353c657419f1560748e6f1da9328c9d568b23b5602dc00",
+      "1-purpose": "adad525a7d6e7ca3cb2b1ab77cb37ef38aa7a9d4b275d422e7a55622b20658c1",
+      "2-1-what-is-new": "af73751b12dc331ef5e7d8b724b6f1d80d27dab92d400838ca8dbe5a8ecb54b1",
+      "2-2-what-is-extended": "946212700d9b27bd3cb7107c48740f5e11ca574c284546f106b02ab8a56d1020",
+      "2-3-what-is-amended": "ad1c07501d6473e2c639558e25a378b82ca15b37e3675a81429e4b69e352dda1",
+      "2-territory": "ffe2ed1f1d5749010653295b9d9f54abe2732f73251afcb02d431705274cbfdc",
+      "3-1-set-identity-and-naming": "a5309153db884c75dbb1dedac203cdf1d7bdfbae66e09e11d502696d8cae0411",
+      "3-2-what-the-store-records": "c5267f27666d89108feb12c304c4347320d09b2c9e4ce5017852ce05ac4c1315",
+      "3-3-ordering-and-requirements-between-sets": "b83401a8cfedf85090fec0a6d4fd8965e581d5279659d3b57ba8a26229f6c65b",
+      "3-4-checksums-and-the-additive-rule": "3f8ba8b3a1ba0c5908e2cec212ea9a5a7a9c055800327e651e4aa037f4a6cd34",
+      "3-5-upgrading-a-single-sequence-store": "dcf644d1dc08570b3eb193b9c1496dcc214773f195c247746c229a03b3c99388",
+      "3-6-backup-restore-and-first-boot": "c706abcefa2968c7ddc3fce614ca78d1e9ac9656243953b1bdac74a58ee22e75",
+      "3-behavior": "0a39eb711a4c1bffd6b170fef72e852e84bd906af44f53447ef267e4fcf273cc",
+      "4-functional-requirements": "5c07b7315eae5ef1494dbb0bee036472997c2c5344b7fb8f4b9094e6a429e1b7",
+      "5-acceptance-criteria": "fc0a53f24a74f0a88b0149efab1adddabb667dffb6be059cd32c9ef86e4481e7",
+      "6-out-of-scope": "bc6b433bc79838a2ca29bc18e6407047efecacc85b9e13e39ba545db92e0065c",
+      "7-resolved-decisions": "3552427393300a65067893adef063493bf5e962526d1f6252e6cd211dc56537b",
+      "verification": "b68f3c5acc4c8ad9bc07e96faf93e2fad705733777d3707767bf151914f03b66"
+    },
+    "sectionHeadings": [
+      "046: Named migration sets",
+      "1. Purpose",
+      "2. Territory",
+      "2.1 What is new",
+      "2.2 What is extended",
+      "2.3 What is amended",
+      "3. Behavior",
+      "3.1 Set identity and naming",
+      "3.2 What the store records",
+      "3.3 Ordering and requirements between sets",
+      "3.4 Checksums and the additive rule",
+      "3.5 Upgrading a single-sequence store",
+      "3.6 Backup, restore, and first boot",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/046-named-migration-sets/spec.md",
+    "status": "approved",
+    "summary": "A store today has one migration sequence, owned by the cell. A library linked into a cell (aicortex inside travel-memory) numbers its own migrations from 1, and so do the chassis's own tables (coordination_migration, 045's receipts), so the host must renumber everyone into its list and every renumbering is a checksum nobody else can reproduce. This spec gives each linked library a named migration set: the store records version, checksum, and the additive declaration per (set, version); migrate plans across sets with declared minimum-version requirements between them; serve, backup, and restore apply 036's checksum-first and additive rules per set. A store written before this spec keeps its schema_version rows byte for byte as the implicit set app. 045's receipt_migration becomes the chassis set rahi.receipts.\n",
+    "title": "Named migration sets: a linked library brings its own versioned, checksummed migration sequence, and never renumbers into the host's"
+  },
+  "shardHash": "05a5e86a7619f8080b27ef5f7ca26f710b6a512551f5678d21527e351de97e74",
+  "specVersion": "1.8.0"
+}
