@@ -1,7 +1,7 @@
 ---
 id: "046-named-migration-sets"
 title: "Named migration sets: a linked library brings its own versioned, checksummed migration sequence, and never renumbers into the host's"
-status: draft
+status: approved
 kind: kernel
 domain: store
 created: "2026-09-24"
@@ -340,33 +340,43 @@ No approved spec's text changes.
   `depends_on` naming an id the registry does not hold would not compile.
   It takes ordinal 046 for the same reason 045 took 045.
 
-### Open questions for the owner
-
-1. **Where the named sets are recorded (B-4, B-5).** Proposed: a new
-   `schema_set_version` table, leaving `schema_version` as the set `app`
-   untouched. The alternative, a `set_name` column on `schema_version`,
-   rewrites the table every 0.2.x binary reads.
-2. **Rolling a binary back below this spec.** A 0.2.x binary reads only
-   `schema_version`, so it serves a store whose library sets are ahead
-   without checking them. B-15 makes its restore fail closed; its `serve`
-   cannot be made to. Accept and document (proposed), or also record a
-   non-additive sentinel in the set `app` so 036 B-8 refuses the rollback
-   (which changes `app`'s history, against B-13)?
-3. **Requirement granularity (B-6).** Per set and per migration
-   (proposed), or per set only?
-4. **Ready-together order (B-7).** Chassis sets, then libraries by name,
-   then `app` (proposed), or a host-declared order?
-5. **A set the binary no longer carries (B-10, B-16).** Judged ahead from
-   version 1 (proposed, so an additive-only library can be unlinked), or
-   always refused?
-6. **Coordination adoption (B-12).** Leave existing placements in `app`
-   forever (proposed), or require every cell to adopt `rahi.coordination`
-   at the next minor?
-7. **Archive format 2 only when a named set exists (B-15)**, or always,
-   so every archive a new binary writes is refused by 0.2.x?
-8. **Naming (B-2).** Is the grammar, the 64-byte bound, and the reserved
-   `app` and `rahi.` enough, or should a library set carry its crate name
-   exactly?
+- **D-4 (2026-09-24, owner decision; open question 1).** Named sets are
+  recorded in a new `schema_set_version` table (B-4, B-5), and
+  `schema_version` stays the set `app`, untouched. Rejected: a `set_name`
+  column on `schema_version`, which rewrites the table every 0.2.x binary
+  reads.
+- **D-5 (2026-09-24, owner decision; open question 2).** Rolling a binary
+  back below this spec is accepted as a documented limitation: a 0.2.x
+  binary reads only `schema_version` and serves a store whose library sets
+  are ahead without checking them. B-15 makes its restore fail closed; its
+  `serve` cannot be made to. Rejected: a non-additive sentinel in the set
+  `app` so 036 B-8 refuses the rollback, because it changes `app`'s
+  history, against B-13.
+- **D-6 (2026-09-24, owner decision; open question 3).** Requirements are
+  declarable per set and per migration (B-6). Rejected: per set only.
+- **D-7 (2026-09-24, owner decision; open question 4).** The ready-together
+  order is chassis sets, then libraries by name, then `app` (B-7).
+  Rejected: a host-declared order.
+- **D-8 (2026-09-24, owner decision; open question 5).** A set present in
+  the store but absent from the binary is judged ahead from version 1
+  (B-10, B-16), so an additive-only library can be unlinked. Rejected:
+  always refusing it.
+- **D-9 (2026-09-24, owner decision; open question 6).** Cells that carry
+  `coordination_migration` in their own `app` list keep it there (B-12).
+  Rejected: requiring every cell to adopt `rahi.coordination` at the next
+  minor.
+- **D-10 (2026-09-24, owner decision; open question 7).** Archive format 2
+  is written only when a named set exists (B-15). Rejected: always writing
+  format 2, which a 0.2.x binary would refuse for every archive.
+- **D-11 (2026-09-24, owner decision; open question 8).** The naming
+  grammar, the 64-byte bound, and the reserved `app` and `rahi.` prefix
+  (B-2) are sufficient; a library set need not carry its crate name.
+- **D-12 (2026-09-24, owner approval).** The owner accepted every proposed
+  answer above ("I agree with all recommendations") and approved this spec
+  for implementation on 2026-09-24 by issuing the travel-memory work order
+  for rahi. `status` moves from `draft` to `approved`; `implementation`
+  stays `pending`. D-2's sentence that approval is a separate human act is
+  kept as the record of the draft; this entry is that act.
 
 ## Verification
 

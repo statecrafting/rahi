@@ -255,8 +255,8 @@
       }
     ],
     "specId": "046-named-migration-sets",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "3f0649b990ef3e81d638b932020377b4cc19b44814139848de678906acb060a8"
+  "shardHash": "fc71d6a401fe1cb483a79f5e39feb1e6dcb4c8422a27b5c8f2abfad0dfddaaf2"
 }
