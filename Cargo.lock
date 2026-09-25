@@ -4,9 +4,9 @@ version = 4
 
 [[package]]
 name = "action-gate-core"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a0c828e53a7a5648d0555dfd8208df7fc9231bb32371078eeabb03c691e4145"
+checksum = "b4b846b3434c5a7a218a3ab7048e0c38f9f9375b3f512e74a242d39cf0aa590a"
 dependencies = [
  "action-gate-types",
  "canonical-keysort-json",
@@ -4191,7 +4191,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.4",
  "windows-sys 0.61.2",

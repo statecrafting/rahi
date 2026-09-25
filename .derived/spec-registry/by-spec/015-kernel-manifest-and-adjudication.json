@@ -83,14 +83,14 @@
     "kind": "kernel",
     "risk": "critical",
     "sectionDigests": {
-      "015-the-kernel": "91f59d872abd73697049a661c74865e5c3f0b2f8086434ed2dd780dbd6d07f25",
+      "015-the-kernel": "f31f565d9797204e3e2cf092d8da4e6d27a97dbc0ff11f7073ab44cf88907d1f",
       "1-purpose": "7a5aea975c9ca5dc5b6c98eb5a9e662e2277cc1ed3694b825446715c1d76e629",
       "2-territory": "cb122d5f984e6076495b7872076de45e372ebab0e368d3581abf740482446920",
       "3-behavior": "14459f61e96a1662eaca69ca7ef299ade9e8d62a16a3bb9b2a1bc23b78aafd5c",
       "4-functional-requirements": "96b57609c4b5ccb7c68600445f292b8ce70511bcb86ef8d586e529eebfaea330",
       "5-acceptance-criteria": "09e797f40083ff28e7437a005984c5a6febe7ff3b6a100cecbfffb5870368aba",
       "6-out-of-scope": "0d5b9c558c343061c7a4dd3819ae5970280d2424e255a0b860fc4723ade824e9",
-      "7-resolved-decisions": "8dec7823d12301b8597fcc94ace85e0845184dbe9e9034b3e457c95c19ad91f0",
+      "7-resolved-decisions": "16004cbf90ea3da71c7c142a49bd3cdb2971e366944c43474504f0e92712baa1",
       "verification": "4ef977e926bcde47acad4b59b7baff77b1b60f60faf538b4d9847ddadf73a1f2"
     },
     "sectionHeadings": [
@@ -109,6 +109,6 @@
     "summary": "The governance seam. An app declares a manifest (TOML, embedded at compile time): identity, services, resources by name, a capability catalog, per service grants, the gate roster, ledger and observability policy. The kernel canonicalizes and hashes it, verifies at build that every governed facade the app links is covered by a grant, adjudicates every store, lock, notify, secret, and egress operation at runtime through the action-gate primitive, denies anything not granted, and appends a Decision for every denial without the request path awaiting the ledger. Carries enrahitu://020 and enrahitu://021 with the parser-based extractor replaced by a declared manifest.\n",
     "title": "The kernel: a declared capability ceiling, verified at build, enforced at runtime, denials ledgered"
   },
-  "shardHash": "83a484fc8390cc08e5c27f53eac2a118900cbb9b52e700201c59d4c532157a6d",
+  "shardHash": "b0dc8569ea040b9eb79e0efbad45dadafeb8815a8d37ccca7b3da734613ffc9d",
   "specVersion": "1.8.0"
 }

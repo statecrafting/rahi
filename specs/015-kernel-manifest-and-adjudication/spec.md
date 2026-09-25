@@ -288,6 +288,22 @@ degradation (a later spec if a product needs them).
   spec to a higher one; and retrying on `AddrInUse`, which hiqlite reports
   as a panic rather than an error.
 
+- **D-11 (2026-09-25, maintenance under the owner's work order of
+  2026-09-25; reads no B-n: a dependency pin).** `action-gate-core` moves
+  from `0.1` to exactly `=0.2.0`. action-gate spec 001 FR-006 states that
+  `SecretsCheck::default()`'s patterns, reason and `config_fingerprint` are
+  unchanged byte for byte from 0.1.0; 0.2.0 only adds a secret-detector
+  registry, `SecretScanCheck` and an opt-in deny-by-default terminal check,
+  none of which the kernel's roster names. Checked rather than assumed: the
+  gate `config_hash` and the manifest `hash` of `testdata/manifests/valid.toml`
+  (`sha256:05c1b1f7...` and `sha256:f3407fd4...`) and of `changed-grant.toml`
+  are identical under both versions, with the roster `["grants", "secrets"]`
+  unchanged, so no deployed cell's manifest hash or chain root moves. The
+  whole `rahi-kernel` suite passes on 0.2.0. `action-gate-types` stays
+  `0.1`, which 0.2.0 still depends on. Adopting `SecretScanCheck` would
+  change the roster and the hash and is a separate decision of this spec,
+  not taken here.
+
 ## Verification
 
 ```verify:cli
