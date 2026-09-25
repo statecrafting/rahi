@@ -1037,6 +1037,35 @@ None remains open: D-7 to D-13 record the owner's approval and choices.
   repins and deployment stay outside it, and D-12's resurfacing before a
   release approval stands.
 
+- **D-15 (2026-09-25, owner decision; the exact repin moves to
+  patched.3).** The owner's work order of 2026-09-25 PM: "043 builds
+  straight onto hiqlite `=0.15.0-patched.3`, not patched.2. patched.3
+  (published, verified) is the readiness-after-crash-recovery fix and
+  supersedes patched.2", recorded as its own amendment "changing only the
+  hiqlite pin (all three crates exact, `--locked`); the Rauthy pin stays
+  `ghcr.io/bartekus/rauthy-patched:0.36.2-patched.3@sha256:d75cac0f708f3e238c458b622fea2f0b7dda9b67e9435eeafa37698d88a2a3c8`".
+  D-14's repin therefore reads: `hiqlite-patched`, `hiqlite-wal-patched`
+  and `hiqlite-derive-patched` at exactly `=0.15.0-patched.3`, built
+  `--locked`, with the Rauthy image unchanged. Coordinates, verified
+  anonymously on crates.io on 2026-09-25 (none yanked): signed tag
+  `v0.15.0-patched.3` on `bartekus/hiqlite@6c8db22`; sha256
+  `hiqlite-patched` `9d3586f7db4e971836ffc5982086bcfa1de0c0293492a194efd7d4ac21ff5ebf`,
+  `hiqlite-wal-patched` `df82af141317c61b135d600a93c0ec2283c40f2761ab956b20568b2c23bc2746`,
+  `hiqlite-derive-patched` `c024ff5b7f4accf1de88d02d478e9ed740a03e9a0bd2d582e87948dc1d58ceae`.
+
+  What patched.3 changes for the cell, and what the same owner decision
+  requires of the build: until each Raft group has applied the log it held
+  at start, hiqlite answers `Error::Recovering` to `is_healthy_db`,
+  `is_healthy_cache` and every client operation on that group. "The cell's
+  readiness must reflect hiqlite's recovery state: under patched.3
+  `is_healthy_db` waits for recovery and early calls return
+  `Error::Recovering`; report 'recovering', not 'down', and accept no work
+  before recovery completes (045's crash table depends on it)." Every
+  other B-n, FR, AC and D-n of this spec is unchanged, and D-12's
+  resurfacing before a release approval stands. Where a B-n or D-P entry
+  names `0.15.0-patched.1` or `.2`, it is the record of what was measured
+  then, not the pin.
+
 ### 7.1 Proposals (2026-09-23)
 
 - **P-6 (withdrawn 2026-09-23, after independent review).** An earlier
