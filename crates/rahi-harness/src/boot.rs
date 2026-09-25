@@ -3,7 +3,7 @@
 //! The sequence mirrors the container's entrypoint (spec 031 B-3):
 //! `first-boot` under a throwaway data directory, `migrate`, then either
 //! `supervise` with a rauthy binary or `serve` alone with
-//! `RAHI_RAUTHY_MODE=none`. Every port is allocated by the OS, the child
+//! `RAHI_RAUTHY_MODE=none`. Every port is allocated fresh, the child
 //! inherits nothing but `PATH` and `HOME`, and boot returns only after
 //! `/readyz` answers `200`.
 
@@ -197,10 +197,52 @@ impl Ports {
     }
 }
 
-/// A port the OS had free a moment ago.
+/// A loopback port no concurrently running process of this workspace's test
+/// suite was handed (spec 033 D-7).
+///
+/// Binding port 0 and dropping the listener raced: the child binds the port
+/// later, and a parallel test binary could take it in between. A port now
+/// comes from 20000..32000, below every OS ephemeral range, starting at an
+/// offset derived from the process id; it is claimed by an exclusive lock on
+/// `<temp>/rahi-test-ports/<port>.lock`, held until this process exits (and so
+/// for the child's whole life), and probed with a bind before it is handed
+/// out. The chassis crates' test helpers use the same range and lock
+/// directory.
 fn free_port() -> Result<u16> {
-    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
-    Ok(listener.local_addr()?.port())
+    use std::fs::OpenOptions;
+    use std::sync::PoisonError;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    const FLOOR: u32 = 20_000;
+    const SPAN: u32 = 12_000;
+    static NEXT: AtomicU32 = AtomicU32::new(0);
+    static HELD: Mutex<Vec<File>> = Mutex::new(Vec::new());
+
+    let dir = std::env::temp_dir().join("rahi-test-ports");
+    std::fs::create_dir_all(&dir)?;
+    let offset = std::process::id().wrapping_mul(7919) % SPAN;
+    loop {
+        let n = NEXT.fetch_add(1, Ordering::Relaxed);
+        if n >= SPAN {
+            return Err(Error::Io(format!(
+                "every port in {FLOOR}..{} is taken",
+                FLOOR + SPAN
+            )));
+        }
+        let port = u16::try_from(FLOOR + (offset + n) % SPAN)
+            .map_err(|err| Error::Io(format!("port out of range: {err}")))?;
+        let lock = OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(dir.join(format!("{port}.lock")))?;
+        if lock.try_lock().is_ok() && TcpListener::bind((Ipv4Addr::LOCALHOST, port)).is_ok() {
+            HELD.lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .push(lock);
+            return Ok(port);
+        }
+    }
 }
 
 /// A booted cell.

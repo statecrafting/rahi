@@ -111,14 +111,14 @@
     "kind": "kernel",
     "risk": "critical",
     "sectionDigests": {
-      "022-sessions-and-the-principal": "ddcf9fd735d90dac3ff9dc6e03a955c3af6d71056f6260646b56c3ab0e7933af",
+      "022-sessions-and-the-principal": "0b72ff95d0e78b5a1f70547cb513bcfe4836dba975224d38b7cd8d33e47c22ab",
       "1-purpose": "cce0a5751e0da75b2cad4fdba7d23b403915c5e884f1251e3888916edfb79646",
       "2-territory": "f63837315a81ee35516db16633d68c99c2172cbbbb56d494041aebc14f726f52",
       "3-behavior": "b38679333fe882dd4a1f8c98d6a133033dbec7e7814896992751cc338661ae9f",
       "4-functional-requirements": "a1a199187324807cd34e631b11d1773be08acc275a9396e4f003a8caffd00bdd",
       "5-acceptance-criteria": "98b45902770275753fbbaabdd6b25a1914748a35ad9fe03a7dbda3ef2e4d8def",
       "6-out-of-scope": "e1a682018b248fb3e4834280ec537db405d0644d057a79e4d54e90f5cfa52ff9",
-      "7-resolved-decisions": "dcafc79d1d963183421edcdc0a2781437b4ca4911a59ec14416d7d0ba762f75b",
+      "7-resolved-decisions": "6bf2781ca099ca2573a37e8c3696fa5b662c30845de2755c028e6dd47fbbf0e0",
       "8-status": "bda4a443316566d315331cbfcdae41732a492143e7c067e2d384ee38be21e01b",
       "verification": "4d970e7de03aeb313069f0f1affc8643e23a35f52559ccf8b05cb9ad1658fa96"
     },
@@ -139,6 +139,6 @@
     "summary": "The app keeps the shell and gives up the authority. Login is the authorization-code flow with PKCE through the proxy; the session cookie is a signed envelope holding rauthy's refresh token and the pinned subject, httpOnly and same-origin, that grants nothing on presentation; the access assertion is short-lived and minted from the IdP's claims; renewal forwards the refresh token to rauthy and re-reads roles and email_verified from userinfo every time, so a role removed at the IdP takes effect within one access lifetime and a refused grant ends the session. No local account row is ever written. Carries enrahitu://004.\n",
     "title": "Sessions and the principal: the signed envelope, renewal as a round-trip, the IdP subject as the only id"
   },
-  "shardHash": "116bfd59f4a39029d7b495284c8888daf11623b0b348e9596eb4021c1694b82f",
+  "shardHash": "b0958bb509283648af2f0a758bfc3960d92b9390d0ab5a4df5777767a9f85239",
   "specVersion": "1.8.0"
 }

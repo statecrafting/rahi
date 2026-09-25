@@ -110,14 +110,14 @@
     "kind": "kernel",
     "risk": "critical",
     "sectionDigests": {
-      "030-the-verbs-and-the-binary-composer": "402bcb315a9fdb63f80956380452bda8b59191f3533aa2d51309eb45388b1321",
+      "030-the-verbs-and-the-binary-composer": "bef6842f13587129919bab4d3da417503d9308d7757dad9ae9021f1c6a22c745",
       "1-purpose": "11d3acb09717b9ba2da4b0f9e749d70506d829fa39d8a5b792cf566f4e88cb3e",
       "2-territory": "b6cca4208b8ecc3a03e740d565bc1b62be24b5780a2a212389928be23b4c2214",
       "3-behavior": "c8ec5df8db674d15b90ab584cb69db9490b2964bf89a850a12535f933aa9aadc",
       "4-functional-requirements": "f61a0bbaae6196f4a39b11afdc1101b60938b943809fa635df47f445ed9ae20f",
       "5-acceptance-criteria": "99f070f87a7cefe8a0a58f039be6c7b9dc8b6cdc3d47368b5d1235a6d3f28678",
       "6-out-of-scope": "9137b00a3fbe47268792ad5351df2394ae231ec8abe79639f6834cc32beb1dfa",
-      "7-resolved-decisions": "c403ee4f64c5ade7623fdfdfd428706237a9d2a357659a21e30e2e6c12c49d17",
+      "7-resolved-decisions": "a3622f7203912204edf75df8bbda255624e32e208cc68d71d8530a1b3d4be546",
       "8-status": "c800af1511938a2c9d104d127b552c09d786a9c7ba08189d1df1a06d07367691",
       "verification": "cc88f57bb0d81cd9f1f0dceeec57a2c381b158d322d72baf8a20b099b2347585"
     },
@@ -138,6 +138,6 @@
     "summary": "Operations that exist. rahi-ops implements preflight (config, keys, both stores' health, disk), migrate (spec 011's migrations as a deploy step, leader-only), backup (one encrypted archive holding the app's hiqlite snapshot taken through the addon, rauthy's snapshot taken through rauthy's own API, and the key material that decrypts both), restore (a cluster reset that refuses partial input and is single-shot by a marker), and ledger verify (spec 013 over an exported chain). rahi-cli is the binary composer: an app implements the Cell trait and its main is rahi_cli::run(cell), which yields serve plus every verb with the four exit codes. Carries enrahitu://027.\n",
     "title": "The verbs and the binary composer: preflight, migrate, backup, restore, ledger verify"
   },
-  "shardHash": "fb7d9166f8fea4309020289a01fdf20cfb8b3d6164bb3a520e3bb453f180b463",
+  "shardHash": "47c638f35dc15704f4de52790ade349bb75366a8af2dd0cc1cd7590d4b25f37c",
   "specVersion": "1.8.0"
 }
