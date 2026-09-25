@@ -10,10 +10,54 @@ Every chassis crate carries one version, and a release is an annotated tag
 `vX.Y.Z` on a `main` commit whose `make ci` passed. Pre-1.0, a minor bump may
 change the consumer contract and a patch bump may not.
 
-## 0.3.0, unreleased
+## 0.3.0, released 2026-09-25
 
-The next minor, not yet tagged. It carries spec 045 (receipts and work
-claims) and spec 046 (named migration sets).
+Every change since `v0.2.0`. All nine chassis crates move together. It
+carries spec 038 (native clients, token lifetimes, and bearer revocation),
+spec 045 (receipts and work claims) and spec 046 (named migration sets).
+The minor bump follows spec 039 B-1: the `Cell` trait, the manifest schema,
+the archive format and the chassis's HTTP surfaces all gain additions, and
+two public structs gain fields.
+
+The tested revision is the commit the annotated `v0.3.0` tag names: the
+squash merge of this release's pull request on `main` (039 D-18). Its tree
+is the tree that pull request's checks ran on (governance, `cargo gate`,
+cargo-deny, the packaging proof, and the whole suite against the pinned
+rauthy), and the `ci` run on `main` for that commit passed before the tag
+was created.
+
+What the tag has not yet proven when this record was written: registry
+availability, anonymous image access and consumer deployment. The nine
+crates reach crates.io at 0.3.0 only when the tag's `release` run publishes
+them and its registry consumer stanza passes. Those outcomes are recorded
+in the release notes, not here.
+
+Still true of every published crate, as at 0.2.0: `[patch.crates-io]`
+substitutes hiqlite for rahi's own builds only (011 D-12). A consumer
+resolving rahi 0.3.0 from crates.io gets hiqlite 0.14.0 without that fix
+unless it declares the same section. The move to the patched hiqlite 0.15
+line is spec 043, which is not in this release.
+
+- **Native clients (038 B-2, B-3).** The manifest's `[auth]` gains
+  `access_token_lifetime_secs` (default 600), `native_refresh_lifetime_secs`
+  (default 86,400, applied to rauthy in whole hours) and
+  `[[auth.native_clients]]` (`id`, `flows`, `scopes`, `redirect_uris`).
+  Each declared client is upserted at every boot as a public PKCE `S256`
+  client with RS256 tokens and `default_aud` the cell's origin. Declaring
+  one moves the manifest hash, so spec 036 governs the change. A consumer
+  that builds `rahi_kernel::manifest::Auth` with a struct literal must add
+  the new fields; `Manifest::parse` callers are unaffected, and manifest
+  schema stays `1.0.0`.
+- **Bearer revocation (038 B-5).** `POST /session/token/revoke` (by the
+  token) and `POST /operator/tokens/revoke` (by `jti`, or by `sub`, which
+  also ends the grant at rauthy). Entries live `lifetime + 120` seconds in
+  the cache group.
+- **CSRF on a bearer route (038 B-1).** A request on a declared bearer route
+  with an `Authorization` header and no session cookie is exempt from the
+  CSRF pair. A request carrying both credentials is refused `400` as
+  before.
+- **`preflight` (038 B-4).** A `tokens` check reads the access-token
+  lifetime back from rauthy and fails when rauthy applies a longer one.
 
 - **`Cell` trait (046 B-1, B-17).** New defaulted method
   `fn migration_sets() -> Vec<MigrationSet>`: the chassis's sets

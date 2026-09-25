@@ -1717,7 +1717,7 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "hello-cell"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "rahi-cli",
@@ -3134,7 +3134,7 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
 name = "rahi-cli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -3152,7 +3152,7 @@ dependencies = [
 
 [[package]]
 name = "rahi-edge"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -3178,7 +3178,7 @@ dependencies = [
 
 [[package]]
 name = "rahi-harness"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "reqwest",
  "ring",
@@ -3191,7 +3191,7 @@ dependencies = [
 
 [[package]]
 name = "rahi-idp"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -3212,7 +3212,7 @@ dependencies = [
 
 [[package]]
 name = "rahi-kernel"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "action-gate-core",
  "action-gate-types",
@@ -3230,7 +3230,7 @@ dependencies = [
 
 [[package]]
 name = "rahi-ledger"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "attest-ledger-core",
@@ -3252,7 +3252,7 @@ dependencies = [
 
 [[package]]
 name = "rahi-ops"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "age",
  "axum",
@@ -3277,7 +3277,7 @@ dependencies = [
 
 [[package]]
 name = "rahi-store"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "attest-ledger-core",
  "futures-core",
@@ -3292,7 +3292,7 @@ dependencies = [
 
 [[package]]
 name = "rahi-types"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "serde",
  "serde_json",
