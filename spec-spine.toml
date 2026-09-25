@@ -5,11 +5,11 @@
 # session (AGENTS.md, "Working the backlog"). Every knob below is deliberate.
 
 [meta]
-# A floor, not the pin (spec 001 D-14; moved to 0.25.0 by D-15). The pin is
-# stated once, in the Makefile, and CI reads it there (B-3). This line makes every older reader
-# refuse the corpus by name at exit 3 instead of judging 1.8.0 shards it
-# cannot read, whichever binary a hook resolves first.
-required_version = ">=0.25.0"
+# The exact pin (spec 001 D-16; a floor under D-14 and D-15). The Makefile
+# states the same version and CI reads it there (B-3). Any other binary,
+# older or newer, refuses the corpus by name at exit 3 instead of judging
+# shards it did not write, whichever binary a hook resolves first.
+required_version = "=0.26.0"
 
 [manifest]
 # Cargo `[package.metadata.spec-spine].spec` names each crate's founding spec.
