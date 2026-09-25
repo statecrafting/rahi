@@ -19,7 +19,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 
 use std::collections::BTreeMap;
-use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 
 use axum::Router;
@@ -123,12 +122,55 @@ impl Cell for V2 {
     }
 }
 
+/// A loopback port no concurrently running test process was handed (spec
+/// 036 D-17).
+///
+/// Binding port 0 and dropping the listener raced: hiqlite binds the address
+/// later, and a parallel test binary could take the port in between. A port
+/// now comes from 20000..32000, below every OS ephemeral range, starting at an
+/// offset derived from the process id; it is claimed by an exclusive lock on
+/// `<temp>/rahi-test-ports/<port>.lock`, held until this process exits, and
+/// probed with a bind before it is handed out. Every copy of this allocator
+/// in the workspace uses the same range and lock directory.
 fn free_port() -> String {
-    TcpListener::bind("127.0.0.1:0")
-        .unwrap()
-        .local_addr()
-        .unwrap()
-        .to_string()
+    format!("127.0.0.1:{}", loopback_port())
+}
+
+fn loopback_port() -> u16 {
+    use std::fs::{File, OpenOptions};
+    use std::net::{Ipv4Addr, TcpListener};
+    use std::sync::atomic::{AtomicU32, Ordering};
+    use std::sync::{Mutex, PoisonError};
+
+    const FLOOR: u32 = 20_000;
+    const SPAN: u32 = 12_000;
+    static NEXT: AtomicU32 = AtomicU32::new(0);
+    static HELD: Mutex<Vec<File>> = Mutex::new(Vec::new());
+
+    let dir = std::env::temp_dir().join("rahi-test-ports");
+    std::fs::create_dir_all(&dir).expect("the port lock directory");
+    let offset = std::process::id().wrapping_mul(7919) % SPAN;
+    loop {
+        let n = NEXT.fetch_add(1, Ordering::Relaxed);
+        assert!(
+            n < SPAN,
+            "every test port in {FLOOR}..{} is taken",
+            FLOOR + SPAN
+        );
+        let port = u16::try_from(FLOOR + (offset + n) % SPAN).expect("a u16 port");
+        let lock = OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(dir.join(format!("{port}.lock")))
+            .expect("a port lock file");
+        if lock.try_lock().is_ok() && TcpListener::bind((Ipv4Addr::LOCALHOST, port)).is_ok() {
+            HELD.lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .push(lock);
+            return port;
+        }
+    }
 }
 
 /// One volume, as the binary's environment describes it.
