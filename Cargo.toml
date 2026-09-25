@@ -50,7 +50,7 @@ url = "2"
 # stable config hash the manifest hash folds in.
 toml = { version = "1", default-features = false, features = ["parse", "serde"] }
 action-gate-types = "0.1"
-action-gate-core = { version = "0.1", features = ["checks-common"] }
+action-gate-core = { version = "=0.2.0", features = ["checks-common"] }
 
 # Binary values (spec 016): the store's own path carries bytes without it,
 # and the test that a BLOB column lands in a `serde_bytes::ByteBuf` field
