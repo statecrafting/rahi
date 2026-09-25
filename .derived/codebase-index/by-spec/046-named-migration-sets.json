@@ -1,0 +1,262 @@
+{
+  "mapping": {
+    "amends": [
+      "045-store-receipts-and-work-claims"
+    ],
+    "dependsOn": [
+      "011-store-hiqlite",
+      "012-store-coordination",
+      "030-operational-verbs",
+      "036-manifest-and-schema-evolution",
+      "045-store-receipts-and-work-claims"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/rahi-cli/src/cell.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/verbs.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/archive.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/backup.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/migrate.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/restore.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/src/migrate.rs",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/migration_sets.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/migration_set.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/migration_sets.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/cell.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/cell.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/verbs.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/verbs.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/archive.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/archive.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/backup.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/backup.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/migrate.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/migrate.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/restore.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/restore.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-store/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-store/src/migrate.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/migrate.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/migrate.rs",
+            "span": {
+              "endLine": 139,
+              "startLine": 124
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "refines",
+        "unit": {
+          "id": "rahi_ops::migrate::check_ahead",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-store/src/migrate.rs",
+            "span": {
+              "endLine": 400,
+              "startLine": 378
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "refines",
+        "unit": {
+          "id": "rahi_store::migrate::check_checksums",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "CHANGELOG.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "CHANGELOG.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/01-consumer-contract.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-consumer-contract.md"
+        }
+      }
+    ],
+    "specId": "046-named-migration-sets",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "fc71d6a401fe1cb483a79f5e39feb1e6dcb4c8422a27b5c8f2abfad0dfddaaf2"
+}
