@@ -1024,6 +1024,18 @@ None remains open: D-7 to D-13 record the owner's approval and choices.
   on it, and a separate owner approval of an exact repin naming them.
   Spec 044, the port-race repair, publication, consumer repins and
   deployment are outside this approval.
+- **D-14 (2026-09-25, owner decision; the exact repin D-13 asks for).** The
+  owner confirmed on 2026-09-25 that revision 4, as D-7 records it, is the
+  implementation contract (the travel-memory work order's "approve revision
+  2" is read as this recorded approval, whose design revision 4 keeps), and
+  approved the exact repin D-13 requires: `hiqlite-patched`,
+  `hiqlite-wal-patched` and `hiqlite-derive-patched` at exactly
+  `=0.15.0-patched.2`, built `--locked`, and Rauthy
+  `ghcr.io/bartekus/rauthy-patched:0.36.2-patched.3@sha256:d75cac0f708f3e238c458b622fea2f0b7dda9b67e9435eeafa37698d88a2a3c8`,
+  the image rebuilt on it. With this entry D-13's conditions for flipping
+  043 `complete` are the build's own verification; publication, consumer
+  repins and deployment stay outside it, and D-12's resurfacing before a
+  release approval stands.
 
 ### 7.1 Proposals (2026-09-23)
 
