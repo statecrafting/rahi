@@ -308,6 +308,31 @@ where archives land in a cluster (032).
   states the owner's reasoning from 042's side. Spec 042 is approved in the same
   change and holds at `implementation: pending`; this amendment authorizes no
   implementation and changes nothing this spec requires.
+- **D-10 (2026-09-24, correction session, owner-authorized work order; reads
+  no B-n: a test-support defect).** `free_addr` in
+  `crates/rahi-ops/tests/common/mod.rs` and `free_port` in
+  `crates/rahi-cli/tests/cli.rs` bound `127.0.0.1:0`, read the port, and
+  dropped the listener before hiqlite (or the spawned cell) bound it. That
+  is a time-of-check race: under parallel test binaries another process
+  could take the port in the gap, and hiqlite then panicked in its
+  `start.rs` with `valid RPC socket address: AddrInUse`. hiqlite binds the
+  address itself and accepts no listener, so holding the socket until the
+  bind is not available. The allocator now hands out ports from
+  20000..32000, below the Linux (32768..60999) and macOS (49152..65535)
+  ephemeral ranges so no outbound connection is given one, starting at an
+  offset derived from the process id and advanced by an in-process atomic
+  counter. Each candidate is claimed by an exclusive `File::try_lock` on
+  `<temp>/rahi-test-ports/<port>.lock`, held until the process exits, and
+  then probed with a bind; a held lock or a failed bind moves on to the next
+  candidate. Every copy of the allocator in the workspace (the store,
+  ledger, kernel, edge, idp, ops and cli tests and the harness) uses the
+  same range and lock directory, so two concurrently running test processes,
+  from this checkout or another, never hand out the same port. This applies
+  to the verb tests. The helpers keep their signatures, so no caller
+  changed. Rejected: a shared helper crate or a dev-dependency on
+  `rahi-harness`, which would add a dependency edge from a lower-numbered
+  spec to a higher one; and retrying on `AddrInUse`, which hiqlite reports
+  as a panic rather than an error.
 
 ## 8. Status
 
