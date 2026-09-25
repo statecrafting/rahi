@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use axum::Router;
 use rahi_edge::{AppState, Route};
 use rahi_idp::BearerRoutes;
-use rahi_store::Migration;
+use rahi_store::{Migration, MigrationSet};
 
 /// The prefix a cell's operator routes are mounted under (spec 024 B-2).
 pub const OPERATOR_PREFIX: &str = "/operator";
@@ -27,6 +27,15 @@ pub trait Cell: Send + Sync + 'static {
     /// The migrations, in version order (spec 011 B-5). `migrate` applies
     /// them; `serve` refuses a store that is behind them.
     fn migrations() -> &'static [Migration];
+
+    /// The named migration sets this cell links (spec 046 B-1): the
+    /// chassis's own (`rahi_store::coordination_set`,
+    /// `rahi_store::receipt_set`) and each library's. [`Cell::migrations`]
+    /// stays the set `app`. Empty by default, which is a cell that behaves
+    /// exactly as before named sets existed (B-13).
+    fn migration_sets() -> Vec<MigrationSet> {
+        Vec::new()
+    }
 
     /// The app's routes, merged at the root and classified authenticated
     /// unless [`Cell::exposed`] says otherwise (spec 024 B-4).

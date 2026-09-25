@@ -10,6 +10,35 @@ Every chassis crate carries one version, and a release is an annotated tag
 `vX.Y.Z` on a `main` commit whose `make ci` passed. Pre-1.0, a minor bump may
 change the consumer contract and a patch bump may not.
 
+## 0.3.0, unreleased
+
+The next minor, not yet tagged. It carries spec 045 (receipts and work
+claims) and spec 046 (named migration sets).
+
+- **`Cell` trait (046 B-1, B-17).** New defaulted method
+  `fn migration_sets() -> Vec<MigrationSet>`: the chassis's sets
+  (`rahi_store::coordination_set()`, `rahi_store::receipt_set()`) and each
+  linked library's. `Cell::migrations()` stays the set `app`, recorded in
+  `schema_version` exactly as before. A cell that declares no set behaves as
+  it did under 0.2.0.
+- **Archive format 2 (046 B-14, B-15).** A backup of a store that records a
+  named set is written as format 2, with every set's history under
+  `schema.sets`; a 0.2.x binary refuses it. A backup with no named set is
+  still format 1 and carries no `sets` key. This binary reads both.
+- **Schema (046 B-4).** The `migrate` baseline creates
+  `schema_set_version`; no existing `schema_version` row changes.
+- **`migrate --plan` (046 B-7).** Prints the cross-set plan and applies
+  nothing.
+- **`rahi_store::Migration` (046 B-6).** Gains a public `requires` field and
+  `Migration::requires(set, min_version)`. A consumer that builds a
+  `Migration` with a struct literal must add the field; `Migration::new`
+  callers are unaffected.
+- **Receipts and work claims (045).** New `rahi_store` surface: `Receipts`,
+  `ReceiptKey`, `ContentDigest`, `Work`, `Claim`, `RetryPolicy` and their
+  companions, shipped as the set `rahi.receipts` (046 B-11; there is no
+  `receipt_migration`). `/metrics` gains the gauge
+  `rahi_work_items{processor, state}`, labelled by processor and state only.
+
 ## 0.2.0, released 2026-09-20
 
 Every change since `v0.1.0` (`6e06c042df4e9f5b47dc86ee8d40167c2e668b5e`).

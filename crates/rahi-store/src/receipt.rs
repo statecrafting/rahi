@@ -12,7 +12,7 @@
 //! Two tables carry the identity: `rahi_receipt_head` is the one row per
 //! identity a staging call compare-and-swaps against (012 D-3's `NOT NULL`
 //! technique, spec 045 B-8), and `rahi_receipt` is one row per revision,
-//! accepted or collision. Both are created by [`receipt_migration`].
+//! accepted or collision. Both are created by the set [`receipt_set`].
 
 use attest_ledger_core::sha256_hex;
 use rahi_types::{Error, UnixSeconds};
@@ -744,13 +744,28 @@ impl From<UnixSeconds> for Value {
     }
 }
 
-/// The receipt tables, applied only by this migration (spec 045 2.1).
+/// The receipt tables, applied only by this set (spec 045 2.1).
 ///
 /// Additive: every statement only creates a table or an index, so a binary
 /// whose last migration is older may still serve a store ahead of it (spec
 /// 036 B-8).
+///
+/// Shipped as the chassis set `rahi.receipts` (spec 046 B-11), versioned by
+/// rahi from 1 and requiring `rahi.coordination >= 1`, because the claim
+/// sweep takes a lease (045 B-19).
 #[must_use]
-pub fn receipt_migration(version: u32) -> Migration {
+pub fn receipt_set() -> crate::migration_set::MigrationSet {
+    crate::migration_set::MigrationSet {
+        name: crate::migration_set::SetName::chassis("receipts"),
+        migrations: vec![receipt_migration(1)],
+        requires: vec![crate::migration_set::SetRequirement {
+            set: crate::migration_set::SetName::chassis("coordination"),
+            min_version: 1,
+        }],
+    }
+}
+
+fn receipt_migration(version: u32) -> Migration {
     Migration::new(
         version,
         "rahi-store receipts and work claims",

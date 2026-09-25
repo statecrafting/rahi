@@ -202,6 +202,8 @@ fn restore_refuses_a_newer_non_additive_archive_and_an_unadopted_manifest() {
                     additive: Some(additive),
                 },
             ],
+            // Spec 046 B-14: this fixture records no named set.
+            sets: std::collections::BTreeMap::new(),
         })
     };
     let cell = |adopt: bool| Compatibility {

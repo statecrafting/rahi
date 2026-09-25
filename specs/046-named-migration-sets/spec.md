@@ -6,7 +6,7 @@ kind: kernel
 domain: store
 created: "2026-09-24"
 authors: ["Bartek Kus"]
-implementation: pending
+implementation: complete
 risk: critical
 wave: 3
 depends_on:
@@ -16,9 +16,9 @@ depends_on:
   - "036-manifest-and-schema-evolution"
   - "045-store-receipts-and-work-claims"
 establishes:
-  - { kind: file, path: "crates/rahi-store/src/migration_set.rs", planned: true }
-  - { kind: file, path: "crates/rahi-store/tests/migration_sets.rs", planned: true }
-  - { kind: file, path: "crates/rahi-ops/tests/migration_sets.rs", planned: true }
+  - { kind: file, path: "crates/rahi-store/src/migration_set.rs" }
+  - { kind: file, path: "crates/rahi-store/tests/migration_sets.rs" }
+  - { kind: file, path: "crates/rahi-ops/tests/migration_sets.rs" }
 extends:
   - { spec: "011-store-hiqlite", unit: "crates/rahi-store/src/migrate.rs", nature: additive }
   - { spec: "011-store-hiqlite", unit: "crates/rahi-store/src/lib.rs", nature: additive }
@@ -29,6 +29,15 @@ extends:
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/backup.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/archive.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/restore.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/serve.rs", nature: additive }
+  - { spec: "036-manifest-and-schema-evolution", unit: "crates/rahi-ops/tests/evolution.rs", nature: additive }
+  - { spec: "036-manifest-and-schema-evolution", unit: "crates/rahi-cli/tests/evolution.rs", nature: additive }
+  - { spec: "039-release-and-out-of-tree-packaging", unit: "CHANGELOG.md", nature: additive }
+  - { spec: "045-store-receipts-and-work-claims", unit: "crates/rahi-store/src/receipt.rs", nature: additive }
+  - { spec: "045-store-receipts-and-work-claims", unit: "crates/rahi-store/tests/receipt.rs", nature: additive }
+  - { spec: "045-store-receipts-and-work-claims", unit: "crates/rahi-store/tests/work.rs", nature: additive }
+  - { spec: "045-store-receipts-and-work-claims", unit: "crates/rahi-store/tests/receipt_recovery.rs", nature: additive }
+  - { spec: "023-observability", unit: "crates/rahi-edge/tests/obs.rs", nature: additive }
 refines:
   - { aspect: "the checksum is per (set, version); the unnamed history is the set named app", unit: { kind: symbol, id: "rahi_store::migrate::check_checksums" } }
   - { aspect: "the additive rule is applied per set", unit: { kind: symbol, id: "rahi_ops::migrate::check_ahead" } }
@@ -378,9 +387,50 @@ No approved spec's text changes.
   stays `pending`. D-2's sentence that approval is a separate human act is
   kept as the record of the draft; this entry is that act.
 
-## Verification
+- **D-13 (2026-09-25, build session; the restore check for `app`).** B-16
+  asks restore to check every set "for checksum and the additive rule",
+  and AC-2 requires 036's `tests/evolution.rs` to pass with its existing
+  assertions, "a cell with no named set behaves as before this spec". One
+  of those assertions restores a legacy archive whose `app` row carries a
+  checksum the fixture binary does not, which 036 B-9 admits because it
+  judges `app` on the additive rule only. Both hold with this mechanism:
+  restore checks checksums for every named set, and judges `app` exactly as
+  036 B-9 does; `app`'s checksums are still checked by the `migrate` and
+  `serve` that must follow any restore. Rejected: checking `app`'s
+  checksums at restore too, which breaks AC-2.
+- **D-14 (2026-09-25, build session; set-aware siblings, not changed
+  signatures).** 2.2 lists `migrate::run`, `check_current`, `adopt` and the
+  restore check as extended. Their signatures are public and 036's tests
+  call them, so each keeps its signature and meaning, and a sibling takes
+  the sets: `run_sets`, `check_current_sets`, `adopt_sets`, `plan_sets`,
+  `check_restorable`, `restore::run_sets`, `restore::check_compatible_sets`.
+  `restore::Compatibility` keeps its fields. `serve` always asks
+  `check_current_sets`, so a store that records a set this binary does not
+  carry is judged by D-8 even in a cell with no sets; the `migrate` verb
+  keeps 0.2.0's path when the cell declares no set. `migrate --plan` takes
+  neither `--backup` nor `--adopt-manifest`, since it applies nothing.
+  Editing the two 036 test fixtures that build an `ArchiveSchema` by struct
+  literal (adding an empty `sets`) changes no assertion; the `extends`
+  edges above record it.
+- **D-15 (2026-09-25, build session; requirement names and reserved
+  names).** B-2 reserves `app` and the `rahi.` prefix, and B-6 has a
+  library require `rahi.receipts`. `SetName::new`, the constructor a
+  library or a cell uses, refuses both reserved forms, and only this
+  crate's `coordination_set()` and `receipt_set()` construct a `rahi.` set;
+  a requirement names its target through `SetName::reference`, which
+  accepts any well-formed name. A cell therefore cannot declare a set
+  named `app` or `rahi.*` at all (FR-007), and the "reserved name they do
+  not own" refusal of B-2 needs no runtime ownership check.
+- **D-16 (2026-09-25, build session; the plan's shape).** B-7 orders
+  "ready together" migrations by rank. The planner takes one migration at a
+  time: the first set, in rank order (chassis sets by name, libraries by
+  name, `app`), whose next pending migration has every requirement met by
+  a recorded or already planned version. A requirement on the set itself
+  is refused as a cycle, and every requirement is validated against the
+  sets the cell carries before any history is read. Statements recording a
+  named set use `?NNN` parameters (045 D-23).
 
-Planned: the two new test files do not exist until the spec is built.
+## Verification
 
 ```verify:cli
 cargo test -p rahi-store --locked --test migration_sets

@@ -461,6 +461,8 @@ fn archive_of(volume: &Volume) -> PathBuf {
         let schema = Some(rahi_ops::archive::ArchiveSchema {
             version: history.last().map_or(0, |row| row.version),
             migrations: history,
+            // Spec 046 B-14: this fixture records no named set.
+            sets: std::collections::BTreeMap::new(),
         });
         let manifest = rahi_ops::archive::ArchiveManifest::over(&parts, 0, current, schema);
         manifest.check_complete().unwrap();

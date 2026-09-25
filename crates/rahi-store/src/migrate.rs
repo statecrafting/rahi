@@ -15,6 +15,7 @@ use attest_ledger_core::sha256_hex;
 use rahi_types::Error;
 use serde::{Deserialize, Serialize};
 
+use crate::migration_set::{SET_TABLE_SQL, SetRequirement};
 use crate::query::Value;
 use crate::store::StoreHandle;
 use crate::txn::Statement;
@@ -84,6 +85,11 @@ pub struct Migration {
     /// has not said it: absence is never permission.
     #[serde(default)]
     pub additive: bool,
+    /// Sets this migration, and every later one in its set, needs (spec 046
+    /// B-6). Empty unless [`Migration::requires`] declared one; not part of
+    /// the checksum, which is over the SQL only.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub requires: Vec<SetRequirement>,
 }
 
 impl Migration {
@@ -95,7 +101,19 @@ impl Migration {
             name: name.into(),
             sql: sql.into(),
             additive: false,
+            requires: Vec::new(),
         }
+    }
+
+    /// Declare that this migration, and every later one in its set, needs
+    /// the set `set` at or above `min_version` (spec 046 B-6).
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Validation`] when `set` is not a well-formed set name.
+    pub fn requires(mut self, set: &str, min_version: u32) -> Result<Self, Error> {
+        self.requires.push(SetRequirement::new(set, min_version)?);
+        Ok(self)
     }
 
     /// Declare that this migration only creates tables, indexes, or nullable
@@ -121,7 +139,7 @@ impl Migration {
         sha256_hex(self.sql.as_bytes())
     }
 
-    fn statements(&self) -> Vec<Statement> {
+    pub(crate) fn statements(&self) -> Vec<Statement> {
         self.sql
             .split(';')
             .map(str::trim)
@@ -207,15 +225,7 @@ impl StoreHandle {
     /// migration rolled back.
     pub async fn migrate(&self, migrations: &[Migration]) -> Result<MigrationReport, Error> {
         validate_list(migrations)?;
-        self.txn(vec![
-            Statement::new(BASELINE_SQL),
-            Statement::with_params(
-                "INSERT OR IGNORE INTO schema_version (version, name) VALUES ($1, $2)",
-                vec![Value::from(BASELINE_VERSION), Value::from("baseline")],
-            ),
-        ])
-        .await?;
-        self.add_migration_columns().await?;
+        self.migration_baseline().await?;
 
         let history = self.recorded_migrations().await?;
         // Spec 036 B-7: what already ran is checked against what this binary
@@ -246,15 +256,7 @@ impl StoreHandle {
                     m.version, m.name
                 )));
             }
-            statements.push(Statement::with_params(
-                RECORD_SQL,
-                vec![
-                    Value::from(m.version),
-                    Value::from(m.name.as_str()),
-                    Value::from(m.checksum()),
-                    Value::from(i64::from(m.additive)),
-                ],
-            ));
+            statements.push(record_statement(m));
             self.txn(statements).await.map_err(|e| {
                 Error::Validation(format!(
                     "migration {} ({}) failed and was rolled back: {}",
@@ -308,6 +310,22 @@ impl StoreHandle {
             .collect()
     }
 
+    /// The store's own baseline (spec 011 B-4): `schema_version` with spec
+    /// 036's columns, and `schema_set_version` (spec 046 B-4, B-13), which is
+    /// the only write spec 046 makes to an existing store's schema.
+    pub(crate) async fn migration_baseline(&self) -> Result<(), Error> {
+        self.txn(vec![
+            Statement::new(BASELINE_SQL),
+            Statement::with_params(
+                "INSERT OR IGNORE INTO schema_version (version, name) VALUES ($1, $2)",
+                vec![Value::from(BASELINE_VERSION), Value::from("baseline")],
+            ),
+            Statement::new(SET_TABLE_SQL),
+        ])
+        .await?;
+        self.add_migration_columns().await
+    }
+
     /// Give an existing `schema_version` table spec 036's two columns.
     async fn add_migration_columns(&self) -> Result<(), Error> {
         let columns: Vec<ColumnRow> = self.query_consistent(COLUMNS_SQL, vec![]).await?;
@@ -336,7 +354,7 @@ impl StoreHandle {
     /// Only for versions this binary carries: a version above its last is one
     /// it knows nothing about, and inventing a checksum for it would make the
     /// next check pass on a fiction.
-    async fn record_missing_checksums(
+    pub(crate) async fn record_missing_checksums(
         &self,
         history: &[RecordedMigration],
         migrations: &[Migration],
@@ -399,7 +417,21 @@ pub fn check_checksums(
     Ok(())
 }
 
-fn validate_list(migrations: &[Migration]) -> Result<(), Error> {
+/// The statement that records `m` in `schema_version`, applied in the same
+/// `txn` as its DDL.
+pub(crate) fn record_statement(m: &Migration) -> Statement {
+    Statement::with_params(
+        RECORD_SQL,
+        vec![
+            Value::from(m.version),
+            Value::from(m.name.as_str()),
+            Value::from(m.checksum()),
+            Value::from(i64::from(m.additive)),
+        ],
+    )
+}
+
+pub(crate) fn validate_list(migrations: &[Migration]) -> Result<(), Error> {
     let mut last = BASELINE_VERSION;
     for m in migrations {
         if m.version == BASELINE_VERSION {

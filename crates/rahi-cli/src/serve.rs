@@ -334,7 +334,8 @@ pub async fn compose_parts<C: Cell>(
     env: &dyn EnvReader,
     streams: &StreamHub,
 ) -> Result<Composed> {
-    rahi_ops::migrate::check_current(&booted.store, C::migrations()).await?;
+    rahi_ops::migrate::check_current_sets(&booted.store, C::migrations(), &C::migration_sets())
+        .await?;
     let ledger = booted.ledger().await?;
     let kernel = Kernel::boot_with(
         booted.manifest.clone(),

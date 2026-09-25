@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 use rahi_types::{Config, Error, Result};
 
-use rahi_store::{Migration, RecordedMigration};
+use rahi_store::{Migration, MigrationSet, RecordedMigration, SetHistories, SetName};
 
 use crate::KeySet;
 use crate::archive::{self, APP_DIR, ArchiveManifest, KEYS_DIR, Part, RAUTHY_DIR};
@@ -258,17 +258,45 @@ pub fn check_compatible(
     parts: &[Part],
     cell: &Compatibility<'_>,
 ) -> Result<SchemaEvidence> {
-    let expected = crate::migrate::expected_version(cell.migrations);
-    let (history, evidence) = match &archive.schema {
-        Some(schema) => (schema.migrations.clone(), SchemaEvidence::Recorded),
-        None => (archived_history(parts)?, SchemaEvidence::ArchivedDatabase),
+    check_compatible_sets(archive, parts, cell, &[])
+}
+
+/// [`check_compatible`] for a cell with named migration sets (spec 046
+/// B-16, I-5): every set's archived history is checked against the cell's
+/// sets for checksum and the additive rule before the destination is
+/// replaced, and a set the archive carries that the cell does not is judged
+/// ahead from version 1. With no `schema` in `manifest.json`, the histories
+/// are read out of the archived database itself: a database with no
+/// `schema_set_version` table has provably applied no named set.
+///
+/// # Errors
+///
+/// As [`check_compatible`]; [`Error::Integrity`] when an archived checksum
+/// differs from this binary's in any set.
+pub fn check_compatible_sets(
+    archive: &ArchiveManifest,
+    parts: &[Part],
+    cell: &Compatibility<'_>,
+    sets: &[MigrationSet],
+) -> Result<SchemaEvidence> {
+    let (histories, evidence) = match &archive.schema {
+        Some(schema) => {
+            let mut histories: SetHistories = schema.sets.clone();
+            histories.insert(SetName::app(), schema.migrations.clone());
+            (histories, SchemaEvidence::Recorded)
+        }
+        None => (archived_histories(parts)?, SchemaEvidence::ArchivedDatabase),
     };
-    crate::migrate::check_ahead(&history, expected).map_err(|err| {
-        Error::Stale(format!(
+    crate::migrate::check_restorable(&histories, cell.migrations, sets).map_err(|err| {
+        let message = format!(
             "the archive cannot be restored into this binary: {} (judged on {})",
             err.message(),
             evidence.describe()
-        ))
+        );
+        match err {
+            Error::Integrity(_) => Error::Integrity(message),
+            _ => Error::Stale(message),
+        }
     })?;
     if archive.manifest_hash != cell.manifest_hash && !cell.adopt {
         return Err(Error::Stale(format!(
@@ -297,7 +325,7 @@ pub fn check_compatible(
 /// # Errors
 ///
 /// [`Error::Stale`] naming the evidence that could not be obtained.
-fn archived_history(parts: &[Part]) -> Result<Vec<RecordedMigration>> {
+fn archived_histories(parts: &[Part]) -> Result<SetHistories> {
     let app = parts.iter().find(|p| p.dir() == APP_DIR).ok_or_else(|| {
         Error::Stale(
             "the archive records no migration history and holds no app snapshot to read one \
@@ -328,11 +356,58 @@ fn archived_history(parts: &[Part]) -> Result<Vec<RecordedMigration>> {
             "its app snapshot is not a readable database ({err})"
         ))
     })?;
-    read_schema_version(&db).map_err(|err| {
+    let mut histories = read_set_versions(&db).map_err(|err| {
+        stale(&format!(
+            "its archived schema_set_version table cannot be read ({err})"
+        ))
+    })?;
+    let app = read_schema_version(&db).map_err(|err| {
         stale(&format!(
             "its archived schema_version table cannot be read ({err})"
         ))
-    })
+    })?;
+    histories.insert(SetName::app(), app);
+    Ok(histories)
+}
+
+/// Every named set's history out of an already opened archived database
+/// (spec 046 B-16). No `schema_set_version` table is evidence that no named
+/// set was ever applied, as no `schema_version` table is for `app`.
+fn read_set_versions(db: &rusqlite::Connection) -> rusqlite::Result<SetHistories> {
+    let present: i64 = db.query_row(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'schema_set_version'",
+        [],
+        |row| row.get(0),
+    )?;
+    let mut histories = SetHistories::new();
+    if present == 0 {
+        return Ok(histories);
+    }
+    let mut statement = db.prepare(
+        "SELECT set_name, version, name, checksum, additive FROM schema_set_version \
+         ORDER BY set_name, version",
+    )?;
+    let rows = statement.query_map([], |row| {
+        let set: String = row.get(0)?;
+        let version: i64 = row.get(1)?;
+        let name: String = row.get(2)?;
+        let checksum: String = row.get(3)?;
+        let additive: i64 = row.get(4)?;
+        Ok((set, version, name, checksum, additive))
+    })?;
+    for row in rows {
+        let (set, version, name, checksum, additive) = row?;
+        // A name outside the grammar is damage: the table cannot be read
+        // as evidence, so the restore is refused rather than the row lost.
+        let set = SetName::reference(set).map_err(|_| rusqlite::Error::InvalidQuery)?;
+        histories.entry(set).or_default().push(RecordedMigration {
+            version: u32::try_from(version).unwrap_or(u32::MAX),
+            name,
+            checksum: Some(checksum),
+            additive: Some(additive != 0),
+        });
+    }
+    Ok(histories)
 }
 
 /// `schema_version` out of an already opened archived database.
@@ -393,6 +468,22 @@ pub async fn run(
     key: &KeySource,
     cell: &Compatibility<'_>,
 ) -> Result<Outcome> {
+    run_sets(config, archive_path, key, cell, &[]).await
+}
+
+/// [`run`] for a cell with named migration sets (spec 046 B-16): the
+/// compatibility check is [`check_compatible_sets`].
+///
+/// # Errors
+///
+/// As [`run`].
+pub async fn run_sets(
+    config: &Config,
+    archive_path: &Path,
+    key: &KeySource,
+    cell: &Compatibility<'_>,
+    sets: &[MigrationSet],
+) -> Result<Outcome> {
     let name = archive_path
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
@@ -431,7 +522,7 @@ pub async fn run(
     // Spec 036 B-9: the compatibility questions are asked here, after the
     // archive has proved itself intact and before the first byte of the
     // volume is touched.
-    let evidence = check_compatible(&manifest, &parts, cell)?;
+    let evidence = check_compatible_sets(&manifest, &parts, cell, sets)?;
 
     let keys = KeySet::of(config);
     for part in parts.iter().filter(|p| p.dir() == KEYS_DIR) {

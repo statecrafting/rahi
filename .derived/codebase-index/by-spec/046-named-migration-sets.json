@@ -12,6 +12,10 @@
     ],
     "implementingPaths": [
       {
+        "path": "CHANGELOG.md",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-cli/src/cell.rs",
         "source": "spec-edge"
       },
@@ -20,7 +24,19 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-cli/src/serve.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-cli/src/verbs.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/tests/evolution.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/tests/obs.rs",
         "source": "spec-edge"
       },
       {
@@ -40,17 +56,53 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-ops/tests/evolution.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/tests/migration_sets.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-store/src/lib.rs",
         "source": "spec-edge"
       },
       {
         "path": "crates/rahi-store/src/migrate.rs",
         "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/src/migration_set.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/src/receipt.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/tests/migration_sets.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/tests/receipt.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/tests/receipt_recovery.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-store/tests/work.rs",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ops/tests/migration_sets.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -59,7 +111,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-store/src/migration_set.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -68,12 +124,29 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-store/tests/migration_sets.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
           "kind": "file",
           "path": "crates/rahi-store/tests/migration_sets.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "CHANGELOG.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "CHANGELOG.md"
         }
       },
       {
@@ -105,6 +178,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-cli/src/serve.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-cli/src/verbs.rs"
           }
         ],
@@ -113,6 +199,32 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-cli/src/verbs.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/tests/evolution.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/evolution.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/tests/obs.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/tests/obs.rs"
         }
       },
       {
@@ -170,6 +282,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-ops/tests/evolution.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/evolution.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-store/src/lib.rs"
           }
         ],
@@ -196,10 +321,62 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-store/src/receipt.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/receipt.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-store/tests/receipt.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/receipt.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-store/tests/receipt_recovery.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/receipt_recovery.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-store/tests/work.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/work.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-ops/src/migrate.rs",
             "span": {
-              "endLine": 139,
-              "startLine": 124
+              "endLine": 142,
+              "startLine": 127
             }
           }
         ],
@@ -215,8 +392,8 @@
           {
             "file": "crates/rahi-store/src/migrate.rs",
             "span": {
-              "endLine": 400,
-              "startLine": 378
+              "endLine": 418,
+              "startLine": 396
             }
           }
         ],
@@ -258,5 +435,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "3e665b7961e213270e729e257d275c46408fcce9e8fa0dc73e4cc0a0645d5037"
+  "shardHash": "a2a9b98e585e3c1d098c632d7ee888c265d14beab684c53081e7df902ef1713e"
 }
