@@ -101,6 +101,7 @@ async fn dispatch<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<i32> {
             Ok(0)
         }
         Verb::FirstBoot { export: false } => first_boot::<C>(env).await.map(|()| 0),
+        Verb::UpgradeCache { backup } => upgrade_cache(backup, env).await.map(|()| 0),
         other => verbs_030::<C>(other, env).await.map(|()| 0),
     }
 }
@@ -122,6 +123,39 @@ async fn first_boot<C: Cell>(env: &dyn EnvReader) -> Result<()> {
                 }
             );
         }
+    }
+    Ok(())
+}
+
+/// Spec 043 B-4 and B-5a: the cache transition, or its abort.
+async fn upgrade_cache(backup: Option<std::path::PathBuf>, env: &dyn EnvReader) -> Result<()> {
+    use rahi_ops::upgrade::{self, NoFaults, Outcome};
+    let config = rahi_types::Config::from_env(env)?;
+    let outcome = match backup {
+        Some(archive) => {
+            println!("{}", upgrade::PRECONDITIONS);
+            upgrade::run(&config, env, &archive, &NoFaults).await?
+        }
+        None => upgrade::abort(&config, &NoFaults)?,
+    };
+    match outcome {
+        Outcome::Floored { id, instant } => println!(
+            "upgrade-cache: transition {id} is floored at {instant}; every bearer token issued \
+             at or before it is refused. Start the new image: supervise lets Rauthy move its \
+             own cache, and serve completes the transition"
+        ),
+        Outcome::Already { phase } => println!(
+            "upgrade-cache: the transition is at `{}`; nothing to do",
+            phase.name()
+        ),
+        Outcome::Nothing(why) => println!("upgrade-cache: {why}; nothing to do"),
+        Outcome::Aborted { id } => println!(
+            "upgrade-cache: transition {id} aborted; the pre-043 layout's operational data is \
+             back and the old image starts as before. Left in place: upgrade-cache.json (as \
+             history), {}/ with its evidence, cell.lock, transition.lock, rauthy-env/, and \
+             changed directory timestamps (spec 043 B-5a)",
+            upgrade::WORK_DIR
+        ),
     }
     Ok(())
 }
@@ -185,7 +219,11 @@ async fn supervise<C: Cell>(env: &dyn EnvReader) -> Result<i32> {
 /// The verbs of spec 030.
 async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
     match verb {
-        Verb::Help | Verb::Version | Verb::Supervise | Verb::FirstBoot { .. } => Ok(()),
+        Verb::Help
+        | Verb::Version
+        | Verb::Supervise
+        | Verb::FirstBoot { .. }
+        | Verb::UpgradeCache { .. } => Ok(()),
         Verb::Serve => serve::serve::<C>(env).await,
         Verb::Preflight => {
             let report = rahi_ops::preflight::run(env, C::manifest()).await;

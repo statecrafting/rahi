@@ -1407,7 +1407,8 @@ fn every_verb_locks_before_it_reads_opens_or_spawns() {
         .unwrap()
         .map(|e| e.unwrap().file_name())
         .collect::<BTreeSet<_>>();
-    for verb in VERBS {
+    // Spec 043's verb is parsed before 030 B-1 names it (043 D-19).
+    for verb in VERBS.iter().copied().chain(["upgrade-cache"]) {
         let argv = argv_of(verb, data);
         let args: Vec<&str> = argv.iter().map(String::as_str).collect();
         let mut cmd = Command::new(env!("CARGO_BIN_EXE_rahi"));

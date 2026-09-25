@@ -477,6 +477,33 @@ impl StoreHandle {
         Ok((count(jti), count(sub)))
     }
 
+    /// T3 of spec 043 B-4, in one `txn`: upsert the transition row at
+    /// `floored` and raise the floor to `instant`, which only rises.
+    ///
+    /// # Errors
+    ///
+    /// The mapped store error when the transaction fails.
+    pub async fn record_transition_floor(&self, id: &str, instant: u64) -> Result<(), Error> {
+        let at = sql_seconds(instant)?;
+        self.txn(vec![
+            Statement {
+                sql: "INSERT INTO rahi_upgrade_transition (id, instant, state) \
+                      VALUES (?1, ?2, 'floored') \
+                      ON CONFLICT(id) DO UPDATE SET state = 'floored'"
+                    .to_owned(),
+                params: vec![Value::from(id.to_owned()), Value::from(at)],
+            },
+            Statement {
+                sql: "INSERT INTO rahi_revocation_floor (id, before) VALUES ('default', ?1) \
+                      ON CONFLICT(id) DO UPDATE SET before = MAX(before, excluded.before)"
+                    .to_owned(),
+                params: vec![Value::from(at)],
+            },
+        ])
+        .await
+        .map(|_| ())
+    }
+
     /// Whether this node currently leads the SQL group. An attached handle
     /// asks the cluster's metrics, because a remote client leads nothing.
     pub async fn is_leader(&self) -> bool {

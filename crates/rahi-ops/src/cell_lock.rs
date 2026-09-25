@@ -317,7 +317,7 @@ pub fn inspect_supervisor_fence(config: &Config) -> Result<SupervisorFence> {
 }
 
 /// The names in `dir`, relative to it and sorted; none when it is absent.
-fn list(dir: &Path) -> Result<Vec<PathBuf>> {
+pub(crate) fn list(dir: &Path) -> Result<Vec<PathBuf>> {
     let entries = match std::fs::read_dir(dir) {
         Ok(entries) => entries,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
@@ -645,7 +645,12 @@ pub fn gate_with_env(
         supervisor_fence,
         fenced,
     };
-    for entry in gate.debris() {
+    let debris: &[PathBuf] = if entry.needs_fence() {
+        gate.debris()
+    } else {
+        &[]
+    };
+    for entry in debris {
         eprintln!(
             "{}: debris beside the fence at {} is left in place (spec 043 B-4a)",
             gate.entry.name(),

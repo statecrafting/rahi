@@ -1132,6 +1132,31 @@ None remains open: D-7 to D-13 record the owner's approval and choices.
   change under this spec's amending edges, and their assertions about
   what is refused are kept.
 
+- **D-19 (2026-09-25, build decisions and one held item; the verb).**
+  (a) **Held for the owner: the verb's place in 030's argv list.** B-4
+  names `rahi upgrade-cache --backup <archive>` and step 6 of the delivery
+  plan puts it in 030's `VERBS`. 030 AC-2's test derives the required
+  verb set from 030 B-1's argv list and the corpus lifecycle, and requires
+  `VERBS` and `--help` to equal it exactly; B-1 names no `upgrade-cache`,
+  and adding an entry there is an amendment of 030's text, as 030 D-9 was
+  for 042's verb (an owner decision). No mechanism satisfies both: in
+  `VERBS` it fails 030 AC-2, and B-1 is not this build's to edit. So the
+  parser accepts `upgrade-cache --backup <archive>` and `upgrade-cache
+  --abort`, and the verb stays out of `VERBS` and the usage until an owner
+  amendment adds ``upgrade-cache --backup <archive>` (043)`` to 030 B-1;
+  FR-008's enumeration test runs it beside `VERBS` meanwhile. (b) T3's
+  fault point follows the node's shutdown: an injected fault in the
+  verb's own process cannot release hiqlite's owner lock as a real crash
+  does, and the floor's `txn` is idempotent, so a rerun after either is
+  the same T3. The node killed while open (AC-4's `flooring` state) is a
+  live-workflow leg. (c) The library tests make the legacy store with
+  this build's hiqlite at the legacy path and simulate a pre-043 clean
+  stop (the WAL checkpointed, `-wal` and `-shm` removed), since in one
+  process hiqlite's connections outlive `shutdown`; the real v0.2.0
+  interleavings stay the live workflow's (FR-010, FR-012). (d) The gate
+  reports debris only for entry points that start on the fence; for the
+  verb, the legacy path's contents are the plan, not debris.
+
 ### 7.1 Proposals (2026-09-23)
 
 - **P-6 (withdrawn 2026-09-23, after independent review).** An earlier

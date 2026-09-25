@@ -78,6 +78,13 @@ pub enum Verb {
         /// The archive holding the sealed segment bodies.
         archive: PathBuf,
     },
+    /// Spec 043 B-4: `upgrade-cache --backup <archive>`, or `--abort`
+    /// (B-5a). Parsed, and outside [`VERBS`] and the usage until spec 030
+    /// B-1's argv list names it (043 D-19).
+    UpgradeCache {
+        /// The verified pre-upgrade archive; `None` with `--abort`.
+        backup: Option<PathBuf>,
+    },
     /// Spec 031.
     Supervise,
     /// Spec 031; `export` is `--export` (spec 032 B-2).
@@ -188,6 +195,17 @@ where
             _ => Err(unexpected(verb, &rest)),
         },
         "restore" => restore_flags(&rest),
+        "upgrade-cache" => match rest.as_slice() {
+            ["--backup", archive] => Ok(Verb::UpgradeCache {
+                backup: Some(PathBuf::from(archive)),
+            }),
+            ["--abort"] => Ok(Verb::UpgradeCache { backup: None }),
+            _ => Err(Error::Validation(
+                "upgrade-cache needs --backup <archive> (a verified pre-upgrade archive) or \
+                 --abort"
+                    .to_owned(),
+            )),
+        },
         "ledger" => match rest.as_slice() {
             ["verify"] => Ok(Verb::LedgerVerify { full: false }),
             ["verify", "--full"] => Ok(Verb::LedgerVerify { full: true }),
