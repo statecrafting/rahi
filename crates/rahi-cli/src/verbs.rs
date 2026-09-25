@@ -38,6 +38,8 @@ pub enum Verb {
         /// Adopt the booted manifest: append a transition when it differs
         /// from the chain's current one (spec 036 B-3).
         adopt_manifest: bool,
+        /// Print the cross-set plan and apply nothing (spec 046 B-7).
+        plan: bool,
     },
     /// B-5; `to` is `--to`, a directory or `s3://bucket/prefix`.
     Backup {
@@ -106,7 +108,7 @@ pub fn usage() -> String {
             "check the deployment by name; exit 1 on any failure; never mutates",
         ),
         (
-            "migrate [--backup] [--adopt-manifest]",
+            "migrate [--backup] [--adopt-manifest] [--plan]",
             "apply the cell's migrations on the leader, and adopt its manifest (036)",
         ),
         (
@@ -208,20 +210,31 @@ where
     }
 }
 
-/// `migrate [--backup] [--adopt-manifest]`, in either order (spec 036 B-3).
+/// `migrate [--backup] [--adopt-manifest] [--plan]`, in any order (spec
+/// 036 B-3, spec 046 B-7). `--plan` applies nothing, so it takes neither
+/// of the others.
 fn migrate_flags(rest: &[&str]) -> Result<Verb> {
     let mut backup = false;
     let mut adopt_manifest = false;
+    let mut plan = false;
     for arg in rest {
         match *arg {
             "--backup" if !backup => backup = true,
             "--adopt-manifest" if !adopt_manifest => adopt_manifest = true,
+            "--plan" if !plan => plan = true,
             _ => return Err(unexpected("migrate", rest)),
         }
+    }
+    if plan && (backup || adopt_manifest) {
+        return Err(Error::Validation(
+            "migrate --plan applies nothing, so it takes neither --backup nor --adopt-manifest"
+                .to_owned(),
+        ));
     }
     Ok(Verb::Migrate {
         backup,
         adopt_manifest,
+        plan,
     })
 }
 

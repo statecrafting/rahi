@@ -10,13 +10,13 @@ use std::time::Duration;
 
 use rahi_store::{
     ContentDigest, DeadFilter, Page, ProcessingKey, ReceiptKey, ReceiptMeta, Receipts, RetryPolicy,
-    StoreHandle, TxnBuilder, Work, coordination_migration, receipt_migration,
+    StoreHandle, TxnBuilder, Work, coordination_set, receipt_set,
 };
 use rahi_types::{Error, UnixSeconds};
 
 async fn migrated(store: &StoreHandle) {
     store
-        .migrate(&[coordination_migration(1), receipt_migration(2)])
+        .migrate_sets(&[], &[coordination_set(), receipt_set()])
         .await
         .unwrap();
 }

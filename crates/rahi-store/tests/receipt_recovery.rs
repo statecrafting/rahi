@@ -16,7 +16,7 @@ use std::time::Duration;
 use rahi_store::{
     Classification, ContentDigest, DeadFilter, Envelope, LEASE_TTL_SECONDS, Outbox, Page,
     ProcessingKey, ReceiptKey, ReceiptMeta, Receipts, RetryPolicy, Store, StoreHandle, TxnBuilder,
-    Value, Work, coordination_migration, receipt_migration,
+    Value, Work, coordination_set, receipt_set,
 };
 use rahi_types::{Error, Revision, UnixSeconds};
 use serde::Deserialize;
@@ -27,7 +27,7 @@ fn now(secs: u64) -> UnixSeconds {
 
 async fn migrated(store: &StoreHandle) {
     store
-        .migrate(&[coordination_migration(1), receipt_migration(2)])
+        .migrate_sets(&[], &[coordination_set(), receipt_set()])
         .await
         .unwrap();
 }

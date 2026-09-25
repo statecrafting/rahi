@@ -18,7 +18,7 @@ use rahi_edge::{AppState, Edge, EdgeError};
 use rahi_kernel::{CapabilityKind, Governed};
 use rahi_store::{
     ContentDigest, ProcessingKey, ReceiptKey, ReceiptMeta, Receipts, TxnBuilder, Work,
-    receipt_migration,
+    coordination_set, receipt_set,
 };
 use rahi_types::Sub;
 
@@ -338,7 +338,7 @@ async fn rahi_work_items_is_redacted() {
     let obs = observability();
     let cell = boot("https://cell.example.com").await;
     cell.store
-        .migrate(&[receipt_migration(1)])
+        .migrate_sets(&[], &[coordination_set(), receipt_set()])
         .await
         .expect("the receipt tables migrate");
 

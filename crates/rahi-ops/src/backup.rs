@@ -131,12 +131,22 @@ pub async fn gather(
     // Spec 036 B-9: the archive records what the store had applied, with each
     // migration's own declaration, because a version above the restoring
     // binary's last is one that binary knows nothing about.
-    let history = store.handle().recorded_migrations().await?;
+    // Spec 046 B-14: every named set's history travels too; `app` stays in
+    // `version` and `migrations`, and an archive with no named set writes no
+    // `sets` key and keeps format 1.
+    let mut histories = store.handle().recorded_set_migrations().await?;
+    let history = histories
+        .remove(&rahi_store::SetName::app())
+        .unwrap_or_default();
     let schema = Some(ArchiveSchema {
         version: history
             .last()
             .map_or(rahi_store::migrate::BASELINE_VERSION, |row| row.version),
         migrations: history,
+        sets: histories
+            .into_iter()
+            .filter(|(_, rows)| !rows.is_empty())
+            .collect(),
     });
     let manifest = ArchiveManifest::over(&parts, created, manifest_hash.to_owned(), schema);
     manifest.check_complete()?;

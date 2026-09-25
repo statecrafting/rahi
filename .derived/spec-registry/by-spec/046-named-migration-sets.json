@@ -21,18 +21,15 @@
     "establishes": [
       {
         "kind": "file",
-        "path": "crates/rahi-store/src/migration_set.rs",
-        "planned": true
+        "path": "crates/rahi-store/src/migration_set.rs"
       },
       {
         "kind": "file",
-        "path": "crates/rahi-store/tests/migration_sets.rs",
-        "planned": true
+        "path": "crates/rahi-store/tests/migration_sets.rs"
       },
       {
         "kind": "file",
-        "path": "crates/rahi-ops/tests/migration_sets.rs",
-        "planned": true
+        "path": "crates/rahi-ops/tests/migration_sets.rs"
       }
     ],
     "extends": [
@@ -107,13 +104,85 @@
           "kind": "file",
           "path": "crates/rahi-ops/src/restore.rs"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "036-manifest-and-schema-evolution",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/evolution.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "036-manifest-and-schema-evolution",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/evolution.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "039-release-and-out-of-tree-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "CHANGELOG.md"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "045-store-receipts-and-work-claims",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/receipt.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "045-store-receipts-and-work-claims",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/receipt.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "045-store-receipts-and-work-claims",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/work.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "045-store-receipts-and-work-claims",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/tests/receipt_recovery.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "023-observability",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/tests/obs.rs"
+        }
       }
     ],
     "extraFrontmatter": {
       "wave": 3
     },
     "id": "046-named-migration-sets",
-    "implementation": "pending",
+    "implementation": "complete",
     "kind": "kernel",
     "obligations": [
       {
@@ -193,7 +262,7 @@
     ],
     "risk": "critical",
     "sectionDigests": {
-      "046-named-migration-sets": "740f0ddbd672f4fcff353c657419f1560748e6f1da9328c9d568b23b5602dc00",
+      "046-named-migration-sets": "acb966b40d4ecbffda542f32f4fe3ed81ae00a12927424cdb617e45ce96bbf28",
       "1-purpose": "adad525a7d6e7ca3cb2b1ab77cb37ef38aa7a9d4b275d422e7a55622b20658c1",
       "2-1-what-is-new": "af73751b12dc331ef5e7d8b724b6f1d80d27dab92d400838ca8dbe5a8ecb54b1",
       "2-2-what-is-extended": "946212700d9b27bd3cb7107c48740f5e11ca574c284546f106b02ab8a56d1020",
@@ -209,8 +278,8 @@
       "4-functional-requirements": "5c07b7315eae5ef1494dbb0bee036472997c2c5344b7fb8f4b9094e6a429e1b7",
       "5-acceptance-criteria": "fc0a53f24a74f0a88b0149efab1adddabb667dffb6be059cd32c9ef86e4481e7",
       "6-out-of-scope": "bc6b433bc79838a2ca29bc18e6407047efecacc85b9e13e39ba545db92e0065c",
-      "7-resolved-decisions": "3552427393300a65067893adef063493bf5e962526d1f6252e6cd211dc56537b",
-      "verification": "b68f3c5acc4c8ad9bc07e96faf93e2fad705733777d3707767bf151914f03b66"
+      "7-resolved-decisions": "92af6ded8ae739df07d2a02a4803bac26fad8826052d84e10d78eeb416f8c17d",
+      "verification": "f3aa06cd5be369156c743886f89cf7a293e91f6459043a09038cd90c1d32aef7"
     },
     "sectionHeadings": [
       "046: Named migration sets",
@@ -237,6 +306,6 @@
     "summary": "A store today has one migration sequence, owned by the cell. A library linked into a cell (aicortex inside travel-memory) numbers its own migrations from 1, and so do the chassis's own tables (coordination_migration, 045's receipts), so the host must renumber everyone into its list and every renumbering is a checksum nobody else can reproduce. This spec gives each linked library a named migration set: the store records version, checksum, and the additive declaration per (set, version); migrate plans across sets with declared minimum-version requirements between them; serve, backup, and restore apply 036's checksum-first and additive rules per set. A store written before this spec keeps its schema_version rows byte for byte as the implicit set app. 045's receipt_migration becomes the chassis set rahi.receipts.\n",
     "title": "Named migration sets: a linked library brings its own versioned, checksummed migration sequence, and never renumbers into the host's"
   },
-  "shardHash": "05a5e86a7619f8080b27ef5f7ca26f710b6a512551f5678d21527e351de97e74",
+  "shardHash": "64a735f1154e1593f2c0ee9c283e4805d82e94da52a020a09dfb351027f81fd7",
   "specVersion": "1.8.0"
 }

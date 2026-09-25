@@ -8,13 +8,13 @@ mod common;
 
 use rahi_store::{
     Classification, ContentDigest, EraseScope, ReceiptKey, ReceiptMeta, Receipts, Statement,
-    StoreHandle, TxnBuilder, Value, coordination_migration, receipt_migration,
+    StoreHandle, TxnBuilder, Value, coordination_set, receipt_set,
 };
 use rahi_types::{Error, UnixSeconds};
 
 async fn migrated(store: &StoreHandle) {
     store
-        .migrate(&[coordination_migration(1), receipt_migration(2)])
+        .migrate_sets(&[], &[coordination_set(), receipt_set()])
         .await
         .unwrap();
 }
