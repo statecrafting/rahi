@@ -14,28 +14,23 @@
     "establishes": [
       {
         "kind": "file",
-        "path": "crates/rahi-store/src/receipt.rs",
-        "planned": true
+        "path": "crates/rahi-store/src/receipt.rs"
       },
       {
         "kind": "file",
-        "path": "crates/rahi-store/src/work.rs",
-        "planned": true
+        "path": "crates/rahi-store/src/work.rs"
       },
       {
         "kind": "file",
-        "path": "crates/rahi-store/tests/receipt.rs",
-        "planned": true
+        "path": "crates/rahi-store/tests/receipt.rs"
       },
       {
         "kind": "file",
-        "path": "crates/rahi-store/tests/work.rs",
-        "planned": true
+        "path": "crates/rahi-store/tests/work.rs"
       },
       {
         "kind": "file",
-        "path": "crates/rahi-store/tests/receipt_recovery.rs",
-        "planned": true
+        "path": "crates/rahi-store/tests/receipt_recovery.rs"
       }
     ],
     "extends": [
@@ -49,10 +44,26 @@
       },
       {
         "nature": "additive",
+        "spec": "011-store-hiqlite",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/error.rs"
+        }
+      },
+      {
+        "nature": "additive",
         "spec": "023-observability",
         "unit": {
           "kind": "file",
           "path": "crates/rahi-edge/src/obs/metrics.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "023-observability",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/tests/obs.rs"
         }
       }
     ],
@@ -60,7 +71,7 @@
       "wave": 3
     },
     "id": "045-store-receipts-and-work-claims",
-    "implementation": "pending",
+    "implementation": "in-progress",
     "kind": "kernel",
     "obligations": [
       {
@@ -151,7 +162,7 @@
     ],
     "risk": "critical",
     "sectionDigests": {
-      "045-receipts-and-work-claims": "b320f5e8daada2f1f4b106cd81ee53c84be53927d2d643a174cf78b3154fd6de",
+      "045-receipts-and-work-claims": "344b1e335f4fbab96fc33cac852377992acd0e7c7fb306f51918ba8a713928bf",
       "1-purpose": "de834dbd9e60931e67e86529da00428058eef4633785769804373bca7a9a2de6",
       "2-1-what-is-new": "fafe8fd5be300c4a5d7db4a1c29c8bc8f646f1499ee1ac532812ef912b0e53a3",
       "2-2-what-is-reused-unchanged": "e36aa5629e52f56f5020361e74642e0fe20a86e08c059d8f03f058e1ad21ad64",
@@ -168,7 +179,7 @@
       "4-functional-requirements": "67d273e09e5c697861a119f0f050ef8eead80682b2cea85e4df02e9cf031fdad",
       "5-acceptance-criteria": "52ff10e95517efbe97f52e2a1869b449c8c872d26e7ae4c0b4cca7ae91855160",
       "6-out-of-scope": "7ef7a59127548826a1c36804f26fa18553e1415c17aeb4f3f0052685dd69b6b3",
-      "7-resolved-decisions": "c5be9de009b307bfafdf43f9cd6e7675177040f59b7c4b1df8c724d338df2c44",
+      "7-resolved-decisions": "01a3165085971919845d6183c4122e7aef5c48058793f9aa6da2c3fb9bc15ec1",
       "follow-up-statecraft-platform-s-sc-idempotency": "c8c46ebbfea97948329a14d0e943b2499710c2f1eb11eecd3ab89b94c92bd240",
       "verification": "94d1d281391e45249003a757a241a639fe848ecdc64eefecd4f7ae55ece10ad0"
     },
@@ -199,6 +210,6 @@
     "summary": "Every product that ingests from an outside source rebuilds the same table: a key, a body digest, the first outcome, and a rule for a repeat (statecraft-platform's `sc_idempotency`; aicortex's work-claim rows over the Lease and the Outbox). This spec puts one primitive in rahi-store. A receipt names an inbound item by tenant, source namespace, and external key (or a synthetic key when the source has none) and records a digest of its content; classification distinguishes first seen, exact redelivery, changed content under the same key (recorded as a new revision or a collision, never dropped), and erased. Receipt rows stage into the caller's TxnBuilder beside the domain writes and Outbox::stage. Processing is identified separately (receipt revision plus processor and its policy revision) so a correction or a new policy reprocesses. Work is reserved under the existing Lease into a fenced claim row with attempt history, bounded retry, a visible dead-letter state, and reclaim after expiry; queue counts reach /metrics redacted. Retention compacts to a tombstone, erasure keeps only the key digest and is never undone, and a crash-point table states recovery at every boundary. Owner decisions of 2026-09-24 are recorded.\n",
     "title": "Receipts and work claims: an inbound item is recorded once per content revision, processed once per processor revision, and never silently dropped"
   },
-  "shardHash": "4095d8cfe80881201971700d5f1f3cb8bc6f3a22a86e42cbc521491104e57410",
+  "shardHash": "2a54736fd9a8f0a75c65360fe7b33e9b7cbc6d493be7d440ad696395097dbb0b",
   "specVersion": "1.8.0"
 }

@@ -6,7 +6,7 @@ kind: kernel
 domain: store
 created: "2026-09-24"
 authors: ["Bartek Kus"]
-implementation: pending
+implementation: in-progress
 risk: critical
 wave: 3
 depends_on:
@@ -15,14 +15,16 @@ depends_on:
   - "023-observability"
   - "036-manifest-and-schema-evolution"
 establishes:
-  - { kind: file, path: "crates/rahi-store/src/receipt.rs", planned: true }
-  - { kind: file, path: "crates/rahi-store/src/work.rs", planned: true }
-  - { kind: file, path: "crates/rahi-store/tests/receipt.rs", planned: true }
-  - { kind: file, path: "crates/rahi-store/tests/work.rs", planned: true }
-  - { kind: file, path: "crates/rahi-store/tests/receipt_recovery.rs", planned: true }
+  - { kind: file, path: "crates/rahi-store/src/receipt.rs" }
+  - { kind: file, path: "crates/rahi-store/src/work.rs" }
+  - { kind: file, path: "crates/rahi-store/tests/receipt.rs" }
+  - { kind: file, path: "crates/rahi-store/tests/work.rs" }
+  - { kind: file, path: "crates/rahi-store/tests/receipt_recovery.rs" }
 extends:
   - { spec: "011-store-hiqlite", unit: "crates/rahi-store/src/lib.rs", nature: additive }
+  - { spec: "011-store-hiqlite", unit: "crates/rahi-store/src/error.rs", nature: additive }
   - { spec: "023-observability", unit: "crates/rahi-edge/src/obs/metrics.rs", nature: additive }
+  - { spec: "023-observability", unit: "crates/rahi-edge/tests/obs.rs", nature: additive }
 refines:
   - { aspect: "a work claim that outlives the lease TTL is a chassis row created and renewed under a short-held lease and fenced by its own token (012 D-10)", unit: { kind: symbol, id: "rahi_store::lock::Lease" } }
 references:
@@ -568,6 +570,56 @@ directory, and asserts the stated end state.
   `approved`; `implementation` stays `pending` until a session builds it.
   D-1's sentence that approval is a separate human act is kept as the
   record of the draft; this entry is that act.
+- **D-16 (2026-09-24, build session).** `crates/rahi-store/src/error.rs`'s
+  `map` classified only hiqlite's own `H::ConstraintViolation` as
+  `Error::Conflict`; a constraint violation raised inside a `txn` batch
+  (012 D-3's `NOT NULL` guard technique, and a bare primary-key collision
+  alike) surfaces as `H::Transaction` instead, which fell through to
+  `Error::Validation`. That contradicts FR-002 and FR-005's `Error::Conflict`
+  and the function's own stated rule ("a constraint is Conflict"); spec
+  011's `tests/txn.rs` already hedges the exact ambiguity
+  (`Error::Conflict(_) | Error::Validation(_)`). Fixed additively (extends
+  edge above, spec 011): an `H::Transaction` whose message names a SQL
+  constraint failure now also maps to `Error::Conflict`. No text of spec 011
+  or 012 states the narrower mapping, so nothing shipped is contradicted.
+  `Receipts::stage_first` was rewritten to match: it seeds the head row at
+  revision 0 (`SEED_HEAD`, `ON CONFLICT DO NOTHING`, which never raises) and
+  then applies the same CAS `stage_revision` uses, rather than leaning on
+  the primary key's own collision.
+- **D-17 (2026-09-24, build session).** B-14 describes the claim `UPDATE`
+  and the attempt row's `INSERT` together, but `fenced_txn`'s
+  `Statement::fenced` accepts only `UPDATE` and `DELETE` (an `INSERT` has no
+  row to compare a token against, per its own doc comment), so the two
+  cannot be one `fenced_txn` call. `Work::reserve` and `Work::next` submit
+  the claim through `fenced_txn` (minting the row's fence from the lease's
+  own token, matching `tests/lock.rs`'s "the row records the lease that
+  wrote it"), then open the attempt row through a plain `StoreHandle::txn`,
+  stamped with the same token, exactly as `Statement::fenced`'s
+  documentation prescribes for an insert under a lease. This is two Raft
+  entries, not the one B-14a's "three round trips" implies for "the fenced
+  write"; the crash-point table's row 4 names the state after `reserve`
+  returns, not a crash between its two writes, so the two-write shape holds
+  the table's assertion without a hand-fenced single batch.
+- **D-18 (2026-09-24, build session).** B-19 fixes `Work::sweep`'s signature
+  at four arguments with no retry policy, yet B-16's last sentence requires
+  a chain of pure expiries (no explicit `Work::fail`) to also reach `dead`
+  once its budget is spent, and neither `Work::reserve`, `Work::next`, nor
+  B-19's literal signature carries one. `Work::sweep` takes `&RetryPolicy`
+  as a fifth argument so its own reclaim step can apply the same ceiling
+  `Work::fail` applies explicitly.
+- **D-19 (2026-09-24, build session).** B-19 says the sweep acts "through
+  fenced_txn". Most of the rows a sweep touches (`rahi_receipt`,
+  `rahi_receipt_head`, `rahi_processing_attempt`) carry no `fence` column at
+  all, so `fenced_txn`'s automatic per-statement rewrite fails them outright
+  ("no such column: fence"); the one table that does, `rahi_processing`,
+  would have that column stamped from the sweep's own lease
+  (`rahi.work.sweep/<namespace>`), a different lease key with an unrelated
+  token sequence from the reservation queue's (`rahi.work/<namespace>/
+  <processor>`), so comparing a row's existing fence against it is not a
+  meaningful check. `Work::sweep` holds the lease for mutual exclusion
+  among concurrent sweepers and writes every chunk through a plain `txn`;
+  row 9 of the crash-point table (no half-applied chunk) holds regardless,
+  since each chunk is still one Raft entry.
 
 ### Follow-up: statecraft-platform's `sc_idempotency`
 

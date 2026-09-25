@@ -41,9 +41,11 @@ pub mod migrate;
 pub mod notify;
 pub mod outbox;
 pub mod query;
+pub mod receipt;
 pub mod store;
 pub mod txn;
 pub mod watermark;
+pub mod work;
 
 pub use backup::{BackupId, BackupListing};
 pub use blob::{Blob, DEFAULT_PAGE_ROWS, EXTENSIONS, EngineReport, MAX_VALUE_BYTES};
@@ -53,9 +55,17 @@ pub use migrate::{Migration, MigrationReport, RecordedMigration, check_checksums
 pub use notify::{Envelope, Listen, Notify};
 pub use outbox::{OUTBOX_TABLE_SQL, Outbox, TxnBuilder};
 pub use query::{Page, Value};
+pub use receipt::{
+    Changed, Classification, ContentDigest, EraseScope, ReceiptKey, ReceiptMeta, ReceiptRevision,
+    Receipts, receipt_migration,
+};
 pub use store::{Cache, Store, StoreHandle};
 pub use txn::{ExecuteResult, Statement};
 pub use watermark::Watermark;
+pub use work::{
+    AttemptRecord, Claim, DeadFilter, DeadItem, FailureDetail, ProcessingKey, QueueCounts,
+    RetryPolicy, SweepReport, Work,
+};
 
 /// The coordination plane's own DDL, as one migration for the app's list.
 ///
