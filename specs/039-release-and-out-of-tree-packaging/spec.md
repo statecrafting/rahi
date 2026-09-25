@@ -584,6 +584,29 @@ RH-05 and RH-06 of the revision-3 register), and approved the spec on
   and AC-2 names those two images. That remains the owner action D-12
   records.
 
+- **D-18 (2026-09-25, release coordination under B-1 and B-2; the 0.3.0
+  release, granted by the owner's work order of 2026-09-25).** 0.3.0
+  carries 038, 045 and 046. All nine versions and internal requirements
+  move to 0.3.0, and `deploy/k8s/kustomization.yaml` moves its `newTag` to
+  `0.3.0`: it still named `0.1.0`, which B-3's "names a version" permits
+  but which pointed a fresh deployment at an image two releases old. The
+  0.3.0 changelog section also records 038, which merged after `v0.2.0`
+  and had been left out of the drafted section.
+
+  Unlike 0.2.0 (D-16), the release lands as one pull request, and the tag
+  names its squash merge directly. The repository allows squash merges
+  only, so the tested pull-request tree becomes one `main` commit with the
+  same tree, and the `ci` run on that commit passes before the tag is
+  created: B-2's "a `main` commit whose `make ci` passed" is met by the
+  tagged commit itself, with no record-only commit between the tested tree
+  and the tag. The record therefore names the tested revision as "the
+  commit the tag names" rather than by hash, because a commit cannot
+  contain its own hash; the hash is stated in the annotated tag's message
+  and the release notes. Rejected: D-16's second commit, which makes the
+  tagged tree differ from the tested one by a paragraph and costs a second
+  full CI cycle for no additional evidence; and recording the hash after
+  the tag, which D-16 already rejected.
+
 ## Verification
 
 ```verify:cli

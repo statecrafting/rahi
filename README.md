@@ -15,14 +15,13 @@ the chassis; it never forks it.
 The name is the lineage: enrahitu was Encore, Rauthy, Hiqlite, Turso. Drop
 Encore and Turso and what remains is what this is.
 
-## Status: v0.2.0 release candidate, recovery exercised at N=1
+## Status: v0.3.0, recovery exercised at N=1
 
 This repository is a specification corpus, the harness that builds it, and
 the code it specifies. Spec ordinals are the build order, and each spec is
-bounded to one driven session's territory. Spec 036 was approved on
-2026-09-17 and is now `implementation: complete`, as are 037 and 042. Spec
-038 is approved and `implementation: pending`: schedulable, not yet built.
-Specs 040 and 041 remain `status: draft`: proposals from the consumer
+bounded to one driven session's territory. Specs 036, 037, 038, 042,
+045 and 046 are `implementation: complete`; spec 043 (the patched hiqlite
+and rauthy adoption) is approved and not yet built. Specs 040 and 041 remain `status: draft`: proposals from the consumer
 contract below that schedule nothing until a human approves them. Nine crates and the reference app exist
 (`rahi-types`, `rahi-store`, `rahi-ledger`, `rahi-kernel`, `rahi-edge`,
 `rahi-idp`, `rahi-ops`, `rahi-cli`, `rahi-harness`, and `apps/hello-cell`),
@@ -34,11 +33,11 @@ Implementation, publication, and operational proof are separate:
 | | State |
 |---|---|
 | Implemented | `spec-spine registry list` reports each spec's lifecycle. A complete implementation does not imply every deployment procedure was exercised: the N=3 rollout check remains recorded rather than run (032 D-1). |
-| Released or installable | [v0.1.0](https://github.com/statecrafting/rahi/releases/tag/v0.1.0) published all nine chassis crates (039 D-12). The workspace now prepares 0.2.0 to deliver completed 037; it is not yet published. The [release proposal](CHANGELOG.md#020-release-candidate-not-published) names upgrade limits and pending tag, registry, and image checks. Consumers need the actual candidate revision until publication. |
+| Released or installable | [v0.1.0](https://github.com/statecrafting/rahi/releases/tag/v0.1.0) and [v0.2.0](https://github.com/statecrafting/rahi/releases/tag/v0.2.0) published all nine chassis crates. 0.3.0 adds specs 038, 045 and 046; the [release record](CHANGELOG.md#030-released-2026-09-25) names what changed and what its tag had not yet proven, and the release notes record registry and image publication. |
 | Exercised against the pinned rauthy | spec 037's `live.yml` runs the whole suite against rauthy 0.36.2 pinned by digest, with gated skips refused. The proof covers login, audience and scope enforcement, fresh backups, restart, and restore with the original user, note, and ledger head. See spec 037's Status for the passing run and revision. |
 | Supported topology | N=1. Three replicas have run only as three processes on one host, without rauthy, in spec 035's test, which CI runs: each replica mints its own decision ids and none of thirty concurrent denials is lost. N=3 on Kubernetes has never run. |
 
-The 0.2.0 candidate changes recovery compatibility: new key sets contain an
+The 0.2.0 release changed recovery compatibility: new key sets contain an
 origin-bound backup passkey; old sets are not automatically upgraded and
 backups refuse without it. It **does** prevent duplicate ledger IDs after
 sealing, by spec 042, at the cost of a stop-the-world reindex of any chain
