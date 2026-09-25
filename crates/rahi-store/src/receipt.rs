@@ -344,10 +344,10 @@ struct RevisionRow {
 }
 
 const SELECT_HEAD: &str = "SELECT revision, accepted_revision, accepted_digest, erased, erased_at \
-     FROM rahi_receipt_head WHERE key_digest = $1";
+     FROM rahi_receipt_head WHERE key_digest = ?1";
 
 const SELECT_REVISION_BY_DIGEST: &str = "SELECT revision, disposition, outcome FROM rahi_receipt \
-     WHERE key_digest = $1 AND digest = $2 LIMIT 1";
+     WHERE key_digest = ?1 AND digest = ?2 LIMIT 1";
 
 /// Seed an identity's head row at `revision = 0` if none exists yet.
 ///
@@ -363,31 +363,48 @@ const SEED_HEAD: &str = "INSERT INTO rahi_receipt_head \
      (key_digest, tenant, namespace, key, key_kind, revision, accepted_revision, \
       accepted_digest, retain_until, tombstone_until, tombstoned, erased, erased_at, \
       created_at) \
-     VALUES ($1, $2, $3, $4, $5, 0, NULL, NULL, $6, $7, 0, 0, NULL, $8) \
+     VALUES (?1, ?2, ?3, ?4, ?5, 0, NULL, NULL, ?6, ?7, 0, 0, NULL, ?8) \
+     ON CONFLICT (key_digest) DO NOTHING";
+
+/// The erasure tombstone of an identity with no head yet (spec 045 B-21).
+const SEED_ERASED: &str = "INSERT INTO rahi_receipt_head \
+     (key_digest, tenant, namespace, key, key_kind, revision, accepted_revision, \
+      accepted_digest, retain_until, tombstone_until, tombstoned, erased, erased_at, \
+      created_at) \
+     VALUES (?1, '', '', NULL, '', 0, NULL, NULL, NULL, NULL, 0, 1, ?2, ?2) \
      ON CONFLICT (key_digest) DO NOTHING";
 
 const INSERT_REVISION: &str = "INSERT INTO rahi_receipt \
      (key_digest, revision, digest, disposition, outcome, seen_count, last_seen_at, \
       created_at) \
-     VALUES ($1, $2, $3, $4, $5, 1, $6, $6)";
+     VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?6)";
 
 /// spec 045 B-8: guards on the CAS baseline the caller was classified
 /// against and on the identity not being erased, using 012 D-3's `NOT NULL`
 /// technique so a mismatch aborts the whole batch, including the revision
 /// insert that follows it.
+///
+/// A head retention compacted (B-20) is live again once a new revision is
+/// staged against it: `tombstoned` returns to 0, the raw key and the new
+/// revision's horizons are written back, so the sweep neither deletes the
+/// new revision with the old tombstone nor keeps a live identity keyless
+/// (spec 045 D-20). On a head that was never compacted the same columns
+/// only take the newest revision's horizons.
 const GUARD_ACCEPT: &str = "UPDATE rahi_receipt_head SET \
-     revision = CASE WHEN revision = $1 AND erased = 0 THEN $2 ELSE NULL END, \
-     accepted_revision = CASE WHEN revision = $1 AND erased = 0 THEN $2 ELSE accepted_revision END, \
-     accepted_digest = CASE WHEN revision = $1 AND erased = 0 THEN $3 ELSE accepted_digest END \
-     WHERE key_digest = $4";
+     revision = CASE WHEN revision = ?1 AND erased = 0 THEN ?2 ELSE NULL END, \
+     accepted_revision = CASE WHEN revision = ?1 AND erased = 0 THEN ?2 ELSE accepted_revision END, \
+     accepted_digest = CASE WHEN revision = ?1 AND erased = 0 THEN ?3 ELSE accepted_digest END, \
+     tombstoned = 0, key = ?5, retain_until = ?6, tombstone_until = ?7 \
+     WHERE key_digest = ?4";
 
 const GUARD_COLLISION: &str = "UPDATE rahi_receipt_head SET \
-     revision = CASE WHEN revision = $1 AND erased = 0 THEN $2 ELSE NULL END \
-     WHERE key_digest = $3";
+     revision = CASE WHEN revision = ?1 AND erased = 0 THEN ?2 ELSE NULL END, \
+     tombstoned = 0, key = ?4, retain_until = ?5, tombstone_until = ?6 \
+     WHERE key_digest = ?3";
 
 const STAGE_SEEN: &str = "UPDATE rahi_receipt SET \
-     seen_count = COALESCE(seen_count, 0) + 1, last_seen_at = $1 \
-     WHERE key_digest = $2 AND revision = $3";
+     seen_count = COALESCE(seen_count, 0) + 1, last_seen_at = ?1 \
+     WHERE key_digest = ?2 AND revision = ?3";
 
 /// Classification, staging, retention, and erasure over receipt rows.
 #[derive(Clone, Copy, Debug)]
@@ -504,6 +521,9 @@ impl Receipts {
                 Value::Integer(1),
                 Value::from(digest.as_str()),
                 Value::from(key_digest.clone()),
+                Value::from(key.key.as_str()),
+                Value::from(meta.retain_until.map(unix_to_sql)),
+                Value::from(meta.tombstone_until.map(unix_to_sql)),
             ],
         ));
         txn.push(Statement::with_params(
@@ -546,6 +566,9 @@ impl Receipts {
                 Value::Integer(next),
                 Value::from(digest.as_str()),
                 Value::from(key_digest.clone()),
+                Value::from(key.key.as_str()),
+                Value::from(meta.retain_until.map(unix_to_sql)),
+                Value::from(meta.tombstone_until.map(unix_to_sql)),
             ],
         ));
         txn.push(Statement::with_params(
@@ -586,6 +609,9 @@ impl Receipts {
                 Value::Integer(expected),
                 Value::Integer(next),
                 Value::from(key_digest.clone()),
+                Value::from(key.key.as_str()),
+                Value::from(meta.retain_until.map(unix_to_sql)),
+                Value::from(meta.tombstone_until.map(unix_to_sql)),
             ],
         ));
         txn.push(Statement::with_params(
@@ -631,9 +657,17 @@ impl Receipts {
         match scope {
             EraseScope::Identity(key) => {
                 let key_digest = key.key_digest();
+                // An identity never delivered yet still gets its tombstone,
+                // so a first delivery after the erasure is `Erased` (B-22).
+                // Like every erasure tombstone it holds only the key digest,
+                // `erased_at`, and structural columns (spec 045 D-25).
+                txn.push(Statement::with_params(
+                    SEED_ERASED,
+                    vec![Value::from(key_digest.clone()), Value::Integer(now_sql)],
+                ));
                 erase_by_predicate(
                     txn,
-                    "key_digest = $1",
+                    "key_digest = ?1",
                     vec![Value::from(key_digest)],
                     now_sql,
                 );
@@ -642,7 +676,7 @@ impl Receipts {
                 erase_by_predicate(
                     txn,
                     "key_digest IN (SELECT key_digest FROM rahi_receipt_head \
-                     WHERE tenant = $1 AND namespace = $2)",
+                     WHERE tenant = ?1 AND namespace = ?2)",
                     vec![
                         Value::from(tenant.as_str()),
                         Value::from(namespace.as_str()),
@@ -653,7 +687,7 @@ impl Receipts {
             EraseScope::Tenant { tenant } => {
                 erase_by_predicate(
                     txn,
-                    "key_digest IN (SELECT key_digest FROM rahi_receipt_head WHERE tenant = $1)",
+                    "key_digest IN (SELECT key_digest FROM rahi_receipt_head WHERE tenant = ?1)",
                     vec![Value::from(tenant.as_str())],
                     now_sql,
                 );
@@ -675,16 +709,16 @@ fn erase_by_predicate(txn: &mut TxnBuilder, predicate: &str, params: Vec<Value>,
         format!("DELETE FROM rahi_processing WHERE {predicate}"),
         params.clone(),
     ));
-    // `now` is appended after the predicate's own params, so its `$N` is one
+    // `now` is appended after the predicate's own params, so its `?N` is one
     // past the highest number the predicate itself uses, whatever that is.
     let erased_at_param = params.len().saturating_add(1);
     let mut set_params = params;
     set_params.push(Value::Integer(now_sql));
     txn.push(Statement::with_params(
         format!(
-            "UPDATE rahi_receipt_head SET key = NULL, \
-             accepted_revision = NULL, accepted_digest = NULL, retain_until = NULL, \
-             tombstone_until = NULL, tombstoned = 0, erased = 1, erased_at = ${erased_at_param} \
+            "UPDATE rahi_receipt_head SET key = NULL, tenant = '', namespace = '', \
+             key_kind = '', accepted_revision = NULL, accepted_digest = NULL, retain_until = NULL, \
+             tombstone_until = NULL, tombstoned = 0, erased = 1, erased_at = ?{erased_at_param} \
              WHERE {predicate}"
         ),
         set_params,
@@ -781,7 +815,8 @@ pub fn receipt_migration(version: u32) -> Migration {
                 detail TEXT NULL, \
                 started_at INTEGER NOT NULL, \
                 ended_at INTEGER NULL, \
-                PRIMARY KEY (key_digest, revision, processor, processor_revision, attempt))",
+                PRIMARY KEY (key_digest, revision, processor, processor_revision, attempt, \
+                             outcome))",
         ]
         .join("; "),
     )

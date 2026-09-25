@@ -14,9 +14,9 @@ mod common;
 use std::time::Duration;
 
 use rahi_store::{
-    Classification, ContentDigest, DeadFilter, Envelope, Outbox, Page, ProcessingKey, ReceiptKey,
-    ReceiptMeta, Receipts, RetryPolicy, Store, StoreHandle, TxnBuilder, Value, Work,
-    coordination_migration, receipt_migration,
+    Classification, ContentDigest, DeadFilter, Envelope, LEASE_TTL_SECONDS, Outbox, Page,
+    ProcessingKey, ReceiptKey, ReceiptMeta, Receipts, RetryPolicy, Store, StoreHandle, TxnBuilder,
+    Value, Work, coordination_migration, receipt_migration,
 };
 use rahi_types::{Error, Revision, UnixSeconds};
 use serde::Deserialize;
@@ -127,7 +127,12 @@ async fn after_the_intake_batch_before_acknowledgement_a_redelivery_writes_nothi
     ));
     Outbox::stage(
         &mut txn,
-        &Envelope::new("receipt.accepted", Some("acme".to_owned()), key.key_digest(), Revision::new(1)),
+        &Envelope::new(
+            "receipt.accepted",
+            Some("acme".to_owned()),
+            key.key_digest(),
+            Revision::new(1),
+        ),
     );
     submit(&handle, txn).await.unwrap();
     // The intake batch committed; the crash happens before the caller acks.
@@ -189,7 +194,11 @@ async fn the_intake_batch_lands_whole_and_a_repeated_classify_never_makes_a_seco
         Classification::Redelivered { .. } => {}
         other => panic!("expected Redelivered, got {other:?}"),
     }
-    assert_eq!(table_count(&handle, "rahi_receipt").await, 1, "at most one receipt");
+    assert_eq!(
+        table_count(&handle, "rahi_receipt").await,
+        1,
+        "at most one receipt"
+    );
 
     store.shutdown().await.unwrap();
 }
@@ -230,6 +239,10 @@ async fn after_reserve_before_processing_ends_the_claim_survives_and_later_recla
         .await
         .unwrap();
     assert_eq!(rows[0].state, "claimed", "the claim survives the crash");
+    // hiqlite hands a lease back unacknowledged and replays lock state on
+    // restart, so the queue's lease may still read as held; it is taken
+    // over by the first request after its TTL (spec 045 D-22).
+    tokio::time::sleep(Duration::from_secs(LEASE_TTL_SECONDS + 1)).await;
     let attempts: Vec<AttemptRow> = handle
         .query("SELECT outcome FROM rahi_processing_attempt", vec![])
         .await
@@ -373,7 +386,12 @@ async fn after_the_completing_batch_the_outbox_row_survives_for_the_next_drain()
     Receipts::stage_first(&mut txn, &key, &digest, &meta, now(1)).unwrap();
     Outbox::stage(
         &mut txn,
-        &Envelope::new("receipt.accepted", Some("acme".to_owned()), key.key_digest(), Revision::new(1)),
+        &Envelope::new(
+            "receipt.accepted",
+            Some("acme".to_owned()),
+            key.key_digest(),
+            Revision::new(1),
+        ),
     );
     submit(&handle, txn).await.unwrap();
     // The crash happens before the drain and before the caller's ack.
@@ -384,7 +402,11 @@ async fn after_the_completing_batch_the_outbox_row_survives_for_the_next_drain()
     let store = Store::open(&cfg).await.unwrap();
     let handle = store.handle();
 
-    assert_eq!(table_count(&handle, "outbox").await, 1, "the outbox row survives");
+    assert_eq!(
+        table_count(&handle, "outbox").await,
+        1,
+        "the outbox row survives"
+    );
     let drained = Outbox::drain(&handle, 10).await.unwrap();
     assert_eq!(drained, 1, "the next drain publishes it");
 
@@ -449,7 +471,7 @@ async fn a_zombie_holder_commits_nothing_after_its_claim_was_reclaimed_across_a_
     store.shutdown().await.unwrap();
 }
 
-/// Row 9: a sweep's chunks already committed through `fenced_txn` survive a
+/// Row 9: a sweep's chunks already committed behind the sweep lease's guard survive a
 /// restart, and the next sweep continues with no half-applied chunk.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_sweep_interrupted_by_a_restart_continues_with_no_half_applied_chunk() {
@@ -477,8 +499,13 @@ async fn a_sweep_interrupted_by_a_restart_continues_with_no_half_applied_chunk()
     }
 
     // The sweep processes only the first chunk before the crash.
-    let first = Work::sweep(&handle, "ns", &policy(), now(10), 1).await.unwrap();
-    assert_eq!(first.expired, 1, "one chunk committed through fenced_txn");
+    let first = Work::sweep(&handle, "ns", &policy(), now(10), 1)
+        .await
+        .unwrap();
+    assert_eq!(
+        first.expired, 1,
+        "one chunk committed behind the lease guard"
+    );
 
     store.shutdown().await.unwrap();
     drop(store);
@@ -486,9 +513,19 @@ async fn a_sweep_interrupted_by_a_restart_continues_with_no_half_applied_chunk()
     let store = Store::open(&cfg).await.unwrap();
     let handle = store.handle();
 
+    // hiqlite hands a lease back unacknowledged and replays lock state on
+    // restart, so the queue's lease may still read as held; it is taken
+    // over by the first request after its TTL (spec 045 D-22).
+    tokio::time::sleep(Duration::from_secs(LEASE_TTL_SECONDS + 1)).await;
+
     // The next sweep continues; no chunk is applied twice or half-applied.
-    let second = Work::sweep(&handle, "ns", &policy(), now(10), 10).await.unwrap();
-    assert_eq!(second.expired, 1, "the remaining item, not the already-closed one");
+    let second = Work::sweep(&handle, "ns", &policy(), now(10), 10)
+        .await
+        .unwrap();
+    assert_eq!(
+        second.expired, 1,
+        "the remaining item, not the already-closed one"
+    );
 
     let attempts: Vec<AttemptRow> = handle
         .query(
@@ -497,10 +534,19 @@ async fn a_sweep_interrupted_by_a_restart_continues_with_no_half_applied_chunk()
         )
         .await
         .unwrap();
-    assert_eq!(attempts.len(), 2, "each item's open attempt was closed exactly once");
+    assert_eq!(
+        attempts.len(),
+        2,
+        "each item's open attempt was closed exactly once"
+    );
 
-    let dead = Work::dead(&handle, &DeadFilter::default(), Page::default()).await.unwrap();
-    assert!(dead.is_empty(), "an expiry alone does not dead-letter below max_attempts");
+    let dead = Work::dead(&handle, &DeadFilter::default(), Page::default())
+        .await
+        .unwrap();
+    assert!(
+        dead.is_empty(),
+        "an expiry alone does not dead-letter below max_attempts"
+    );
 
     store.shutdown().await.unwrap();
 }

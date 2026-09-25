@@ -169,6 +169,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-store/src/lock.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/lock.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-store/src/lock.rs",
             "span": {
               "endLine": 86,
@@ -214,5 +227,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "9f1f45d996771090bae104e0af8e3cb91c9b12b21a543c3324cadcd259ac5550"
+  "shardHash": "a1424dbbe99c15dc5b3de14feb9f34ff90ea28c3177905eecdcc65a416b91292"
 }

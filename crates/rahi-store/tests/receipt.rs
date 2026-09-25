@@ -95,7 +95,11 @@ async fn every_classification_outcome_is_reachable() {
         Classification::Changed(changed) => changed,
         other => panic!("expected Changed, got {other:?}"),
     };
-    assert_eq!(changed.head_revision(), 2, "the collision guards on the accepted head");
+    assert_eq!(
+        changed.head_revision(),
+        2,
+        "the collision guards on the accepted head"
+    );
     let mut txn = TxnBuilder::new();
     Receipts::stage_collision(
         &mut txn,
@@ -176,10 +180,7 @@ async fn a_second_stage_first_for_one_identity_conflicts_and_leaves_nothing() {
     assert!(matches!(err, Error::Conflict(_)), "{err}");
 
     let rows: Vec<serde_json::Value> = store
-        .query(
-            "SELECT id, note FROM domain ORDER BY id",
-            vec![],
-        )
+        .query("SELECT id, note FROM domain ORDER BY id", vec![])
         .await
         .unwrap();
     assert_eq!(rows.len(), 1, "the loser's domain row never lands");
@@ -203,7 +204,10 @@ async fn erasure_refuses_every_staging_call_against_it() {
     submit(&store, txn).await.unwrap();
 
     let changed_digest = ContentDigest::of(b"other body");
-    let changed = match Receipts::classify(&store, &key, &changed_digest).await.unwrap() {
+    let changed = match Receipts::classify(&store, &key, &changed_digest)
+        .await
+        .unwrap()
+    {
         Classification::Changed(changed) => changed,
         other => panic!("expected Changed, got {other:?}"),
     };
@@ -271,7 +275,10 @@ async fn retention_compacts_only_when_processing_is_terminal_and_keeps_classifyi
     let report = rahi_store::Work::sweep(&store, "ns", &policy, now(15), 10)
         .await
         .unwrap();
-    assert_eq!(report.compacted, 0, "an open processing row blocks compaction");
+    assert_eq!(
+        report.compacted, 0,
+        "an open processing row blocks compaction"
+    );
     match Receipts::classify(&store, &key, &digest).await.unwrap() {
         Classification::Redelivered { outcome, .. } => {
             assert_eq!(outcome.as_deref(), Some("ref-1"));
@@ -319,43 +326,132 @@ async fn retention_compacts_only_when_processing_is_terminal_and_keeps_classifyi
     f.store.shutdown().await.unwrap();
 }
 
+/// spec 045 D-20: a new revision staged over a compacted tombstone makes the
+/// identity live again, so the old tombstone's horizon never deletes it.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn debug_erasure_row_state() {
+async fn a_revision_over_a_compacted_tombstone_is_live_and_outlives_the_old_horizon() {
     let f = common::open().await;
     let store = f.store.handle();
     migrated(&store).await;
+    let policy = rahi_store::RetryPolicy {
+        max_attempts: 3,
+        base: std::time::Duration::from_millis(1),
+        cap: std::time::Duration::from_secs(1),
+    };
+
     let key = ReceiptKey::new("acme", "ns", "msg-1").unwrap();
-    let digest = ContentDigest::of(b"body");
+    let first = ContentDigest::of(b"body-a");
+    let meta = ReceiptMeta {
+        retain_until: Some(now(10)),
+        tombstone_until: Some(now(20)),
+        outcome: None,
+    };
     let mut txn = TxnBuilder::new();
-    Receipts::stage_first(&mut txn, &key, &digest, &ReceiptMeta::default(), now(1)).unwrap();
+    Receipts::stage_first(&mut txn, &key, &first, &meta, now(1)).unwrap();
+    submit(&store, txn).await.unwrap();
+    let report = rahi_store::Work::sweep(&store, "ns", &policy, now(15), 10)
+        .await
+        .unwrap();
+    assert_eq!(report.compacted, 1, "no processing rows, so it compacts");
+
+    // Changed content arrives against the tombstone and is accepted.
+    let second = ContentDigest::of(b"body-b");
+    let Classification::Changed(changed) = Receipts::classify(&store, &key, &second).await.unwrap()
+    else {
+        panic!("a different digest against a tombstone is Changed");
+    };
+    let mut txn = TxnBuilder::new();
+    Receipts::stage_revision(
+        &mut txn,
+        &key,
+        &second,
+        &changed,
+        &ReceiptMeta::default(),
+        now(16),
+    )
+    .unwrap();
     submit(&store, txn).await.unwrap();
 
-    let mut txn = TxnBuilder::new();
-    Receipts::stage_erasure(&mut txn, &EraseScope::Identity(key.clone()), now(2));
-    for s in txn.statements() {
-        eprintln!("STMT: {} PARAMS: {:?}", s.sql, s.params);
+    // Past the old tombstone_until, the live identity is untouched.
+    let report = rahi_store::Work::sweep(&store, "ns", &policy, now(25), 10)
+        .await
+        .unwrap();
+    assert_eq!(report.tombstones_deleted, 0, "the identity is live again");
+    match Receipts::classify(&store, &key, &second).await.unwrap() {
+        Classification::Redelivered {
+            revision, is_head, ..
+        } => {
+            assert_eq!(revision, 2);
+            assert!(is_head);
+        }
+        other => panic!("expected Redelivered of revision 2, got {other:?}"),
     }
-    let results = store.txn(txn.into_statements()).await.unwrap();
-    eprintln!("RESULTS: {:?}", results);
+    #[derive(serde::Deserialize)]
+    struct KeyRow {
+        key: Option<String>,
+    }
+    let rows: Vec<KeyRow> = store
+        .query(
+            "SELECT key FROM rahi_receipt_head WHERE key_digest = $1",
+            vec![Value::from(key.key_digest())],
+        )
+        .await
+        .unwrap();
+    assert_eq!(rows[0].key.as_deref(), Some("msg-1"), "the raw key is back");
 
-    let direct = store.execute(
-        "UPDATE rahi_receipt_head SET erased = 1, erased_at = $2 WHERE key_digest = $1",
-        vec![Value::from(key.key_digest()), Value::Integer(99)],
-    ).await.unwrap();
-    eprintln!("DIRECT: {:?}", direct);
+    f.store.shutdown().await.unwrap();
+}
 
-    #[derive(Debug, serde::Deserialize)]
-    struct N { n: i64 }
-    let count: Vec<N> = store.query("SELECT COUNT(*) AS n FROM rahi_receipt_head WHERE key_digest = $1", vec![Value::from(key.key_digest())]).await.unwrap();
-    eprintln!("COUNT WHERE: {:?}", count);
-    let count2: Vec<N> = store.query("SELECT COUNT(*) AS n FROM rahi_receipt_head", vec![]).await.unwrap();
-    eprintln!("COUNT ALL: {:?}", count2);
-    eprintln!("KEY DIGEST PARAM: {:?}", key.key_digest());
+/// spec 045 B-21, B-22: erasing an identity that was never delivered still
+/// leaves its tombstone, so its first delivery afterwards is `Erased` and
+/// cannot be staged.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn erasing_a_never_delivered_identity_still_refuses_its_first_delivery() {
+    let f = common::open().await;
+    let store = f.store.handle();
+    migrated(&store).await;
 
-    #[derive(Debug, serde::Deserialize)]
-    struct DebugRow { key_digest: String, erased: i64, erased_at: Option<i64>, revision: i64 }
-    let rows: Vec<DebugRow> = store.query("SELECT key_digest, erased, erased_at, revision FROM rahi_receipt_head", vec![]).await.unwrap();
-    eprintln!("ROWS: {:?}", rows);
+    let key = ReceiptKey::new("acme", "ns", "never-seen").unwrap();
+    let digest = ContentDigest::of(b"body");
+    let mut txn = TxnBuilder::new();
+    Receipts::stage_erasure(&mut txn, &EraseScope::Identity(key.clone()), now(5));
+    submit(&store, txn).await.unwrap();
+
+    assert_eq!(
+        Receipts::classify(&store, &key, &digest).await.unwrap(),
+        Classification::Erased { erased_at: now(5) }
+    );
+    let mut txn = TxnBuilder::new();
+    Receipts::stage_first(&mut txn, &key, &digest, &ReceiptMeta::default(), now(6)).unwrap();
+    let err = submit(&store, txn).await.unwrap_err();
+    assert!(matches!(err, Error::Conflict(_)), "{err}");
+
+    // A namespace-scoped erasure finds its identities by the scope columns
+    // it then clears, and every one of them classifies as erased.
+    let others: Vec<ReceiptKey> = (1..=2)
+        .map(|n| ReceiptKey::new("acme", "ns2", format!("m-{n}")).unwrap())
+        .collect();
+    for other in &others {
+        let mut txn = TxnBuilder::new();
+        Receipts::stage_first(&mut txn, other, &digest, &ReceiptMeta::default(), now(7)).unwrap();
+        submit(&store, txn).await.unwrap();
+    }
+    let mut txn = TxnBuilder::new();
+    Receipts::stage_erasure(
+        &mut txn,
+        &EraseScope::Namespace {
+            tenant: "acme".to_owned(),
+            namespace: "ns2".to_owned(),
+        },
+        now(8),
+    );
+    submit(&store, txn).await.unwrap();
+    for other in &others {
+        assert_eq!(
+            Receipts::classify(&store, other, &digest).await.unwrap(),
+            Classification::Erased { erased_at: now(8) }
+        );
+    }
 
     f.store.shutdown().await.unwrap();
 }

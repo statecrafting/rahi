@@ -233,71 +233,96 @@ struct CandidateRow {
 
 const SELECT_ELIGIBLE_BY_IDENTITY: &str = "SELECT key_digest, revision, processor, \
      processor_revision, tenant, namespace, key, attempt FROM rahi_processing \
-     WHERE key_digest = $1 AND revision = $2 AND processor = $3 AND processor_revision = $4 \
+     WHERE key_digest = ?1 AND revision = ?2 AND processor = ?3 AND processor_revision = ?4 \
      AND (state = 'pending' \
-          OR (state = 'claimed' AND expires_at <= $5) \
-          OR (state = 'failed' AND next_attempt_at <= $5))";
+          OR (state = 'claimed' AND expires_at <= ?5) \
+          OR (state = 'failed' AND next_attempt_at <= ?5))";
 
 const SELECT_ELIGIBLE_BY_QUEUE: &str = "SELECT key_digest, revision, processor, \
      processor_revision, tenant, namespace, key, attempt FROM rahi_processing \
-     WHERE namespace = $1 AND processor = $2 \
+     WHERE namespace = ?1 AND processor = ?2 \
      AND (state = 'pending' \
-          OR (state = 'claimed' AND expires_at <= $3) \
-          OR (state = 'failed' AND next_attempt_at <= $3)) \
-     ORDER BY created_at ASC LIMIT $4";
+          OR (state = 'claimed' AND expires_at <= ?3) \
+          OR (state = 'failed' AND next_attempt_at <= ?3)) \
+     ORDER BY created_at ASC LIMIT ?4";
 
-const CLAIM_ROW: &str = "UPDATE rahi_processing SET state = 'claimed', holder = $1, \
-     expires_at = $2, attempt = $3 \
-     WHERE key_digest = $4 AND revision = $5 AND processor = $6 AND processor_revision = $7 \
-     AND attempt = $8";
+/// spec 045 B-14: the claim. Fenced by hand (`fence <= ?9`, then `fence =
+/// ?9`), the rewrite [`crate::Statement::fenced`] would make, because it
+/// shares a batch with the attempt `INSERT` (spec 045 D-17). The row's
+/// eligibility is re-checked here, inside the batch (B-10), so a row another
+/// reservation or the sweep moved since the read is left alone.
+const CLAIM_ROW: &str = "UPDATE rahi_processing SET state = 'claimed', holder = ?1, \
+     expires_at = ?2, attempt = ?3, fence = ?9 \
+     WHERE key_digest = ?4 AND revision = ?5 AND processor = ?6 AND processor_revision = ?7 \
+     AND attempt = ?8 AND fence <= ?9 \
+     AND (state = 'pending' \
+          OR (state = 'claimed' AND expires_at <= ?10) \
+          OR (state = 'failed' AND next_attempt_at <= ?10))";
 
+/// A reclaim closes the prior attempt as `expired` (spec 045 B-14), only
+/// when the claim in the same batch took the row.
+const CLOSE_PRIOR_EXPIRED: &str = "UPDATE rahi_processing_attempt SET outcome = 'expired', \
+     ended_at = ?1 \
+     WHERE key_digest = ?2 AND revision = ?3 AND processor = ?4 AND processor_revision = ?5 \
+     AND attempt = ?6 AND outcome = 'open' \
+     AND EXISTS (SELECT 1 FROM rahi_processing p WHERE p.key_digest = ?2 AND p.revision = ?3 \
+                 AND p.processor = ?4 AND p.processor_revision = ?5 AND p.attempt = ?7 \
+                 AND p.fence = ?8 AND p.state = 'claimed')";
+
+/// The new attempt row, opened only when the claim in the same batch took
+/// the row, so a claimed row never exists without its open attempt (spec
+/// 045 3.7, row 4; D-17).
 const OPEN_ATTEMPT: &str = "INSERT INTO rahi_processing_attempt \
      (key_digest, revision, processor, processor_revision, attempt, holder, outcome, \
       started_at) \
-     VALUES ($1, $2, $3, $4, $5, $6, 'open', $7)";
+     SELECT key_digest, revision, processor, processor_revision, attempt, holder, 'open', ?1 \
+     FROM rahi_processing \
+     WHERE key_digest = ?2 AND revision = ?3 AND processor = ?4 AND processor_revision = ?5 \
+     AND attempt = ?6 AND fence = ?7 AND state = 'claimed'";
 
 /// spec 045 B-15: aborts the caller's whole batch (012 D-3's `NOT NULL`
 /// technique) unless the row still carries this claim's fence, is still
 /// `claimed`, and has not yet expired.
 const GUARD_CLAIM: &str = "UPDATE rahi_processing SET \
-     fence = CASE WHEN fence = $1 AND state = 'claimed' AND expires_at > $2 THEN fence \
+     fence = CASE WHEN fence = ?1 AND state = 'claimed' AND expires_at > ?2 THEN fence \
                   ELSE NULL END \
-     WHERE key_digest = $3 AND revision = $4 AND processor = $5 AND processor_revision = $6";
+     WHERE key_digest = ?3 AND revision = ?4 AND processor = ?5 AND processor_revision = ?6";
 
 const COMPLETE_ROW: &str = "UPDATE rahi_processing SET state = 'done' \
-     WHERE key_digest = $1 AND revision = $2 AND processor = $3 AND processor_revision = $4";
+     WHERE key_digest = ?1 AND revision = ?2 AND processor = ?3 AND processor_revision = ?4";
 
 const CLOSE_ATTEMPT_DONE: &str = "UPDATE rahi_processing_attempt SET outcome = 'done', \
-     ended_at = $1 \
-     WHERE key_digest = $2 AND revision = $3 AND processor = $4 AND processor_revision = $5 \
-     AND attempt = $6";
+     ended_at = ?1 \
+     WHERE key_digest = ?2 AND revision = ?3 AND processor = ?4 AND processor_revision = ?5 \
+     AND attempt = ?6 AND outcome = 'open'";
 
-const FAIL_ROW: &str = "UPDATE rahi_processing SET state = 'failed', next_attempt_at = $1 \
-     WHERE key_digest = $2 AND revision = $3 AND processor = $4 AND processor_revision = $5";
+const FAIL_ROW: &str = "UPDATE rahi_processing SET state = 'failed', next_attempt_at = ?1 \
+     WHERE key_digest = ?2 AND revision = ?3 AND processor = ?4 AND processor_revision = ?5";
 
 const DEAD_ROW: &str = "UPDATE rahi_processing SET state = 'dead', next_attempt_at = NULL \
-     WHERE key_digest = $1 AND revision = $2 AND processor = $3 AND processor_revision = $4";
+     WHERE key_digest = ?1 AND revision = ?2 AND processor = ?3 AND processor_revision = ?4";
 
-const CLOSE_ATTEMPT_FAILED: &str = "UPDATE rahi_processing_attempt SET outcome = $1, \
-     error_class = $2, detail = $3, ended_at = $4 \
-     WHERE key_digest = $5 AND revision = $6 AND processor = $7 AND processor_revision = $8 \
-     AND attempt = $9";
+const CLOSE_ATTEMPT_FAILED: &str = "UPDATE rahi_processing_attempt SET outcome = ?1, \
+     error_class = ?2, detail = ?3, ended_at = ?4 \
+     WHERE key_digest = ?5 AND revision = ?6 AND processor = ?7 AND processor_revision = ?8 \
+     AND attempt = ?9 AND outcome = 'open'";
 
-const RENEW_ROW: &str = "UPDATE rahi_processing SET expires_at = $1 \
-     WHERE key_digest = $2 AND revision = $3 AND processor = $4 AND processor_revision = $5 \
-     AND fence = $6 AND state = 'claimed' AND expires_at > $7";
+const RENEW_ROW: &str = "UPDATE rahi_processing SET expires_at = ?1 \
+     WHERE key_digest = ?2 AND revision = ?3 AND processor = ?4 AND processor_revision = ?5 \
+     AND fence = ?6 AND state = 'claimed' AND expires_at > ?7";
 
 const REQUEUE_ROW: &str = "UPDATE rahi_processing SET state = 'pending', next_attempt_at = NULL \
-     WHERE key_digest = $1 AND revision = $2 AND processor = $3 AND processor_revision = $4 \
+     WHERE key_digest = ?1 AND revision = ?2 AND processor = ?3 AND processor_revision = ?4 \
      AND state = 'dead'";
 
 const REQUEUE_ATTEMPT: &str = "INSERT INTO rahi_processing_attempt \
      (key_digest, revision, processor, processor_revision, attempt, holder, outcome, \
       started_at, ended_at) \
      SELECT key_digest, revision, processor, processor_revision, attempt, holder, \
-            'requeued', $1, $1 \
+            'requeued', ?1, ?1 \
      FROM rahi_processing \
-     WHERE key_digest = $2 AND revision = $3 AND processor = $4 AND processor_revision = $5";
+     WHERE key_digest = ?2 AND revision = ?3 AND processor = ?4 AND processor_revision = ?5 \
+     AND state = 'dead'";
 
 /// Reservation, retry, the dead letter, and the sweep over processing rows.
 #[derive(Clone, Copy, Debug)]
@@ -311,7 +336,7 @@ impl Work {
             "INSERT INTO rahi_processing \
              (key_digest, revision, processor, processor_revision, tenant, namespace, key, \
               state, attempt, created_at) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', 0, $8) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'pending', 0, ?8) \
              ON CONFLICT (key_digest, revision, processor, processor_revision) DO NOTHING",
             vec![
                 Value::from(key.key_digest()),
@@ -329,15 +354,16 @@ impl Work {
     /// Reserve exactly `key`, if it is eligible (spec 045 B-14).
     ///
     /// Takes the queue's lease, reads the row's current state and attempt
-    /// count with `query_consistent`, and, if eligible, writes the claim
-    /// through `fenced_txn`; the attempt row is then opened through
-    /// `StoreHandle::txn`, stamped with the lease's token, following the
-    /// pattern [`crate::Statement::fenced`]'s own documentation states for
-    /// an insert under a lease (spec 045 D-17).
+    /// count with `query_consistent`, and, if eligible, submits one batch:
+    /// the lease's guard, the claim fenced by the lease's token, the prior
+    /// attempt's close on a reclaim, and the new attempt's open row. The
+    /// claim and its attempt are one Raft entry (spec 045 D-17).
     ///
     /// # Errors
     ///
-    /// The store's error when the lease, the read, or either write fails.
+    /// [`Error::Conflict`] when the lease was superseded before the batch
+    /// committed; the store's error when the lease, the read, or the write
+    /// fails.
     pub async fn reserve(
         store: &StoreHandle,
         key: &ProcessingKey,
@@ -362,17 +388,22 @@ impl Work {
             lease.release().await;
             return Ok(None);
         };
-        let claim = claim_candidate(store, &lease, &candidate, holder, hold_for, now).await?;
+        let claim = claim_candidate(store, &lease, &candidate, holder, hold_for, now).await;
         lease.release().await;
-        Ok(Some(claim))
+        claim
     }
 
     /// Reserve up to `limit` of the oldest eligible rows of one queue under
     /// one lease acquisition (spec 045 B-14, B-14a).
     ///
+    /// A row that another reservation took between the read and its batch
+    /// is skipped, not an error.
+    ///
     /// # Errors
     ///
-    /// The store's error when the lease, the read, or a write fails.
+    /// [`Error::Conflict`] when the lease was superseded; the store's error
+    /// when the lease, the read, or a write fails. Claims already committed
+    /// before the error stay held and expire as any claim does.
     pub async fn next(
         store: &StoreHandle,
         namespace: &str,
@@ -400,10 +431,13 @@ impl Work {
             .await?;
         let mut claims = Vec::with_capacity(candidates.len());
         for candidate in &candidates {
-            if let Ok(claim) =
-                claim_candidate(store, &lease, candidate, holder, hold_for, now).await
-            {
-                claims.push(claim);
+            match claim_candidate(store, &lease, candidate, holder, hold_for, now).await {
+                Ok(Some(claim)) => claims.push(claim),
+                Ok(None) => {}
+                Err(e) => {
+                    lease.release().await;
+                    return Err(e);
+                }
             }
         }
         lease.release().await;
@@ -579,11 +613,11 @@ impl Work {
         let mut params = Vec::new();
         if let Some(namespace) = &filter.namespace {
             params.push(Value::from(namespace.as_str()));
-            sql.push_str(&format!(" AND namespace = ${}", params.len()));
+            sql.push_str(&format!(" AND namespace = ?{}", params.len()));
         }
         if let Some(processor) = &filter.processor {
             params.push(Value::from(processor.as_str()));
-            sql.push_str(&format!(" AND processor = ${}", params.len()));
+            sql.push_str(&format!(" AND processor = ?{}", params.len()));
         }
         sql.push_str(" ORDER BY created_at ASC");
         let rows: Vec<CandidateRow> = store.query_paged(&sql, params, page).await?;
@@ -593,8 +627,8 @@ impl Work {
             let attempts: Vec<AttemptRow> = store
                 .query(
                     "SELECT attempt, outcome, error_class, detail FROM rahi_processing_attempt \
-                     WHERE key_digest = $1 AND revision = $2 AND processor = $3 \
-                     AND processor_revision = $4 ORDER BY attempt ASC",
+                     WHERE key_digest = ?1 AND revision = ?2 AND processor = ?3 \
+                     AND processor_revision = ?4 ORDER BY attempt ASC, started_at ASC, outcome ASC",
                     vec![
                         Value::from(row.key_digest.clone()),
                         Value::Integer(row.revision),
@@ -687,21 +721,23 @@ impl Work {
     /// or delete retention-expired receipts, in chunks under the sweep
     /// lease (spec 045 B-19).
     ///
-    /// `policy` decides which claimed rows have spent their retry budget:
-    /// B-16 fixes that decision for an explicit [`Work::fail`], and this is
-    /// the same rule applied to a chain of pure expiries that never called
-    /// it (spec 045 D-18).
+    /// `policy` decides which rows have spent their retry budget: B-16 fixes
+    /// that decision for an explicit [`Work::fail`], and this is the same
+    /// rule applied to a chain of pure expiries that never called it (spec
+    /// 045 D-18).
     ///
-    /// The lease serialises concurrent sweepers; the writes themselves run
-    /// through a plain `txn`, not `fenced_txn`'s automatic per-statement
-    /// rewrite, because most of the rows this sweep touches carry no
-    /// `fence` column at all, and the one table that does (`rahi_processing`)
-    /// stamps it from a queue lease with its own, unrelated token sequence
+    /// Each phase is one chunk of at most `limit` rows, submitted as one
+    /// batch that opens with the sweep lease's guard, so a sweeper whose
+    /// lease was superseded commits nothing and no chunk is half-applied
+    /// (3.7, row 9). Every statement re-checks, inside the batch, the
+    /// condition its row was read under (B-10), so a row a reservation, a
+    /// completion, or a new revision moved since the read is left alone
     /// (spec 045 D-19).
     ///
     /// # Errors
     ///
-    /// The store's error when the lease or a write fails.
+    /// [`Error::Conflict`] when the sweep lease was superseded; the store's
+    /// error when the lease, a read, or a write fails.
     pub async fn sweep(
         store: &StoreHandle,
         namespace: &str,
@@ -710,141 +746,240 @@ impl Work {
         limit: u32,
     ) -> Result<SweepReport, Error> {
         let lease = store.lease(&format!("rahi.work.sweep/{namespace}")).await?;
-        let mut report = SweepReport::default();
+        let report = sweep_chunks(store, &lease, namespace, policy, now, limit).await;
+        lease.release().await;
+        report
+    }
+}
 
-        let expired: Vec<CandidateRow> = store
-            .query_paged(
-                "SELECT key_digest, revision, processor, processor_revision, tenant, \
-                 namespace, key, attempt FROM rahi_processing \
-                 WHERE namespace = $1 AND state = 'claimed' AND expires_at <= $2",
-                vec![Value::from(namespace), Value::Integer(unix_to_sql(now))],
-                Page::new(limit.max(1)),
-            )
-            .await?;
+/// The four phases of [`Work::sweep`], each one guarded batch.
+async fn sweep_chunks(
+    store: &StoreHandle,
+    lease: &crate::lock::Lease,
+    namespace: &str,
+    policy: &RetryPolicy,
+    now: UnixSeconds,
+    limit: u32,
+) -> Result<SweepReport, Error> {
+    let mut report = SweepReport::default();
+    let page = Page::new(limit.max(1));
+    let now_sql = unix_to_sql(now);
+    let max_attempts = i64::from(policy.max_attempts);
+
+    let expired: Vec<KeyDigestRow> = store
+        .query_paged(
+            "SELECT key_digest, revision, processor, processor_revision, attempt \
+             FROM rahi_processing \
+             WHERE namespace = ?1 AND state = 'claimed' AND expires_at <= ?2 \
+             ORDER BY created_at ASC",
+            vec![Value::from(namespace), Value::Integer(now_sql)],
+            page,
+        )
+        .await?;
+    if !expired.is_empty() {
+        let mut batch = Vec::with_capacity(expired.len().saturating_mul(2));
         for row in &expired {
-            let attempt = to_attempt(row.attempt, &row.key_digest)?;
-            if attempt >= policy.max_attempts {
-                store
-                    .txn(vec![Statement::with_params(
-                        "UPDATE rahi_processing SET state = 'dead', next_attempt_at = NULL \
-                         WHERE key_digest = $1 AND revision = $2 AND processor = $3 \
-                         AND processor_revision = $4",
-                        vec![
-                            Value::from(row.key_digest.clone()),
-                            Value::Integer(row.revision),
-                            Value::from(row.processor.clone()),
-                            Value::from(row.processor_revision.clone()),
-                        ],
-                    )])
-                    .await?;
-                report.dead += 1;
+            // Spent: the expired claim was the last attempt the budget
+            // allows, so it goes to `dead` rather than back to the queue.
+            batch.push(Statement::with_params(
+                "UPDATE rahi_processing SET state = 'dead', next_attempt_at = NULL \
+                 WHERE key_digest = ?1 AND revision = ?2 AND processor = ?3 \
+                 AND processor_revision = ?4 AND attempt = ?5 AND attempt >= ?6 \
+                 AND state = 'claimed' AND expires_at <= ?7",
+                vec![
+                    Value::from(row.key_digest.clone()),
+                    Value::Integer(row.revision),
+                    Value::from(row.processor.clone()),
+                    Value::from(row.processor_revision.clone()),
+                    Value::Integer(row.attempt),
+                    Value::Integer(max_attempts),
+                    Value::Integer(now_sql),
+                ],
+            ));
+            batch.push(Statement::with_params(
+                "UPDATE rahi_processing_attempt SET outcome = 'expired', ended_at = ?1 \
+                 WHERE key_digest = ?2 AND revision = ?3 AND processor = ?4 \
+                 AND processor_revision = ?5 AND attempt = ?6 AND outcome = 'open' \
+                 AND EXISTS (SELECT 1 FROM rahi_processing p WHERE p.key_digest = ?2 \
+                             AND p.revision = ?3 AND p.processor = ?4 \
+                             AND p.processor_revision = ?5 AND p.attempt = ?6 \
+                             AND (p.state = 'dead' \
+                                  OR (p.state = 'claimed' AND p.expires_at <= ?1)))",
+                vec![
+                    Value::Integer(now_sql),
+                    Value::from(row.key_digest.clone()),
+                    Value::Integer(row.revision),
+                    Value::from(row.processor.clone()),
+                    Value::from(row.processor_revision.clone()),
+                    Value::Integer(row.attempt),
+                ],
+            ));
+        }
+        let results = guarded_txn(store, lease, batch).await?;
+        for pair in results.chunks(2) {
+            if let [dead, closed] = pair {
+                report.dead += dead.rows_affected;
+                report.expired += closed.rows_affected;
             }
-            let closed = store
-                .execute(
-                    "UPDATE rahi_processing_attempt SET outcome = 'expired', ended_at = $1 \
-                     WHERE key_digest = $2 AND revision = $3 AND processor = $4 \
-                     AND processor_revision = $5 AND attempt = $6 AND outcome = 'open'",
+        }
+    }
+
+    let spent: Vec<KeyDigestRow> = store
+        .query_paged(
+            "SELECT key_digest, revision, processor, processor_revision, attempt \
+             FROM rahi_processing \
+             WHERE namespace = ?1 AND state = 'failed' AND attempt >= ?2 \
+             ORDER BY created_at ASC",
+            vec![Value::from(namespace), Value::Integer(max_attempts)],
+            page,
+        )
+        .await?;
+    if !spent.is_empty() {
+        let batch = spent
+            .iter()
+            .map(|row| {
+                Statement::with_params(
+                    "UPDATE rahi_processing SET state = 'dead', next_attempt_at = NULL \
+                     WHERE key_digest = ?1 AND revision = ?2 AND processor = ?3 \
+                     AND processor_revision = ?4 AND state = 'failed' AND attempt >= ?5",
                     vec![
-                        Value::Integer(unix_to_sql(now)),
                         Value::from(row.key_digest.clone()),
                         Value::Integer(row.revision),
                         Value::from(row.processor.clone()),
                         Value::from(row.processor_revision.clone()),
-                        Value::Integer(row.attempt),
+                        Value::Integer(max_attempts),
                     ],
                 )
-                .await?;
-            report.expired += closed.rows_affected;
-        }
-
-        let spent: Vec<KeyDigestRow> = store
-            .query_paged(
-                "SELECT key_digest, revision, processor, processor_revision FROM rahi_processing \
-                 WHERE namespace = $1 AND state = 'failed' AND next_attempt_at IS NULL",
-                vec![Value::from(namespace)],
-                Page::new(limit.max(1)),
-            )
-            .await?;
-        for row in &spent {
-            store
-                .txn(vec![Statement::with_params(
-                    DEAD_ROW,
-                    vec![
-                        Value::from(row.key_digest.clone()),
-                        Value::Integer(row.revision),
-                        Value::from(row.processor.clone()),
-                        Value::from(row.processor_revision.clone()),
-                    ],
-                )])
-                .await?;
-            report.dead += 1;
-        }
-
-        let compactable: Vec<HeadKeyRow> = store
-            .query_paged(
-                "SELECT key_digest FROM rahi_receipt_head \
-                 WHERE tombstoned = 0 AND erased = 0 AND retain_until IS NOT NULL \
-                 AND retain_until <= $1 \
-                 AND NOT EXISTS (SELECT 1 FROM rahi_processing p \
-                                 WHERE p.key_digest = rahi_receipt_head.key_digest \
-                                 AND p.state NOT IN ('done', 'dead'))",
-                vec![Value::Integer(unix_to_sql(now))],
-                Page::new(limit.max(1)),
-            )
-            .await?;
-        for row in &compactable {
-            store
-                .txn(vec![
-                    Statement::with_params(
-                        "DELETE FROM rahi_processing_attempt WHERE key_digest = $1",
-                        vec![Value::from(row.key_digest.clone())],
-                    ),
-                    Statement::with_params(
-                        "DELETE FROM rahi_processing WHERE key_digest = $1",
-                        vec![Value::from(row.key_digest.clone())],
-                    ),
-                    Statement::with_params(
-                        "UPDATE rahi_receipt SET outcome = NULL, seen_count = NULL, \
-                         last_seen_at = NULL WHERE key_digest = $1",
-                        vec![Value::from(row.key_digest.clone())],
-                    ),
-                    Statement::with_params(
-                        "UPDATE rahi_receipt_head SET key = NULL, tombstoned = 1 \
-                         WHERE key_digest = $1",
-                        vec![Value::from(row.key_digest.clone())],
-                    ),
-                ])
-                .await?;
-            report.compacted += 1;
-        }
-
-        let expired_tombstones: Vec<HeadKeyRow> = store
-            .query_paged(
-                "SELECT key_digest FROM rahi_receipt_head \
-                 WHERE tombstoned = 1 AND tombstone_until IS NOT NULL AND tombstone_until <= $1",
-                vec![Value::Integer(unix_to_sql(now))],
-                Page::new(limit.max(1)),
-            )
-            .await?;
-        for row in &expired_tombstones {
-            store
-                .txn(vec![
-                    Statement::with_params(
-                        "DELETE FROM rahi_receipt WHERE key_digest = $1",
-                        vec![Value::from(row.key_digest.clone())],
-                    ),
-                    Statement::with_params(
-                        "DELETE FROM rahi_receipt_head WHERE key_digest = $1",
-                        vec![Value::from(row.key_digest.clone())],
-                    ),
-                ])
-                .await?;
-            report.tombstones_deleted += 1;
-        }
-
-        lease.release().await;
-        Ok(report)
+            })
+            .collect();
+        let results = guarded_txn(store, lease, batch).await?;
+        report.dead += results.iter().map(|r| r.rows_affected).sum::<u64>();
     }
+
+    let compactable: Vec<HeadKeyRow> = store
+        .query_paged(
+            "SELECT key_digest FROM rahi_receipt_head \
+             WHERE namespace = ?1 AND tombstoned = 0 AND erased = 0 \
+             AND retain_until IS NOT NULL AND retain_until <= ?2 \
+             AND NOT EXISTS (SELECT 1 FROM rahi_processing p \
+                             WHERE p.key_digest = rahi_receipt_head.key_digest \
+                             AND p.state NOT IN ('done', 'dead')) \
+             ORDER BY key_digest ASC",
+            vec![Value::from(namespace), Value::Integer(now_sql)],
+            page,
+        )
+        .await?;
+    if !compactable.is_empty() {
+        let mut batch = Vec::with_capacity(compactable.len().saturating_mul(4));
+        for row in &compactable {
+            // The head's update runs first and is the chunk's re-check: only
+            // a head still due, still live, and with no open work is marked
+            // tombstoned, and every later statement for this identity acts
+            // only on a head this batch marked (`tombstoned = 1` and `key IS
+            // NULL` together, which nothing else writes).
+            batch.push(Statement::with_params(
+                "UPDATE rahi_receipt_head SET key = NULL, tombstoned = 1 \
+                 WHERE key_digest = ?1 AND tombstoned = 0 AND erased = 0 \
+                 AND retain_until IS NOT NULL AND retain_until <= ?2 \
+                 AND NOT EXISTS (SELECT 1 FROM rahi_processing p \
+                                 WHERE p.key_digest = ?1 AND p.state NOT IN ('done', 'dead'))",
+                vec![Value::from(row.key_digest.clone()), Value::Integer(now_sql)],
+            ));
+            for sql in [
+                "DELETE FROM rahi_processing_attempt WHERE key_digest = ?1 \
+                 AND EXISTS (SELECT 1 FROM rahi_receipt_head h WHERE h.key_digest = ?1 \
+                             AND h.tombstoned = 1 AND h.erased = 0)",
+                "DELETE FROM rahi_processing WHERE key_digest = ?1 \
+                 AND EXISTS (SELECT 1 FROM rahi_receipt_head h WHERE h.key_digest = ?1 \
+                             AND h.tombstoned = 1 AND h.erased = 0)",
+                "UPDATE rahi_receipt SET outcome = NULL, seen_count = NULL, last_seen_at = NULL \
+                 WHERE key_digest = ?1 \
+                 AND EXISTS (SELECT 1 FROM rahi_receipt_head h WHERE h.key_digest = ?1 \
+                             AND h.tombstoned = 1 AND h.erased = 0)",
+            ] {
+                batch.push(Statement::with_params(
+                    sql,
+                    vec![Value::from(row.key_digest.clone())],
+                ));
+            }
+        }
+        let results = guarded_txn(store, lease, batch).await?;
+        report.compacted += results
+            .chunks(4)
+            .filter_map(|c| c.first())
+            .map(|r| r.rows_affected)
+            .sum::<u64>();
+    }
+
+    let expired_tombstones: Vec<HeadKeyRow> = store
+        .query_paged(
+            "SELECT key_digest FROM rahi_receipt_head \
+             WHERE namespace = ?1 AND tombstoned = 1 AND erased = 0 \
+             AND tombstone_until IS NOT NULL AND tombstone_until <= ?2 \
+             ORDER BY key_digest ASC",
+            vec![Value::from(namespace), Value::Integer(now_sql)],
+            page,
+        )
+        .await?;
+    if !expired_tombstones.is_empty() {
+        let mut batch = Vec::with_capacity(expired_tombstones.len().saturating_mul(2));
+        for row in &expired_tombstones {
+            // The revisions go first, while the head still proves the
+            // identity is a due tombstone; the head goes last on the same
+            // re-check. An erasure tombstone is never deleted (B-22).
+            batch.push(Statement::with_params(
+                "DELETE FROM rahi_receipt WHERE key_digest = ?1 \
+                 AND EXISTS (SELECT 1 FROM rahi_receipt_head h WHERE h.key_digest = ?1 \
+                             AND h.tombstoned = 1 AND h.erased = 0 \
+                             AND h.tombstone_until IS NOT NULL AND h.tombstone_until <= ?2)",
+                vec![Value::from(row.key_digest.clone()), Value::Integer(now_sql)],
+            ));
+            batch.push(Statement::with_params(
+                "DELETE FROM rahi_receipt_head WHERE key_digest = ?1 \
+                 AND tombstoned = 1 AND erased = 0 \
+                 AND tombstone_until IS NOT NULL AND tombstone_until <= ?2",
+                vec![Value::from(row.key_digest.clone()), Value::Integer(now_sql)],
+            ));
+        }
+        let results = guarded_txn(store, lease, batch).await?;
+        report.tombstones_deleted += results
+            .chunks(2)
+            .filter_map(|c| c.get(1))
+            .map(|r| r.rows_affected)
+            .sum::<u64>();
+    }
+
+    Ok(report)
+}
+
+/// Submit `statements` as one batch behind `lease`'s guard (spec 045 D-17,
+/// D-19): a superseded lease aborts the whole batch as [`Error::Conflict`].
+/// The results are the caller's statements, in order.
+async fn guarded_txn(
+    store: &StoreHandle,
+    lease: &crate::lock::Lease,
+    statements: Vec<Statement>,
+) -> Result<Vec<crate::txn::ExecuteResult>, Error> {
+    let mut batch = Vec::with_capacity(statements.len().saturating_add(1));
+    batch.push(lease.guard_statement()?);
+    batch.extend(statements);
+    let mut results = store
+        .txn(batch)
+        .await
+        .map_err(|e| lease.superseded_error(e))?;
+    if results.is_empty() {
+        return Err(Error::Integrity(
+            "a guarded batch ran the lease guard but got no result for it".to_owned(),
+        ));
+    }
+    let guard = results.remove(0);
+    if guard.rows_affected != 1 {
+        return Err(Error::Conflict(format!(
+            "lease {} has no fencing row; the lease was never minted or was cleared",
+            lease.key()
+        )));
+    }
+    Ok(results)
 }
 
 #[derive(Debug, Deserialize)]
@@ -868,6 +1003,7 @@ struct KeyDigestRow {
     revision: i64,
     processor: String,
     processor_revision: String,
+    attempt: i64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -875,12 +1011,10 @@ struct HeadKeyRow {
     key_digest: String,
 }
 
-/// Claim one already-fenced UPDATE's candidate, then open its attempt row.
-///
-/// The `UPDATE` runs through `fenced_txn`, so its fence is minted from the
-/// lease's own token (spec 045 D-17); the attempt insert follows through a
-/// plain `txn`, stamped with the same token, as [`crate::Statement::fenced`]
-/// documents for an insert under a lease.
+/// Claim one candidate in one batch behind the queue lease's guard: the
+/// claim, the prior attempt's close on a reclaim, and the new attempt's open
+/// row (spec 045 B-14, D-17). `None` when the row moved since the read, so
+/// the claim matched nothing and the batch wrote nothing else.
 async fn claim_candidate(
     store: &StoreHandle,
     lease: &crate::lock::Lease,
@@ -888,51 +1022,68 @@ async fn claim_candidate(
     holder: &str,
     hold_for: Duration,
     now: UnixSeconds,
-) -> Result<Claim, Error> {
+) -> Result<Option<Claim>, Error> {
     let old_attempt = candidate.attempt;
     let new_attempt = old_attempt.saturating_add(1);
     let expires_at = UnixSeconds::new(now.get().saturating_add(hold_for.as_secs()));
-    let claim_stmt = Statement::with_params(
-        CLAIM_ROW,
+    let token = fence_to_sql(lease.token);
+    let now_sql = unix_to_sql(now);
+    let identity = || {
         vec![
-            Value::from(holder),
-            Value::Integer(unix_to_sql(expires_at)),
-            Value::Integer(new_attempt),
             Value::from(candidate.key_digest.clone()),
             Value::Integer(candidate.revision),
             Value::from(candidate.processor.clone()),
             Value::from(candidate.processor_revision.clone()),
-            Value::Integer(old_attempt),
+        ]
+    };
+    let mut claim_params = vec![
+        Value::from(holder),
+        Value::Integer(unix_to_sql(expires_at)),
+        Value::Integer(new_attempt),
+    ];
+    claim_params.extend(identity());
+    claim_params.extend([
+        Value::Integer(old_attempt),
+        Value::Integer(token),
+        Value::Integer(now_sql),
+    ]);
+    let mut close_params = vec![Value::Integer(now_sql)];
+    close_params.extend(identity());
+    close_params.extend([
+        Value::Integer(old_attempt),
+        Value::Integer(new_attempt),
+        Value::Integer(token),
+    ]);
+    let mut open_params = vec![Value::Integer(now_sql)];
+    open_params.extend(identity());
+    open_params.extend([Value::Integer(new_attempt), Value::Integer(token)]);
+
+    let results = guarded_txn(
+        store,
+        lease,
+        vec![
+            Statement::with_params(CLAIM_ROW, claim_params),
+            Statement::with_params(CLOSE_PRIOR_EXPIRED, close_params),
+            Statement::with_params(OPEN_ATTEMPT, open_params),
         ],
-    );
-    let results = store.fenced_txn(lease, vec![claim_stmt]).await?;
-    let affected = results.first().map(|r| r.rows_affected).unwrap_or(0);
-    if affected != 1 {
-        return Err(Error::Conflict(format!(
-            "processing row {} revision {} raced away before it could be claimed",
+    )
+    .await?;
+    let claimed = results.first().map_or(0, |r| r.rows_affected);
+    let opened = results.get(2).map_or(0, |r| r.rows_affected);
+    match (claimed, opened) {
+        (0, 0) => Ok(None),
+        (1, 1) => Ok(Some(Claim {
+            key: candidate_key(candidate)?,
+            token: lease.token,
+            attempt: to_attempt(new_attempt, &candidate.key_digest)?,
+            expires_at,
+        })),
+        (c, o) => Err(Error::Integrity(format!(
+            "claiming processing row {} revision {} changed {c} row(s) and opened {o} \
+             attempt(s); one of each, or none, was expected",
             candidate.key_digest, candidate.revision
-        )));
+        ))),
     }
-    store
-        .txn(vec![Statement::with_params(
-            OPEN_ATTEMPT,
-            vec![
-                Value::from(candidate.key_digest.clone()),
-                Value::Integer(candidate.revision),
-                Value::from(candidate.processor.clone()),
-                Value::from(candidate.processor_revision.clone()),
-                Value::Integer(new_attempt),
-                Value::from(holder),
-                Value::Integer(unix_to_sql(now)),
-            ],
-        )])
-        .await?;
-    Ok(Claim {
-        key: candidate_key(candidate)?,
-        token: lease.token,
-        attempt: to_attempt(new_attempt, &candidate.key_digest)?,
-        expires_at,
-    })
 }
 
 fn candidate_key(row: &CandidateRow) -> Result<ProcessingKey, Error> {

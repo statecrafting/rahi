@@ -9,8 +9,8 @@ mod common;
 use std::time::Duration;
 
 use rahi_store::{
-    ContentDigest, DeadFilter, Page, ProcessingKey, ReceiptKey, ReceiptMeta, Receipts,
-    RetryPolicy, StoreHandle, TxnBuilder, Work, coordination_migration, receipt_migration,
+    ContentDigest, DeadFilter, Page, ProcessingKey, ReceiptKey, ReceiptMeta, Receipts, RetryPolicy,
+    StoreHandle, TxnBuilder, Work, coordination_migration, receipt_migration,
 };
 use rahi_types::{Error, UnixSeconds};
 
@@ -127,7 +127,9 @@ async fn a_superseded_claim_commits_nothing() {
     store.txn(txn.into_statements()).await.unwrap();
     let counts = Work::counts(&store).await.unwrap();
     assert!(
-        counts.iter().all(|c| c.processor != "extract" || c.claimed == 0),
+        counts
+            .iter()
+            .all(|c| c.processor != "extract" || c.claimed == 0),
         "the legitimate holder's completion lands"
     );
 
@@ -175,8 +177,17 @@ async fn three_failures_reach_dead_and_requeue_restores_pending() {
         .await
         .unwrap();
     assert_eq!(dead.len(), 1);
-    assert_eq!(dead[0].attempts.len(), 3, "the attempt history holds three rows");
-    assert!(dead[0].attempts.iter().all(|a| a.outcome == "dead" || a.outcome == "failed"));
+    assert_eq!(
+        dead[0].attempts.len(),
+        3,
+        "the attempt history holds three rows"
+    );
+    assert!(
+        dead[0]
+            .attempts
+            .iter()
+            .all(|a| a.outcome == "dead" || a.outcome == "failed")
+    );
 
     let mut txn = TxnBuilder::new();
     Work::requeue(&mut txn, &key, now(2));
@@ -261,7 +272,10 @@ async fn counts_aggregate_by_processor_over_every_tenant_and_namespace() {
 
     let counts = Work::counts(&store).await.unwrap();
     let extract = counts.iter().find(|c| c.processor == "extract").unwrap();
-    assert_eq!(extract.pending, 2, "aggregated over both tenants and namespaces");
+    assert_eq!(
+        extract.pending, 2,
+        "aggregated over both tenants and namespaces"
+    );
 
     f.store.shutdown().await.unwrap();
 }

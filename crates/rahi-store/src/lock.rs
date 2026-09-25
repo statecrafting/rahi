@@ -112,6 +112,39 @@ impl Lease {
         self.hand_back();
     }
 
+    /// The guard [`StoreHandle::fenced_txn`] runs first, for a caller in
+    /// this crate whose batch must also `INSERT` and so cannot go through
+    /// `fenced_txn`'s per-statement rewrite (spec 045 D-17, D-19). The caller
+    /// submits it first in a plain `txn`, fences its own `UPDATE`s by hand,
+    /// and maps the batch's error through [`Lease::superseded_error`].
+    pub(crate) fn guard_statement(&self) -> Result<Statement, Error> {
+        Ok(Statement::with_params(
+            GUARD_SQL,
+            vec![
+                Value::Integer(fence_literal(self.token)?),
+                Value::from(self.key.as_str()),
+            ],
+        ))
+    }
+
+    /// Classify a batch error that [`Lease::guard_statement`] may have
+    /// provoked: the guard is the only statement that can fail on
+    /// `lease_fence`, so a failure naming it means superseded and becomes
+    /// [`Error::Conflict`]; any other error passes through with its own
+    /// class.
+    pub(crate) fn superseded_error(&self, e: Error) -> Error {
+        if !e.message().contains(FENCE_COLUMN) {
+            return e;
+        }
+        self.superseded.store(true, Ordering::Relaxed);
+        Error::Conflict(format!(
+            "lease {} token {} has been superseded: {}",
+            self.key,
+            self.token.get(),
+            e.message()
+        ))
+    }
+
     /// Give up the lock, unless this lease has already been superseded.
     ///
     /// A superseded lease no longer owns the key, and hiqlite's lock handler
@@ -207,33 +240,15 @@ impl StoreHandle {
             ));
         }
         let mut batch = Vec::with_capacity(statements.len().saturating_add(1));
-        batch.push(Statement::with_params(
-            GUARD_SQL,
-            vec![
-                Value::Integer(fence_literal(lease.token)?),
-                Value::from(lease.key.as_str()),
-            ],
-        ));
+        batch.push(lease.guard_statement()?);
         for statement in statements {
             batch.push(statement.fenced(lease.token)?);
         }
 
-        let mut results = self.txn(batch).await.map_err(|e| {
-            // The guard is the only statement in the batch that can fail on
-            // `lease_fence`, so its failure is the one that means superseded;
-            // an error from the caller's own statements passes through with
-            // its own class.
-            if !e.message().contains(FENCE_COLUMN) {
-                return e;
-            }
-            lease.superseded.store(true, Ordering::Relaxed);
-            Error::Conflict(format!(
-                "lease {} token {} has been superseded: {}",
-                lease.key,
-                lease.token.get(),
-                e.message()
-            ))
-        })?;
+        let mut results = self
+            .txn(batch)
+            .await
+            .map_err(|e| lease.superseded_error(e))?;
         if results.is_empty() {
             return Err(Error::Integrity(
                 "fenced_txn ran the guard but got no result for it".to_owned(),

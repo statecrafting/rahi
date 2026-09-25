@@ -337,40 +337,72 @@ async fn the_scrape_and_the_static_slot_are_not_observed() {
 async fn rahi_work_items_is_redacted() {
     let obs = observability();
     let cell = boot("https://cell.example.com").await;
-    cell.store.migrate(&[receipt_migration(1)]).await.expect("the receipt tables migrate");
+    cell.store
+        .migrate(&[receipt_migration(1)])
+        .await
+        .expect("the receipt tables migrate");
 
     let receipt = ReceiptKey::new("secret-tenant", "email:imap:acct-7", "msg-super-secret")
         .expect("a well-formed receipt key");
     let digest = ContentDigest::of(b"a private message body");
     let mut txn = TxnBuilder::new();
-    Receipts::stage_first(&mut txn, &receipt, &digest, &ReceiptMeta::default(), rahi_types::UnixSeconds::new(1))
-        .expect("the outcome fits");
-    cell.store.txn(txn.into_statements()).await.expect("the receipt commits");
+    Receipts::stage_first(
+        &mut txn,
+        &receipt,
+        &digest,
+        &ReceiptMeta::default(),
+        rahi_types::UnixSeconds::new(1),
+    )
+    .expect("the outcome fits");
+    cell.store
+        .txn(txn.into_statements())
+        .await
+        .expect("the receipt commits");
 
     let key = ProcessingKey::new(receipt.clone(), 1, "extract.itinerary", "v1")
         .expect("a well-formed processing key");
     let mut txn = TxnBuilder::new();
     Work::stage_work(&mut txn, &key, rahi_types::UnixSeconds::new(1));
-    cell.store.txn(txn.into_statements()).await.expect("the work row commits");
+    cell.store
+        .txn(txn.into_statements())
+        .await
+        .expect("the work row commits");
 
     let counts = Work::counts(&cell.store).await.expect("counts read back");
     for c in &counts {
-        obs.metrics().set_work_items(&c.processor, "pending", i64::try_from(c.pending).unwrap());
-        obs.metrics().set_work_items(&c.processor, "claimed", i64::try_from(c.claimed).unwrap());
-        obs.metrics().set_work_items(&c.processor, "failed", i64::try_from(c.failed).unwrap());
-        obs.metrics().set_work_items(&c.processor, "dead", i64::try_from(c.dead).unwrap());
+        obs.metrics()
+            .set_work_items(&c.processor, "pending", i64::try_from(c.pending).unwrap());
+        obs.metrics()
+            .set_work_items(&c.processor, "claimed", i64::try_from(c.claimed).unwrap());
+        obs.metrics()
+            .set_work_items(&c.processor, "failed", i64::try_from(c.failed).unwrap());
+        obs.metrics()
+            .set_work_items(&c.processor, "dead", i64::try_from(c.dead).unwrap());
     }
 
     let router = Edge::builder(cell.state.clone()).build();
     let exposition = send(&router, get_request("/metrics")).await;
-    assert!(exposition.body.contains("rahi_work_items"), "{}", exposition.body);
+    assert!(
+        exposition.body.contains("rahi_work_items"),
+        "{}",
+        exposition.body
+    );
     assert!(
         exposition.body.contains("processor=\"extract.itinerary\""),
         "{}",
         exposition.body
     );
-    assert!(exposition.body.contains("state=\"pending\""), "{}", exposition.body);
-    for secret in ["secret-tenant", "acct-7", "msg-super-secret", &receipt.key_digest()] {
+    assert!(
+        exposition.body.contains("state=\"pending\""),
+        "{}",
+        exposition.body
+    );
+    for secret in [
+        "secret-tenant",
+        "acct-7",
+        "msg-super-secret",
+        &receipt.key_digest(),
+    ] {
         assert!(
             !exposition.body.contains(secret),
             "{secret} leaked into the exposition:\n{}",
