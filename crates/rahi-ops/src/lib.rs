@@ -32,6 +32,7 @@
 
 pub mod archive;
 pub mod backup;
+pub mod cell_lock;
 pub mod first_boot;
 pub mod keys;
 pub mod migrate;
@@ -40,7 +41,9 @@ pub mod rauthy_api;
 pub mod rauthy_env;
 pub mod rauthy_session;
 pub mod restore;
+pub mod stop;
 pub mod supervise;
+pub mod upgrade;
 
 use std::os::unix::fs::PermissionsExt as _;
 use std::path::{Path, PathBuf};

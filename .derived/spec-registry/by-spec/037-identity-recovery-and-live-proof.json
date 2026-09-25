@@ -232,7 +232,7 @@
     ],
     "risk": "high",
     "sectionDigests": {
-      "037-identity-recovery-and-the-live-proof": "9c8e47281f42086eee7a44406a79beee0232456efbc2d8ff5e46ec90f067caa6",
+      "037-identity-recovery-and-the-live-proof": "3083489cde757d87b4a394e04b0b9790232a2eafcc9d613aa9c647109499c463",
       "1-purpose": "17a73acda85c1491707513ad521243f042d931f43129417fb8a51a5cd4d32d4d",
       "2-territory": "b33e57007a560da785088dfc50c3fde84c1c31a7fe24e5600fc37c49b1e14a0c",
       "3-behavior": "245a68eefcd4eb2c7c646ac65240750efcb0290f4b226841c10c39d477a6bf15",
@@ -241,7 +241,7 @@
       "6-out-of-scope": "134a2816c79d1a43961e6f4ac498e43d8b0bf99d3207f2086134b47e2de32173",
       "7-resolved-decisions": "b441d2b3f611dcb509eb7f4a9c230c17f3ad06b771395719692cff604d05e1e2",
       "evidence-and-proposals-2026-09-12": "37a9d1637921deaf05a087d9c73089035206e8e1c139e4b1e87ec8fb35e57fe2",
-      "status": "6c55c7d94535844a6b0c4f7ed7074de467e5dd96d5be4f358260905d1768edc6",
+      "status": "9065f5c7f3ca87bdbf49d1b8d9126f2fdf95d4d0d0a1b705d61a32ec89be8862",
       "verification": "ef943017a0a3f745b630667ab9999adb763e3b3ae6cbde94d4c14b16419b3b57"
     },
     "sectionHeadings": [
@@ -262,6 +262,6 @@
     "summary": "Recovery of a cell is two state systems, and only one of them recovers today. Against a real rauthy the backup verb fails outright, because rauthy's backup routes accept only an admin session and the verb presents the admin API key (030 D-3, observed against 0.36.2). The app half races hiqlite's background backup and can report no file for a backup that lands a moment later (observed on two of four runs). A restore places rauthy's snapshot and nothing hands it to rauthy, so a restored cell comes up with no users, and every sub in its rows is unreachable. CI never runs a real rauthy. This spec resolves D-3 by the mechanism a human chooses, waits for the app backup to exist, applies rauthy's snapshot exactly once on the next start, and adds a CI job that runs every rauthy-gated test, and an end-to-end test through recovery with identity, against the pinned rauthy release.\n",
     "title": "Identity recovery and the live proof: a backup a real rauthy answers, a restore that brings the users back, and CI that runs against the pinned release"
   },
-  "shardHash": "40086010900379e82f3cb7fdd104b12a192b65cad5366c02e63dd0582fc86198",
+  "shardHash": "f1ead215ebb230375855034bd624d20db566eaecda6c0557aa8f491c1da0511b",
   "specVersion": "1.8.0"
 }

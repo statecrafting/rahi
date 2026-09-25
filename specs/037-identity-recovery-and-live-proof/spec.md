@@ -519,6 +519,10 @@ D-7 stands.
   (D-7). Implementation stays `in-progress` until that is reconciled by a
   human. Nothing in this repository claims unattended recovery beyond what
   B-6 proves at N=1.
+- **D-10 (2026-09-25; cross-reference).** Section 6's "a rauthy fork: rahi
+  consumes released rauthy" stands. The N=1 cell consumes one downstream
+  build of released Rauthy 0.36.2, pinned by digest, under 011 D-14 and
+  043 D-1, D-14, D-15. rahi authors no change to it and maintains no fork.
 
 ### Evidence and proposals (2026-09-12)
 
