@@ -243,6 +243,28 @@ pub fn write(config: &Config, record: &Record) -> Result<()> {
     crate::write_replacing(&state_path(config), &bytes)
 }
 
+/// Record `to` when the transition stands at one of `from` (T4, T5): the
+/// completions `supervise` and `serve` write. `Ok(false)` when the record is
+/// absent or elsewhere, which changes nothing.
+///
+/// The caller holds `transition.lock` shared through its gate, so no verb,
+/// abort or restore can change the layout or the record meanwhile.
+///
+/// # Errors
+///
+/// As [`read`] and [`write`].
+pub fn complete(config: &Config, from: &[Phase], to: Phase) -> Result<bool> {
+    let Some(mut record) = read(config)? else {
+        return Ok(false);
+    };
+    if !from.contains(&record.phase) {
+        return Ok(false);
+    }
+    record.phase = to;
+    write(config, &record)?;
+    Ok(true)
+}
+
 // ------------------------------------------------------------------ the verb
 
 /// B-4's two preconditions, word for word: the verb prints them before T1,

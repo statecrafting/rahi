@@ -1442,3 +1442,98 @@ fn every_verb_locks_before_it_reads_opens_or_spawns() {
     }
     drop((cell, layout));
 }
+
+/// Spec 043 AC-3's shape through the binary: a volume in the pre-043 layout
+/// is refused by `serve` before anything opens; `upgrade-cache` with a
+/// verifying archive reaches `floored`; `serve` then answers ready and
+/// records `done`; a second verb run changes nothing.
+#[test]
+fn a_pre043_volume_is_refused_then_transitioned_then_served_to_done() {
+    let volume = Volume::new();
+    let data = volume.path();
+    assert_eq!(volume.run(&["migrate"]).code, 0);
+
+    // The layout every pre-043 binary wrote: the store at <data>/hiqlite and
+    // the rendered environment at <data>/rauthy/rauthy.env.
+    std::fs::remove_dir_all(data.join("hiqlite")).unwrap();
+    std::fs::remove_dir_all(data.join("rauthy").join("rauthy.env")).unwrap();
+    std::fs::rename(data.join("app-store"), data.join("hiqlite")).unwrap();
+    std::fs::write(data.join("rauthy").join("rauthy.env"), b"OLD=1\n").unwrap();
+    let db = data.join("hiqlite").join("state_machine").join("db");
+    let leftovers: Vec<String> = std::fs::read_dir(&db)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .filter(|n| n.ends_with("-wal") || n.ends_with("-shm"))
+        .collect();
+    assert!(
+        leftovers.is_empty(),
+        "a stopped process closed SQLite: {leftovers:?}"
+    );
+
+    let refused = volume.run(&["serve"]);
+    assert_ne!(refused.code, 0);
+    assert!(
+        refused.stderr.contains("rahi upgrade-cache"),
+        "{}",
+        refused.stderr
+    );
+    assert!(!data.join("app-store").exists(), "nothing was opened");
+
+    let keys = KeySet::at(data.join("keys"));
+    let parts = vec![
+        rahi_ops::archive::Part::new(rahi_ops::archive::APP_DIR, "a.sqlite", b"app".to_vec()),
+        rahi_ops::archive::Part::new(rahi_ops::archive::RAUTHY_DIR, "r.sqlite", b"r".to_vec()),
+        rahi_ops::archive::Part::new(rahi_ops::archive::KEYS_DIR, "ledger.key", b"k".to_vec()),
+    ];
+    let manifest =
+        rahi_ops::archive::ArchiveManifest::over(&parts, 1, "sha256:test".to_owned(), None);
+    let sealed =
+        rahi_ops::archive::seal(&parts, &manifest, &keys.backup_recipient().unwrap()).unwrap();
+    let archive = data.join("pre-upgrade.tar.age");
+    std::fs::write(&archive, sealed).unwrap();
+
+    let run = volume.run(&["upgrade-cache", "--backup", archive.to_str().unwrap()]);
+    assert_eq!(run.code, 0, "{}{}", run.stdout, run.stderr);
+    assert!(
+        run.stdout.contains("Every old process is stopped"),
+        "{}",
+        run.stdout
+    );
+    assert!(run.stdout.contains("is floored at"), "{}", run.stdout);
+
+    let record = || {
+        let text = std::fs::read_to_string(data.join(rahi_ops::upgrade::STATE_FILE)).unwrap();
+        serde_json::from_str::<serde_json::Value>(&text).unwrap()["phase"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    assert_eq!(record(), "floored");
+
+    let mut serve = Command::new(env!("CARGO_BIN_EXE_rahi"));
+    serve.arg("serve");
+    for (k, v) in &volume.env {
+        serve.env(k, v);
+    }
+    serve.env_remove(rahi_ops::RESTORE_ENV_VAR);
+    let mut child = serve
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(90);
+    while record() != "done" && std::time::Instant::now() < deadline {
+        std::thread::sleep(std::time::Duration::from_millis(250));
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+    assert_eq!(record(), "done", "serve's first ready answer completes it");
+
+    let again = volume.run(&["upgrade-cache", "--backup", archive.to_str().unwrap()]);
+    assert_eq!(again.code, 0, "{}", again.stderr);
+    assert!(
+        again.stdout.contains("`done`; nothing to do"),
+        "{}",
+        again.stdout
+    );
+}

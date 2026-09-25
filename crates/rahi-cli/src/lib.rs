@@ -173,6 +173,16 @@ async fn supervise<C: Cell>(env: &dyn EnvReader) -> Result<i32> {
     let manifest = rahi_kernel::Manifest::parse(C::manifest())?;
     let app_name = manifest.app.name.as_str().to_owned();
     let (mut rauthy, supplied) = sup::prepare_rauthy(&config, env)?;
+    // Spec 043 B-4 T4: while the transition stands at `floored`, Rauthy is
+    // given its consent to move its own cache aside, and only then. The
+    // operator's value never reaches it: the gate refused it in this
+    // process's environment, and the child's environment is cleared.
+    let consent = gate
+        .record()
+        .is_some_and(|r| r.phase == rahi_ops::upgrade::Phase::Floored);
+    if consent {
+        rauthy.env(rahi_ops::cell_lock::ENV_CACHE_LEGACY_MOVE_ASIDE, "true");
+    }
     // Spec 038 B-4 and D-11: rauthy takes the refresh token lifetime as a
     // number of hours in its own configuration rather than as a client
     // field, so the manifest's value is applied to the child at every start.
@@ -185,6 +195,17 @@ async fn supervise<C: Cell>(env: &dyn EnvReader) -> Result<i32> {
         // admin the verb logs in as must exist before anything asks for a
         // backup.
         let steps = sup::ready_after_health(&config, &keys, &api, supplied.as_ref()).await?;
+        if consent
+            && rahi_ops::upgrade::complete(
+                &config,
+                &[rahi_ops::upgrade::Phase::Floored],
+                rahi_ops::upgrade::Phase::RauthyDone,
+            )?
+        {
+            println!(
+                "supervise: rauthy moved its cache under consent; the transition is rauthy-done"
+            );
+        }
         let custodied = sup::custody_client(&config, &keys, &manifest).await?;
         let mut said = steps.render();
         let native = custodied.render();

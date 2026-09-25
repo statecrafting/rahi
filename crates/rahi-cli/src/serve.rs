@@ -650,6 +650,18 @@ pub async fn serve_gated<C: Cell>(
         ServeGate::Own => Booted::open_serve::<C>(env).await?,
         ServeGate::Supervisor(gate) => Booted::open_owned::<C>(env, gate).await?,
     };
+    // Spec 043 B-4 T5: at `floored` or `rauthy-done`, the first ready answer
+    // completes the transition.
+    let transition = match gate {
+        ServeGate::Own => booted.gate().and_then(|g| g.record().map(|r| r.phase)),
+        ServeGate::Supervisor(gate) => gate.record().map(|r| r.phase),
+    };
+    let completes = transition.is_some_and(|p| {
+        matches!(
+            p,
+            rahi_ops::upgrade::Phase::Floored | rahi_ops::upgrade::Phase::RauthyDone
+        )
+    });
     let Composed { router, kernel } = match compose_parts::<C>(&booted, env, &streams).await {
         Ok(composed) => composed,
         Err(err) => {
@@ -674,6 +686,8 @@ pub async fn serve_gated<C: Cell>(
         booted.manifest.app.name.as_str(),
         booted.config.public_url.origin()
     );
+    let completion =
+        completes.then(|| tokio::spawn(complete_after_ready(booted.config.clone(), bound)));
     let stopped = std::sync::Arc::new(tokio::sync::Notify::new());
     let until = {
         let stopped = stopped.clone();
@@ -709,11 +723,54 @@ pub async fn serve_gated<C: Cell>(
         }
     };
     drop(server);
+    if let Some(task) = completion {
+        task.abort();
+    }
     // Spec 035 B-1: the requests are done; the records of their denials get
     // their bound before the store they are written through goes away.
     drain_denials(&kernel, denial_bound).await;
     booted.shutdown().await;
     served
+}
+
+/// Spec 043 B-4 T5: ask this process's own `/readyz` until it answers 200,
+/// then record `done`. The answer is the real probe's, over the socket.
+async fn complete_after_ready(config: Config, bound: SocketAddr) {
+    while !tokio::time::timeout(Duration::from_secs(5), ready_once(bound))
+        .await
+        .unwrap_or(false)
+    {
+        tokio::time::sleep(Duration::from_millis(250)).await;
+    }
+    match rahi_ops::upgrade::complete(
+        &config,
+        &[
+            rahi_ops::upgrade::Phase::Floored,
+            rahi_ops::upgrade::Phase::RauthyDone,
+        ],
+        rahi_ops::upgrade::Phase::Done,
+    ) {
+        Ok(true) => println!("serve: ready; the cache transition is done"),
+        Ok(false) => {}
+        Err(err) => eprintln!("serve: the transition's completion cannot be recorded: {err}"),
+    }
+}
+
+/// One `GET /readyz` on `bound`: whether it answered 200.
+async fn ready_once(bound: SocketAddr) -> bool {
+    use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+    let Ok(mut stream) = tokio::net::TcpStream::connect(bound).await else {
+        return false;
+    };
+    let request = format!(
+        "GET {} HTTP/1.1\r\nHost: {bound}\r\nConnection: close\r\n\r\n",
+        rahi_edge::probes::READYZ_PATH
+    );
+    if stream.write_all(request.as_bytes()).await.is_err() {
+        return false;
+    }
+    let mut head = [0u8; 12];
+    stream.read_exact(&mut head).await.is_ok() && head.ends_with(b" 200")
 }
 
 /// `endpoint` on the loopback base when it is on the public origin, as
