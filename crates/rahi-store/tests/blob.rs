@@ -469,20 +469,21 @@ struct Probe {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn the_engine_refuses_to_load_an_extension() {
     // `Store::open` already asserted this against its own connection; a store
-    // that reached this line booted without loading one. The direct ask is
-    // here so the assertion is visible rather than implied. hiqlite drops
-    // row-level errors on a local read, so a refused load arrives as no rows;
-    // a load that had succeeded would return one row holding NULL.
+    // that reached this line booted without loading one. Under patched hiqlite
+    // the query fails closed with an error.
     let f = common::open().await;
     let store = f.store.handle();
-    let answer: Vec<Probe> = store
-        .query(
+    let err = store
+        .query::<Probe>(
             "SELECT load_extension($1) AS probe",
             vec![Value::from("rahi-no-such-extension")],
         )
         .await
-        .unwrap();
-    assert!(answer.is_empty(), "the engine loaded nothing");
+        .unwrap_err();
+    assert!(
+        matches!(err, Error::Validation(_)),
+        "expected validation refusal, got {err:?}"
+    );
 
     let report = store.engine_report();
     assert_eq!(report.extensions, "none");
