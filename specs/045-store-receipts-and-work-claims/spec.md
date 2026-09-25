@@ -1,7 +1,7 @@
 ---
 id: "045-store-receipts-and-work-claims"
 title: "Receipts and work claims: an inbound item is recorded once per content revision, processed once per processor revision, and never silently dropped"
-status: draft
+status: approved
 kind: kernel
 domain: store
 created: "2026-09-24"
@@ -562,6 +562,12 @@ directory, and asserts the stated end state.
 - **D-14 (2026-09-24, ordinal).** 043 and 044 are drafts in flight on
   their own branches, so this draft takes 045 and none of the three
   collide.
+- **D-15 (2026-09-24, owner approval).** The owner approved this spec for
+  implementation on 2026-09-24, with D-5 to D-14 as recorded, by issuing
+  the travel-memory work order for rahi. `status` moves from `draft` to
+  `approved`; `implementation` stays `pending` until a session builds it.
+  D-1's sentence that approval is a separate human act is kept as the
+  record of the draft; this entry is that act.
 
 ### Follow-up: statecraft-platform's `sc_idempotency`
 
