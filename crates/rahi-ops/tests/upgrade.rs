@@ -446,6 +446,11 @@ async fn repeated_debris_is_recovered_by_identity_without_replacement() {
     let record = upgrade::read(&config).unwrap().unwrap();
     assert_eq!(record.phase, Phase::Relocating);
     let source = record.plan[0].source.clone();
+    assert_eq!(
+        source.file_name().unwrap(),
+        "logs",
+        "the pre-043 WAL log moves before an old start can mutate it"
+    );
 
     recreate_directory(&source, b"one");
     assert!(

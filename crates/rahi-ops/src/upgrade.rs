@@ -805,13 +805,17 @@ fn plan_t2(config: &Config, record: &mut Record, faults: &dyn Faults) -> Result<
         }
         entries.push((legacy.join(&name), destination(&name, false)));
     }
-    // hiqlite F-130: the snapshot cache before the cache log.
+    // A pre-043 start opens and may truncate the WAL log before it checks the
+    // state-machine marker. Move the durable log first, so every refused old
+    // start after the first fault can create only a new debris occurrence.
+    // hiqlite F-130 then requires the snapshot cache before the cache log.
     let rank = |p: &Path| match p.file_name().and_then(|n| n.to_str()) {
-        Some("state_machine_cache") => 1,
-        Some("logs_cache") => 2,
-        _ => 0,
+        Some("logs") => 0,
+        Some("state_machine_cache") => 2,
+        Some("logs_cache") => 3,
+        _ => 1,
     };
-    entries.sort_by_key(|(source, _)| rank(source));
+    entries.sort_by(|(a, _), (b, _)| rank(a).cmp(&rank(b)).then_with(|| a.cmp(b)));
     let mut plan = Vec::with_capacity(entries.len());
     for (source, destination) in entries {
         if is_symlink(&source) {
