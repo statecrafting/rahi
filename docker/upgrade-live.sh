@@ -319,10 +319,12 @@ ac4d() {
     else
       old_serves_nothing "AC-4 (d) $state" "$vol" 30
     fi
-    if verb "$new" "$vol" upgrade-cache --backup "$archive" >/dev/null 2>&1; then
+    if out="$(verb "$new" "$vol" upgrade-cache --backup "$archive" 2>&1)"; then
       pass "AC-4 (a) $state: a rerun of the verb reaches floored"
     else
-      fail "AC-4 (a) $state: the rerun failed"
+      say "$out"
+      tree "$vol" hiqlite >&2
+      fail "AC-4 (a) $state: the rerun failed: $(printf '%s' "$out" | grep '^error' | head -1)"
       continue
     fi
     new_reaches_done "AC-4 (a) $state" "$vol"
