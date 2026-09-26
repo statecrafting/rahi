@@ -1,59 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-ops/src/upgrade.rs' does not exist",
-        "path": "crates/rahi-ops/src/upgrade.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-ops/src/cell_lock.rs' does not exist",
-        "path": "crates/rahi-ops/src/cell_lock.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-ops/src/stop.rs' does not exist",
-        "path": "crates/rahi-ops/src/stop.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-ops/tests/upgrade.rs' does not exist",
-        "path": "crates/rahi-ops/tests/upgrade.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-ops/tests/cell_lock.rs' does not exist",
-        "path": "crates/rahi-ops/tests/cell_lock.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-cli/tests/terminal.rs' does not exist",
-        "path": "crates/rahi-cli/tests/terminal.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-cli/tests/stop_budget.rs' does not exist",
-        "path": "crates/rahi-cli/tests/stop_budget.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-cli/tests/stop_outcome.rs' does not exist",
-        "path": "crates/rahi-cli/tests/stop_outcome.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-idp/tests/revocation_durable.rs' does not exist",
-        "path": "crates/rahi-idp/tests/revocation_durable.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '043-patched-dependency-adoption' file unit 'crates/rahi-store/tests/dependency_identity.rs' does not exist",
-        "path": "crates/rahi-store/tests/dependency_identity.rs"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "010-workspace-and-core-types",
@@ -101,7 +46,35 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-cli/tests/evolution.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-cli/tests/shutdown.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/tests/stop_budget.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/tests/stop_fixture/mod.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/tests/stop_outcome.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/tests/terminal.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/obs/metrics.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/probes.rs",
         "source": "spec-edge"
       },
       {
@@ -114,6 +87,30 @@
       },
       {
         "path": "crates/rahi-idp/src/revoke.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/tests/bearer.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/tests/native.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/tests/revocation_durable.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ledger/tests/identity.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/cell_lock.rs",
         "source": "spec-edge"
       },
       {
@@ -137,7 +134,31 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-ops/src/stop.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-ops/src/supervise.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/upgrade.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/tests/cell_lock.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/tests/rauthy_restore.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/tests/restore.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/tests/upgrade.rs",
         "source": "spec-edge"
       },
       {
@@ -157,7 +178,15 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-store/tests/dependency_identity.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-types/src/config.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-types/tests/config.rs",
         "source": "spec-edge"
       },
       {
@@ -179,11 +208,23 @@
       {
         "path": "docker/runtime.Dockerfile",
         "source": "spec-edge"
+      },
+      {
+        "path": "docker/smoke.sh",
+        "source": "spec-edge"
+      },
+      {
+        "path": "docker/upgrade-live.sh",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-cli/tests/stop_budget.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -192,7 +233,24 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-cli/tests/stop_fixture/mod.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/stop_fixture/mod.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/tests/stop_outcome.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -201,7 +259,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-cli/tests/terminal.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -210,7 +272,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-idp/tests/revocation_durable.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -219,7 +285,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/cell_lock.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -228,7 +298,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/stop.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -237,7 +311,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/upgrade.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -246,7 +324,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ops/tests/cell_lock.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -255,7 +337,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ops/tests/upgrade.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -264,12 +350,29 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-store/tests/dependency_identity.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
           "kind": "file",
           "path": "crates/rahi-store/tests/dependency_identity.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docker/upgrade-live.sh"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "docker/upgrade-live.sh"
         }
       },
       {
@@ -366,6 +469,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-cli/tests/evolution.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/evolution.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-cli/tests/shutdown.rs"
           }
         ],
@@ -374,6 +490,32 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-cli/tests/shutdown.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/obs/metrics.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/obs/metrics.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/probes.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/probes.rs"
         }
       },
       {
@@ -413,6 +555,58 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-idp/src/revoke.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/tests/bearer.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/bearer.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/tests/native.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/native.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ledger/tests/identity.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/tests/identity.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/Cargo.toml"
         }
       },
       {
@@ -496,6 +690,32 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-ops/tests/rauthy_restore.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/rauthy_restore.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/tests/restore.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/restore.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-store/src/error.rs"
           }
         ],
@@ -561,6 +781,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-types/tests/config.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-types/tests/config.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "deny.toml"
           }
         ],
@@ -621,6 +854,19 @@
         "unit": {
           "kind": "file",
           "path": "docker/runtime.Dockerfile"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docker/smoke.sh"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "docker/smoke.sh"
         }
       },
       {
@@ -719,5 +965,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "6f86b9af8f59d04c5d60e9d204fade9dfc10474e7d2150aa6041466d41ad1460"
+  "shardHash": "2fcfe41be6be702219010f7a67d90cc389c0887b70f4db26e3b49cbdceef70ab"
 }

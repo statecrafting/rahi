@@ -258,7 +258,11 @@ async fn run_supervisor(config: &Config, env: &BTreeMap<&str, &str>) {
     .await
     .expect("supervisor is bounded");
     assert_eq!(result.reason, supervise::Reason::ServeEnded);
-    assert_eq!(result.code, 0);
+    // The stub installs no SIGTERM handler, so the supervisor's SIGTERM ends
+    // it by signal (143). Spec 043 FR-009 carries a Rauthy that exits
+    // non-zero into the supervisor's status as an unconfirmed stop, `3`,
+    // where this used to be `0`.
+    assert_eq!(result.code, rahi_types::error::EXIT_INFRA);
 }
 
 #[tokio::test]

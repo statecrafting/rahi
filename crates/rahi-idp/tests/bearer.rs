@@ -258,7 +258,11 @@ async fn the_four_malformed_credentials_are_each_refused() {
     let server = resource_server(&cell).await;
     let app = app(&cell, &server);
 
+    // Spec 043 B-6: every admitted token has `iat <= exp`, so an expired
+    // one was issued a lifetime before it expired.
     let expired = issued(&cell, "person.json", |payload| {
+        payload["iat"] = json!(T0 - 4500);
+        payload["nbf"] = json!(T0 - 4500);
         payload["exp"] = json!(T0 - 3600);
     });
     assert_eq!(
@@ -268,6 +272,8 @@ async fn the_four_malformed_credentials_are_each_refused() {
     );
 
     let inside_leeway = issued(&cell, "person.json", |payload| {
+        payload["iat"] = json!(T0 - 930);
+        payload["nbf"] = json!(T0 - 930);
         payload["exp"] = json!(T0 - 30);
     });
     assert_eq!(
@@ -442,7 +448,7 @@ async fn a_cookie_and_a_token_together_are_refused() {
 /// FR-004: a deny-listed `jti` is refused inside the lag, and the entry
 /// expires on its own (B-5).
 #[tokio::test]
-async fn a_deny_listed_token_is_refused_until_the_lag_elapses() {
+async fn a_deny_listed_token_is_refused_past_the_lag() {
     let cell = oidc::boot().await;
     let server = resource_server(&cell).await;
     let app = app(&cell, &server);
@@ -465,13 +471,13 @@ async fn a_deny_listed_token_is_refused_until_the_lag_elapses() {
     assert_eq!(refused.status, StatusCode::UNAUTHORIZED, "{}", refused.body);
     assert!(refused.body.contains("revoked"), "{}", refused.body);
 
-    // The entry is remembered for one access lifetime and no longer: past it
-    // the bound has been paid and the token stands on its own expiry again.
+    // Spec 043 B-6 (i), D-10: the row is retained. Past the accepted
+    // validity 038 remembered it for, the token is still refused.
     cell.advance(rahi_idp::DEFAULT_REVOCATION_LAG.as_secs() + 1);
     assert_eq!(
         send(&app, with_token("/api/me", &token)).await.status,
-        StatusCode::OK,
-        "the deny-list entry expires on its own"
+        StatusCode::UNAUTHORIZED,
+        "the revocation row is retained, not expired"
     );
 }
 

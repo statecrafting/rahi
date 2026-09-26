@@ -21,6 +21,7 @@ use tokio::process::{Child, Command};
 use crate::KeySet;
 use crate::rauthy_api::RauthyApi;
 use crate::rauthy_env;
+use crate::stop::{Observed, Reason as StopReason};
 
 /// Where the rauthy binary is, when the environment does not say.
 pub const DEFAULT_RAUTHY_BIN: &str = "/usr/local/bin/rauthy";
@@ -367,6 +368,52 @@ pub async fn custody_client(
     })
 }
 
+/// Re-apply the rendered API key access to rauthy's key, through the
+/// backup admin's session (spec 043 D-24).
+///
+/// rauthy applies `BOOTSTRAP_API_KEY`'s access only when it initializes a
+/// fresh database, not at every start, so a key first rendered before a
+/// later spec widened [`rauthy_env::API_KEY_ACCESS`] (038 widened it with
+/// `Scopes` and `Sessions`) keeps its old access on an upgraded volume, and
+/// the widened calls are refused. The key cannot widen itself (rauthy asks
+/// for the `ApiKeys` group, which it is never given), so the passkey-only
+/// backup admin (037 B-1) logs in and sets the key's access to exactly the
+/// rendered value: nothing broader than 031 D-8 allows.
+///
+/// # Errors
+///
+/// [`Error::Unauthorized`] when the key set holds no backup passkey or
+/// rauthy refuses the admin; [`Error::Upstream`] when rauthy refuses the
+/// update.
+pub async fn reapply_rendered_key_access(api: &RauthyApi, keys: &KeySet) -> Result<()> {
+    let token = keys.admin_token()?;
+    let name = token
+        .split_once('$')
+        .map(|(name, _)| name.to_owned())
+        .ok_or_else(|| Error::Config("the admin token is not name$secret".to_owned()))?;
+    let passkey = keys.backup_passkey()?.ok_or_else(|| {
+        Error::Unauthorized(format!(
+            "rauthy's API key {name} lacks the access this version renders, and this key set              holds no {} to widen it with",
+            crate::BACKUP_PASSKEY_FILE
+        ))
+    })?;
+    let access: serde_json::Value = serde_json::from_str(rauthy_env::API_KEY_ACCESS)
+        .map_err(|err| Error::Config(format!("the rendered API key access is not JSON: {err}")))?;
+    let mut session = crate::rauthy_session::AdminSession::new(api.base())?;
+    session.login(&passkey).await?;
+    let body = serde_json::json!({ "name": name, "exp": null, "access": access });
+    let path = format!("/auth/v1/api_keys/{name}");
+    let (status, text) = session
+        .call(reqwest::Method::PUT, &path, Some(&body))
+        .await?;
+    if !status.is_success() {
+        return Err(Error::Upstream(format!(
+            "rauthy answered {status} to {path}: {text}"
+        )));
+    }
+    Ok(())
+}
+
 /// Give rauthy the refresh token lifetime the manifest names (038 B-4,
 /// D-11).
 ///
@@ -450,18 +497,41 @@ pub async fn shutdown_signal() {
 
 /// SIGTERM `child`, wait `grace`, then SIGKILL. Returns the exit code.
 pub async fn terminate(child: &mut Child, grace: Duration) -> i32 {
+    terminate_observed(child, grace).await.code
+}
+
+/// How a terminated child ended (spec 043 B-10).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Terminated {
+    /// Its exit code (`128 + signal` for a signal death).
+    pub code: i32,
+    /// Whether this process had to send SIGKILL: the witness of
+    /// `rauthy_killed`.
+    pub killed: bool,
+    /// From SIGTERM to exit.
+    pub took: Duration,
+}
+
+/// [`terminate`], saying whether the SIGKILL was needed and how long it took.
+pub async fn terminate_observed(child: &mut Child, grace: Duration) -> Terminated {
+    let started = tokio::time::Instant::now();
     if let Some(pid) = child.id() {
         let _ = nix::sys::signal::kill(
             nix::unistd::Pid::from_raw(pid as i32),
             nix::sys::signal::Signal::SIGTERM,
         );
     }
-    match tokio::time::timeout(grace, child.wait()).await {
-        Ok(Ok(status)) => exit_code(status),
+    let (code, killed) = match tokio::time::timeout(grace, child.wait()).await {
+        Ok(Ok(status)) => (exit_code(status), false),
         _ => {
             let _ = child.kill().await;
-            child.wait().await.map_or(137, exit_code)
+            (child.wait().await.map_or(137, exit_code), true)
         }
+    };
+    Terminated {
+        code,
+        killed,
+        took: started.elapsed(),
     }
 }
 
@@ -475,17 +545,19 @@ pub fn exit_code(status: std::process::ExitStatus) -> i32 {
         .unwrap_or(1)
 }
 
-/// How long serve has to finish its own shutdown once told to stop.
-pub const SERVE_GRACE: Duration = Duration::from_secs(15);
+/// How long serve has to finish its own shutdown once told to stop: spec
+/// 043 B-9's `S + C + D + H`, forty seconds with the defaults.
+pub const SERVE_GRACE: Duration = crate::stop::SERVE_GRACE;
 
 /// How long rauthy has to exit after a propagated SIGTERM (B-3's last
-/// sentence). rauthy's own graceful stop finishes its open connections and
-/// then its Raft node, which takes two to five seconds in practice; the
-/// five seconds of [`TERM_GRACE`] belong to the serve-failure path, where
-/// nothing is waiting on a clean stop. An orchestrator's termination budget
-/// must cover [`SERVE_GRACE`] plus this (Kubernetes gives thirty seconds by
-/// default; `docker stop -t 30`).
-pub const SHUTDOWN_TERM_GRACE: Duration = Duration::from_secs(10);
+/// sentence, spec 043 B-9's R). rauthy's own graceful stop finishes its open
+/// connections and then its Raft node, which takes two to five seconds in
+/// practice; the five seconds of [`TERM_GRACE`] belong to the serve-failure
+/// path, where nothing is waiting on a clean stop. An orchestrator's
+/// termination budget must cover [`SERVE_GRACE`] plus this:
+/// [`crate::stop::CONTAINER_GRACE`], fifty seconds (`terminationGracePeriodSeconds:
+/// 50`, `docker stop -t 50`).
+pub const SHUTDOWN_TERM_GRACE: Duration = crate::stop::RAUTHY_STOP;
 
 /// Run `rauthy` and `serve` as one lifetime (B-3).
 ///
@@ -531,7 +603,7 @@ pub struct Graces {
 
 /// [`supervise`] with the grace periods named.
 pub async fn supervise_with<R, S, F, D>(
-    mut rauthy: Command,
+    rauthy: Command,
     ready: R,
     serve: S,
     shutdown: D,
@@ -543,13 +615,60 @@ where
     F: Future<Output = Result<()>>,
     D: Future<Output = ()>,
 {
+    supervise_observed(
+        rauthy,
+        ready,
+        |stop| {
+            let served = serve(stop);
+            async move { (served.await, Observed::default()) }
+        },
+        shutdown,
+        graces,
+    )
+    .await
+    .exit
+}
+
+/// How the supervisor ended, with everything its stop observed (spec 043
+/// B-10, FR-009).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Supervised {
+    /// The exit code and which half ended first.
+    pub exit: Exit,
+    /// Every phase that ran and every reason the stop is unconfirmed.
+    pub observed: Observed,
+}
+
+/// [`supervise_with`] whose `serve` reports what its own stop observed, and
+/// which answers the whole observation. The exit code carries B-10's
+/// outcome on every path: the first half's own non-zero code stands, and a
+/// path that would otherwise exit `0` exits `3` when the stop is
+/// unconfirmed (a serve overrun, a serve error, a Rauthy kill, a Rauthy
+/// non-zero exit).
+pub async fn supervise_observed<R, S, F, D>(
+    mut rauthy: Command,
+    ready: R,
+    serve: S,
+    shutdown: D,
+    graces: Graces,
+) -> Supervised
+where
+    R: Future<Output = Result<()>>,
+    S: FnOnce(tokio::sync::oneshot::Receiver<()>) -> F,
+    F: Future<Output = (Result<()>, Observed)>,
+    D: Future<Output = ()>,
+{
+    let mut observed = Observed::default();
     let mut child = match rauthy.spawn() {
         Ok(child) => child,
         Err(err) => {
             eprintln!("supervise: rauthy cannot be spawned: {err}");
-            return Exit {
-                code: rahi_types::error::EXIT_INFRA,
-                reason: Reason::RauthyExited,
+            return Supervised {
+                exit: Exit {
+                    code: rahi_types::error::EXIT_INFRA,
+                    reason: Reason::RauthyExited,
+                },
+                observed,
             };
         }
     };
@@ -564,18 +683,25 @@ where
         status = child.wait() => {
             let code = status.map_or(1, exit_code);
             eprintln!("supervise: rauthy exited with {code} before it was healthy");
-            return Exit { code, reason: Reason::RauthyExited };
+            if code != 0 {
+                observed.reason(StopReason::RauthyNonzero { code });
+            }
+            return Supervised { exit: Exit { code, reason: Reason::RauthyExited }, observed };
         }
         readiness = ready => {
             if let Err(err) = readiness {
                 eprintln!("supervise: {err}");
-                let _ = terminate(&mut child, term_grace).await;
-                return Exit { code: err.exit_code(), reason: Reason::RauthyUnhealthy };
+                stop_rauthy(&mut child, term_grace, &mut observed).await;
+                return Supervised {
+                    exit: Exit { code: err.exit_code(), reason: Reason::RauthyUnhealthy },
+                    observed,
+                };
             }
         }
         () = &mut shutdown => {
-            let _ = terminate(&mut child, shutdown_grace).await;
-            return Exit { code: 0, reason: Reason::Shutdown };
+            stop_rauthy(&mut child, shutdown_grace, &mut observed).await;
+            let code = observed.exit_code();
+            return Supervised { exit: Exit { code, reason: Reason::Shutdown }, observed };
         }
     }
 
@@ -586,20 +712,23 @@ where
         status = child.wait() => {
             let code = status.map_or(1, exit_code);
             eprintln!("supervise: rauthy exited with {code}; stopping serve");
+            if code != 0 {
+                observed.reason(StopReason::RauthyNonzero { code });
+            }
             let _ = stop.send(());
-            let _ = tokio::time::timeout(serve_grace, &mut serve).await;
-            Exit { code, reason: Reason::RauthyExited }
+            let served = tokio::time::timeout(serve_grace, &mut serve).await;
+            let serve_code = absorb_serve(served, &mut observed);
+            let code = if code == 0 { serve_code.unwrap_or_else(|| observed.exit_code()) } else { code };
+            Supervised { exit: Exit { code, reason: Reason::RauthyExited }, observed }
         }
         served = &mut serve => {
-            let code = match &served {
-                Ok(()) => 0,
-                Err(err) => {
-                    eprintln!("supervise: serve ended: {err}");
-                    err.exit_code()
-                }
-            };
-            let _ = terminate(&mut child, term_grace).await;
-            Exit { code, reason: Reason::ServeEnded }
+            let serve_code = absorb_serve(Ok(served), &mut observed);
+            if let Some(code) = serve_code {
+                eprintln!("supervise: serve ended with {code}");
+            }
+            stop_rauthy(&mut child, term_grace, &mut observed).await;
+            let code = serve_code.unwrap_or_else(|| observed.exit_code());
+            Supervised { exit: Exit { code, reason: Reason::ServeEnded }, observed }
         }
         () = &mut shutdown => {
             // serve first, then rauthy: serve's proxy holds keep-alive
@@ -608,12 +737,55 @@ where
             // and ends in a SIGKILL that leaves rauthy's lock file behind.
             let _ = stop.send(());
             let served = tokio::time::timeout(serve_grace, &mut serve).await;
-            let _ = terminate(&mut child, shutdown_grace).await;
-            let code = match served {
-                Ok(Err(err)) => err.exit_code(),
-                _ => 0,
-            };
-            Exit { code, reason: Reason::Shutdown }
+            let serve_code = absorb_serve(served, &mut observed);
+            stop_rauthy(&mut child, shutdown_grace, &mut observed).await;
+            let code = serve_code.unwrap_or_else(|| observed.exit_code());
+            Supervised { exit: Exit { code, reason: Reason::Shutdown }, observed }
         }
+    }
+}
+
+/// Fold serve's end into `observed`; its own error's code, if it failed.
+fn absorb_serve(
+    served: std::result::Result<(Result<()>, Observed), tokio::time::error::Elapsed>,
+    observed: &mut Observed,
+) -> Option<i32> {
+    match served {
+        Err(_) => {
+            eprintln!("supervise: serve did not stop within its grace");
+            observed.reason(StopReason::ServeGraceOverrun);
+            None
+        }
+        Ok((result, from_serve)) => {
+            observed.absorb(from_serve);
+            match result {
+                Ok(()) => None,
+                Err(err) => {
+                    eprintln!("supervise: serve ended: {err}");
+                    if !observed
+                        .reasons
+                        .iter()
+                        .any(|r| matches!(r, StopReason::StorageTerminal))
+                    {
+                        observed.reason(StopReason::ServeError {
+                            error: err.to_string(),
+                        });
+                    }
+                    Some(err.exit_code())
+                }
+            }
+        }
+    }
+}
+
+/// Terminate Rauthy within `grace`, recording the phase and what it took.
+async fn stop_rauthy(child: &mut Child, grace: Duration, observed: &mut Observed) {
+    let ended = terminate_observed(child, grace).await;
+    observed.phase("rauthy_stop", ended.took, grace);
+    if ended.killed {
+        eprintln!("supervise: rauthy ignored SIGTERM for {grace:?}; it was killed");
+        observed.reason(StopReason::RauthyKilled);
+    } else if ended.code != 0 {
+        observed.reason(StopReason::RauthyNonzero { code: ended.code });
     }
 }

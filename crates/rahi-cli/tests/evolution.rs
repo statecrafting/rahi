@@ -281,7 +281,7 @@ fn current_manifest<C: Cell>(volume: &Volume) -> String {
         let booted = rahi_cli::Booted::open::<C>(&volume.env).await.unwrap();
         let ledger = booted.ledger().await.unwrap();
         let current = ledger.current_manifest().await.unwrap().to_string();
-        booted.shutdown().await;
+        booted.shutdown().await.expect("the node stops");
         current
     })
 }
@@ -440,7 +440,7 @@ fn archive_of(volume: &Volume) -> PathBuf {
         let id = booted.store.backup().await.unwrap();
         let snapshot = booted.store.config().backup_dir().join(id.as_str());
         let bytes = tokio::fs::read(&snapshot).await.unwrap();
-        booted.shutdown().await;
+        booted.shutdown().await.expect("the node stops");
 
         let keys = volume.keys();
         let mut parts = vec![

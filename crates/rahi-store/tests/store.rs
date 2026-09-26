@@ -102,7 +102,7 @@ fn store_config_derives_from_the_chassis_config() {
     )]);
     let chassis = Config::from_env(&env).unwrap();
     let cfg = StoreConfig::from_config(&chassis, common::secrets());
-    assert_eq!(cfg.data_dir, PathBuf::from("/data/hiqlite"));
+    assert_eq!(cfg.data_dir, PathBuf::from("/data/app-store"));
     assert_eq!(cfg.api_addr.port(), 8300);
     assert_eq!(cfg.raft_addr.port(), 8400);
     for port in [cfg.api_addr.port(), cfg.raft_addr.port()] {
@@ -115,7 +115,7 @@ fn store_config_derives_from_the_chassis_config() {
     assert!(cfg.nodes.is_empty());
     assert_eq!(
         cfg.backup_dir(),
-        PathBuf::from("/data/hiqlite/state_machine/backups")
+        PathBuf::from("/data/app-store/state_machine/backups")
     );
     assert!(
         !format!("{cfg:?}").contains("raft-secret"),
@@ -134,4 +134,49 @@ fn the_config_has_no_field_for_rauthys_directory() {
         .map(String::as_str)
         .collect();
     assert!(!keys.iter().any(|k| k.contains("rauthy")), "{keys:?}");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn chassis_tables_and_revocation_floor_are_established_on_open() {
+    let f = common::open().await;
+    let store = f.store.handle();
+
+    // Verify the four chassis tables exist and can be queried (043 D-10:
+    // no prune horizon, since no row is ever pruned).
+    store
+        .query::<serde_json::Value>("SELECT * FROM rahi_revocation_jti", vec![])
+        .await
+        .unwrap();
+    store
+        .query::<serde_json::Value>("SELECT * FROM rahi_revocation_sub", vec![])
+        .await
+        .unwrap();
+    store
+        .query::<serde_json::Value>("SELECT * FROM rahi_revocation_floor", vec![])
+        .await
+        .unwrap();
+    store
+        .query::<serde_json::Value>("SELECT * FROM rahi_upgrade_transition", vec![])
+        .await
+        .unwrap();
+
+    // Floor starts at None.
+    assert_eq!(store.revocation_floor().await.unwrap(), None);
+
+    // Raising floor sets it.
+    store.raise_revocation_floor(100).await.unwrap();
+    assert_eq!(store.revocation_floor().await.unwrap(), Some(100));
+
+    // Raising floor to a lower value does not lower it.
+    store.raise_revocation_floor(50).await.unwrap();
+    assert_eq!(store.revocation_floor().await.unwrap(), Some(100));
+
+    // Raising floor to a higher value raises it.
+    store.raise_revocation_floor(200).await.unwrap();
+    assert_eq!(store.revocation_floor().await.unwrap(), Some(200));
+
+    // is_healthy reports Ok when healthy.
+    assert!(store.is_healthy().await.is_ok());
+
+    f.store.shutdown().await.unwrap();
 }

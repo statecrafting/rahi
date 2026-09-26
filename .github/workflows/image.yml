@@ -49,16 +49,35 @@ jobs:
       # Spec 039 B-4: docker/runtime.Dockerfile is this recipe's runtime
       # stage on its own, so the two must pin the same rauthy. A drift here
       # would ship a cell and a runtime with different identity providers.
+      #
+      # Spec 043 FR-002: the image, its version and both binary hashes are
+      # pinned identically in both files; each Dockerfile's build then
+      # refuses a binary whose `rauthy --version` or sha256 differs.
       - name: One runtime
         run: |
           set -euo pipefail
-          cell="$(grep -m1 '^ARG RAUTHY_IMAGE=' docker/Dockerfile)"
-          runtime="$(grep -m1 '^ARG RAUTHY_IMAGE=' docker/runtime.Dockerfile)"
-          if [ "$cell" != "$runtime" ]; then
-            echo "docker/Dockerfile pins $cell" >&2
-            echo "docker/runtime.Dockerfile pins $runtime" >&2
-            exit 1
-          fi
+          for arg in RAUTHY_IMAGE RAUTHY_VERSION RAUTHY_SHA256_AMD64 RAUTHY_SHA256_ARM64; do
+            cell="$(grep -m1 "^ARG ${arg}=" docker/Dockerfile || true)"
+            runtime="$(grep -m1 "^ARG ${arg}=" docker/runtime.Dockerfile || true)"
+            if [ -z "$cell" ] || [ "$cell" != "$runtime" ]; then
+              echo "docker/Dockerfile pins '$cell'" >&2
+              echo "docker/runtime.Dockerfile pins '$runtime'" >&2
+              exit 1
+            fi
+          done
+
+      # Spec 043 FR-002 and AC-2, on this architecture: the runtime image
+      # builds only with the pinned binary, and its `rauthy --version`
+      # answers the pinned version.
+      - name: The pinned rauthy, by version and hash
+        run: |
+          set -euo pipefail
+          docker buildx build --load --platform "linux/${{ matrix.arch }}" \
+            -f docker/runtime.Dockerfile -t rahi-runtime:pin .
+          want="$(grep -m1 '^ARG RAUTHY_VERSION=' docker/Dockerfile | cut -d= -f2- | tr -d '"')"
+          got="$(docker run --rm --entrypoint /usr/local/bin/rauthy rahi-runtime:pin --version)"
+          echo "rauthy --version: $got"
+          [ "$got" = "$want" ] || { echo "expected '$want'" >&2; exit 1; }
 
       - name: Build the image
         uses: docker/build-push-action@v7

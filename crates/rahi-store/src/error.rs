@@ -36,7 +36,38 @@ pub(crate) fn map(err: hiqlite::Error) -> Error {
         H::RaftErrorFatal(_) | H::WAL(_) | H::SnapshotError(_) | H::InitializeError(_) => {
             Error::Io(msg)
         }
+        H::NodeFailed(m) => Error::Io(format!("NodeFailed: {m}")),
+        H::Recovering(m) => Error::Upstream(format!("recovering: {m}")),
         _ => Error::Upstream(msg),
+    }
+}
+
+/// Whether an error represents a terminal storage failure (hiqlite NodeFailed, spec 043 B-7).
+#[must_use]
+pub fn is_terminal(err: &Error) -> bool {
+    match err {
+        Error::Io(msg) => msg.starts_with("NodeFailed:"),
+        _ => false,
+    }
+}
+
+/// Whether an error is hiqlite's `Error::Timeout`: what `Client::shutdown`
+/// answers when its caller-side wait ([`crate::SHUTDOWN_WAIT`]) elapses
+/// (spec 043 B-9, B-10's `store_timeout`).
+#[must_use]
+pub fn is_timeout(err: &Error) -> bool {
+    match err {
+        Error::Upstream(msg) => msg.starts_with("Timeout:"),
+        _ => false,
+    }
+}
+
+/// Whether an error represents hiqlite's recovering state (spec 043 D-15).
+#[must_use]
+pub fn is_recovering(err: &Error) -> bool {
+    match err {
+        Error::Upstream(msg) => msg.starts_with("recovering:"),
+        _ => false,
     }
 }
 
@@ -63,4 +94,40 @@ fn is_storage_failure(msg: &str) -> bool {
         || upper.contains("DATABASE DISK IMAGE IS MALFORMED")
         || upper.contains("DATABASE OR DISK IS FULL")
         || upper.contains("DISK I/O ERROR")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn node_failed_maps_to_terminal_io_error() {
+        let h_err = hiqlite::Error::NodeFailed("storage disconnected".into());
+        let mapped = map(h_err);
+        assert!(matches!(mapped, Error::Io(_)));
+        assert!(is_terminal(&mapped));
+        assert!(!is_recovering(&mapped));
+        assert_eq!(mapped.exit_code(), 3);
+    }
+
+    #[test]
+    fn a_shutdown_timeout_is_told_apart() {
+        let mapped = map(hiqlite::Error::Timeout(
+            "the shutdown did not finish".into(),
+        ));
+        assert!(is_timeout(&mapped));
+        assert!(!is_terminal(&mapped) && !is_recovering(&mapped));
+        assert!(!is_timeout(&map(hiqlite::Error::Error("other".into()))));
+    }
+
+    #[test]
+    fn recovering_maps_to_upstream_recovering_error() {
+        let h_err = hiqlite::Error::Recovering("applying startup log".into());
+        let mapped = map(h_err);
+        assert!(matches!(mapped, Error::Upstream(_)));
+        assert!(is_recovering(&mapped));
+        assert!(!is_terminal(&mapped));
+        assert_eq!(mapped.exit_code(), 3);
+        assert!(mapped.message().starts_with("recovering:"));
+    }
 }

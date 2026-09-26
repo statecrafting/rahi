@@ -840,6 +840,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6ef517f0926dd24a1582492c791b6a4818a4d94e789a334894aa15b0d12f55c"
 
 [[package]]
+name = "constant_time_eq"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6187e670c346a04bcbf5def0393d57ec0e5ab56565cde6be4a7cbdb6cdc2f3f6"
+dependencies = [
+ "rustversion",
+]
+
+[[package]]
 name = "cookie-factory"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1742,15 +1751,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
-name = "hiqlite"
-version = "0.14.0"
-source = "git+https://github.com/sebadob/hiqlite?rev=8f3b9bde9454d563d604f49c527e1527e193c4ab#8f3b9bde9454d563d604f49c527e1527e193c4ab"
+name = "hiqlite-patched"
+version = "0.15.0-patched.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d3586f7db4e971836ffc5982086bcfa1de0c0293492a194efd7d4ac21ff5ebf"
 dependencies = [
  "axum",
  "axum-server",
  "bincode",
  "bytes",
  "chrono",
+ "constant_time_eq",
  "cron",
  "crossbeam",
  "cryptr",
@@ -1758,10 +1769,11 @@ dependencies = [
  "dotenvy",
  "fastwebsockets",
  "flume",
+ "fs4",
  "futures-util",
  "getrandom 0.4.3",
  "hex",
- "hiqlite-wal",
+ "hiqlite-wal-patched",
  "hostname",
  "http-body-util",
  "hyper",
@@ -1793,15 +1805,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "hiqlite-wal"
-version = "0.14.0"
-source = "git+https://github.com/sebadob/hiqlite?rev=8f3b9bde9454d563d604f49c527e1527e193c4ab#8f3b9bde9454d563d604f49c527e1527e193c4ab"
+name = "hiqlite-wal-patched"
+version = "0.15.0-patched.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df82af141317c61b135d600a93c0ec2283c40f2761ab956b20568b2c23bc2746"
 dependencies = [
  "bincode",
  "byteorder",
  "crc",
  "flume",
  "fs4",
+ "libc",
  "memmap2",
  "openraft",
  "serde",
@@ -3268,6 +3282,7 @@ dependencies = [
  "reqwest",
  "ring",
  "rusqlite",
+ "rustix 1.1.4",
  "serde",
  "serde_json",
  "tar",
@@ -3281,7 +3296,7 @@ version = "0.3.0"
 dependencies = [
  "attest-ledger-core",
  "futures-core",
- "hiqlite",
+ "hiqlite-patched",
  "rahi-types",
  "serde",
  "serde_bytes",

@@ -19,8 +19,16 @@ use rahi_types::{Config, Error, Result};
 /// The template, as committed.
 pub const TEMPLATE: &str = include_str!("../rauthy.env.template");
 
-/// The rendered environment, relative to the data directory.
-pub const ENV_FILE: &str = "rauthy/rauthy.env";
+/// The rendered environment, relative to the data directory (spec 043 B-5,
+/// P-10: outside Rauthy's directory, where no pre-043 `supervise` reads).
+pub const ENV_FILE: &str = "rauthy-env/rauthy.env";
+
+/// The directory [`ENV_FILE`] lives in, relative to the data directory.
+pub const ENV_DIR: &str = "rauthy-env";
+
+/// Where every pre-043 `supervise` reads the rendered environment, relative
+/// to the data directory: the supervisor fence (spec 043 B-5).
+pub const LEGACY_ENV_FILE: &str = "rauthy/rauthy.env";
 
 /// The empty configuration file rauthy is pointed at, relative to the data
 /// directory.
@@ -263,6 +271,13 @@ impl HqlPorts {
 #[must_use]
 pub fn env_path(config: &Config) -> PathBuf {
     config.data_dir.join(ENV_FILE)
+}
+
+/// The supervisor fence's path, where pre-043 binaries rendered the
+/// environment (spec 043 B-5).
+#[must_use]
+pub fn legacy_env_path(config: &Config) -> PathBuf {
+    config.data_dir.join(LEGACY_ENV_FILE)
 }
 
 /// The empty config file's path.

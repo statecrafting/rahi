@@ -53,6 +53,14 @@ pub struct Marker {
     /// it is the repair.
     #[serde(default)]
     pub rauthy_snapshot_applied: Option<u64>,
+    /// The revocation floor this restore owes the app store (spec 043 B-6c,
+    /// D-8): the restore instant, in seconds, read after the archive was
+    /// verified and before the first byte of the volume changed. Every open
+    /// of the store while this marker stands raises the floor to it; the
+    /// raise is a `MAX`, so the first open does it and every later one is a
+    /// no-op. Absent in a marker written before spec 043.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending_floor: Option<u64>,
     /// The archive manifest that was applied.
     pub manifest: ArchiveManifest,
 }
@@ -176,6 +184,29 @@ pub async fn record_rauthy_snapshot_applied(
         ))
     })?;
     Ok(Some(supplied.path().to_path_buf()))
+}
+
+/// Raise the revocation floor a restore left pending (spec 043 B-6c, D-8),
+/// on an open of the app store and before it serves. The raise is one
+/// statement and a `MAX`, so an open after the first changes nothing. The
+/// floor answered is the one the marker owes, or `None` with no marker or a
+/// marker written before spec 043.
+///
+/// # Errors
+///
+/// As [`Marker::read`], and the store's error when the raise is refused.
+pub async fn raise_pending_floor(
+    config: &Config,
+    store: &rahi_store::StoreHandle,
+) -> Result<Option<u64>> {
+    let Some(marker) = Marker::read(&crate::restore_marker(config))? else {
+        return Ok(None);
+    };
+    let Some(floor) = marker.pending_floor else {
+        return Ok(None);
+    };
+    store.raise_revocation_floor(floor).await?;
+    Ok(Some(floor))
 }
 
 /// How a restore ended.
@@ -489,6 +520,11 @@ pub async fn run_sets(
         .map(|n| n.to_string_lossy().into_owned())
         .ok_or_else(|| Error::Validation(format!("{} names no file", archive_path.display())))?;
 
+    // Spec 043 B-4a: both locks exclusively before anything on the volume is
+    // read; the gate creates both fences on a volume without a legacy path
+    // and refuses one whose legacy path holds a store.
+    let _gate = crate::cell_lock::gate(config, crate::cell_lock::Entry::Restore)?;
+
     let marker_path = crate::restore_marker(config);
     if let Some(marker) = Marker::read(&marker_path)?
         && marker.archive == name
@@ -523,6 +559,10 @@ pub async fn run_sets(
     // archive has proved itself intact and before the first byte of the
     // volume is touched.
     let evidence = check_compatible_sets(&manifest, &parts, cell, sets)?;
+    // Spec 043 B-6c and D-8: the restore instant, after the archive proved
+    // itself and before anything on the volume changes. Every restore owes
+    // the floor this value.
+    let restore_instant = crate::unix_now();
 
     let keys = KeySet::of(config);
     for part in parts.iter().filter(|p| p.dir() == KEYS_DIR) {
@@ -547,6 +587,7 @@ pub async fn run_sets(
         restored: crate::unix_now(),
         rauthy_snapshot: rauthy_snapshot.display().to_string(),
         rauthy_snapshot_applied: None,
+        pending_floor: Some(restore_instant),
         manifest,
     };
     let bytes = serde_json::to_vec_pretty(&marker)

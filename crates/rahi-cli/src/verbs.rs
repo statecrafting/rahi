@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use rahi_types::{Error, Result};
 
 /// The verbs, in the order `--help` lists them.
-pub const VERBS: [&str; 10] = [
+pub const VERBS: [&str; 11] = [
     "serve",
     "preflight",
     "migrate",
@@ -17,6 +17,7 @@ pub const VERBS: [&str; 10] = [
     "ledger reindex",
     "supervise",
     "first-boot",
+    "upgrade-cache",
 ];
 
 /// What argv asked for.
@@ -78,6 +79,12 @@ pub enum Verb {
         /// The archive holding the sealed segment bodies.
         archive: PathBuf,
     },
+    /// Spec 043 B-4: `upgrade-cache --backup <archive>`, or `--abort`
+    /// (B-5a); in spec 030 B-1's argv list since 030 D-11.
+    UpgradeCache {
+        /// The verified pre-upgrade archive; `None` with `--abort`.
+        backup: Option<PathBuf>,
+    },
     /// Spec 031.
     Supervise,
     /// Spec 031; `export` is `--export` (spec 032 B-2).
@@ -136,6 +143,10 @@ pub fn usage() -> String {
             "first-boot",
             "generate keys and rauthy's environment once (spec 031)",
         ),
+        (
+            "upgrade-cache --backup <archive> | --abort",
+            "MUTATES: cross the hiqlite 0.15 cache boundary once (spec 043)",
+        ),
     ];
     for (verb, what) in lines {
         out.push_str(&format!("  {verb:<44} {what}\n"));
@@ -188,6 +199,17 @@ where
             _ => Err(unexpected(verb, &rest)),
         },
         "restore" => restore_flags(&rest),
+        "upgrade-cache" => match rest.as_slice() {
+            ["--backup", archive] => Ok(Verb::UpgradeCache {
+                backup: Some(PathBuf::from(archive)),
+            }),
+            ["--abort"] => Ok(Verb::UpgradeCache { backup: None }),
+            _ => Err(Error::Validation(
+                "upgrade-cache needs --backup <archive> (a verified pre-upgrade archive) or \
+                 --abort"
+                    .to_owned(),
+            )),
+        },
         "ledger" => match rest.as_slice() {
             ["verify"] => Ok(Verb::LedgerVerify { full: false }),
             ["verify", "--full"] => Ok(Verb::LedgerVerify { full: true }),

@@ -101,6 +101,7 @@ async fn dispatch<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<i32> {
             Ok(0)
         }
         Verb::FirstBoot { export: false } => first_boot::<C>(env).await.map(|()| 0),
+        Verb::UpgradeCache { backup } => upgrade_cache(backup, env).await.map(|()| 0),
         other => verbs_030::<C>(other, env).await.map(|()| 0),
     }
 }
@@ -126,15 +127,86 @@ async fn first_boot<C: Cell>(env: &dyn EnvReader) -> Result<()> {
     Ok(())
 }
 
+/// Names the fault point at which the verb ends its process as a crash
+/// would, for the live workflow's legs (spec 043 FR-003, AC-4 (d)): the
+/// real binary stopped at a persistent state, with no cleanup after it.
+pub const ENV_UPGRADE_CRASH_AT: &str = "RAHI_TEST_UPGRADE_CRASH_AT";
+
+/// The fault injector [`ENV_UPGRADE_CRASH_AT`] selects: at its point the
+/// process exits `137`, the code of a SIGKILL, without unwinding.
+struct CrashAt(Option<String>);
+
+impl rahi_ops::upgrade::Faults for CrashAt {
+    fn hit(&self, point: &str) -> Result<()> {
+        if self.0.as_deref() == Some(point) {
+            eprintln!("upgrade-cache: {ENV_UPGRADE_CRASH_AT} ends the process at `{point}`");
+            std::process::exit(137);
+        }
+        Ok(())
+    }
+}
+
+/// Spec 043 B-4 and B-5a: the cache transition, or its abort.
+async fn upgrade_cache(backup: Option<std::path::PathBuf>, env: &dyn EnvReader) -> Result<()> {
+    use rahi_ops::upgrade::{self, Outcome};
+    let config = rahi_types::Config::from_env(env)?;
+    let faults = CrashAt(env.get(ENV_UPGRADE_CRASH_AT).filter(|p| !p.is_empty()));
+    let outcome = match backup {
+        Some(archive) => {
+            println!("{}", upgrade::PRECONDITIONS);
+            upgrade::run(&config, env, &archive, &faults).await?
+        }
+        None => upgrade::abort(&config, &faults)?,
+    };
+    match outcome {
+        Outcome::Floored { id, instant } => println!(
+            "upgrade-cache: transition {id} is floored at {instant}; every bearer token issued \
+             at or before it is refused. Start the new image: supervise lets Rauthy move its \
+             own cache, and serve completes the transition"
+        ),
+        Outcome::Already { phase } => println!(
+            "upgrade-cache: the transition is at `{}`; nothing to do",
+            phase.name()
+        ),
+        Outcome::Nothing(why) => println!("upgrade-cache: {why}; nothing to do"),
+        Outcome::Aborted { id } => println!(
+            "upgrade-cache: transition {id} aborted; the pre-043 layout's operational data is \
+             back and the old image starts as before. Left in place: upgrade-cache.json (as \
+             history), {}/ with its evidence, cell.lock, transition.lock, rauthy-env/, and \
+             changed directory timestamps (spec 043 B-5a)",
+            upgrade::WORK_DIR
+        ),
+    }
+    Ok(())
+}
+
 /// Spec 031 B-3: rauthy and serve as one lifetime.
 async fn supervise<C: Cell>(env: &dyn EnvReader) -> Result<i32> {
     use rahi_ops::supervise as sup;
     let config = rahi_types::Config::from_env(env)?;
+    // Spec 043 B-4a: the cell exclusively and the layout shared, for the
+    // supervisor's life, before anything is read or spawned; its in-process
+    // `serve` uses this ownership rather than taking its own.
+    let gate = rahi_ops::cell_lock::gate(&config, rahi_ops::cell_lock::Entry::Supervise)?;
+    // Spec 043 B-10: the supervisor keeps the stop record for the container.
+    let recorder = std::sync::Arc::new(rahi_ops::stop::Recorder::begin(&config, "supervise")?);
+    eprintln!("supervise: {}", recorder.previous().render());
+    serve::remember_previous_stop(recorder.previous());
     let keys = rahi_ops::KeySet::of(&config);
     keys.check()?;
     let manifest = rahi_kernel::Manifest::parse(C::manifest())?;
     let app_name = manifest.app.name.as_str().to_owned();
     let (mut rauthy, supplied) = sup::prepare_rauthy(&config, env)?;
+    // Spec 043 B-4 T4: while the transition stands at `floored`, Rauthy is
+    // given its consent to move its own cache aside, and only then. The
+    // operator's value never reaches it: the gate refused it in this
+    // process's environment, and the child's environment is cleared.
+    let consent = gate
+        .record()
+        .is_some_and(|r| r.phase == rahi_ops::upgrade::Phase::Floored);
+    if consent {
+        rauthy.env(rahi_ops::cell_lock::ENV_CACHE_LEGACY_MOVE_ASIDE, "true");
+    }
     // Spec 038 B-4 and D-11: rauthy takes the refresh token lifetime as a
     // number of hours in its own configuration rather than as a client
     // field, so the manifest's value is applied to the child at every start.
@@ -147,7 +219,32 @@ async fn supervise<C: Cell>(env: &dyn EnvReader) -> Result<i32> {
         // admin the verb logs in as must exist before anything asks for a
         // backup.
         let steps = sup::ready_after_health(&config, &keys, &api, supplied.as_ref()).await?;
-        let custodied = sup::custody_client(&config, &keys, &manifest).await?;
+        if consent
+            && rahi_ops::upgrade::complete(
+                &config,
+                &[rahi_ops::upgrade::Phase::Floored],
+                rahi_ops::upgrade::Phase::RauthyDone,
+            )?
+        {
+            println!(
+                "supervise: rauthy moved its cache under consent; the transition is rauthy-done"
+            );
+        }
+        let custodied = match sup::custody_client(&config, &keys, &manifest).await {
+            // Spec 043 D-24: a key rendered before 038 widened its access
+            // keeps the old access, because rauthy applies it only when it
+            // initializes; the backup admin re-applies the rendered access
+            // once and the custody step runs again.
+            Err(Error::Unauthorized(why)) => {
+                eprintln!(
+                    "supervise: {why}; re-applying the rendered API key access through the \
+                     backup admin"
+                );
+                sup::reapply_rendered_key_access(&api, &keys).await?;
+                sup::custody_client(&config, &keys, &manifest).await?
+            }
+            other => other?,
+        };
         let mut said = steps.render();
         let native = custodied.render();
         if !native.is_empty() {
@@ -163,25 +260,66 @@ async fn supervise<C: Cell>(env: &dyn EnvReader) -> Result<i32> {
         );
         Ok(())
     };
-    let exit = sup::supervise(
+    let shutdown = {
+        let recorder = recorder.clone();
+        async move {
+            sup::shutdown_signal().await;
+            recorder.received();
+        }
+    };
+    let supervised = sup::supervise_observed(
         rauthy,
         ready,
-        |stop| {
-            serve::serve_until::<C>(env, async {
-                let _ = stop.await;
-            })
+        |stop| async {
+            let served =
+                serve::serve_observed::<C>(env, serve::ServeGate::Supervisor(&gate), None, async {
+                    let _ = stop.await;
+                })
+                .await;
+            (served.result, served.observed)
         },
-        sup::shutdown_signal(),
+        shutdown,
+        sup::Graces {
+            term: sup::TERM_GRACE,
+            serve: sup::SERVE_GRACE,
+            shutdown_term: sup::SHUTDOWN_TERM_GRACE,
+        },
     )
     .await;
-    println!("supervise: exiting {} ({:?})", exit.code, exit.reason);
+    let exit = supervised.exit;
+    // Spec 043 B-10: the outcome and every phase, then the exit status that
+    // carries it (FR-009).
+    if let Err(err) = recorder.finish(&supervised.observed, exit.code) {
+        eprintln!("supervise: the stop outcome cannot be recorded: {err}");
+    }
+    println!(
+        "supervise: exiting {} ({:?}); stop {}",
+        exit.code,
+        exit.reason,
+        supervised.observed.render()
+    );
     Ok(exit.code)
+}
+
+/// Shut a verb's node and answer the verb's own result. A shutdown that did
+/// not confirm is said on stderr: the verb's work is done and committed, and
+/// B-10's outcome and exit status belong to the long-running entry points
+/// (spec 043 FR-009), not to a verb that finished.
+async fn stop_after(booted: &Booted, result: Result<()>) -> Result<()> {
+    if let Err(err) = booted.shutdown().await {
+        eprintln!("warning: the store's shutdown did not confirm: {err}");
+    }
+    result
 }
 
 /// The verbs of spec 030.
 async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
     match verb {
-        Verb::Help | Verb::Version | Verb::Supervise | Verb::FirstBoot { .. } => Ok(()),
+        Verb::Help
+        | Verb::Version
+        | Verb::Supervise
+        | Verb::FirstBoot { .. }
+        | Verb::UpgradeCache { .. } => Ok(()),
         Verb::Serve => serve::serve::<C>(env).await,
         Verb::Preflight => {
             let report = rahi_ops::preflight::run(env, C::manifest()).await;
@@ -205,8 +343,7 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
             } else {
                 migrate::<C>(&booted, backup, adopt_manifest, env).await
             };
-            booted.shutdown().await;
-            result
+            stop_after(&booted, result).await
         }
         Verb::Backup { to } => {
             let booted = Booted::open_or_attach::<C>(env).await?;
@@ -215,8 +352,7 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
                 None => Destination::default_for(&booted.config),
             };
             let result = backup(&booted, &to, env).await;
-            booted.shutdown().await;
-            result
+            stop_after(&booted, result).await
         }
         Verb::Restore {
             archive,
@@ -273,14 +409,12 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
         Verb::LedgerVerify { full } => {
             let booted = Booted::open::<C>(env).await?;
             let result = ledger_verify(&booted, full, env).await;
-            booted.shutdown().await;
-            result
+            stop_after(&booted, result).await
         }
         Verb::LedgerReindex { archive } => {
             let booted = Booted::open::<C>(env).await?;
             let result = ledger_reindex(&booted, &archive).await;
-            booted.shutdown().await;
-            result
+            stop_after(&booted, result).await
         }
         Verb::LedgerExport { path } => {
             let booted = Booted::open::<C>(env).await?;
@@ -320,8 +454,7 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
                 Ok(())
             }
             .await;
-            booted.shutdown().await;
-            result
+            stop_after(&booted, result).await
         }
     }
 }

@@ -474,6 +474,11 @@ fn issued(cell: &Cell, edit: impl FnOnce(&mut Value)) -> String {
         serde_json::from_str(&text.replace(FIXTURE_ORIGIN, cell.sessions.origin()))
             .expect("the fixture is JSON");
     edit(&mut payload);
+    // Spec 043 B-6: the bearer check enforces the manifest's lifetime on
+    // `exp - iat`, so the fixture carries this server's 600 seconds.
+    if let Some(iat) = payload.get("iat").and_then(Value::as_u64) {
+        payload["exp"] = json!(iat + 600);
+    }
     sign(
         &json!({ "alg": "RS256", "typ": "JWT", "kid": KID }),
         &payload,
@@ -580,6 +585,8 @@ async fn a_subject_revocation_bounds_by_the_instant_it_was_made_at() {
 
 /// A token that will not say when it was minted is refused while its subject
 /// is deny-listed: the entry asks a question the token declines to answer.
+/// Since spec 043 B-6 it is refused before any revocation too: its age
+/// cannot be bounded.
 #[tokio::test]
 async fn a_token_with_no_iat_is_refused_while_its_subject_is_deny_listed() {
     let cell = oidc::boot().await;
@@ -589,7 +596,11 @@ async fn a_token_with_no_iat_is_refused_while_its_subject_is_deny_listed() {
         payload.as_object_mut().expect("an object").remove("iat");
         payload["jti"] = json!("undated");
     });
-    server.validate(&undated).await.expect("a good token");
+    let err = server
+        .validate(&undated)
+        .await
+        .expect_err("043 B-6: no iat is refused");
+    assert!(err.message().contains("no iat"), "{err}");
 
     deny_subject(server.store(), SUB, server.now(), server.revocation_lag())
         .await

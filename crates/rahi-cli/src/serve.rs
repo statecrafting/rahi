@@ -9,7 +9,7 @@
 use std::future::{Future, IntoFuture as _};
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use axum::Router;
 use axum::http::HeaderMap;
@@ -24,6 +24,8 @@ use rahi_idp::{
 use rahi_kernel::{Kernel, KernelOptions, Manifest};
 use rahi_ledger::{FsArchive, Hash, Ledger};
 use rahi_ops::KeySet;
+use rahi_ops::cell_lock::{Entry, Gate};
+use rahi_ops::stop::{Observed, Reason};
 use rahi_store::Store;
 use rahi_types::{Config, EnvReader, Error, Result};
 
@@ -191,6 +193,9 @@ pub struct Booted {
     pub manifest: Manifest,
     /// Its hash: the chain's genesis parent.
     pub hash: Hash,
+    /// Spec 043 B-4a's gate: the locks this process holds while the store is
+    /// open. `None` inside `supervise`, whose own gate outlives this value.
+    gate: Option<Gate>,
 }
 
 impl Booted {
@@ -202,7 +207,33 @@ impl Booted {
     /// wrong, or when [`rahi_ops::RESTORE_ENV_VAR`] is set; a store failure
     /// as itself.
     pub async fn open<C: Cell>(env: &dyn EnvReader) -> Result<Self> {
-        Self::boot::<C>(env, false).await
+        Self::boot::<C>(env, Entry::Store { may_attach: false }).await
+    }
+
+    /// As [`Self::open`], for `serve` alone (spec 043 B-4a): the cell
+    /// exclusively and the layout shared for the process's life, at
+    /// `floored`, `rauthy-done`, `done` or no transition.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub async fn open_serve<C: Cell>(env: &dyn EnvReader) -> Result<Self> {
+        Self::boot::<C>(env, Entry::Serve).await
+    }
+
+    /// As [`Self::open`], under a gate this process already holds: the
+    /// in-process `serve` of `supervise` uses the supervisor's ownership.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub async fn open_owned<C: Cell>(env: &dyn EnvReader, gate: &Gate) -> Result<Self> {
+        if !gate.owns_cell() {
+            return Err(Error::Conflict(
+                "the supervisor's gate does not own the cell".to_owned(),
+            ));
+        }
+        Self::boot_inner::<C>(env, None).await
     }
 
     /// As [`Self::open`], for a verb that may run beside a running cluster
@@ -219,10 +250,19 @@ impl Booted {
     /// As [`Self::open`]; [`Error::Upstream`] when the running node does
     /// not answer.
     pub async fn open_or_attach<C: Cell>(env: &dyn EnvReader) -> Result<Self> {
-        Self::boot::<C>(env, true).await
+        Self::boot::<C>(env, Entry::Store { may_attach: true }).await
     }
 
-    async fn boot<C: Cell>(env: &dyn EnvReader, may_attach: bool) -> Result<Self> {
+    async fn boot<C: Cell>(env: &dyn EnvReader, entry: Entry) -> Result<Self> {
+        let config = Config::from_env(env)?;
+        // Spec 043 B-4a: the gate before the volume is read, written or
+        // opened. It decides attaching too: another process holding the
+        // cell's lock is the running node.
+        let gate = rahi_ops::cell_lock::gate(&config, entry)?;
+        Self::boot_inner::<C>(env, Some(gate)).await
+    }
+
+    async fn boot_inner<C: Cell>(env: &dyn EnvReader, gate: Option<Gate>) -> Result<Self> {
         let config = Config::from_env(env)?;
         rahi_ops::refuse_env_restore()?;
         let keys = KeySet::of(&config);
@@ -230,12 +270,25 @@ impl Booted {
         let manifest = Manifest::parse(C::manifest())?;
         let hash = manifest.hash()?;
         let store_cfg = rahi_ops::store_config(&config, env, keys.store_secrets()?)?;
+        let attached = gate.as_ref().is_some_and(|g| !g.owns_cell());
+        let may_attach = gate
+            .as_ref()
+            .is_some_and(|g| g.entry() == Entry::Store { may_attach: true });
         let store = if may_attach && rahi_ops::store_client_requested(env) {
             Store::connect(&store_cfg).await?
-        } else if may_attach && rahi_ops::app_lock_file(&config).exists() {
+        } else if attached {
             Store::attach(&store_cfg).await?
         } else {
-            Store::open(&store_cfg).await?
+            let store = Store::open(&store_cfg).await?;
+            // Spec 043 B-6c: the floor a restore owes is raised on the open
+            // that owns the node, before anything serves.
+            match rahi_ops::restore::raise_pending_floor(&config, &store.handle()).await {
+                Ok(_) => store,
+                Err(err) => {
+                    let _ = store.shutdown().await;
+                    return Err(err);
+                }
+            }
         };
         Ok(Self {
             config,
@@ -243,7 +296,14 @@ impl Booted {
             store,
             manifest,
             hash,
+            gate,
         })
+    }
+
+    /// The gate this value holds, when it took its own.
+    #[must_use]
+    pub fn gate(&self) -> Option<&Gate> {
+        self.gate.as_ref()
     }
 
     /// Open the chain and verify it at resident depth (spec 013 B-6).
@@ -274,9 +334,15 @@ impl Booted {
         FsArchive::open(dir)
     }
 
-    /// Shut the node down.
-    pub async fn shutdown(&self) {
-        let _ = self.store.shutdown().await;
+    /// Shut the node down, answering the store's shutdown result (spec 043
+    /// FR-009): `Error::Upstream` with hiqlite's timeout when its wait
+    /// elapsed ([`rahi_store::is_timeout`]).
+    ///
+    /// # Errors
+    ///
+    /// The store's shutdown error.
+    pub async fn shutdown(&self) -> Result<()> {
+        self.store.shutdown().await
     }
 }
 
@@ -351,13 +417,36 @@ pub async fn compose_parts<C: Cell>(
         .with_service_name(booted.manifest.app.name.as_str());
     rahi_edge::obs::init(obs)?;
 
-    let state = AppState::new(
+    let mut state = AppState::new(
         kernel.clone(),
         booted.store.handle(),
         ledger,
         booted.config.clone(),
     )
     .with_extension(streams.clone());
+    if RauthyMode::from_env(env)? == RauthyMode::Required {
+        // Spec 043 B-8: a Rauthy that is up and unready fails readiness, on
+        // every call, and never ends the process.
+        let api = rahi_ops::rauthy_api::RauthyApi::new(
+            booted.config.rauthy_base_url(),
+            booted.keys.admin_token().unwrap_or_default(),
+        )?;
+        state = state.with_extension(rahi_edge::probes::ReadinessCheck::new(
+            "rauthy",
+            move || {
+                let api = api.clone();
+                async move {
+                    tokio::time::timeout(RAUTHY_READY_WAIT, api.health())
+                    .await
+                    .map_err(|_| {
+                        Error::Upstream(format!(
+                            "rauthy did not answer its health route within {RAUTHY_READY_WAIT:?}"
+                        ))
+                    })?
+                }
+            },
+        ));
+    }
 
     // The app's routes are built first because building them is what
     // publishes the scopes its gates require (spec 025 B-2), and spec 038
@@ -502,6 +591,9 @@ pub async fn compose_parts<C: Cell>(
     Ok(Composed { router, kernel })
 }
 
+/// How long readiness waits for Rauthy's health route (spec 043 B-8).
+const RAUTHY_READY_WAIT: Duration = Duration::from_secs(2);
+
 /// What the identity block built, mounted once the edge builder exists.
 struct Identity {
     proxy: Router,
@@ -526,14 +618,46 @@ pub fn boot_line(kernel: &Kernel) -> String {
 /// B-1 and B-2 of spec 035: give the denial queue its bound, and say so in
 /// one warning line when the bound expired. Each abandoned id has already
 /// been counted and written as its own error line by the failure observer.
-async fn drain_denials(kernel: &Kernel, bound: Duration) {
+/// Spec 043 B-10: the phase and any abandoned count go into `observed`.
+async fn drain_denials(kernel: &Kernel, bound: Duration, observed: &mut Observed) {
+    let started = Instant::now();
     let drained = kernel.drain(bound).await;
+    observed.phase("denial_drain", started.elapsed(), bound);
     if !drained.is_complete() {
         eprintln!(
             "WARN {DECISION_TARGET}: the denial drain bound of {bound:?} expired with {} \
              decision(s) abandoned",
             drained.abandoned.len()
         );
+        observed.reason(Reason::DenialsAbandoned {
+            n: drained.abandoned.len(),
+        });
+    }
+}
+
+/// Spec 043 B-9's H and B-10: shut the store, timing it, and name what went
+/// wrong. The store's own wait is the bound; nothing here wraps it in a
+/// shorter one.
+async fn shut_store(booted: &Booted, observed: &mut Observed) {
+    let started = Instant::now();
+    let result = booted.shutdown().await;
+    observed.phase(
+        "store_shutdown",
+        started.elapsed(),
+        rahi_store::SHUTDOWN_WAIT,
+    );
+    match result {
+        Ok(()) => {}
+        Err(err) if rahi_store::is_timeout(&err) => {
+            eprintln!("serve: the store's shutdown did not confirm: {err}");
+            observed.reason(Reason::StoreTimeout);
+        }
+        Err(err) => {
+            eprintln!("serve: the store's shutdown failed: {err}");
+            observed.reason(Reason::StoreError {
+                error: err.to_string(),
+            });
+        }
     }
 }
 
@@ -548,9 +672,19 @@ pub const DRAIN_BUDGET: std::time::Duration = std::time::Duration::from_secs(10)
 /// # Errors
 ///
 /// As [`Booted::open`] and [`compose`], plus [`Error::Io`] when the address
-/// cannot be bound.
+/// cannot be bound, and [`Error::Io`] naming every reason when the stop was
+/// unconfirmed (spec 043 B-10, exit `3`).
 pub async fn serve<C: Cell>(env: &dyn EnvReader) -> Result<()> {
     serve_until::<C>(env, shutdown_signal()).await
+}
+
+/// Which gate a `serve` runs under (spec 043 B-4a).
+pub enum ServeGate<'a> {
+    /// `serve` alone takes its own, and keeps its own stop record.
+    Own,
+    /// `supervise`'s in-process `serve` uses the supervisor's gate, and the
+    /// supervisor keeps the stop record.
+    Supervisor(&'a Gate),
 }
 
 /// [`serve`] that stops when `stop` resolves, and only then: under the
@@ -568,52 +702,238 @@ pub async fn serve_until<C: Cell>(
     env: &dyn EnvReader,
     stop: impl Future<Output = ()> + Send + 'static,
 ) -> Result<()> {
-    let addr = listen_addr(env)?;
-    let streams = StreamHub::new(stream_options(env)?);
-    let denial_bound = denial_drain_timeout(env)?;
-    // Spec 039 B-5: a page the cell cannot serve is a boot failure, and it is
-    // one before the store is opened. `compose` resolves it again for its own
-    // callers; both calls are one `is_dir`.
-    static_dir::<C>(env)?;
-    let booted = Booted::open::<C>(env).await?;
+    serve_gated::<C>(env, ServeGate::Own, stop).await
+}
+
+/// [`serve_until`] under `gate`.
+///
+/// # Errors
+///
+/// As [`serve`].
+pub async fn serve_gated<C: Cell>(
+    env: &dyn EnvReader,
+    gate: ServeGate<'_>,
+    stop: impl Future<Output = ()> + Send + 'static,
+) -> Result<()> {
+    match gate {
+        ServeGate::Supervisor(gate) => {
+            let served = serve_observed::<C>(env, ServeGate::Supervisor(gate), None, stop).await;
+            served.into_result()
+        }
+        ServeGate::Own => {
+            // Spec 043 B-4a, then B-10: the gate before anything touches the
+            // volume, the stop record before the store opens.
+            let config = Config::from_env(env)?;
+            let own = rahi_ops::cell_lock::gate(&config, Entry::Serve)?;
+            let recorder = std::sync::Arc::new(rahi_ops::stop::Recorder::begin(&config, "serve")?);
+            eprintln!("serve: {}", recorder.previous().render());
+            remember_previous_stop(recorder.previous());
+            let marked = {
+                let recorder = recorder.clone();
+                async move {
+                    stop.await;
+                    recorder.received();
+                }
+            };
+            let mut served = serve_observed::<C>(env, ServeGate::Own, Some(own), marked).await;
+            served.name_error();
+            let code = served.exit_code();
+            if let Err(err) = recorder.finish(&served.observed, code) {
+                eprintln!("serve: the stop outcome cannot be recorded: {err}");
+            }
+            if !served.observed.phases.is_empty() {
+                eprintln!("serve: stop {}", served.observed.render());
+            }
+            served.into_result()
+        }
+    }
+}
+
+/// What one run of `serve` ended with: its own result and what its stop
+/// observed (spec 043 B-10, FR-009).
+#[derive(Debug)]
+pub struct Served {
+    /// The run's own result: a boot, compose or listener failure.
+    pub result: Result<()>,
+    /// Every stop phase that ran and every reason it is unconfirmed.
+    pub observed: Observed,
+}
+
+impl Served {
+    /// The exit status: the run's own error's code first, then `3` for an
+    /// unconfirmed stop, else `0`.
+    #[must_use]
+    pub fn exit_code(&self) -> i32 {
+        match &self.result {
+            Err(err) => err.exit_code(),
+            Ok(()) => self.observed.exit_code(),
+        }
+    }
+
+    /// Name the run's own error among the stop's reasons, unless it is the
+    /// terminal store failure already named.
+    pub fn name_error(&mut self) {
+        if let Err(err) = &self.result
+            && !self
+                .observed
+                .reasons
+                .iter()
+                .any(|r| matches!(r, Reason::StorageTerminal))
+        {
+            self.observed.reason(Reason::ServeError {
+                error: err.to_string(),
+            });
+        }
+    }
+
+    /// The run as a `Result`: an unconfirmed stop is an [`Error::Io`] naming
+    /// its reasons, the infrastructure code of spec 010.
+    ///
+    /// # Errors
+    ///
+    /// The run's own error, or the unconfirmed stop.
+    pub fn into_result(self) -> Result<()> {
+        self.result?;
+        if self.observed.confirmed() {
+            Ok(())
+        } else {
+            Err(Error::Io(format!(
+                "the stop was {} (spec 043 B-10)",
+                self.observed.render()
+            )))
+        }
+    }
+}
+
+fn failed(err: Error) -> Served {
+    let mut observed = Observed::default();
+    if rahi_store::is_terminal(&err) {
+        observed.reason(Reason::StorageTerminal);
+    }
+    Served {
+        result: Err(err),
+        observed,
+    }
+}
+
+/// The body of [`serve_gated`]: boot, compose, listen, and stop in B-9's
+/// order, observing every phase. `own` is the gate `serve` alone took.
+pub async fn serve_observed<C: Cell>(
+    env: &dyn EnvReader,
+    gate: ServeGate<'_>,
+    own: Option<Gate>,
+    stop: impl Future<Output = ()> + Send + 'static,
+) -> Served {
+    let setup = (|| {
+        let addr = listen_addr(env)?;
+        let streams = StreamHub::new(stream_options(env)?);
+        let denial_bound = denial_drain_timeout(env)?;
+        // Spec 039 B-5: a page the cell cannot serve is a boot failure, and it
+        // is one before the store is opened. `compose` resolves it again for
+        // its own callers; both calls are one `is_dir`.
+        static_dir::<C>(env)?;
+        Ok::<_, Error>((addr, streams, denial_bound))
+    })();
+    let (addr, streams, denial_bound) = match setup {
+        Ok(setup) => setup,
+        Err(err) => return failed(err),
+    };
+    let opened = match gate {
+        ServeGate::Own => Booted::boot_inner::<C>(env, own).await,
+        ServeGate::Supervisor(gate) => Booted::open_owned::<C>(env, gate).await,
+    };
+    let booted = match opened {
+        Ok(booted) => booted,
+        Err(err) => return failed(err),
+    };
+    // Spec 043 B-4 T5: at `floored` or `rauthy-done`, the first ready answer
+    // completes the transition.
+    let transition = match gate {
+        ServeGate::Own => booted.gate().and_then(|g| g.record().map(|r| r.phase)),
+        ServeGate::Supervisor(gate) => gate.record().map(|r| r.phase),
+    };
+    let completes = transition.is_some_and(|p| {
+        matches!(
+            p,
+            rahi_ops::upgrade::Phase::Floored | rahi_ops::upgrade::Phase::RauthyDone
+        )
+    });
+    let mut observed = Observed::default();
     let Composed { router, kernel } = match compose_parts::<C>(&booted, env, &streams).await {
         Ok(composed) => composed,
         Err(err) => {
-            booted.shutdown().await;
-            return Err(err);
+            shut_store(&booted, &mut observed).await;
+            let mut served = failed(err);
+            served.observed.absorb(observed);
+            return served;
         }
     };
     println!("{}", boot_line(&kernel));
+    export_boot_gauges(&booted, gate).await;
     let listener = match tokio::net::TcpListener::bind(addr).await {
         Ok(listener) => listener,
         Err(err) => {
-            drain_denials(&kernel, denial_bound).await;
-            booted.shutdown().await;
-            return Err(Error::Io(format!("cannot listen on {addr}: {err}")));
+            drain_denials(&kernel, denial_bound, &mut observed).await;
+            shut_store(&booted, &mut observed).await;
+            let mut served = failed(Error::Io(format!("cannot listen on {addr}: {err}")));
+            served.observed.absorb(observed);
+            return served;
         }
     };
-    let bound = listener
-        .local_addr()
-        .map_err(|err| Error::Io(format!("bound address unknown: {err}")))?;
+    let bound = match listener.local_addr() {
+        Ok(bound) => bound,
+        Err(err) => {
+            drain_denials(&kernel, denial_bound, &mut observed).await;
+            shut_store(&booted, &mut observed).await;
+            let mut served = failed(Error::Io(format!("bound address unknown: {err}")));
+            served.observed.absorb(observed);
+            return served;
+        }
+    };
     println!(
         "serve: {} listening on {bound}, public origin {}",
         booted.manifest.app.name.as_str(),
         booted.config.public_url.origin()
     );
+    let completion =
+        completes.then(|| tokio::spawn(complete_after_ready(booted.config.clone(), bound)));
+    // Spec 043 B-7: the first terminal store failure ends the process through
+    // the ordinary stop. `/readyz` already fails on it (020 B-6); this watch
+    // is what turns it into a stop.
+    let (terminal_tx, terminal_rx) = tokio::sync::oneshot::channel::<Error>();
+    let watch = tokio::spawn(watch_terminal(booted.store.handle(), terminal_tx));
+    let stream_drain = std::sync::Arc::new(std::sync::Mutex::new(None::<(Duration, usize)>));
     let stopped = std::sync::Arc::new(tokio::sync::Notify::new());
+    let terminal = std::sync::Arc::new(std::sync::Mutex::new(None::<Error>));
     let until = {
         let stopped = stopped.clone();
         let streams = streams.clone();
+        let stream_drain = stream_drain.clone();
+        let terminal = terminal.clone();
         async move {
-            stop.await;
+            tokio::select! {
+                () = stop => {}
+                fault = terminal_rx => {
+                    if let Ok(err) = fault {
+                        eprintln!("serve: the app store failed terminally; stopping: {err}");
+                        *terminal.lock().unwrap_or_else(std::sync::PoisonError::into_inner) =
+                            Some(err);
+                    }
+                }
+            }
             // Spec 026 B-7: every open stream hears the shutdown and has the
             // drain timeout to close before the listener stops.
+            let started = Instant::now();
             let remaining = streams.drain().await;
             if remaining > 0 {
                 eprintln!(
                     "serve: {remaining} stream(s) still open after the drain timeout; closing them"
                 );
             }
+            *stream_drain
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) =
+                Some((started.elapsed(), remaining));
             stopped.notify_one();
         }
     };
@@ -622,6 +942,7 @@ pub async fn serve_until<C: Cell>(
             .with_graceful_shutdown(until)
             .into_future(),
     );
+    let mut connections_from = None;
     let served = tokio::select! {
         result = &mut server => {
             result.map_err(|err| Error::Io(format!("the listener failed: {err}")))
@@ -631,15 +952,140 @@ pub async fn serve_until<C: Cell>(
             tokio::time::sleep(DRAIN_BUDGET).await;
         } => {
             eprintln!("serve: connections still open after the drain budget; closing them");
+            observed.reason(Reason::ConnectionDrainOverrun);
+            connections_from = Some(DRAIN_BUDGET);
             Ok(())
         }
     };
+    let drained_at = Instant::now();
     drop(server);
+    watch.abort();
+    if let Some(task) = completion {
+        task.abort();
+    }
+    let stream_phase = *stream_drain
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let stream_bound =
+        stream_options(env).map_or(rahi_ops::stop::STREAM_DRAIN, |o| o.drain_timeout);
+    if let Some((took, remaining)) = stream_phase {
+        observed.phase("stream_drain", took, stream_bound);
+        if remaining > 0 {
+            observed.reason(Reason::StreamDrainOverrun { open: remaining });
+        }
+        // C runs from the streams' drain to the server's exit.
+        let connection_took = connections_from.unwrap_or_else(|| drained_at.elapsed());
+        observed.phase("connection_drain", connection_took, DRAIN_BUDGET);
+    }
     // Spec 035 B-1: the requests are done; the records of their denials get
     // their bound before the store they are written through goes away.
-    drain_denials(&kernel, denial_bound).await;
-    booted.shutdown().await;
-    served
+    drain_denials(&kernel, denial_bound, &mut observed).await;
+    shut_store(&booted, &mut observed).await;
+    let fault = terminal
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .take();
+    let result = match (served, fault) {
+        (Err(err), _) => Err(err),
+        (Ok(()), Some(err)) => {
+            observed.reason(Reason::StorageTerminal);
+            Err(err)
+        }
+        (Ok(()), None) => Ok(()),
+    };
+    Served { result, observed }
+}
+
+/// How often `serve` asks the store whether it failed terminally.
+const TERMINAL_POLL: Duration = Duration::from_secs(1);
+
+/// Spec 043 B-7: poll the store's health; the first terminal error is sent
+/// and the watch ends. Any other error (a peer away, recovery) is not
+/// terminal and does not stop the process.
+async fn watch_terminal(store: rahi_store::StoreHandle, tx: tokio::sync::oneshot::Sender<Error>) {
+    loop {
+        tokio::time::sleep(TERMINAL_POLL).await;
+        if let Err(err) = store.health().await
+            && rahi_store::is_terminal(&err)
+        {
+            let _ = tx.send(err);
+            return;
+        }
+    }
+}
+
+/// Spec 043 B-10, B-6 (i) and B-5: the gauges set once per boot.
+async fn export_boot_gauges(booted: &Booted, gate: ServeGate<'_>) {
+    let Some(obs) = rahi_edge::obs::current() else {
+        return;
+    };
+    let metrics = obs.metrics();
+    if let Some(classified) = PREVIOUS_STOP.get() {
+        metrics.set_previous_stop(classified.previous.label(), classified.cause.label());
+    }
+    match booted.store.revocation_rows().await {
+        Ok((jti, subject)) => {
+            metrics.set_revocation_rows("jti", i64::try_from(jti).unwrap_or(i64::MAX));
+            metrics.set_revocation_rows("subject", i64::try_from(subject).unwrap_or(i64::MAX));
+        }
+        Err(err) => eprintln!("serve: the revocation rows cannot be counted: {err}"),
+    }
+    let debris = match gate {
+        ServeGate::Own => booted.gate().map_or(0, |g| g.debris().len()),
+        ServeGate::Supervisor(gate) => gate.debris().len(),
+    };
+    metrics.set_legacy_path_debris(i64::try_from(debris).unwrap_or(i64::MAX));
+}
+
+/// This boot's classification of the previous stop, made before the record
+/// was rewritten and kept for the process's life; set once by whichever
+/// entry point began the stop record.
+static PREVIOUS_STOP: std::sync::OnceLock<rahi_ops::stop::Classified> = std::sync::OnceLock::new();
+
+/// Remember this boot's classification of the previous stop, for the gauge
+/// `serve` exports once observability is up.
+pub fn remember_previous_stop(classified: &rahi_ops::stop::Classified) {
+    let _ = PREVIOUS_STOP.set(classified.clone());
+}
+
+/// Spec 043 B-4 T5: ask this process's own `/readyz` until it answers 200,
+/// then record `done`. The answer is the real probe's, over the socket.
+async fn complete_after_ready(config: Config, bound: SocketAddr) {
+    while !tokio::time::timeout(Duration::from_secs(5), ready_once(bound))
+        .await
+        .unwrap_or(false)
+    {
+        tokio::time::sleep(Duration::from_millis(250)).await;
+    }
+    match rahi_ops::upgrade::complete(
+        &config,
+        &[
+            rahi_ops::upgrade::Phase::Floored,
+            rahi_ops::upgrade::Phase::RauthyDone,
+        ],
+        rahi_ops::upgrade::Phase::Done,
+    ) {
+        Ok(true) => println!("serve: ready; the cache transition is done"),
+        Ok(false) => {}
+        Err(err) => eprintln!("serve: the transition's completion cannot be recorded: {err}"),
+    }
+}
+
+/// One `GET /readyz` on `bound`: whether it answered 200.
+async fn ready_once(bound: SocketAddr) -> bool {
+    use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+    let Ok(mut stream) = tokio::net::TcpStream::connect(bound).await else {
+        return false;
+    };
+    let request = format!(
+        "GET {} HTTP/1.1\r\nHost: {bound}\r\nConnection: close\r\n\r\n",
+        rahi_edge::probes::READYZ_PATH
+    );
+    if stream.write_all(request.as_bytes()).await.is_err() {
+        return false;
+    }
+    let mut head = [0u8; 12];
+    stream.read_exact(&mut head).await.is_ok() && head.ends_with(b" 200")
 }
 
 /// `endpoint` on the loopback base when it is on the public origin, as

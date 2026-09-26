@@ -44,7 +44,7 @@ use axum::response::{IntoResponse, Response};
 use rahi_kernel::Kernel;
 use rahi_store::StoreHandle;
 use rahi_types::{Config, CookieScheme, Error, Principal, Result, UnixSeconds};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::config::AUTH_PREFIX;
 use crate::envelope::{Cookie, cookie_value};
@@ -60,6 +60,14 @@ use crate::session::{
 pub const BEARER_SCHEME: &str = "bearer";
 /// How far outside its window a token is still accepted, in seconds (B-3).
 pub const LEEWAY_SECONDS: u64 = 60;
+
+/// The hard maximum of `exp - iat` the bearer check admits, whatever a
+/// manifest declares (spec 043 B-6: L_max, checked without reading any
+/// manifest). The same number as the manifest's own bound and rauthy's
+/// client limit, asserted equal at compile time.
+pub const L_MAX_SECONDS: u64 = 86_400;
+
+const _: () = assert!(L_MAX_SECONDS == rahi_kernel::manifest::MAX_ACCESS_TOKEN_LIFETIME_SECS);
 /// The revocation lag: how long a deny-listed `jti` is remembered (B-5).
 ///
 /// One access token lifetime. A deny-list entry that outlived the token it
@@ -125,12 +133,6 @@ impl Bearer {
     }
 }
 
-/// A deny-list entry: the moment the token it names expires anyway (B-5).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-struct Denied {
-    expires: UnixSeconds,
-}
-
 /// The claims of a rauthy access token.
 ///
 /// Deliberately partial, like [`IdpClaims`]: `azp` is the client, `scope` is
@@ -179,6 +181,7 @@ pub struct ResourceServer {
     kernel: Kernel,
     scheme: CookieScheme,
     lag: Duration,
+    lifetime: u64,
     rate_limit: u32,
     clock: Clock,
 }
@@ -214,6 +217,7 @@ impl ResourceServer {
             kernel,
             scheme: config.cookie_scheme,
             lag: DEFAULT_REVOCATION_LAG,
+            lifetime: L_MAX_SECONDS,
             rate_limit: DEFAULT_RATE_LIMIT,
             clock: system_clock(),
         }
@@ -248,8 +252,17 @@ impl ResourceServer {
     /// which is longer: the leeway on either end of the window is time a
     /// revoked token would otherwise come back to life in.
     #[must_use]
-    pub fn with_lifetime(self, lifetime: Duration) -> Self {
+    pub fn with_lifetime(mut self, lifetime: Duration) -> Self {
+        // Spec 043 B-6: L bounds every admitted token, not only preflight's
+        // report; a server never given one enforces L_max alone.
+        self.lifetime = lifetime.as_secs().min(L_MAX_SECONDS);
         self.with_revocation_lag(crate::revoke::denylist_ttl(lifetime))
+    }
+
+    /// The lifetime ceiling L this server enforces on `exp - iat`.
+    #[must_use]
+    pub const fn lifetime_ceiling(&self) -> u64 {
+        self.lifetime
     }
 
     /// The cache group the deny-lists live in (spec 038 B-5).
@@ -305,14 +318,8 @@ impl ResourceServer {
     ///
     /// The store's error when the cache group refuses the write.
     pub async fn deny(&self, jti: &str) -> Result<()> {
-        let lag = self.lag.as_secs();
-        let entry = Denied {
-            expires: UnixSeconds::new(self.now().saturating_add(lag)),
-        };
-        let ttl = u32::try_from(lag).unwrap_or(u32::MAX);
-        self.store
-            .kv_put(&Self::denylist_key(jti), &entry, Some(ttl))
-            .await
+        // Spec 043 B-6: a durable row, retained (D-10), not a cache entry.
+        crate::revoke::record_jti(&self.store, jti, self.now()).await
     }
 
     /// Whether `jti` is deny-listed and not yet past its own expiry (B-5).
@@ -326,8 +333,7 @@ impl ResourceServer {
     /// The store's error when the cache group cannot be reached. A deny-list
     /// this cell cannot read is a deny-list it must not act as if were empty.
     pub async fn is_denied(&self, jti: &str) -> Result<bool> {
-        let entry: Option<Denied> = self.store.kv_get(&Self::denylist_key(jti)).await?;
-        Ok(entry.is_some_and(|denied| self.now() < denied.expires.get()))
+        crate::revoke::is_jti_revoked(&self.store, jti).await
     }
 
     /// Validate one bearer credential (B-3, B-4, B-5).
@@ -373,14 +379,16 @@ impl ResourceServer {
             )));
         }
         let now = self.now();
-        if claims.exp.saturating_add(LEEWAY_SECONDS) <= now {
-            return Err(Error::Unauthorized("the token has expired".to_owned()));
-        }
-        if claims
-            .nbf
-            .is_some_and(|nbf| nbf > now.saturating_add(LEEWAY_SECONDS))
+        let iat = self.admit_lifetime(&claims, now)?;
+        // Spec 043 B-6b: the floor refuses every token issued at or before
+        // it, inclusively, whatever its `exp`.
+        if let Some(before) = self.store.revocation_floor().await?
+            && iat <= before
         {
-            return Err(Error::Unauthorized("the token is not valid yet".to_owned()));
+            return Err(Error::Unauthorized(format!(
+                "the token was issued at {iat}, at or before this cell's revocation floor \
+                 {before}; refresh it"
+            )));
         }
         // RFC 8707, and the reason this whole module can be trusted beside
         // another resource server on the same IdP: a token addressed
@@ -431,6 +439,50 @@ impl ResourceServer {
                 .unwrap_or_default(),
             jti: claims.jti,
         })
+    }
+
+    /// The admission refusals of spec 043 B-6 besides the floor, by checked
+    /// arithmetic only; the token's `iat` when it is admitted.
+    ///
+    /// A token needs an `iat`; `exp < iat` is refused by a checked
+    /// subtraction; `exp - iat` above [`L_MAX_SECONDS`] is refused without
+    /// reading any manifest, and above this server's L too; a token from
+    /// more than [`LEEWAY_SECONDS`] in the future is refused; and every sum
+    /// that overflows refuses rather than saturates. Claims outside
+    /// `0..=u64::MAX` never reach here: they do not decode as `u64`.
+    fn admit_lifetime(&self, claims: &AccessClaims, now: u64) -> Result<u64> {
+        let refuse = |why: &str| Err(Error::Unauthorized(why.to_owned()));
+        let Some(iat) = claims.iat else {
+            return refuse("the token carries no iat, so its age cannot be bounded");
+        };
+        let Some(span) = claims.exp.checked_sub(iat) else {
+            return refuse("the token expires before it was issued");
+        };
+        if span > L_MAX_SECONDS {
+            return refuse("the token's lifetime exceeds the 86,400-second maximum");
+        }
+        if span > self.lifetime {
+            return Err(Error::Unauthorized(format!(
+                "the token's lifetime of {span} seconds exceeds this cell's ceiling of {}",
+                self.lifetime
+            )));
+        }
+        let Some(horizon) = now.checked_add(LEEWAY_SECONDS) else {
+            return refuse("the clock is beyond the range a token can be checked in");
+        };
+        if iat > horizon {
+            return refuse("the token was issued in the future");
+        }
+        let Some(valid_until) = claims.exp.checked_add(LEEWAY_SECONDS) else {
+            return refuse("the token's expiry is beyond the range a token can be checked in");
+        };
+        if valid_until <= now {
+            return refuse("the token has expired");
+        }
+        if claims.nbf.is_some_and(|nbf| nbf > horizon) {
+            return refuse("the token is not valid yet");
+        }
+        Ok(iat)
     }
 
     /// Count one token-authenticated request in the bearer group (B-12).

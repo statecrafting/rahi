@@ -22,7 +22,10 @@ spec:
       labels:
         app.kubernetes.io/name: rahi
     spec:
-      terminationGracePeriodSeconds: 30
+      # Spec 043 B-9: SERVE_GRACE (S + C + D + H = 40 s) plus Rauthy's stop
+      # (R = 10 s). The composition test (rahi-cli tests/stop_budget.rs)
+      # reads this value.
+      terminationGracePeriodSeconds: 50
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001

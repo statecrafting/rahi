@@ -304,6 +304,20 @@ Locks, notify, outbox, and the revision watermark (012); the decision chain
   a dev-dependency on `rahi-harness`, which would add a dependency edge from
   a lower-numbered spec to a higher one; and retrying on `AddrInUse`, which
   hiqlite reports as a panic rather than an error.
+- **D-14 (2026-09-25, owner decision, recorded from 043 D-1 and D-15; the
+  patched-dependency exception).** B-6's "the released crate from the
+  registry, never a fork or a patch" and D-10 stand as written. They are
+  suspended for exactly the published, provenance-pinned artifacts of 043
+  D-15: the crates.io packages `hiqlite-patched =0.15.0-patched.3`,
+  `hiqlite-wal-patched =0.15.0-patched.3` and `hiqlite-derive-patched
+  =0.15.0-patched.3`, with the checksums of 043 D-15, consumed under the
+  name `hiqlite` by package rename; and the Rauthy image
+  `ghcr.io/bartekus/rauthy-patched:0.36.2-patched.3@sha256:d75cac0f708f3e238c458b622fea2f0b7dda9b67e9435eeafa37698d88a2a3c8`.
+  D-12's `[patch.crates-io]` and the hiqlite allow-git entry end with
+  043. rahi authors no change to either artifact and maintains no fork. A
+  later version of either is its own governed adoption. Unlike D-12, the
+  exception reaches registry consumers: the published `rahi-store`
+  declares the renamed package, so a consumer resolves the same crates.
 
 ## Verification
 

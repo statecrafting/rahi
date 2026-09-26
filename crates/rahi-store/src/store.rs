@@ -38,6 +38,67 @@ impl CacheVariants for Cache {
     }
 }
 
+/// SQL for the durable JTI revocation table (spec 043 B-6).
+pub const REVOCATION_JTI_TABLE_SQL: &str = "CREATE TABLE IF NOT EXISTS rahi_revocation_jti (\
+    jti TEXT PRIMARY KEY,\
+    revoked_at INTEGER NOT NULL\
+)";
+
+/// SQL for the durable subject revocation table (spec 043 B-6).
+pub const REVOCATION_SUB_TABLE_SQL: &str = "CREATE TABLE IF NOT EXISTS rahi_revocation_sub (\
+    sub TEXT PRIMARY KEY,\
+    revoked_at INTEGER NOT NULL\
+)";
+
+/// SQL for the durable token floor table (spec 043 B-6b).
+pub const REVOCATION_FLOOR_TABLE_SQL: &str = "CREATE TABLE IF NOT EXISTS rahi_revocation_floor (\
+    id TEXT PRIMARY KEY,\
+    before INTEGER NOT NULL\
+)";
+
+/// SQL for the cache upgrade transition table (spec 043 B-4).
+pub const UPGRADE_TRANSITION_TABLE_SQL: &str = "CREATE TABLE IF NOT EXISTS rahi_upgrade_transition (\
+    id TEXT PRIMARY KEY,\
+    instant INTEGER NOT NULL,\
+    state TEXT NOT NULL\
+)";
+
+/// Ensure that the chassis-managed tables for spec 043 exist.
+///
+/// # Errors
+///
+/// The mapped store error if creating any table fails.
+pub async fn ensure_chassis_tables(handle: &StoreHandle) -> Result<(), Error> {
+    for sql in [
+        REVOCATION_JTI_TABLE_SQL,
+        REVOCATION_SUB_TABLE_SQL,
+        REVOCATION_FLOOR_TABLE_SQL,
+        UPGRADE_TRANSITION_TABLE_SQL,
+    ] {
+        handle.execute(sql, vec![]).await?;
+    }
+    Ok(())
+}
+
+#[derive(serde::Deserialize)]
+struct RevokedAt {
+    revoked_at: i64,
+}
+
+impl RevokedAt {
+    fn seconds(&self) -> u64 {
+        u64::try_from(self.revoked_at).unwrap_or(0)
+    }
+}
+
+/// Seconds as SQLite's signed integer; a value beyond it is refused rather
+/// than wrapped.
+fn sql_seconds(seconds: u64) -> Result<i64, Error> {
+    i64::try_from(seconds).map_err(|_| {
+        Error::Validation(format!("{seconds} seconds does not fit a revocation table"))
+    })
+}
+
 /// The running hiqlite node. Owns the lifecycle; hands out [`StoreHandle`]s.
 pub struct Store {
     handle: StoreHandle,
@@ -121,6 +182,7 @@ impl Store {
             let _ = handle.client.shutdown().await;
             return Err(refused);
         }
+        ensure_chassis_tables(&handle).await?;
         Ok(Self {
             handle,
             cfg: cfg.clone(),
@@ -259,10 +321,187 @@ impl StoreHandle {
     ///
     /// # Errors
     ///
-    /// The mapped hiqlite error of whichever group is unhealthy.
+    /// Returns [`Error::Upstream`] reporting "recovering" while hiqlite is in
+    /// startup recovery (spec 043 D-15), or the mapped error of whichever
+    /// group is unhealthy.
     pub async fn health(&self) -> Result<(), Error> {
         self.client.is_healthy_db().await.map_err(map)?;
         self.client.is_healthy_cache().await.map_err(map)
+    }
+
+    /// Whether this node is healthy and ready to accept work.
+    ///
+    /// Reports "recovering" rather than "down" while startup recovery is in
+    /// progress (spec 043 D-15), and accepts no work before recovery completes.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Upstream`] reporting "recovering: ..." if still applying logs,
+    /// or the underlying error if a Raft group is down.
+    pub async fn is_healthy(&self) -> Result<(), Error> {
+        self.health().await
+    }
+
+    /// Read the durable revocation floor in whole seconds, if any has been set (spec 043 B-6b).
+    ///
+    /// # Errors
+    ///
+    /// The mapped store error on query failure.
+    pub async fn revocation_floor(&self) -> Result<Option<u64>, Error> {
+        #[derive(serde::Deserialize)]
+        struct FloorRow {
+            before: i64,
+        }
+        // Through the leader: a read that fails is an error, never an
+        // empty answer that would admit.
+        let rows: Vec<FloorRow> = self
+            .query_consistent(
+                "SELECT before FROM rahi_revocation_floor WHERE id = 'default'",
+                vec![],
+            )
+            .await?;
+        Ok(rows.first().and_then(|r| {
+            if r.before >= 0 {
+                Some(r.before as u64)
+            } else {
+                None
+            }
+        }))
+    }
+
+    /// Raise the durable revocation floor to `before` seconds, only if `before`
+    /// is higher than the current floor (spec 043 B-6b).
+    ///
+    /// # Errors
+    ///
+    /// The mapped store error on execute failure.
+    pub async fn raise_revocation_floor(&self, before: u64) -> Result<(), Error> {
+        self.execute(
+            "INSERT INTO rahi_revocation_floor (id, before) VALUES ('default', ?1) \
+             ON CONFLICT(id) DO UPDATE SET before = MAX(before, excluded.before)",
+            vec![Value::from(sql_seconds(before)?)],
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// Record a `jti` revocation at `revoked_at` (spec 043 B-6). A second
+    /// revocation of the same `jti` keeps the first row; no row is ever
+    /// deleted (043 D-10).
+    ///
+    /// # Errors
+    ///
+    /// The mapped store error when the write is refused.
+    pub async fn record_jti_revocation(&self, jti: &str, revoked_at: u64) -> Result<(), Error> {
+        self.execute(
+            "INSERT INTO rahi_revocation_jti (jti, revoked_at) VALUES (?1, ?2) \
+             ON CONFLICT(jti) DO NOTHING",
+            vec![
+                Value::from(jti.to_owned()),
+                Value::from(sql_seconds(revoked_at)?),
+            ],
+        )
+        .await
+        .map(|_| ())
+    }
+
+    /// Record a subject revocation at `revoked_at` (spec 043 B-6): its
+    /// `revoked_at` only rises, so a later revocation covers every token an
+    /// earlier one did.
+    ///
+    /// # Errors
+    ///
+    /// The mapped store error when the write is refused.
+    pub async fn record_subject_revocation(&self, sub: &str, revoked_at: u64) -> Result<(), Error> {
+        self.execute(
+            "INSERT INTO rahi_revocation_sub (sub, revoked_at) VALUES (?1, ?2) \
+             ON CONFLICT(sub) DO UPDATE SET revoked_at = MAX(revoked_at, excluded.revoked_at)",
+            vec![
+                Value::from(sub.to_owned()),
+                Value::from(sql_seconds(revoked_at)?),
+            ],
+        )
+        .await
+        .map(|_| ())
+    }
+
+    /// When `jti` was revoked, if it was (spec 043 B-6). Read through the
+    /// leader, so a read that fails is an error and never an empty answer.
+    ///
+    /// # Errors
+    ///
+    /// The mapped store error when the table cannot be read.
+    pub async fn jti_revoked_at(&self, jti: &str) -> Result<Option<u64>, Error> {
+        let rows: Vec<RevokedAt> = self
+            .query_consistent(
+                "SELECT revoked_at FROM rahi_revocation_jti WHERE jti = ?1",
+                vec![Value::from(jti.to_owned())],
+            )
+            .await?;
+        Ok(rows.first().map(RevokedAt::seconds))
+    }
+
+    /// When `sub` was last revoked, if it was (spec 043 B-6).
+    ///
+    /// # Errors
+    ///
+    /// The mapped store error when the table cannot be read.
+    pub async fn subject_revoked_at(&self, sub: &str) -> Result<Option<u64>, Error> {
+        let rows: Vec<RevokedAt> = self
+            .query_consistent(
+                "SELECT revoked_at FROM rahi_revocation_sub WHERE sub = ?1",
+                vec![Value::from(sub.to_owned())],
+            )
+            .await?;
+        Ok(rows.first().map(RevokedAt::seconds))
+    }
+
+    /// How many revocation rows each table holds, `(jti, sub)`: what
+    /// `rahi_revocation_rows{kind}` reports (spec 043 B-6 (i)).
+    ///
+    /// # Errors
+    ///
+    /// The mapped store error when a table cannot be read.
+    pub async fn revocation_rows(&self) -> Result<(u64, u64), Error> {
+        #[derive(serde::Deserialize)]
+        struct Count {
+            n: i64,
+        }
+        let count = |rows: Vec<Count>| rows.first().map_or(0, |c| u64::try_from(c.n).unwrap_or(0));
+        let jti: Vec<Count> = self
+            .query_consistent("SELECT COUNT(*) AS n FROM rahi_revocation_jti", vec![])
+            .await?;
+        let sub: Vec<Count> = self
+            .query_consistent("SELECT COUNT(*) AS n FROM rahi_revocation_sub", vec![])
+            .await?;
+        Ok((count(jti), count(sub)))
+    }
+
+    /// T3 of spec 043 B-4, in one `txn`: upsert the transition row at
+    /// `floored` and raise the floor to `instant`, which only rises.
+    ///
+    /// # Errors
+    ///
+    /// The mapped store error when the transaction fails.
+    pub async fn record_transition_floor(&self, id: &str, instant: u64) -> Result<(), Error> {
+        let at = sql_seconds(instant)?;
+        self.txn(vec![
+            Statement {
+                sql: "INSERT INTO rahi_upgrade_transition (id, instant, state) \
+                      VALUES (?1, ?2, 'floored') \
+                      ON CONFLICT(id) DO UPDATE SET state = 'floored'"
+                    .to_owned(),
+                params: vec![Value::from(id.to_owned()), Value::from(at)],
+            },
+            Statement {
+                sql: "INSERT INTO rahi_revocation_floor (id, before) VALUES ('default', ?1) \
+                      ON CONFLICT(id) DO UPDATE SET before = MAX(before, excluded.before)"
+                    .to_owned(),
+                params: vec![Value::from(at)],
+            },
+        ])
+        .await
+        .map(|_| ())
     }
 
     /// Whether this node currently leads the SQL group. An attached handle

@@ -70,7 +70,8 @@ boot, key generation, and supervision (031) are modules added to
   Router; fn operator_routes(state) -> Router { empty } }`. `rahi_cli::run
   (cell)` parses argv: `serve`, `preflight`, `migrate`, `backup`, `restore
   <archive>`, `ledger verify [--full]`, `ledger export <path>`, `supervise`
-  (031), `first-boot` (031), `ledger reindex <archive>` (042). Exit codes are
+  (031), `first-boot` (031), `ledger reindex <archive>` (042),
+  `upgrade-cache --backup <archive>` (043). Exit codes are
   `rahi_types::Error::exit_code`. A verb annotated with an ordinal is
   established by that spec and enters the binary when that spec lands;
   `ledger reindex` is the only mutating verb under `ledger`, and D-9 records
@@ -333,6 +334,17 @@ where archives land in a cluster (032).
   `rahi-harness`, which would add a dependency edge from a lower-numbered
   spec to a higher one; and retrying on `AddrInUse`, which hiqlite reports
   as a panic rather than an error.
+
+- **D-11 (2026-09-25, owner decision; amends B-1's argv list).** B-1's
+  list gains `upgrade-cache --backup <archive>`, established by spec 043
+  B-4 (its `--abort` form is the same verb). Spec 043's build held the verb
+  out of `VERBS` because AC-2 derives the required set from this list and
+  the list is this spec's text (043 D-19 (a)); the owner approved the
+  amendment on 2026-09-25, as D-9 did for 042's verb. No behavior of any
+  existing verb changes, no functional requirement changes, and this spec's
+  implementation stays complete. AC-2's test reads a verb as the words
+  before its first placeholder, optional group or flag, so the entry is
+  `upgrade-cache`.
 
 ## 8. Status
 

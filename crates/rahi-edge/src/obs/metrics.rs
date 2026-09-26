@@ -47,6 +47,12 @@ pub const STREAMS_CLOSED: &str = "rahi_streams_closed_total";
 /// Work items per processor and state, redacted counts only: never a
 /// tenant, namespace, key, or digest (spec 045 B-17, I-8).
 pub const WORK_ITEMS: &str = "rahi_work_items";
+/// How the previous boot stopped, by outcome and cause (spec 043 B-10).
+pub const PREVIOUS_STOP: &str = "rahi_previous_stop";
+/// Revocation rows held, by kind (spec 043 B-6 (i), D-10).
+pub const REVOCATION_ROWS: &str = "rahi_revocation_rows";
+/// Entries found on the legacy path's fence (spec 043 B-5, D-17 (e)).
+pub const LEGACY_PATH_DEBRIS: &str = "rahi_legacy_path_debris";
 
 /// The buckets a stream's lifetime falls into, in seconds: a stream lives
 /// seconds to hours, not milliseconds.
@@ -76,6 +82,9 @@ pub struct Metrics {
     stream_events: IntCounter,
     streams_closed: IntCounterVec,
     work_items: IntGaugeVec,
+    previous_stop: IntGaugeVec,
+    revocation_rows: IntGaugeVec,
+    legacy_path_debris: IntGauge,
 }
 
 impl Metrics {
@@ -204,6 +213,33 @@ impl Metrics {
         registry
             .register(Box::new(work_items.clone()))
             .map_err(config)?;
+        // Spec 043 B-10, B-6 (i) and B-5: set once at boot by the composer,
+        // from what the process found on its volume and in its store.
+        let previous_stop = IntGaugeVec::new(
+            Opts::new(
+                PREVIOUS_STOP,
+                "How the previous boot stopped: 1 on its outcome and cause",
+            ),
+            &["outcome", "cause"],
+        )
+        .map_err(config)?;
+        let revocation_rows = IntGaugeVec::new(
+            Opts::new(REVOCATION_ROWS, "Retained bearer revocation rows, by kind"),
+            &["kind"],
+        )
+        .map_err(config)?;
+        let legacy_path_debris = IntGauge::with_opts(Opts::new(
+            LEGACY_PATH_DEBRIS,
+            "Entries beside the fence on the legacy store path",
+        ))
+        .map_err(config)?;
+        for collector in [
+            Box::new(previous_stop.clone()) as Box<dyn prometheus::core::Collector>,
+            Box::new(revocation_rows.clone()),
+            Box::new(legacy_path_debris.clone()),
+        ] {
+            registry.register(collector).map_err(config)?;
+        }
         register_process_collector(&registry)?;
 
         Ok(Self {
@@ -221,6 +257,9 @@ impl Metrics {
             stream_events,
             streams_closed,
             work_items,
+            previous_stop,
+            revocation_rows,
+            legacy_path_debris,
         })
     }
 
@@ -333,6 +372,25 @@ impl Metrics {
     #[must_use]
     pub fn work_items(&self, processor: &str, state: &str) -> i64 {
         self.work_items.with_label_values(&[processor, state]).get()
+    }
+
+    /// Record how the previous boot stopped (spec 043 B-10): the one series
+    /// for `outcome` and `cause` is `1`.
+    pub fn set_previous_stop(&self, outcome: &str, cause: &str) {
+        self.previous_stop.reset();
+        self.previous_stop
+            .with_label_values(&[outcome, cause])
+            .set(1);
+    }
+
+    /// Set the retained revocation rows of `kind` (`jti` or `subject`).
+    pub fn set_revocation_rows(&self, kind: &str, count: i64) {
+        self.revocation_rows.with_label_values(&[kind]).set(count);
+    }
+
+    /// Set the number of entries beside the legacy path's fence.
+    pub fn set_legacy_path_debris(&self, entries: i64) {
+        self.legacy_path_debris.set(entries);
     }
 
     /// The current value of a request counter, for a test or a probe.

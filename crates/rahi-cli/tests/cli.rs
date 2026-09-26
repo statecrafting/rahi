@@ -215,13 +215,15 @@ fn implementation_of(ordinal: &str) -> String {
 }
 
 /// The bare verb of one B-1 argv entry: the words before its first
-/// placeholder or flag group. `restore <archive>` is `restore`; `ledger
-/// verify [--full]` is `ledger verify`.
+/// placeholder, flag group or flag. `restore <archive>` is `restore`;
+/// `ledger verify [--full]` is `ledger verify`; `upgrade-cache --backup
+/// <archive>` is `upgrade-cache` (030 D-11).
 fn verb_of(entry: &str) -> String {
     let end = entry
         .find(" <")
         .into_iter()
         .chain(entry.find(" ["))
+        .chain(entry.find(" --"))
         .min()
         .unwrap_or(entry.len());
     entry[..end].trim().to_owned()
@@ -470,7 +472,11 @@ fn serve_with_a_static_directory_that_is_absent_is_exit_3_before_the_store_opens
     );
     assert!(run.stderr.contains("404"), "{}", run.stderr);
     assert!(
-        !volume.path().join("hiqlite").exists(),
+        !volume
+            .path()
+            .join("app-store")
+            .join("state_machine")
+            .exists(),
         "no node was opened"
     );
 }
@@ -545,7 +551,11 @@ fn migrate_on_a_bad_restore_env_is_refused_before_the_node_opens() {
     assert_eq!(run.code, 3, "{}", run.stderr);
     assert!(run.stderr.contains("HQL_BACKUP_RESTORE is set"));
     assert!(
-        !volume.path().join("hiqlite").exists(),
+        !volume
+            .path()
+            .join("app-store")
+            .join("state_machine")
+            .exists(),
         "the node was never opened"
     );
 }
@@ -576,7 +586,11 @@ fn preflight_with_the_restore_env_set_refuses_to_open_the_node() {
     assert!(run.stdout.contains("SKIP engine:"));
     assert!(run.stdout.contains("SKIP ledger:"));
     assert!(
-        !volume.path().join("hiqlite").exists(),
+        !volume
+            .path()
+            .join("app-store")
+            .join("state_machine")
+            .exists(),
         "the node was never opened"
     );
 }
@@ -749,7 +763,7 @@ fn backup_and_restore_round_trip_through_the_binary() {
     let snapshots: Vec<String> = std::fs::read_dir(
         source
             .path()
-            .join("hiqlite")
+            .join("app-store")
             .join("state_machine")
             .join("backups"),
     )
@@ -816,6 +830,9 @@ fn backup_inside_a_running_replica_attaches_to_its_node_instead_of_opening_a_sec
     // runs in another process against the same volume (spec 032 B-5).
     let env: BTreeMap<String, String> = volume.env.iter().cloned().collect();
     let config = rahi_types::Config::from_env(&env).unwrap();
+    // Spec 043 B-4a: the process that owns the node holds `cell.lock`, as
+    // `serve` does; that lock, not hiqlite's own, is what a verb attaches to.
+    let _owner = rahi_ops::cell_lock::gate(&config, rahi_ops::cell_lock::Entry::Serve).unwrap();
     let secrets = KeySet::of(&config).store_secrets().unwrap();
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
@@ -878,7 +895,7 @@ fn backup_inside_a_running_replica_attaches_to_its_node_instead_of_opening_a_sec
         run.stdout
     );
     assert!(
-        !job.path().join("hiqlite").exists(),
+        !job.path().join("app-store").join("state_machine").exists(),
         "a client opens no node of its own"
     );
     runtime.block_on(store.shutdown()).unwrap();
@@ -1330,4 +1347,242 @@ fn ledger_reindex_is_a_verb_of_its_own_and_says_it_mutates() {
     let run = bare(&["ledger", "reindex"]);
     assert_eq!(run.code, 1);
     assert!(run.stderr.contains("ledger reindex needs an archive"));
+}
+
+/// The argv that runs `verb` of [`VERBS`] against `volume`. A verb this does
+/// not know fails the test, so a new verb cannot skip spec 043 FR-008.
+fn argv_of(verb: &str, volume: &Path) -> Vec<String> {
+    let archive = volume
+        .join("backups")
+        .join("none.age")
+        .display()
+        .to_string();
+    let words: Vec<String> = match verb {
+        "serve" | "preflight" | "migrate" | "backup" | "supervise" | "first-boot" => {
+            vec![verb.to_owned()]
+        }
+        "restore" => vec!["restore".to_owned(), archive],
+        "ledger verify" => vec!["ledger".to_owned(), "verify".to_owned()],
+        "ledger export" => vec![
+            "ledger".to_owned(),
+            "export".to_owned(),
+            volume.join("export.jsonl").display().to_string(),
+        ],
+        "ledger reindex" => vec![
+            "ledger".to_owned(),
+            "reindex".to_owned(),
+            volume.join("ledger-archive").display().to_string(),
+        ],
+        "upgrade-cache" => vec!["upgrade-cache".to_owned(), "--backup".to_owned(), archive],
+        other => panic!("spec 043 FR-008: {other:?} has no argv here; add it"),
+    };
+    words
+}
+
+/// Spec 043 FR-008: every verb of [`VERBS`] passes B-4a's gate before it
+/// reads the transition record, opens the store or spawns Rauthy. With both
+/// locks held elsewhere and a record no build can read, each one refuses at
+/// a lock (a verb that read the record first would name the record instead),
+/// creates no fence, opens no node and spawns no Rauthy.
+#[test]
+fn every_verb_locks_before_it_reads_opens_or_spawns() {
+    let volume = Volume::new();
+    let data = volume.path();
+    let record = data.join(rahi_ops::upgrade::STATE_FILE);
+    std::fs::write(&record, b"{ not a transition record").unwrap();
+    let spawned = data.join("rauthy-spawned");
+    let fake_rauthy = data.join("fake-rauthy.sh");
+    std::fs::write(
+        &fake_rauthy,
+        format!("#!/bin/sh\ntouch {}\nsleep 30\n", spawned.display()),
+    )
+    .unwrap();
+    std::fs::set_permissions(&fake_rauthy, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let cell = rahi_ops::cell_lock::try_lock(&data.join(rahi_ops::cell_lock::CELL_LOCK_FILE), true)
+        .unwrap()
+        .unwrap();
+    let layout =
+        rahi_ops::cell_lock::try_lock(&data.join(rahi_ops::cell_lock::TRANSITION_LOCK_FILE), true)
+            .unwrap()
+            .unwrap();
+    let before = std::fs::read_dir(data)
+        .unwrap()
+        .map(|e| e.unwrap().file_name())
+        .collect::<BTreeSet<_>>();
+    for verb in VERBS {
+        let argv = argv_of(verb, data);
+        let args: Vec<&str> = argv.iter().map(String::as_str).collect();
+        let mut cmd = Command::new(env!("CARGO_BIN_EXE_rahi"));
+        cmd.args(&args);
+        for (k, v) in &volume.env {
+            cmd.env(k, v);
+        }
+        cmd.env_remove(rahi_ops::RESTORE_ENV_VAR);
+        cmd.env("RAHI_RAUTHY_BIN", &fake_rauthy);
+        let run = Run::of(cmd.output().unwrap());
+        assert_ne!(run.code, 0, "{verb}: refused\n{}{}", run.stdout, run.stderr);
+        let said = format!("{}{}", run.stdout, run.stderr);
+        assert!(
+            said.contains(rahi_ops::cell_lock::CELL_LOCK_FILE)
+                || said.contains(rahi_ops::cell_lock::TRANSITION_LOCK_FILE),
+            "{verb}: refused at a lock, before reading the record:\n{}{}",
+            run.stdout,
+            run.stderr
+        );
+        assert!(!spawned.exists(), "{verb}: no Rauthy was spawned");
+        let after = std::fs::read_dir(data)
+            .unwrap()
+            .map(|e| e.unwrap().file_name())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(after, before, "{verb}: nothing was created on the volume");
+        assert_eq!(
+            std::fs::read(&record).unwrap(),
+            b"{ not a transition record",
+            "{verb}: the record is untouched"
+        );
+    }
+    drop((cell, layout));
+}
+
+/// Spec 043 AC-3's shape through the binary: a volume in the pre-043 layout
+/// is refused by `serve` before anything opens; `upgrade-cache` with a
+/// verifying archive reaches `floored`; `serve` then answers ready and
+/// records `done`; a second verb run changes nothing.
+#[test]
+fn a_pre043_volume_is_refused_then_transitioned_then_served_to_done() {
+    let volume = Volume::new();
+    let data = volume.path();
+    assert_eq!(volume.run(&["migrate"]).code, 0);
+
+    // The layout every pre-043 binary wrote: the store at <data>/hiqlite and
+    // the rendered environment at <data>/rauthy/rauthy.env.
+    std::fs::remove_dir_all(data.join("hiqlite")).unwrap();
+    std::fs::remove_dir_all(data.join("rauthy").join("rauthy.env")).unwrap();
+    std::fs::rename(data.join("app-store"), data.join("hiqlite")).unwrap();
+    std::fs::write(data.join("rauthy").join("rauthy.env"), b"OLD=1\n").unwrap();
+    let db = data.join("hiqlite").join("state_machine").join("db");
+    let leftovers: Vec<String> = std::fs::read_dir(&db)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .filter(|n| n.ends_with("-wal") || n.ends_with("-shm"))
+        .collect();
+    assert!(
+        leftovers.is_empty(),
+        "a stopped process closed SQLite: {leftovers:?}"
+    );
+
+    let refused = volume.run(&["serve"]);
+    assert_ne!(refused.code, 0);
+    assert!(
+        refused.stderr.contains("rahi upgrade-cache"),
+        "{}",
+        refused.stderr
+    );
+    assert!(!data.join("app-store").exists(), "nothing was opened");
+
+    let keys = KeySet::at(data.join("keys"));
+    let parts = vec![
+        rahi_ops::archive::Part::new(rahi_ops::archive::APP_DIR, "a.sqlite", b"app".to_vec()),
+        rahi_ops::archive::Part::new(rahi_ops::archive::RAUTHY_DIR, "r.sqlite", b"r".to_vec()),
+        rahi_ops::archive::Part::new(rahi_ops::archive::KEYS_DIR, "ledger.key", b"k".to_vec()),
+    ];
+    let manifest =
+        rahi_ops::archive::ArchiveManifest::over(&parts, 1, "sha256:test".to_owned(), None);
+    let sealed =
+        rahi_ops::archive::seal(&parts, &manifest, &keys.backup_recipient().unwrap()).unwrap();
+    let archive = data.join("pre-upgrade.tar.age");
+    std::fs::write(&archive, sealed).unwrap();
+
+    let run = volume.run(&["upgrade-cache", "--backup", archive.to_str().unwrap()]);
+    assert_eq!(run.code, 0, "{}{}", run.stdout, run.stderr);
+    assert!(
+        run.stdout.contains("Every old process is stopped"),
+        "{}",
+        run.stdout
+    );
+    assert!(run.stdout.contains("is floored at"), "{}", run.stdout);
+
+    let record = || {
+        let text = std::fs::read_to_string(data.join(rahi_ops::upgrade::STATE_FILE)).unwrap();
+        serde_json::from_str::<serde_json::Value>(&text).unwrap()["phase"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    assert_eq!(record(), "floored");
+
+    let mut serve = Command::new(env!("CARGO_BIN_EXE_rahi"));
+    serve.arg("serve");
+    for (k, v) in &volume.env {
+        serve.env(k, v);
+    }
+    serve.env_remove(rahi_ops::RESTORE_ENV_VAR);
+    let mut child = serve
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(90);
+    while record() != "done" && std::time::Instant::now() < deadline {
+        std::thread::sleep(std::time::Duration::from_millis(250));
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+    assert_eq!(record(), "done", "serve's first ready answer completes it");
+
+    let again = volume.run(&["upgrade-cache", "--backup", archive.to_str().unwrap()]);
+    assert_eq!(again.code, 0, "{}", again.stderr);
+    assert!(
+        again.stdout.contains("`done`; nothing to do"),
+        "{}",
+        again.stdout
+    );
+}
+
+/// Spec 043 D-21 (c): `RAHI_TEST_UPGRADE_CRASH_AT` stops the real binary at
+/// a persistent state as a crash would (exit 137, nothing after it), and a
+/// rerun of the verb resumes from there to `floored`.
+#[test]
+fn the_verb_stopped_at_a_persistent_state_resumes_to_floored() {
+    let volume = Volume::new();
+    let data = volume.path();
+    assert_eq!(volume.run(&["migrate"]).code, 0);
+    std::fs::remove_dir_all(data.join("hiqlite")).unwrap();
+    std::fs::remove_dir_all(data.join("rauthy").join("rauthy.env")).unwrap();
+    std::fs::rename(data.join("app-store"), data.join("hiqlite")).unwrap();
+    std::fs::write(data.join("rauthy").join("rauthy.env"), b"OLD=1\n").unwrap();
+
+    let keys = KeySet::at(data.join("keys"));
+    let parts = vec![
+        rahi_ops::archive::Part::new(rahi_ops::archive::APP_DIR, "a.sqlite", b"app".to_vec()),
+        rahi_ops::archive::Part::new(rahi_ops::archive::RAUTHY_DIR, "r.sqlite", b"r".to_vec()),
+        rahi_ops::archive::Part::new(rahi_ops::archive::KEYS_DIR, "ledger.key", b"k".to_vec()),
+    ];
+    let manifest =
+        rahi_ops::archive::ArchiveManifest::over(&parts, 1, "sha256:test".to_owned(), None);
+    let sealed =
+        rahi_ops::archive::seal(&parts, &manifest, &keys.backup_recipient().unwrap()).unwrap();
+    let archive = data.join("pre-upgrade.tar.age");
+    std::fs::write(&archive, sealed).unwrap();
+    let phase = || {
+        let text = std::fs::read_to_string(data.join(rahi_ops::upgrade::STATE_FILE)).unwrap();
+        serde_json::from_str::<serde_json::Value>(&text).unwrap()["phase"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+
+    let mut crashed = Command::new(env!("CARGO_BIN_EXE_rahi"));
+    crashed.args(["upgrade-cache", "--backup", archive.to_str().unwrap()]);
+    for (k, v) in &volume.env {
+        crashed.env(k, v);
+    }
+    crashed.env(rahi_cli::ENV_UPGRADE_CRASH_AT, "guarded");
+    let out = crashed.output().unwrap();
+    assert_eq!(out.status.code(), Some(137), "{out:?}");
+    assert_eq!(phase(), "guarded");
+
+    let run = volume.run(&["upgrade-cache", "--backup", archive.to_str().unwrap()]);
+    assert_eq!(run.code, 0, "{}{}", run.stdout, run.stderr);
+    assert_eq!(phase(), "floored");
 }

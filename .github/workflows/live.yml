@@ -174,6 +174,19 @@ jobs:
         # Keep every test binary's result visible when any one fails.
         run: cargo test --workspace --locked --no-fail-fast -- --test-threads=2
 
+      # Spec 043 AC-7 and step 14 of its delivery plan: the graceful stop
+      # series under the declared workload, with Rauthy, recorded per run
+      # (each phase, the outcome, time to exit, time to both owner locks'
+      # release). The suite above already required it to pass; this prints
+      # the record so the run carries it.
+      - name: The stop series (spec 043 AC-7), recorded
+        env:
+          RAHI_REQUIRE_RAUTHY: "1"
+          RAHI_STOP_SERIES_OUT: ${{ runner.temp }}/ac7-series.json
+        run: |
+          cargo test -p rahi-cli --locked --test stop_budget ac7 -- --nocapture
+          cat "$RAHI_STOP_SERIES_OUT"
+
       - name: rauthy's log, on a failure
         if: failure()
         run: docker logs rauthy-live
@@ -181,3 +194,31 @@ jobs:
       - name: Stop rauthy
         if: always()
         run: docker rm -f rauthy-live || true
+
+  # Spec 043 FR-010, AC-3, AC-3a, AC-4 (d), AC-5 and AC-9: the real v0.2.0
+  # image, by digest, against the image built from this change, on real
+  # volumes. The script prints every leg as PASS, FAIL or UNEXECUTED with
+  # its reason, and fails the job on any failed leg.
+  upgrade:
+    name: the upgrade legs, v0.2.0 against this change
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build hello-cell from this change
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64
+          load: true
+          tags: hello-cell:upgrade
+          build-args: |
+            RAHI_PACKAGE=hello-cell
+            RAHI_BIN=hello-cell
+            RAHI_STATIC_SRC=apps/hello-cell/web
+          cache-from: type=gha,scope=amd64
+      - name: Pull the v0.2.0 image by digest
+        run: docker pull ghcr.io/statecrafting/rahi-hello-cell:0.2.0@sha256:494a566d1ea97aa348a0ccbe0adda4a87522f0b67a87518a46f980d68b66f06b
+      - name: The upgrade legs
+        run: docker/upgrade-live.sh hello-cell:upgrade

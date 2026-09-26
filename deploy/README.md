@@ -211,22 +211,156 @@ restores on node 1 and makes the other nodes delete their data and rejoin,
 and that path has not been exercised. Do not promise unattended recovery of
 a three-replica cell.
 
+## Upgrading from 0.3.x or earlier to 0.4.0 (spec 043)
+
+0.4.0 builds on `hiqlite-patched =0.15.0-patched.3` and runs the Rauthy
+build `ghcr.io/bartekus/rauthy-patched:0.36.2-patched.3` (pinned by
+digest in both Dockerfiles). hiqlite 0.15 cannot read a 0.14 cache, so the
+boundary is crossed once, by a verb, on a stopped cell. The app store moves
+from `<data>/hiqlite` to `<data>/app-store`; `<data>/hiqlite` becomes a
+permanent fence. A fresh volume gets the new layout and both fences at its
+first boot and needs none of this.
+
+**Preconditions the verb cannot establish.** Establish them before you run
+it; the verb prints them before it starts:
+
+1. Every old process is stopped, and the old container is removed with
+   every restart source that could bring it back disabled (a restart
+   policy, a unit file, a controller). This includes a pre-043 supervisor
+   started directly and every Rauthy it spawned.
+2. No old process on the volume, in any state, has
+   `HQL_DANGER_RAFT_STATE_RESET` or `HQL_BACKUP_RESTORE` in its
+   environment.
+
+And start no Rauthy outside the cell on the volume: a bare
+`ghcr.io/sebadob/rauthy:0.36.2` pointed at it is not excluded by anything
+here, and from the transition on Rauthy's directory is in 0.15 format,
+which a hiqlite 0.14 process can destroy.
+
+**The procedure.**
+
+1. Take a backup with the old image while it runs (`rahi backup`), and
+   keep the archive: it is the verb's precondition and the only rollback
+   after the store has been opened by 0.15.
+2. Stop and remove the old cell (precondition 1).
+3. Run the new image's verb on the volume:
+   `rahi upgrade-cache --backup <archive>`. It verifies the archive,
+   places a guard where the old store's lock marker lives, checks that no
+   old node is live or stopped uncleanly, fences the old supervisor's
+   configuration path, moves the store into `<data>/app-store` (its two
+   0.14 caches go aside, under `<data>/upgrade-cache/`), raises the
+   revocation floor, and stops at `floored`. Every step is recorded in
+   `<data>/upgrade-cache.json` before and after it acts, so a rerun
+   after any interruption resumes where it stopped.
+4. Start the new image. `supervise` gives Rauthy its consent to move its
+   own cache aside (only while the record says `floored`), and `serve`'s
+   first ready answer records `done`. A later boot needs nothing.
+
+The new image refuses a volume in the old layout at every entry point,
+before it opens, writes or spawns anything, and names the verb.
+
+**The fences, and exactly what they exclude.** The guard stays as the
+fence at `<data>/hiqlite/state_machine/lock`: a pre-043 `serve`,
+`ledger verify` or node panics on it, a pre-043 `restore` and `preflight`
+refuse on it, and the old image's default entrypoint waits in its
+`migrate` step. The supervisor fence is a directory at
+`<data>/rauthy/rauthy.env`: a pre-043 `rahi supervise` whose read of that
+path opens it at or after the verb's move of the old file fails that read
+and exits before it spawns Rauthy. A supervisor that opened the file
+before that move and has not yet spawned is not stopped by it, which is
+why precondition 1 exists. Never remove either fence, including to satisfy
+an old `restore`'s "clear an unclean shutdown" message: that is
+unsupported.
+
+**Abandoning and rolling back.** Before `flooring`,
+`rahi upgrade-cache --abort` returns every moved entry to its original
+path, verified by identity, and the old image starts as before. It is not
+a byte-identical volume: `upgrade-cache.json` (state `aborted`, kept as
+history), `<data>/upgrade-cache/` with its evidence, `cell.lock`,
+`transition.lock`, `<data>/rauthy-env/` and changed directory timestamps
+remain. From `flooring` on, the app store has been opened by 0.15, and the
+only rollback is the verified pre-upgrade archive restored into a fresh
+volume with the old image. An old binary started over a 0.15 store
+without the fence can destroy its raft metadata; the volume is then not
+trusted and the archive is the recovery. An archive written by 0.4.0
+restored by an older image is unsupported.
+
+**What the upgrade costs.**
+
+- **Every bearer access token issued before the upgrade is refused** from
+  the transition on: the floor is the verb's instant, and a token whose
+  `iat` is at or before it is refused. A native client must refresh; a
+  refresh presented before the refresh token's own `nbf` (Rauthy sets it
+  to `issued_at + L - 60`) makes Rauthy end that user's sessions, so the
+  user logs in again. Browser sessions keep their Rauthy session and pay
+  one renewal round trip.
+- **The floor assumes the wall clock did not step backwards** between the
+  last token the old cell issued or revoked and the verb's instant. If it
+  did, by Δ seconds, a revocation that lived only in the old cache stops
+  protecting a token whose `iat` falls in that gap, which is then admitted
+  until its own expiry: at most Δ + L + 60 seconds after the upgrade. No
+  signing-key rotation closes this (spec 043 D-12 (a)). Mitigation: check the host clock is monotonic across
+  the upgrade (NTP slewing, not stepping), and keep the manifest's lifetime
+  L short.
+- **Rauthy's cache-only state is lost** when Rauthy moves its cache aside:
+  authorization and ToS-await codes, device codes, WebAuthn and
+  MFA-modification challenges, proof-of-work challenges, DPoP nonces, every
+  IP ban (manual and automatic alike), failed-login counters,
+  credential-stuffing and rate-limit windows, upstream-provider callback
+  state, and a client's previous secret during its rotation window.
+  Logins and challenges in progress restart. Carry the bans yourself: list
+  them with `GET /auth/v1/blacklist` before the upgrade and re-apply each
+  with `POST /auth/v1/blacklist` and the same expiry after it.
+  Failed-login counters cannot be carried. Sessions, refresh tokens and
+  Rauthy's own revocations are in its database and survive.
+- **The known gap in Rauthy's own cache move.** An interruption inside
+  Rauthy's two cache renames (a crash between them) can leave a 0.14 cache
+  snapshot that its next start restores without refusal (hiqlite F-130).
+  Do not interrupt the first start after the verb; if it was interrupted,
+  restore the pre-upgrade archive into a fresh volume and run the upgrade
+  again.
+
+**Restores after the upgrade.** A restore returns both databases to the
+archive's instant. Every restore raises the revocation floor to the
+restore instant (spec 043 D-8), at the first open after it and before
+`/readyz` answers, so every bearer access token issued before the restore
+is refused. What no rahi floor stops (spec 043 D-12 (b)): Rauthy's restored database is older than the state it
+replaces, so it revives what was removed after the archive instant,
+including ended sessions and revoked refresh tokens, which can mint new
+access tokens that the floor admits because they are issued after it; it
+also revives disabled users and clients, deleted API keys and superseded
+secrets, and forgets anything created after the archive. A restore in
+place (into a volume that already holds Rauthy's cache) keeps that cache,
+and a cached session copy wins over the restored row for up to four hours.
+Mitigation: restore into a fresh volume; after a restore, revoke again
+every session, refresh token, user, client and key you revoked or removed
+after the archive was taken, and rotate the credentials you superseded.
+
+**N=1 only.** Both patched builds are qualified for a single-node cell.
+`deploy/n3` is not qualified with them and must not be used for this
+release.
+
 ## Token lifetimes and revocation
 
-Spec 025 B-5 asks the deployment documentation to state the revocation
-bound. As built:
+Spec 025 B-5, spec 038 and spec 043 B-6. As built:
 
 - A browser session holds a cached assertion for fifteen minutes and then
   renews through rauthy, re-reading the user's roles. A user disabled in
   rauthy loses the session at the next renewal, so within fifteen minutes.
 - A bearer access token is validated locally against rauthy's key set,
-  never introspected, and accepted until its `exp` plus sixty seconds of
-  leeway. rahi sets no token lifetime, so the lifetime is rauthy's client
-  default: 1800 seconds in rauthy 0.36.2. The `jti` deny-list the resource
-  server consults exists with its writer, and nothing calls the writer yet
-  (neither logout nor a verb), so a bearer token cannot be revoked before
-  it expires.
-- `preflight` does not report the bound yet.
+  never introspected. Its lifetime is the manifest's (038 B-4), at most
+  86,400 seconds. The check refuses a token with no `iat`, with `exp`
+  before `iat`, with `exp - iat` above 86,400 or above the manifest's
+  lifetime, with an `iat` more than sixty seconds in the future, or with
+  an `iat` at or before the revocation floor, and otherwise accepts it
+  until `exp` plus sixty seconds of leeway.
+- A revocation (a client revoking its own token, or an operator revoking a
+  `jti` or a subject, 038 B-5) is a row in SQL, durable before the route
+  answers and read on every bearer check. No row is ever deleted (043
+  D-10): a revoked token is refused for the life of the volume, whatever
+  the clock does afterwards, and the rows grow without bound, one per
+  `jti` revocation and at most one per subject. The growth has not been
+  measured; `rahi_revocation_rows{kind}` reports it at every boot.
 
 ## Denials at a stop
 
@@ -248,9 +382,10 @@ in a `403` promises. As built:
   storage failure. On SIGTERM, `serve` lets in-flight requests finish, then
   gives the queue `RAHI_DENIAL_DRAIN_TIMEOUT_SECS` (default 5) before it
   shuts the store; what the store has not taken by then is abandoned and
-  counted. If the supervisor stops waiting for `serve` first (fifteen
-  seconds, spec 031 D-4, which open streams and slow connections can use
-  up), the records still owed are counted as abandoned as the process ends.
+  counted. If the supervisor stops waiting for `serve` first (forty
+  seconds since spec 043, `SERVE_GRACE`, which open streams and slow
+  connections can use up), the records still owed are counted as abandoned
+  as the process ends, and the stop is recorded as unconfirmed.
 - An id names one denial across replicas. It is
   `kernel:<nonce>:<node>:<counter>`, where the node is the replica's
   `RAHI_HIQ_NODE_ID` (the pod ordinal plus one). One residual remains (spec
@@ -260,9 +395,58 @@ in a `403` promises. As built:
   `INFO rahi.decision` line naming its nonce and node, so a re-mint shows as
   two boot lines of one node on one nonce.
 
+## Stopping: the budget and the recorded outcome
+
+Spec 043 B-9 and B-10. A stop runs five bounded phases, in order: the
+stream drain S (`RAHI_STREAM_DRAIN_TIMEOUT_SECS`, default 10 s), the
+connection drain C (10 s), the denial drain D
+(`RAHI_DENIAL_DRAIN_TIMEOUT_SECS`, default 5 s), the store's shutdown H
+(hiqlite's own 15 s wait, never shortened) and, under `supervise`, Rauthy's
+stop R (10 s, then SIGKILL). `supervise` gives `serve` `SERVE_GRACE` =
+S + C + D + H = 40 s, and the orchestrator must give the container
+SERVE_GRACE + R = **50 s**: the StatefulSet sets
+`terminationGracePeriodSeconds: 50`, and a hand-run container is stopped
+with `docker stop -t 50`. Raising a drain above its default raises both
+sums; the composition test (`crates/rahi-cli/tests/stop_budget.rs`) holds
+the shipped values to them.
+
+Every `serve` or `supervise` process keeps `<data>/stop.json`: written
+whole at boot as `{boot, started_at}`, given `received_at` on SIGTERM, and
+given the outcome, each phase's duration and the exit status on exit.
+
+- **confirmed**, exit `0`: every phase inside its bound, no stream or
+  connection cut, every queued denial ledgered, the store's shutdown
+  answered `Ok`, and Rauthy exited `0` inside its grace.
+- **unconfirmed**, exit `3`, with every reason that applies:
+  `store_timeout`, `store_error`, `stream_drain_overrun`,
+  `connection_drain_overrun`, `denials_abandoned{n}`,
+  `serve_grace_overrun`, `rauthy_nonzero{code}`, `rauthy_killed`,
+  `storage_terminal`, and `serve_error` for a run that ended on an error of
+  its own (its own exit code stands).
+
+The next boot logs how the previous one stopped and exports it as
+`rahi_previous_stop{outcome, cause}`: an outcome as written (cause
+`recorded`); **stopped without a recorded signal**; **incomplete after
+SIGTERM**; or **no record for the previous boot**. The last three name no
+cause, because a SIGKILL, a crash, a power loss and an interrupted write
+leave the same record; the cause is `witnessed_kill` only when a witness
+record (`<data>/stop-witness.json`, written by the process that sent the
+SIGKILL) names that boot, and `unknown` otherwise.
+
+A stop that did not finish the store's shutdown (`store_timeout`, or a kill
+before the store shut) leaves hiqlite's unclean-stop marker,
+`<data>/app-store/state_machine/lock`, and the next start refuses it:
+this release does not enable hiqlite's `auto-heal`. hiqlite's refusal says
+what to establish before the marker is removed (no process uses the
+directory, and the database is consistent with the Raft log), or restore a
+backup. A kill that lands after the store has shut (under `supervise`,
+during Rauthy's stop) leaves no marker, and the next boot needs no step.
+
 ## What does not span replicas
 
-- **The cache group is per node.** Nothing durable lives in it.
+- **The cache group is per node.** Nothing durable lives in it. Until
+  0.4.0 the bearer revocation deny-list did live there, and a cache loss
+  forgot revocations; since spec 043 every revocation is a SQL row.
 - **Rate limiting is per node.** N replicas admit N times the ceiling the
   manifest declares. Size the ceiling for one node and multiply.
 - **Migrations are a Job**, run once, before the rollout, as above.

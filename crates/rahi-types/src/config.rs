@@ -223,9 +223,15 @@ impl Config {
         format!("http://{}", self.rauthy_addr)
     }
 
-    /// The directory of the app's own hiqlite state.
+    /// The directory of the app's own store (spec 043 B-4).
     #[must_use]
     pub fn hiqlite_dir(&self) -> PathBuf {
+        self.data_dir.join("app-store")
+    }
+
+    /// The legacy directory where pre-043 binaries opened the store, now the fence path (spec 043 B-4).
+    #[must_use]
+    pub fn legacy_hiqlite_dir(&self) -> PathBuf {
         self.data_dir.join("hiqlite")
     }
 
