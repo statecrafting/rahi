@@ -385,7 +385,7 @@ pub async fn custody_client(
 /// [`Error::Unauthorized`] when the key set holds no backup passkey or
 /// rauthy refuses the admin; [`Error::Upstream`] when rauthy refuses the
 /// update.
-pub async fn reapply_api_key_access(api: &RauthyApi, keys: &KeySet) -> Result<()> {
+pub async fn reapply_rendered_key_access(api: &RauthyApi, keys: &KeySet) -> Result<()> {
     let token = keys.admin_token()?;
     let name = token
         .split_once('$')

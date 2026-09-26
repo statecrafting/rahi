@@ -240,7 +240,7 @@ async fn supervise<C: Cell>(env: &dyn EnvReader) -> Result<i32> {
                     "supervise: {why}; re-applying the rendered API key access through the \
                      backup admin"
                 );
-                sup::reapply_api_key_access(&api, &keys).await?;
+                sup::reapply_rendered_key_access(&api, &keys).await?;
                 sup::custody_client(&config, &keys, &manifest).await?
             }
             other => other?,
