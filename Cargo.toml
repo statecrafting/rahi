@@ -37,7 +37,7 @@ attest-ledger-types = "0.1"
 attest-ledger-core = "0.1"
 canonical-keysort-json = "0.1"
 ed25519-dalek = "3"
-base64 = "0.22"
+base64 = "0.23"
 # The segment archive (spec 014): a dyn-compatible async trait needs boxed
 # futures, and the object store is the S3 client hiqlite already carries,
 # reached through a parsed endpoint.
