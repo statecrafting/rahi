@@ -607,6 +607,19 @@ RH-05 and RH-06 of the revision-3 register), and approved the spec on
   full CI cycle for no additional evidence; and recording the hash after
   the tag, which D-16 already rejected.
 
+- **D-19 (2026-09-26, owner release grant; 0.4.0).** The owner explicitly
+  granted preparation, merge, signed tag, publication and anonymous
+  verification of 0.4.0 after PR 91 is complete and green. The release
+  carries spec 043 at the `in-progress` boundary D-22 authorizes, uses
+  exactly `hiqlite-patched`, `hiqlite-wal-patched` and
+  `hiqlite-derive-patched` `0.15.0-patched.3`, publishes all nine chassis
+  crates and all three images, and proves a registry-only consumer with no
+  path, Git or patch override. Patched.4 is excluded. The release record,
+  README and consumer contract state D-12's two limits, D-20 (c)'s unclean
+  shutdown limit, D-21 (c)'s three unexecuted live legs and the lease-wake
+  behavior. The annotated signed tag is the publication checkpoint. A
+  GitHub Release object remains owner-only and is not created by this grant.
+
 ## Verification
 
 ```verify:cli

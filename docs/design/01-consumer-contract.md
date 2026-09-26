@@ -1,12 +1,11 @@
 # The consumer contract, as built
 
-**Current release, 2026-09-25:** 0.3.0 under approved spec 039. It
-carries completed specs **038** (native clients, token lifetimes, and bearer
-revocation), **045** (receipts and work claims) and **046** (named migration
-sets) on top of 0.2.0. Section 2.0 is the current consumer guidance; the
+**Current release candidate, 2026-09-26:** 0.4.0 under approved spec 039.
+It carries spec **043** at its owner-approved `in-progress` release boundary
+on top of 0.3.0. Section 2.0 is the current consumer guidance; the
 dated readings below remain historical evidence. The release identity is
-[`v0.3.0` source](https://github.com/statecrafting/rahi/tree/v0.3.0): the
-annotated tag names the tested squash merge on `main` (039 B-2, D-18), and
+the annotated `v0.4.0` tag once created: it names the tested squash merge
+on `main` (039 B-2, D-18), and
 this document is updated to that commit. A version declaration is not
 publication or downstream adoption: registry availability is proven only by
 the tag's `consumer-registry` job, and is recorded in the release notes.
@@ -77,39 +76,39 @@ nothing in the chassis distributes jobs to workers.
 
 ## 2. Consuming today
 
-### 2.0 The 0.3.0 release and its compatibility boundary
+### 2.0 The 0.4.0 release and its compatibility boundary
 
-All nine inherited chassis versions and internal requirements are 0.3.0.
-It is a minor bump under 039 B-1, not a compatible patch to 0.2.0: the
-`Cell` trait gains the defaulted `migration_sets()` (046), the manifest's
-`[auth]` gains token lifetimes and `[[auth.native_clients]]` (038), a backup
-of a store that records a named set is archive format 2, which a 0.2.x
-binary refuses (046), and `rahi_store` gains receipts and work claims
-(045). `rahi_store::Migration` and `rahi_kernel::manifest::Auth` gain public
-fields, so struct-literal construction must add them. The full list is
-[CHANGELOG.md](../../CHANGELOG.md#030-released-2026-09-25).
+All nine inherited chassis versions and internal requirements are 0.4.0.
+It is a minor bump under 039 B-1. Spec 043 moves the app store from
+`<data>/hiqlite` to `<data>/app-store`, adds the guarded `upgrade-cache`
+transition, durable revocations and their permanent floor, bounded stop
+records, restore fencing, and recovery-aware readiness. The full list and
+declared limits are [CHANGELOG.md](../../CHANGELOG.md#040-release-candidate-2026-09-26).
 
 Once `consumer-registry` passes for the tag, the registry stanza is:
 
 ```toml
 [dependencies]
-rahi-cli    = "=0.3.0"
-rahi-edge   = "=0.3.0"
-rahi-idp    = "=0.3.0"
-rahi-kernel = "=0.3.0"
-rahi-ledger = "=0.3.0"
-rahi-ops    = "=0.3.0"
-rahi-store  = "=0.3.0"
-rahi-types  = "=0.3.0"
+rahi-cli    = "=0.4.0"
+rahi-edge   = "=0.4.0"
+rahi-idp    = "=0.4.0"
+rahi-kernel = "=0.4.0"
+rahi-ledger = "=0.4.0"
+rahi-ops    = "=0.4.0"
+rahi-store  = "=0.4.0"
+rahi-types  = "=0.4.0"
 
 [dev-dependencies]
-rahi-harness = "=0.3.0"
+rahi-harness = "=0.4.0"
 ```
 
-Use the same release for every chassis dependency. hiqlite stays 0.14.0
-from the registry; section 2.0.1 still applies. Rolling a store back to a
-0.2.x binary after a named set is recorded is not supported (046): restore
-the pre-upgrade archive instead.
+Use the same release for every chassis dependency. The registry-only stanza
+resolves `hiqlite-patched =0.15.0-patched.3`; do not add a patch section and
+do not adopt patched.4 in this release. After restart, an expired lease is
+reconsidered only when a fresh request arrives after TTL+1. The transition's
+backward-clock gap, stale-restore refresh-credential revival, unclean-marker
+refusal after an early kill or shutdown timeout, and the three unexecuted
+live legs are the limits recorded in the changelog.
 
 SQL sent through `rahi_store` must use numbered `?NNN` placeholders in any
 statement that reuses or reorders parameters: SQLite numbers `$n` by first
