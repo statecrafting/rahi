@@ -102,6 +102,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-ledger/tests/identity.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-ops/Cargo.toml",
         "source": "spec-edge"
       },
@@ -582,6 +586,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-ledger/tests/identity.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ledger/tests/identity.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-ops/Cargo.toml"
           }
         ],
@@ -948,5 +965,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "b0d4fe854e61370f69b2fab1bb0525b7d0559af68a9701ebac123ee50372b322"
+  "shardHash": "b994bb870c001eb22d74ce3ca8d0486be01dcf778c2977e80772d103808479f6"
 }

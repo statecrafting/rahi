@@ -2974,7 +2974,21 @@ fn used_bytes(db: &rusqlite::Connection) -> i64 {
 /// while B-9's estimate is explicitly inclusive of page slack.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn the_resident_cost_per_decision_is_within_the_tolerance_fixed_before_it_was_measured() {
-    let f = common::open().await;
+    // AC-9 fixes auto_vacuum at NONE for this measurement. Establish that
+    // database-header choice before the store's asynchronous connections race
+    // to create the otherwise empty file; either setting is valid at runtime,
+    // but only NONE makes the specified drop-and-freelist measurement.
+    let dir = tempfile::tempdir().unwrap();
+    let data_dir = dir.path().join("hiqlite");
+    let db_path = data_dir.join("state_machine/db/hiqlite.db");
+    std::fs::create_dir_all(db_path.parent().unwrap()).unwrap();
+    let db = rusqlite::Connection::open(&db_path).unwrap();
+    db.pragma_update(None, "auto_vacuum", 0).unwrap();
+    drop(db);
+    let store = rahi_store::Store::open(&common::config(&data_dir))
+        .await
+        .expect("single-voter node opens");
+    let f = common::Fixture { store, dir };
     let ledger = open_ledger(f.handle()).await;
     let archive_dir = tempfile::tempdir().unwrap();
     let archive = FsArchive::open(archive_dir.path().join("archive")).unwrap();

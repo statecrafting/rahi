@@ -304,8 +304,13 @@ ac4d() {
     vol="${run_id}-ac4-$(printf '%s' "$state" | tr '.' '-')"
     archive="$(old_volume "$vol")" || { fail "AC-4 (d) $state: preparation"; continue; }
     code=0
-    CRASH_AT="$state" verb "$new" "$vol" upgrade-cache --backup "$archive" >/dev/null 2>&1 || code=$?
-    if [ "$code" != 137 ]; then fail "AC-4 (d) $state: the verb did not stop there (exit $code)"; continue; fi
+    out=""
+    out="$(CRASH_AT="$state" verb "$new" "$vol" upgrade-cache --backup "$archive" 2>&1)" || code=$?
+    if [ "$code" != 137 ]; then
+      say "$out"
+      fail "AC-4 (d) $state: the verb did not stop there (exit $code)"
+      continue
+    fi
     if [ "$state" = begin ]; then
       # No guard yet: the old image may serve on the untouched legacy store.
       p="$(vol_port "$vol")"; name="${run_id}-ac4-begin-old"

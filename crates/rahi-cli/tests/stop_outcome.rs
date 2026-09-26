@@ -341,10 +341,11 @@ impl Stubborn {
 /// `Client::shutdown`'s own fifteen seconds, and it answers `Timeout`. No
 /// fault available to a test drives a single node's shutdown past its wait.
 ///
-/// The node exits `3` with `store_timeout`. hiqlite's unclean-stop marker is
-/// left, because the shutdown did not finish, and the next start refuses it
-/// without `auto-heal` (spec 043 D-20 (c)): that refusal is asserted here as
-/// what an operator meets, not hidden.
+/// The node exits `3` with `store_timeout`. If hiqlite's background shutdown
+/// has not completed, its unclean-stop marker is left and the next start
+/// refuses it without `auto-heal` (spec 043 D-20 (c)). If it completes after
+/// the caller-side timeout, the marker is gone and the next start succeeds.
+/// Both schedules retain the unconfirmed stop record and its classification.
 #[test]
 fn a_store_shutdown_that_overruns_is_store_timeout_and_exits_three() {
     let nodes = Node::cluster(3);
@@ -384,17 +385,32 @@ fn a_store_shutdown_that_overruns_is_store_timeout_and_exits_three() {
     for cell in &mut running[..2] {
         let _ = cell.wait(STOP_BUDGET);
     }
-    let next = nodes[2].run("serve");
-    assert_eq!(next.code, Some(3), "{}", next.logs());
-    assert!(
-        next.stderr
-            .contains("previous stop: boot 1, unconfirmed (store_timeout), cause recorded"),
-        "the next boot classifies before it opens the store\n{}",
-        next.logs()
-    );
-    assert!(
-        next.stderr.contains("did not stop cleanly"),
-        "hiqlite refuses the unclean marker without auto-heal\n{}",
-        next.logs()
-    );
+    let marker = nodes[2].data_dir.join("app-store/state_machine/lock");
+    if marker.exists() {
+        let next = nodes[2].run("serve");
+        assert_eq!(next.code, Some(3), "{}", next.logs());
+        assert!(
+            next.stderr
+                .contains("previous stop: boot 1, unconfirmed (store_timeout), cause recorded"),
+            "the next boot classifies before it opens the store\n{}",
+            next.logs()
+        );
+        assert!(
+            next.stderr.contains("did not stop cleanly"),
+            "hiqlite refuses the unclean marker without auto-heal\n{}",
+            next.logs()
+        );
+    } else {
+        let mut next = nodes[2].spawn("serve");
+        nodes[2].wait_ready(&mut next, Duration::from_secs(180));
+        assert!(
+            next.logs()
+                .contains("previous stop: boot 1, unconfirmed (store_timeout), cause recorded"),
+            "the next boot classifies before it opens the store\n{}",
+            next.logs()
+        );
+        next.sigterm();
+        let stopped = next.wait(STOP_BUDGET);
+        assert_eq!(stopped.code, Some(0), "{}", stopped.logs());
+    }
 }

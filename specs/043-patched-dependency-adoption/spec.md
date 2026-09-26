@@ -50,6 +50,7 @@ extends:
   - { spec: "025-api-tokens-and-resource-server", unit: "crates/rahi-idp/src/bearer.rs", nature: amending }
   - { spec: "025-api-tokens-and-resource-server", unit: "crates/rahi-idp/tests/bearer.rs", nature: amending }
   - { spec: "038-native-clients-and-bearer-revocation", unit: "crates/rahi-idp/tests/native.rs", nature: amending }
+  - { spec: "042-ledger-lifetime-identity", unit: "crates/rahi-ledger/tests/identity.rs", nature: additive }
   - { spec: "038-native-clients-and-bearer-revocation", unit: "crates/rahi-idp/src/revoke.rs", nature: amending }
   - { spec: "021-idp-proxy-and-discovery", unit: "crates/rahi-idp/src/lib.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/lib.rs", nature: amending }
