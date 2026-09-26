@@ -873,6 +873,63 @@ line asserted `0.25.0`; it now asserts `0.26.0`, and one line is added for
 the manifest's exact pin. No other line depends on the version. The dated
 records naming older versions are kept.
 
+D-17 (2026-09-25, owner decision; CI is the Statecraft setup profile
+`github-actions-rust`, revision 7). The owner's decisions of 2026-09-24
+and 2026-09-25 for every Rust repository in the family: "one CI shape: the
+Statecraft setup profile `github-actions-rust`, revision 7", with, for
+rahi, "Carry spec-dag, Kubernetes manifests and corpus attestation as
+declared extra required jobs, and weaken nothing", and "remove the old
+`ci-gate` job" because the profile's aggregate carries that name. Rendered
+with `statecraft-cli` at `9bb61881ef3ec12b08f00f090bab45d8b3ee81e6`.
+
+**What B-3 now reads as.** B-3's text is kept as the record of what was
+asked. Its mechanism changes: the one triggered workflow is the profile's
+`.github/workflows/statecraft-ci.yml`, and its `ci-gate` is the one
+required check. It runs governance (`spec-spine check --fail-on-warn`,
+`lint --fail-on-warn`, `index coverage --fail-on-untraced`, `index check
+--fail-on-unresolved`, coupling with the PR body, the authored-content
+rules on files, title, body and commits, each commit's tree, signed
+commits), the cargo gate (build, test, clippy `-D warnings`, fmt, all
+`--locked`), and an AI review. `govern.yml` is unchanged except its header
+comment, and is declared as the extra required job `govern`: it still runs
+`make gate` with `scripts/spec-dag.sh`, the Kubernetes manifests and the
+corpus attestation, none of which the profile runs. `ci.yml` becomes a
+reusable workflow holding only cargo-deny, declared as `supply-chain`,
+because the old `ci-gate` needed it and so made it required. Its cargo job
+is removed (the profile's code job runs the same four verbs), and its
+`ci-gate` job is removed. Nothing that was required stops being required.
+
+**Rejected.** Splitting `govern.yml` into three workflows (spec-dag,
+manifests, attestation): specs 031 and 032 extend `govern.yml` and 001
+establishes it, so deleting it leaves three complete specs claiming an
+absent file. Keeping `ci.yml`'s triggers: the cargo gate would then run
+twice on every pull request.
+
+**Verification.** The three lines that asserted `ci.yml` carries
+`ci-gate`, calls `govern.yml` and runs on `merge_group` now assert those
+of `statecraft-ci.yml`; lines are added asserting `ci.yml` is reusable and
+carries no `ci-gate`.
+
+D-18 (2026-09-26, owner instruction; CI profile revision 9 and Rahi's
+unresolved-claim policy). Re-render the Statecraft setup profile
+`github-actions-rust` at revision 9 from statecraft-cli commit
+`cecb110217f3d8a661c9dc029d5f62acbdd48bad`, with
+`governance.fail_on_unresolved` set to `false`. Rahi approves work orders
+before their source units exist, so unresolved claims from approved and draft
+specs are intentional until those specs are implemented. The governance gate
+still runs `index check`, reports every unresolved claim, and retains every
+other check; only `--fail-on-unresolved` is omitted. Revision 8's alternate
+`ANTHROPIC_API_KEY` credential path is included as part of the revision-9
+render, without reading or changing repository secrets.
+
+As in D-17, the producer's generic `specs/000-bootstrap/spec.md` and
+`standards/spec/templates/constitution-template.md` are not committed. The
+former collides with Rahi's canonical `000-rahi-bootstrap`; retaining it would
+make the corpus invalid. Applying the stable post-render plan a second time
+left both the tracked diff and untracked content byte-identical. The render's
+local governance gate then passed with all 18 unresolved claims reported as
+warnings.
+
 ## Verification
 
 ```verify:cli
@@ -897,14 +954,21 @@ sh -c '! grep -A7 "unwitnessed-claim count" AGENTS.md | grep -qE "[0-9]+ of [0-9
 # FR-002: one verification protocol, one implementation of it.
 sh -c '! test -e scripts/verify-spec.sh'
 sh -c 'sed -n "/^verify:/,/^$/p" Makefile | grep -q "SPEC_SPINE) verify"'
-# B-3: exactly one aggregate gate, named ci-gate, in the one triggered workflow.
-grep -q '^  ci-gate:' .github/workflows/ci.yml
+# B-3 as D-17 carries it: exactly one aggregate gate, named ci-gate, in the
+# profile's triggered workflow, and none left in ci.yml.
+grep -q '^  ci-gate:' .github/workflows/statecraft-ci.yml
+sh -c '! grep -q "^  ci-gate:" .github/workflows/ci.yml'
 # B-3: the governance chain is reusable only (no event triggers of its own).
 grep -q 'workflow_call' .github/workflows/govern.yml
 sh -c '! grep -qE "^  (push|pull_request|merge_group):" .github/workflows/govern.yml'
-# B-3: ci.yml is the single triggered entry point and calls that chain.
-grep -q 'uses: ./.github/workflows/govern.yml' .github/workflows/ci.yml
-grep -q '^  merge_group:' .github/workflows/ci.yml
+# D-17: ci.yml (cargo-deny) is reusable only too.
+grep -q 'workflow_call' .github/workflows/ci.yml
+sh -c '! grep -qE "^  (push|pull_request|merge_group):" .github/workflows/ci.yml'
+# D-17: the profile's workflow is the triggered entry point, calls both as
+# declared extra required jobs, and runs on the merge queue.
+grep -q 'uses: ./.github/workflows/govern.yml' .github/workflows/statecraft-ci.yml
+grep -q 'uses: ./.github/workflows/ci.yml' .github/workflows/statecraft-ci.yml
+grep -q '^  merge_group:' .github/workflows/statecraft-ci.yml
 # B-3: the coupling gate diffs the event's frozen SHAs, never the merge ref.
 grep -q 'HEAD_SHA: ..{ github.event.pull_request.head.sha }' .github/workflows/govern.yml
 sh -c '! grep -q -- "--head HEAD" .github/workflows/govern.yml'

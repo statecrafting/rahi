@@ -1,3 +1,5 @@
+@.statecraft/AGENTS.md
+
 # AGENTS.md: rahi
 
 Cross-agent authority for rahi, read by Claude Code, Codex CLI, Cursor,
@@ -218,6 +220,21 @@ read lives in this file (the pin, the binary, `make gate` and `make ci` as
 the gate, the default branch) and in the path-scoped rules (the chassis
 invariants, the build commands); do not edit a skill to add a project fact,
 add it here.
+
+## Continuous integration
+
+CI is the Statecraft setup profile `github-actions-rust`, revision 7
+(spec 001 D-17). The one required check is `ci-gate` in
+`.github/workflows/statecraft-ci.yml`: governance, the cargo gate, an AI
+review of every pull request, and the two declared extra required jobs,
+`govern` (`govern.yml`: `make gate` with `scripts/spec-dag.sh`, the
+Kubernetes manifests, the corpus attestation) and `supply-chain` (`ci.yml`:
+cargo-deny). The managed files (`.github/workflows/statecraft-*.yml`,
+`scripts/statecraft/*`, `.statecraft/setup/*`) change only by editing
+`project.setup.parameters` in `.statecraft/environment.json` and
+re-rendering with `statecraft-cli init plan` / `init apply`, never by hand.
+Any change under `.github/workflows/` or `scripts/statecraft/` needs the
+owner's approval of that run's `statecraft-review-exception` Environment.
 
 ## Conventions
 

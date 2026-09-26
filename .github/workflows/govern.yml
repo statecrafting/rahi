@@ -2,11 +2,14 @@
 # (spec 001 B-3): both event legs call `make gate` (D-15).
 #
 # This is a REUSABLE workflow. It declares no event triggers of its own:
-# `ci.yml` calls it as `jobs.govern`, so its result folds into the one
-# `ci-gate` status check branch protection requires instead of publishing a
-# second, separately-named check (spec 001 D-9). The `github` context inside a
-# called workflow is the caller's, so `github.event.pull_request` below is the
-# real PR event.
+# the Statecraft profile's `statecraft-ci.yml` calls it as the declared extra
+# required job `govern` (`ci.extra_required_jobs`, spec 001 D-17), so its
+# result folds into the one `ci-gate` status check branch protection requires
+# instead of publishing a second, separately-named check (spec 001 D-9). It
+# carries what the profile does not run: `scripts/spec-dag.sh` (inside
+# `make gate`), the Kubernetes manifests and the corpus attestation. The
+# `github` context inside a called workflow is the caller's, so
+# `github.event.pull_request` below is the real PR event.
 #
 # Nothing here writes to `.derived/`: a writing `compile` before `--check`
 # would make the freshness check pass unconditionally.
