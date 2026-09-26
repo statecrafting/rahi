@@ -15,13 +15,14 @@ the chassis; it never forks it.
 The name is the lineage: enrahitu was Encore, Rauthy, Hiqlite, Turso. Drop
 Encore and Turso and what remains is what this is.
 
-## Status: v0.3.0, recovery exercised at N=1
+## Status: v0.4.0 release candidate, recovery exercised at N=1
 
 This repository is a specification corpus, the harness that builds it, and
 the code it specifies. Spec ordinals are the build order, and each spec is
 bounded to one driven session's territory. Specs 036, 037, 038, 042,
 045 and 046 are `implementation: complete`; spec 043 (the patched hiqlite
-and rauthy adoption) is approved and not yet built. Specs 040 and 041 remain `status: draft`: proposals from the consumer
+and rauthy adoption) is merged at `implementation: in-progress` under its
+owner-approved 0.4.0 release decision. Specs 040 and 041 remain `status: draft`: proposals from the consumer
 contract below that schedule nothing until a human approves them. Nine crates and the reference app exist
 (`rahi-types`, `rahi-store`, `rahi-ledger`, `rahi-kernel`, `rahi-edge`,
 `rahi-idp`, `rahi-ops`, `rahi-cli`, `rahi-harness`, and `apps/hello-cell`),
@@ -33,23 +34,29 @@ Implementation, publication, and operational proof are separate:
 | | State |
 |---|---|
 | Implemented | `spec-spine registry list` reports each spec's lifecycle. A complete implementation does not imply every deployment procedure was exercised: the N=3 rollout check remains recorded rather than run (032 D-1). |
-| Released or installable | [v0.1.0](https://github.com/statecrafting/rahi/releases/tag/v0.1.0) and [v0.2.0](https://github.com/statecrafting/rahi/releases/tag/v0.2.0) published all nine chassis crates. 0.3.0 adds specs 038, 045 and 046; the [release record](CHANGELOG.md#030-released-2026-09-25) names what changed and what its tag had not yet proven, and the release notes record registry and image publication. |
+| Released or installable | Versions 0.1.0 through 0.3.0 published all nine chassis crates. 0.4.0 adopts registry-published `hiqlite-patched =0.15.0-patched.3`; the [release record](CHANGELOG.md#040-release-candidate-2026-09-26) names its behavior and limits. Publication and anonymous access are proven only after the tag workflows and fresh anonymous checks pass. |
 | Exercised against the pinned rauthy | spec 037's `live.yml` runs the whole suite against rauthy 0.36.2 pinned by digest, with gated skips refused. The proof covers login, audience and scope enforcement, fresh backups, restart, and restore with the original user, note, and ledger head. See spec 037's Status for the passing run and revision. |
 | Supported topology | N=1. Three replicas have run only as three processes on one host, without rauthy, in spec 035's test, which CI runs: each replica mints its own decision ids and none of thirty concurrent denials is lost. N=3 on Kubernetes has never run. |
 
-The 0.2.0 release changed recovery compatibility: new key sets contain an
+The 0.4.0 candidate changes recovery compatibility: new key sets contain an
 origin-bound backup passkey; old sets are not automatically upgraded and
 backups refuse without it. It **does** prevent duplicate ledger IDs after
 sealing, by spec 042, at the cost of a stop-the-world reindex of any chain
 sealed before it and one permanent resident row per decision; the
-CHANGELOG's "Upgrade limits (spec 042)" is the procedure. It does **not**
-fix hiqlite 0.14.0's stale lease release after TTL takeover: rahi patches
-that dependency in its own workspace root and a consumer does not inherit
-the patch, so every published crate still resolves 0.14.0 without the fix.
-It does **not** establish full-node restart followed by a second lease
-acquisition, which no approved spec carries. Its operational proof is N=1;
+CHANGELOG's "Upgrade limits (spec 042)" is the procedure. This candidate
+uses registry-published `hiqlite-patched =0.15.0-patched.3`, so consumers
+must remove the old `[patch.crates-io]` workaround. After restart, an expired
+lease is reconsidered only on a fresh request after TTL+1; restart alone does
+not wake a waiter. Its operational proof is N=1;
 Kubernetes N=3 has never run. Publication changes no consumer rollout
 target.
+
+The declared 0.4.0 gaps are explicit. The transition has a backward-clock
+revocation gap and an old restore can revive refresh credentials. A kill or
+shutdown timeout before app-store shutdown completes can leave hiqlite's
+unclean marker, so the next boot refuses without a manual recovery decision;
+automatic healing is not enabled. The live suite does not execute Rauthy's
+mid-cache-rename crash, the real v0.2 stop/start race offsets, or a v0.1 leg.
 
 [`docs/design/01-consumer-contract.md`](docs/design/01-consumer-contract.md)
 states what a consumer gets and what is proven, by which test, against which

@@ -57,6 +57,7 @@ extends:
   - { spec: "020-edge-server", unit: "crates/rahi-edge/testdata/manifest.toml", nature: additive }
   - { spec: "022-session-and-principal", unit: "crates/rahi-idp/testdata/oidc/", nature: additive }
   - { spec: "035-denials-survive-shutdown", unit: "crates/rahi-cli/tests/shutdown.rs", nature: additive }
+  - { spec: "043-patched-dependency-adoption", unit: "crates/rahi-cli/tests/stop_outcome.rs", nature: additive }
   # The static directory, the page in the image, and the render's images.
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/tests/cli.rs", nature: additive }
   - { spec: "031-single-container-packaging", unit: "docker/smoke.sh", nature: additive }
@@ -606,6 +607,19 @@ RH-05 and RH-06 of the revision-3 register), and approved the spec on
   tagged tree differ from the tested one by a paragraph and costs a second
   full CI cycle for no additional evidence; and recording the hash after
   the tag, which D-16 already rejected.
+
+- **D-19 (2026-09-26, owner release grant; 0.4.0).** The owner explicitly
+  granted preparation, merge, signed tag, publication and anonymous
+  verification of 0.4.0 after PR 91 is complete and green. The release
+  carries spec 043 at the `in-progress` boundary D-22 authorizes, uses
+  exactly `hiqlite-patched`, `hiqlite-wal-patched` and
+  `hiqlite-derive-patched` `0.15.0-patched.3`, publishes all nine chassis
+  crates and all three images, and proves a registry-only consumer with no
+  path, Git or patch override. Patched.4 is excluded. The release record,
+  README and consumer contract state D-12's two limits, D-20 (c)'s unclean
+  shutdown limit, D-21 (c)'s three unexecuted live legs and the lease-wake
+  behavior. The annotated signed tag is the publication checkpoint. A
+  GitHub Release object remains owner-only and is not created by this grant.
 
 ## Verification
 

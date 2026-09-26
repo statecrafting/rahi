@@ -379,12 +379,6 @@ fn a_store_shutdown_that_overruns_is_store_timeout_and_exits_three() {
         stopped.logs()
     );
 
-    for cell in &running[..2] {
-        cell.sigterm();
-    }
-    for cell in &mut running[..2] {
-        let _ = cell.wait(STOP_BUDGET);
-    }
     let marker = nodes[2].data_dir.join("app-store/state_machine/lock");
     if marker.exists() {
         let next = nodes[2].run("serve");
@@ -412,5 +406,11 @@ fn a_store_shutdown_that_overruns_is_store_timeout_and_exits_three() {
         next.sigterm();
         let stopped = next.wait(STOP_BUDGET);
         assert_eq!(stopped.code, Some(0), "{}", stopped.logs());
+    }
+    for cell in &running[..2] {
+        cell.sigterm();
+    }
+    for cell in &mut running[..2] {
+        let _ = cell.wait(STOP_BUDGET);
     }
 }

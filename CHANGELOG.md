@@ -10,6 +10,40 @@ Every chassis crate carries one version, and a release is an annotated tag
 `vX.Y.Z` on a `main` commit whose `make ci` passed. Pre-1.0, a minor bump may
 change the consumer contract and a patch bump may not.
 
+## 0.4.0, release candidate 2026-09-26
+
+Every change since `v0.3.0`. All nine chassis crates move together. This
+release adopts the three registry-published patched hiqlite crates at exactly
+`0.15.0-patched.3`; a registry-only consumer uses no path, Git, or
+`[patch.crates-io]` override. Patched.4 is not part of this release.
+
+- `upgrade-cache --backup <archive>` performs the fenced, resumable move from
+  `<data>/hiqlite` to `<data>/app-store`; the legacy path becomes a permanent
+  fence and repeated debris is preserved as evidence by identity.
+- Revocations are durable SQL checked at every admission and retained without
+  pruning. They are not ledger events: spec 015 ledgers denials, and adding a
+  revocation append remains a future spec 013 change.
+- A permanent revocation floor, recovery-aware readiness, bounded and
+  classified stop records, terminal-store handling, restore fencing, and
+  image identity checks are included.
+- After restart, an expired lease is reconsidered only by a fresh request
+  after TTL+1. Restart alone does not wake a waiter.
+
+Spec 043 remains `implementation: in-progress` under owner decision D-22.
+The transition retains a backward-clock revocation gap, and restoring stale
+identity state can revive refresh credentials. A kill or shutdown timeout
+before the app store finishes shutdown may leave hiqlite's unclean marker;
+the next boot then refuses, because automatic healing is not enabled. The
+live suite does not execute Rauthy's mid-cache-rename interruption, the real
+v0.2 stop/start race offsets, or a v0.1 upgrade leg. These are declared gaps,
+not passed acceptance.
+
+The tested revision is the commit the annotated `v0.4.0` tag names: the
+squash merge of this release pull request after its full PR checks and the
+post-merge `main` CI pass. Registry publication, checksums, anonymous image
+access, image digests, and the registry-only consumer are tag-time evidence.
+No GitHub Release object is created for this release.
+
 ## 0.3.0, released 2026-09-25
 
 Every change since `v0.2.0`. All nine chassis crates move together. It

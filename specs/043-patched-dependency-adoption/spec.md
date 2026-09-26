@@ -1396,6 +1396,18 @@ None remains open: D-7 to D-13 record the owner's approval and choices.
   still resumes through interrupted intent, completed rename and a third
   occurrence.
 
+- **D-27 (2026-09-26, release-CI evidence correction; retain quorum for
+  the clean-marker restart).** AC-7a's real three-node shutdown-timeout test
+  has two valid schedules from D-20 (c): an unclean marker remains and the
+  next boot refuses, or the background shutdown finishes and removes the
+  marker so the next boot succeeds. The second branch used to stop the two
+  surviving peers before asking the timed-out member to become ready. On a
+  slower runner that member correctly waited for quorum until the test's
+  readiness budget expired; this measured cluster availability, not the
+  clean-marker recovery claim. The test now keeps the two peers alive until
+  the restarted member is ready and has stopped, then stops them. The
+  marker-present refusal branch is unchanged.
+
 ### 7.1 Proposals (2026-09-23)
 
 - **P-6 (withdrawn 2026-09-23, after independent review).** An earlier
