@@ -70,6 +70,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-cli/tests/stop_outcome.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-edge/Cargo.toml",
         "source": "spec-edge"
       },
@@ -381,6 +385,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-cli/tests/shutdown.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/tests/stop_outcome.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/stop_outcome.rs"
         }
       },
       {
@@ -762,5 +779,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "21f3e815b74af716408b5f6086d2c5defa12359f16378cad30cabf2dc2ee192b"
+  "shardHash": "135bc0136d142ffb5110f66ce81587a0756d5526d281253a011f78100923d6c6"
 }

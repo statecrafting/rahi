@@ -57,6 +57,7 @@ extends:
   - { spec: "020-edge-server", unit: "crates/rahi-edge/testdata/manifest.toml", nature: additive }
   - { spec: "022-session-and-principal", unit: "crates/rahi-idp/testdata/oidc/", nature: additive }
   - { spec: "035-denials-survive-shutdown", unit: "crates/rahi-cli/tests/shutdown.rs", nature: additive }
+  - { spec: "043-patched-dependency-adoption", unit: "crates/rahi-cli/tests/stop_outcome.rs", nature: additive }
   # The static directory, the page in the image, and the render's images.
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/tests/cli.rs", nature: additive }
   - { spec: "031-single-container-packaging", unit: "docker/smoke.sh", nature: additive }
