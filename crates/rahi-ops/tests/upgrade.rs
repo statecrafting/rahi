@@ -11,10 +11,11 @@
 #![allow(clippy::expect_used, clippy::unwrap_used, clippy::indexing_slicing)]
 
 use std::collections::BTreeMap;
+use std::fs::File;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use rahi_ops::archive::{self, ArchiveManifest, Part};
 use rahi_ops::cell_lock::{self, Legacy, SupervisorFence};
@@ -137,6 +138,93 @@ impl Faults for FailAt {
         if self.seen.fetch_add(1, Ordering::SeqCst) + 1 == self.n {
             point.clone_into(&mut self.last.lock().unwrap());
             return Err(Error::Io(format!("injected fault at {point}")));
+        }
+        Ok(())
+    }
+}
+
+/// Fails once at one named fault point.
+struct FailOn {
+    point: &'static str,
+    hit: AtomicBool,
+}
+
+impl FailOn {
+    fn new(point: &'static str) -> Self {
+        Self {
+            point,
+            hit: AtomicBool::new(false),
+        }
+    }
+}
+
+impl Faults for FailOn {
+    fn hit(&self, point: &str) -> Result<()> {
+        if point == self.point && !self.hit.swap(true, Ordering::SeqCst) {
+            return Err(Error::Io(format!("injected fault at {point}")));
+        }
+        Ok(())
+    }
+}
+
+enum Pre043Action {
+    HoldLog,
+    TruncateMarker,
+    UnlinkMarker,
+    LeaveDatabaseOpen,
+}
+
+/// Performs one pre-043 action after T1 publishes and syncs its guard.
+struct Pre043Interleave {
+    config: Config,
+    action: Pre043Action,
+    ran: AtomicBool,
+    held: Mutex<Option<File>>,
+}
+
+impl Pre043Interleave {
+    fn new(config: Config, action: Pre043Action) -> Self {
+        Self {
+            config,
+            action,
+            ran: AtomicBool::new(false),
+            held: Mutex::new(None),
+        }
+    }
+}
+
+impl Faults for Pre043Interleave {
+    fn hit(&self, point: &str) -> Result<()> {
+        if point != "t1.dirsync" || self.ran.swap(true, Ordering::SeqCst) {
+            return Ok(());
+        }
+        let legacy = self.config.legacy_hiqlite_dir();
+        let marker = rahi_ops::legacy_marker(&self.config);
+        match self.action {
+            Pre043Action::HoldLog => {
+                let path = legacy.join("logs").join("lock.hql");
+                std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+                let file = std::fs::OpenOptions::new()
+                    .create(true)
+                    .truncate(false)
+                    .write(true)
+                    .open(path)
+                    .unwrap();
+                file.try_lock().unwrap();
+                *self.held.lock().unwrap() = Some(file);
+            }
+            Pre043Action::TruncateMarker => {
+                drop(File::create(marker).unwrap());
+            }
+            Pre043Action::UnlinkMarker => {
+                std::fs::remove_file(marker).unwrap();
+            }
+            Pre043Action::LeaveDatabaseOpen => {
+                let db = legacy.join("state_machine").join("db");
+                std::fs::create_dir_all(&db).unwrap();
+                std::fs::write(db.join("hiqlite.db-wal"), b"wal").unwrap();
+                std::fs::write(db.join("hiqlite.db-shm"), b"shm").unwrap();
+            }
         }
         Ok(())
     }
@@ -313,6 +401,139 @@ async fn a_live_or_uncleanly_stopped_pre043_node_is_refused() {
     std::fs::write(db.join("hiqlite.db-wal"), b"").unwrap();
     let err = run(&open_db, &NoFaults).await.unwrap_err();
     assert!(err.message().contains("-wal"), "{err}");
+}
+
+/// FR-012 and AC-5: reproduce each pre-043 operation at a deterministic
+/// point after the guard is durable and before T1 accepts it.
+#[tokio::test]
+async fn every_pre043_t1_interleaving_refuses_and_never_reaches_guarded() {
+    for action in [
+        Pre043Action::HoldLog,
+        Pre043Action::TruncateMarker,
+        Pre043Action::UnlinkMarker,
+        Pre043Action::LeaveDatabaseOpen,
+    ] {
+        let volume = pre043().await;
+        let faults = Pre043Interleave::new(volume.config(), action);
+        let err = run(&volume, &faults).await.unwrap_err();
+        assert!(
+            err.message().contains("pre-043 node")
+                || err.message().contains("database open")
+                || err.message().contains("no longer this transition's guard"),
+            "{err}"
+        );
+        let record = upgrade::read(&volume.config()).unwrap().unwrap();
+        assert_eq!(record.phase, Phase::Begin, "T1 was not accepted");
+    }
+}
+
+fn recreate_directory(path: &Path, bytes: &[u8]) {
+    std::fs::create_dir_all(path).unwrap();
+    std::fs::write(path.join("occurrence"), bytes).unwrap();
+}
+
+fn t2_evidence(record: &upgrade::Record) -> Vec<&upgrade::EvidenceMove> {
+    record.evidence.iter().filter(|m| m.step == "t2").collect()
+}
+
+/// FR-013 and AC-4 (f): three occurrences of the same debris receive three
+/// names, including recovery after an intent and after a completed rename.
+#[tokio::test]
+async fn repeated_debris_is_recovered_by_identity_without_replacement() {
+    let volume = pre043().await;
+    assert!(run(&volume, &FailOn::new("t2.move.0")).await.is_err());
+    let config = volume.config();
+    let record = upgrade::read(&config).unwrap().unwrap();
+    assert_eq!(record.phase, Phase::Relocating);
+    let source = record.plan[0].source.clone();
+
+    recreate_directory(&source, b"one");
+    assert!(
+        run(&volume, &FailOn::new("evidence.t2.intent"))
+            .await
+            .is_err()
+    );
+    let record = upgrade::read(&config).unwrap().unwrap();
+    let first = t2_evidence(&record)[0];
+    assert!(!first.done);
+    assert_eq!(std::fs::read(source.join("occurrence")).unwrap(), b"one");
+
+    assert!(
+        run(&volume, &FailOn::new("evidence.recovered"))
+            .await
+            .is_err()
+    );
+    let record = upgrade::read(&config).unwrap().unwrap();
+    let first = t2_evidence(&record)[0];
+    assert!(first.done);
+    assert_eq!(
+        std::fs::read(first.destination.join("occurrence")).unwrap(),
+        b"one"
+    );
+
+    recreate_directory(&source, b"two");
+    assert!(
+        run(&volume, &FailOn::new("evidence.t2.rename"))
+            .await
+            .is_err()
+    );
+    let record = upgrade::read(&config).unwrap().unwrap();
+    let moves = t2_evidence(&record);
+    assert_eq!(moves.len(), 2);
+    assert!(moves[1].done);
+    assert_eq!(
+        std::fs::read(moves[1].destination.join("occurrence")).unwrap(),
+        b"two"
+    );
+
+    recreate_directory(&source, b"three");
+    run(&volume, &NoFaults).await.unwrap();
+    let record = upgrade::read(&config).unwrap().unwrap();
+    let moves = t2_evidence(&record);
+    assert_eq!(moves.len(), 3);
+    let mut destinations = moves.iter().map(|m| &m.destination).collect::<Vec<_>>();
+    destinations.sort();
+    destinations.dedup();
+    assert_eq!(destinations.len(), 3);
+    for (moved, bytes) in
+        moves
+            .iter()
+            .zip([b"one".as_slice(), b"two".as_slice(), b"three".as_slice()])
+    {
+        assert!(moved.done);
+        assert_eq!(
+            std::fs::read(moved.destination.join("occurrence")).unwrap(),
+            bytes
+        );
+    }
+}
+
+/// FR-013: an evidence name occupied by another identity refuses recovery
+/// and preserves both the intended source and the foreign destination.
+#[tokio::test]
+async fn a_foreign_evidence_identity_refuses_without_replacing_anything() {
+    let volume = pre043().await;
+    assert!(run(&volume, &FailOn::new("t2.move.0")).await.is_err());
+    let config = volume.config();
+    let record = upgrade::read(&config).unwrap().unwrap();
+    let source = record.plan[0].source.clone();
+    recreate_directory(&source, b"source");
+    assert!(
+        run(&volume, &FailOn::new("evidence.t2.intent"))
+            .await
+            .is_err()
+    );
+    let record = upgrade::read(&config).unwrap().unwrap();
+    let destination = t2_evidence(&record)[0].destination.clone();
+    recreate_directory(&destination, b"foreign");
+
+    let err = run(&volume, &NoFaults).await.unwrap_err();
+    assert!(err.message().contains("identity"), "{err}");
+    assert_eq!(std::fs::read(source.join("occurrence")).unwrap(), b"source");
+    assert_eq!(
+        std::fs::read(destination.join("occurrence")).unwrap(),
+        b"foreign"
+    );
 }
 
 /// AC-4 (f): a non-empty app store refuses before T2's intent.

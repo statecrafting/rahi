@@ -169,18 +169,7 @@ where archives land in a cluster (032).
   them from `preflight` its AC-2, but `preflight` is this spec's territory
   and B-3 did not list the check, so a diligent session building 030 would
   have closed every requirement it could read and still left 016's AC-2
-  open. Spec 016's own `- **D-11 (2026-09-25, owner decision; amends B-1's argv list).** B-1's
-  list gains `upgrade-cache --backup <archive>`, established by spec 043
-  B-4 (its `--abort` form is the same verb). Spec 043's build held the verb
-  out of `VERBS` because AC-2 derives the required set from this list and
-  the list is this spec's text (043 D-19 (a)); the owner approved the
-  amendment on 2026-09-25, as D-9 did for 042's verb. No behavior of any
-  existing verb changes, no functional requirement changes, and this spec's
-  implementation stays complete. AC-2's test reads a verb as the words
-  before its first placeholder, optional group or flag, so the entry is
-  `upgrade-cache`.
-
-## 8. Status` surfaced that contradiction on
+  open. Spec 016's own `## 8. Status` surfaced that contradiction on
   2026-09-06 rather than resolving it, which is what the coherence guard
   asks of a build session; this entry is the human answer it was waiting
   for. The session that builds 030 adds the check, and flips spec 016 to
@@ -345,6 +334,17 @@ where archives land in a cluster (032).
   `rahi-harness`, which would add a dependency edge from a lower-numbered
   spec to a higher one; and retrying on `AddrInUse`, which hiqlite reports
   as a panic rather than an error.
+
+- **D-11 (2026-09-25, owner decision; amends B-1's argv list).** B-1's
+  list gains `upgrade-cache --backup <archive>`, established by spec 043
+  B-4 (its `--abort` form is the same verb). Spec 043's build held the verb
+  out of `VERBS` because AC-2 derives the required set from this list and
+  the list is this spec's text (043 D-19 (a)); the owner approved the
+  amendment on 2026-09-25, as D-9 did for 042's verb. No behavior of any
+  existing verb changes, no functional requirement changes, and this spec's
+  implementation stays complete. AC-2's test reads a verb as the words
+  before its first placeholder, optional group or flag, so the entry is
+  `upgrade-cache`.
 
 ## 8. Status
 

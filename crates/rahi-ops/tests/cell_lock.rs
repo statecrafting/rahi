@@ -7,6 +7,7 @@
 use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Barrier};
 
 use rahi_ops::cell_lock::{
     self, CELL_LOCK_FILE, Entry, Legacy, SupervisorFence, TRANSITION_LOCK_FILE,
@@ -358,6 +359,47 @@ fn a_layout_change_excludes_every_other_entry_point_and_waits_for_none() {
     assert!(cell_lock::try_lock(&holder_path, false).unwrap().is_none());
     drop(restoring);
     assert!(gate(&config, Entry::Store { may_attach: true }).is_ok());
+}
+
+#[test]
+fn concurrent_entry_points_have_exactly_one_admitted_lock_owner() {
+    for (left, right) in [
+        (Entry::FirstBoot, Entry::UpgradeCache),
+        (Entry::Restore, Entry::FirstBoot),
+        (Entry::Store { may_attach: true }, Entry::UpgradeCache),
+        (Entry::Store { may_attach: true }, Entry::Restore),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let config = config(dir.path());
+        drop(gate(&config, Entry::Serve).unwrap());
+        let barrier = Arc::new(Barrier::new(3));
+        let results = std::thread::scope(|scope| {
+            let start = Arc::clone(&barrier);
+            let left_config = config.clone();
+            let a = scope.spawn(move || {
+                start.wait();
+                let result = gate(&left_config, left);
+                start.wait();
+                result
+            });
+            let start = Arc::clone(&barrier);
+            let right_config = config.clone();
+            let b = scope.spawn(move || {
+                start.wait();
+                let result = gate(&right_config, right);
+                start.wait();
+                result
+            });
+            barrier.wait();
+            barrier.wait();
+            [a.join().unwrap(), b.join().unwrap()]
+        });
+        assert_eq!(
+            results.iter().filter(|result| result.is_ok()).count(),
+            1,
+            "{left:?} racing {right:?}: {results:?}"
+        );
+    }
 }
 
 #[tokio::test]

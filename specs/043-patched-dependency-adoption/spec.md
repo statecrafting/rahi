@@ -1369,6 +1369,17 @@ None remains open: D-7 to D-13 record the owner's approval and choices.
   it. Rejected: minting a broad key (031 D-8), and an operator step in the
   README, which every pre-038 volume would meet as a failed start.
 
+- **D-25 (2026-09-25, build record; step 15 coverage).** FR-012's four
+  pre-043 actions run at a deterministic point after T1 publishes and
+  syncs its guard, and each refuses before `guarded`. FR-013 repeats the
+  same debris occurrence three times across an interrupted intent, a
+  recovered rename and a completed rename; each occurrence keeps its own
+  identity and bytes, while a foreign destination refuses without either
+  side being replaced. AC-5 races the entry-point pairs it names behind a
+  common barrier and admits exactly one lock owner. The verification block
+  also names restore's floor and fence suite and the CLI test that proves
+  every verb locks before it reads, opens or spawns.
+
 ### 7.1 Proposals (2026-09-23)
 
 - **P-6 (withdrawn 2026-09-23, after independent review).** An earlier
@@ -1917,7 +1928,9 @@ cargo test -p rahi-store --locked --test dependency_identity
 cargo test -p rahi-store --locked --test blob
 cargo test -p rahi-ops --locked --test upgrade
 cargo test -p rahi-ops --locked --test cell_lock
+cargo test -p rahi-ops --locked --test restore
 cargo test -p rahi-idp --locked --test revocation_durable
+cargo test -p rahi-cli --locked --test cli every_verb_locks_before_it_reads_opens_or_spawns
 cargo test -p rahi-cli --locked --test terminal
 cargo test -p rahi-cli --locked --test stop_budget
 cargo test -p rahi-cli --locked --test stop_outcome

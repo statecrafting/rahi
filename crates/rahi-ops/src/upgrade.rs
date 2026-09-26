@@ -399,7 +399,9 @@ pub async fn run(
         // archive before it changes anything more.
         verify_archive(config, archive)?;
     }
-    recover_evidence(config, &mut record)?;
+    if recover_evidence(config, &mut record)? {
+        faults.hit("evidence.recovered")?;
+    }
     loop {
         match record.phase {
             Phase::Begin => t1(config, &mut record, faults)?,
@@ -732,12 +734,13 @@ fn finish_evidence(record: &mut Record) -> Result<()> {
 }
 
 /// Recovery of an interrupted evidence move at resume.
-fn recover_evidence(config: &Config, record: &mut Record) -> Result<()> {
+fn recover_evidence(config: &Config, record: &mut Record) -> Result<bool> {
     if record.evidence.iter().any(|m| !m.done) {
         finish_evidence(record)?;
         write(config, record)?;
+        return Ok(true);
     }
-    Ok(())
+    Ok(false)
 }
 
 fn is_symlink(path: &Path) -> bool {
@@ -978,7 +981,7 @@ pub fn abort(config: &Config, faults: &dyn Faults) -> Result<Outcome> {
         }
         _ => {}
     }
-    recover_evidence(config, &mut record)?;
+    let _ = recover_evidence(config, &mut record)?;
     let legacy = config.legacy_hiqlite_dir();
     let marker = crate::legacy_marker(config);
     // Debris a refused old start created, to evidence first.
