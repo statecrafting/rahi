@@ -46,6 +46,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-cli/tests/evolution.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-cli/tests/shutdown.rs",
         "source": "spec-edge"
       },
@@ -54,11 +58,19 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-cli/tests/stop_fixture/mod.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-cli/tests/stop_outcome.rs",
         "source": "spec-edge"
       },
       {
         "path": "crates/rahi-cli/tests/terminal.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/obs/metrics.rs",
         "source": "spec-edge"
       },
       {
@@ -134,6 +146,14 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-ops/tests/rauthy_restore.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/tests/restore.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-ops/tests/upgrade.rs",
         "source": "spec-edge"
       },
@@ -184,6 +204,14 @@
       {
         "path": "docker/runtime.Dockerfile",
         "source": "spec-edge"
+      },
+      {
+        "path": "docker/smoke.sh",
+        "source": "spec-edge"
+      },
+      {
+        "path": "docker/upgrade-live.sh",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
@@ -198,6 +226,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-cli/tests/stop_budget.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/tests/stop_fixture/mod.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/stop_fixture/mod.rs"
         }
       },
       {
@@ -320,6 +361,19 @@
       {
         "locations": [
           {
+            "file": "docker/upgrade-live.sh"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "docker/upgrade-live.sh"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": ".github/workflows/image.yml"
           }
         ],
@@ -411,6 +465,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-cli/tests/evolution.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/evolution.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-cli/tests/shutdown.rs"
           }
         ],
@@ -419,6 +486,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-cli/tests/shutdown.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/obs/metrics.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/obs/metrics.rs"
         }
       },
       {
@@ -593,6 +673,32 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-ops/tests/rauthy_restore.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/rauthy_restore.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/tests/restore.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/tests/restore.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-store/src/error.rs"
           }
         ],
@@ -736,6 +842,19 @@
       {
         "locations": [
           {
+            "file": "docker/smoke.sh"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "docker/smoke.sh"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "docs/design/01-consumer-contract.md"
           }
         ],
@@ -829,5 +948,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "7d5a25570a0557b59221a683401c5275cc36adaeb9f1c78712c625606fef2258"
+  "shardHash": "cd2238d43814928d587aaf20c28bf4510b1e9599e58d179881278e1b0682b56e"
 }

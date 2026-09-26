@@ -33,6 +33,8 @@ establishes:
   - "crates/rahi-cli/tests/terminal.rs"
   - "crates/rahi-cli/tests/stop_budget.rs"
   - "crates/rahi-cli/tests/stop_outcome.rs"
+  - "crates/rahi-cli/tests/stop_fixture/mod.rs"
+  - "docker/upgrade-live.sh"
   - "crates/rahi-idp/tests/revocation_durable.rs"
   - "crates/rahi-store/tests/dependency_identity.rs"
 extends:
@@ -53,6 +55,8 @@ extends:
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/lib.rs", nature: amending }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/preflight.rs", nature: amending }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/restore.rs", nature: amending }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-ops/tests/restore.rs", nature: additive }
+  - { spec: "037-identity-recovery-and-live-proof", unit: "crates/rahi-ops/tests/rauthy_restore.rs", nature: amending }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/lib.rs", nature: amending }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/verbs.rs", nature: amending }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/serve.rs", nature: amending }
@@ -68,6 +72,9 @@ extends:
   - { spec: "032-cluster-topology", unit: "deploy/k8s/statefulset.yaml", nature: amending }
   - { spec: "037-identity-recovery-and-live-proof", unit: ".github/workflows/live.yml", nature: additive }
   - { spec: "020-edge-server", unit: "crates/rahi-edge/src/probes.rs", nature: amending }
+  - { spec: "023-observability", unit: "crates/rahi-edge/src/obs/metrics.rs", nature: additive }
+  - { spec: "036-manifest-and-schema-evolution", unit: "crates/rahi-cli/tests/evolution.rs", nature: amending }
+  - { spec: "031-single-container-packaging", unit: "docker/smoke.sh", nature: amending }
 references:
   - { unit: { kind: file, path: "docs/design/01-consumer-contract.md" }, role: context }
   - { unit: { kind: file, path: "docs/design/02-operational-prerequisites.md" }, role: context }
@@ -356,7 +363,7 @@ Terms.
   | `supervise` (and so the image) | exclusive, for its life; its in-process `serve` uses that ownership | shared, for its life | `floored`, `rauthy-done`, `done`, or no file | fence with debris, or absent (the gate creates both fences) | refuses before spawning Rauthy otherwise; reads Rauthy's environment only at the new path |
   | `serve` alone | exclusive, for its life | shared, for its life | as `supervise` | as `supervise` | Rauthy's consent is then the operator's |
   | `first-boot` | exclusive, to exit | shared, to exit | any | any | on a volume whose legacy path is absent and which has no state file, creates both fences before its layout creates the app store; otherwise writes only keys, rendered files and directories that are absent (031 B-1, B-2) and opens neither store. It takes the locks because it creates the fences and the app store's directory, and a concurrent `restore` or `upgrade-cache` must not see a half-built layout; in the image it runs alone, so the locks cost nothing |
-  | `migrate`, `preflight`, `backup`, `ledger`, and every other verb that opens the store | exclusive when free; when another process holds it and the verb supports attaching, attaches without it | shared, for its whole attached life | `done` or no file | fence with debris, or absent (the gate creates both fences) | refuses at every other state, before attaching; since the lock is shared for the verb's life, no transition or restore begins while it is attached |
+  | `migrate`, `preflight`, `backup`, `ledger`, and every other verb that opens the store | exclusive when free; when another process holds it and the verb supports attaching, attaches without it | shared, for its whole attached life | `floored`, `rauthy-done`, `done`, or no file (D-22) | fence with debris, or absent (the gate creates both fences) | refuses at every other state, before attaching; since the lock is shared for the verb's life, no transition or restore begins while it is attached |
   | `restore` | exclusive, to exit | exclusive, to exit | `done` or no file | fence with debris, or absent | creates both fences before it resets the app store; refuses a volume whose legacy path holds a store |
   | a second instance of any of these | refused at a lock it cannot take (or attaches, as above) | | | | concurrent-start refusal, AC-5 |
 
@@ -1156,6 +1163,177 @@ None remains open: D-7 to D-13 record the owner's approval and choices.
   interleavings stay the live workflow's (FR-010, FR-012). (d) The gate
   reports debris only for entry points that start on the fence; for the
   verb, the legacy path's contents are the plan, not debris.
+
+- **D-20 (2026-09-25, build decisions and one surfaced finding; the stop,
+  steps 8 and 9).** (a) **Who keeps the record.** `serve` alone keeps
+  `<data>/stop.json`; under `supervise` the supervisor keeps it, one record
+  per container, and its in-process `serve` reports its phases to it. Each
+  keeper takes its gate first (B-4a) and writes the record before the store
+  opens. "A record for an older boot" needs a count the record cannot carry
+  about itself, so a boot first writes `<data>/boot.seq` (the same whole-file
+  write) and then the record; a record whose `boot` is not the counted one is
+  **no record for the previous boot**. The witness is
+  `<data>/stop-witness.json`, `{boot, by, at}`, written by the process that
+  sent the SIGKILL. The supervisor's witness of its Rauthy kill is
+  `rauthy_killed` in its own outcome, since Rauthy has no boot of rahi's to
+  name. `rahi-harness` depends on no chassis crate and writes no witness, so
+  its own SIGKILL after five seconds is classified with cause `unknown`;
+  the stop tests are the harness AC-7a names and write it. (b) **A run that
+  ended on its own error.** B-10's reasons are silent on a `serve` that
+  failed for a reason of its own (a compose or listener failure, a store
+  refusal at open). It is recorded as `serve_error`, unconfirmed, and its
+  own exit code stands (010's four codes are not widened); `storage_terminal`
+  is named instead when the error is the terminal store failure. Verbs other
+  than `serve` and `supervise` keep their exit codes and say on stderr when
+  the store's shutdown did not confirm: FR-009 names the two long-running
+  entry points, and a finished backup is not made a failure by its node's
+  stop. 037's `rauthy_restore.rs` asserted a supervisor exit of `0` over a
+  stub Rauthy that dies on SIGTERM (143); FR-009 makes that `3`, and the
+  test now asserts it under an amending edge, its restore assertions kept.
+  (c) **Surfaced for the owner: AC-7a's "every next boot succeeds with
+  no manual step" holds only where the kill lands after the app store's
+  shutdown returned.** A SIGKILL before it, and a `store_timeout` (the
+  shutdown did not finish), leave hiqlite's `<app store>/state_machine/lock`,
+  and hiqlite 0.15 refuses to open a store with it unless `auto-heal` is
+  enabled, which section 6 puts out of scope. No mechanism in this spec's
+  territory honors both: making that boot succeed is opening a store past its
+  unclean marker, which is what `auto-heal` is. So the tests assert what
+  holds and state what does not: the next boot classifies the previous stop
+  at every kill point (the classification is made before the store opens,
+  and the refused boot records its own `serve_error` outcome), hiqlite's
+  refusal is asserted where it happens, and "no manual step" is asserted for
+  a kill that lands in the supervisor's Rauthy phase, after the store shut
+  (live). This is not a regression: 0.3.0 and v0.2.0 refuse the same marker.
+  The README states it. The criterion's clause is not met as written for
+  those two cases until the owner accepts it as documented or asks for a
+  recovery path in a later change. (d) **The three metrics** live in 023's
+  registry (additive edge) and are set once per boot by the composer:
+  `rahi_previous_stop{outcome, cause}` is `1` on the classified series;
+  `rahi_revocation_rows{kind}` counts the retained rows (`jti`, `subject`);
+  `rahi_legacy_path_debris` is a gauge whose value is the number of entries
+  beside the fence (B-5's `{entries}` read as the value, not a label).
+  (e) **B-8's readiness.** 020's `/readyz` read the store and the chain and
+  nothing of Rauthy, so a Rauthy that is up and unready did not fail it. The
+  composer now registers a `ReadinessCheck` extension (the amending edge on
+  `probes.rs`) that asks Rauthy's health route, with a two-second wait, on
+  every call, and names `rauthy` as the failed component; nothing in it ends
+  the process. (f) **The phases as measured.** C runs from the end of the
+  stream drain to the server's exit and overruns at `DRAIN_BUDGET`; H is
+  `Store::shutdown` itself, never wrapped in a shorter wait
+  (`rahi_store::SHUTDOWN_WAIT` names hiqlite's fifteen seconds, which hiqlite
+  does not export, and `rahi_store::is_timeout` tells its `Timeout` apart).
+  (g) **The real faults.** FR-005's is the app store's `logs/` directory made
+  unwritable under a running node: its WAL writer fails at the next segment
+  rollover and hiqlite takes the node out of service with `NodeFailed`;
+  `serve` notices within its one-second terminal watch, fails `/readyz`
+  (503), stops, records `storage_terminal` and exits `3`, and after the
+  directory is restored the next boot is ready. AC-7a's `store_timeout` is
+  a member of a three-node cluster stopped while its two peers are frozen
+  (SIGSTOP): hiqlite's pre-shutdown delay and its wait for a cache leader
+  outlast its own fifteen seconds. No fault available to a test drives a
+  single node's shutdown past its wait; the classification is the same.
+  (h) **Step 14's record, local.** On 2026-09-25, against a patched Rauthy
+  built from the `0.36.2-patched.3` source (the pinned image's binary runs
+  in the live workflow): AC-7's series, three runs of `supervise` with four
+  streams open and a 200-denial burst in flight at SIGTERM, every run
+  confirmed, SIGTERM to exit 844 to 1,199 ms, both owner locks free 818 to
+  1,172 ms, against a 50 s grace. Without Rauthy, `serve` alone: 471 to
+  624 ms against 40 s. These are evidence about the declared workload only
+  (B-9).
+
+- **D-21 (2026-09-25, build decisions and records; steps 10 to 13).**
+  (a) **The restore floor (step 10).** The gate already takes both locks,
+  creates both fences on a volume without a legacy path and refuses one
+  whose legacy path holds a store (step 4), so the restore's own change is
+  the floor: the restore instant is read after the archive verified and
+  its compatibility was judged, before the first byte of the volume
+  changes, and written to the marker as `pending_floor` for every restore
+  (D-8), whatever version wrote the archive. The first open that owns the
+  node raises the floor to it before anything serves (`Booted` in `rahi-cli`,
+  which every serving and store-opening verb shares); the raise is the
+  store's `MAX` upsert, so the marker is never rewritten for it, which keeps
+  037 B-3's whole-marker comparison between `prepare_rauthy` and its record
+  intact, and every later open is a no-op. (b) **The image (step 11).** Both
+  Dockerfiles pin the image of D-14 and D-15 with its version and both
+  platform binary hashes as build arguments, and each build refuses a
+  binary whose sha256 or `rauthy --version` differs (FR-002); `image.yml`
+  refuses the two files disagreeing on any of the four and asserts the
+  version again on each architecture it builds. Identities, read
+  anonymously on 2026-09-25 from release `v0.36.2-patched.3` of
+  `bartekus/rauthy` (published 2026-09-24T12:57:06Z, source `da8fb522`,
+  upstream base `dd61ac3c`) and from the image itself: index
+  `sha256:d75cac0f708f3e238c458b622fea2f0b7dda9b67e9435eeafa37698d88a2a3c8`,
+  `linux/amd64` manifest `sha256:63d3213f04db80e65fe243c441f74fbdf50353e2b23464bf1485cb2b2a60015c`,
+  `linux/arm64` manifest `sha256:aa468fc4fff7b9148452ba2229117e6e73799666a791ad0649ae3176cec26a20`,
+  `/app/rauthy` sha256 `809aa9eb97e7f0b331279719a37de9191fd8e66bfc051f84997221c9a303a188`
+  (amd64) and `d30f38213465acd4db132d3af2d9ba85a68ff9567eaec4c371b0c9b7e23ad257`
+  (arm64), equal to the release's `SHA256SUMS`, and `rauthy --version`
+  prints `rauthy 0.36.2-patched.3`. B-2's text names `0.36.2-patched.2`;
+  D-14 and D-15 are the pin. A local arm64 build passed on the pinned
+  binary and failed at `sha256sum -c` with one hash digit changed.
+  (c) **The live legs (step 12).** `docker/upgrade-live.sh` runs the real
+  v0.2.0 image by digest (FR-010) against the image built from this change
+  in `live.yml`'s `upgrade` job, and prints each leg as PASS, FAIL or
+  UNEXECUTED with its reason. It executes AC-3, AC-3a, AC-4 (d) with (a) at
+  `begin`, `guarded`, after T2's first single rename, `relocated` and
+  `floored` (each followed by the v0.2.0 image's default entrypoint,
+  `supervise` and `serve` run directly, except at `begin`, where v0.2.0
+  may serve and does), AC-5's live-cell and unclean-stop refusals and its
+  three refused variables. To stop the real binary at a persistent state
+  with no cleanup, as a crash would, the verb reads
+  `RAHI_TEST_UPGRADE_CRASH_AT=<fault point>` and exits `137` there (the
+  library's FR-003 points; the verb is resumable from each by design, so
+  the variable cannot leave a volume the verb does not already recover).
+  UNEXECUTED, with the reason printed: AC-4 (g) (no seam in the pinned
+  Rauthy build injects a crash between its two cache renames), the real
+  v0.2.0 stop and start races at offsets around T1 (D-P12, D-P13; FR-012's
+  library interleavings cover the orders), and a v0.1.0 leg. AC-9's "zero
+  skipped required legs" is therefore not met as written for those three,
+  and 043 stays `in-progress` on them, as the delivery plan's step 15
+  allows for AC-4 (g). Neither the AC-7a clause of D-20 (c) nor these legs
+  is in B-4b's gate, which D-14 and D-15 satisfy. In place of a first-boot
+  "changes nothing" the AC-3 leg compares the volume without
+  `<data>/rauthy-env/` and the two lock files: B-4a lets `first-boot`
+  write a rendered file that is absent, and B-5a names the locks as left.
+  (d) **Documentation (step 13).** `deploy/README.md` carries the upgrade
+  procedure, B-4's preconditions word for word, the fences and the
+  supervisor fence's exact residual guarantee, `--abort` and the rollback,
+  the floor's consequence and clock assumption, retention (D-10) and its
+  unmeasured cost, Rauthy's cache-only losses with the ban export and
+  re-import, the restore boundary including revived refresh credentials and
+  an in-place restore's surviving cache, the graces, `deploy/n3` as
+  unqualified, and the cache-group correction; its revocation section,
+  which still described 025's unwired deny-list, now describes what 038 and
+  this spec built. The consumer contract marks its 0.3.0 hiqlite patch
+  section as superseded on `main`; the release names the version.
+
+- **D-22 (2026-09-25, owner decisions on the items this build held).**
+  (a) **B-4a's store-verb row accepts `floored` and `rauthy-done`.** The
+  live legs of D-21 (c), run against the real v0.2.0 image, found that the
+  image could not finish a transition whenever the cell's manifest or
+  schema changed across it (hello-cell's manifest did after v0.2.0): the
+  entrypoint runs `rahi migrate --adopt-manifest` before `supervise` (031
+  D-5, 036 B-3), `serve` refuses an unadopted manifest or a stale store
+  (036 B-4, 030 B-2), and B-4a's row let `migrate` run only at `done`,
+  which only `serve` can reach. No mechanism left 031, 036 and B-4a all
+  true, so it was put to the owner, who chose, verbatim: "Amend B-4a's
+  migrate/preflight/backup/ledger row to accept `floored` and
+  `rauthy-done` as well as `done`. At floored the verb is finished with the
+  store, so migrate is safe. The entrypoint and 036 stay as they are."
+  The row now reads so; `restore`'s row is unchanged. Rejected: the verb
+  running the cell's deploy step itself and the entrypoint skipping its own
+  (it amends 031's entrypoint and adds a step to B-4), and holding the
+  build. (b) **The verb joins 030 B-1.** The owner approved amending 030
+  B-1's argv list with `upgrade-cache --backup <archive>` (043), as 030 D-9
+  did for 042's verb, which releases D-19 (a): the verb is in `VERBS` and
+  the usage. (c) **Revocations stay unledgered.** The owner accepted D-18
+  as recorded: revocation rows are durable SQL read on every check and are
+  not ledgered, since 015 B-6 ledgers denials only; ledgering them would be
+  a later change to 013's append path. (d) **The release.** The owner
+  chose to ship 0.4.0 with this spec merged at `in-progress`, with AC-4
+  (g), the unexecuted live legs of D-21 (c) and D-20 (c)'s AC-7a clause
+  stated as gaps in the changelog, the release notes and the README, beside
+  D-12's two items; the release record carries that decision.
 
 ### 7.1 Proposals (2026-09-23)
 

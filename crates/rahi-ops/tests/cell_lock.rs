@@ -293,20 +293,23 @@ fn each_entry_point_accepts_exactly_its_transition_states() {
     drop(gate(&config, Entry::Serve).unwrap());
     for phase in all {
         write_record(&config, phase);
-        for entry in [Entry::Supervise, Entry::Serve] {
+        // Spec 043 D-22: the store verbs accept what supervise and serve do.
+        for entry in [
+            Entry::Supervise,
+            Entry::Serve,
+            Entry::Store { may_attach: false },
+        ] {
             assert_eq!(
                 gate(&config, entry).is_ok(),
                 serving.contains(&phase),
                 "{entry:?} at {phase:?}"
             );
         }
-        for entry in [Entry::Store { may_attach: false }, Entry::Restore] {
-            assert_eq!(
-                gate(&config, entry).is_ok(),
-                phase == Phase::Done,
-                "{entry:?} at {phase:?}"
-            );
-        }
+        assert_eq!(
+            gate(&config, Entry::Restore).is_ok(),
+            phase == Phase::Done,
+            "restore at {phase:?}"
+        );
         for entry in [Entry::UpgradeCache, Entry::Abort, Entry::FirstBoot] {
             assert!(gate(&config, entry).is_ok(), "{entry:?} at {phase:?}");
         }

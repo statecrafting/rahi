@@ -112,8 +112,11 @@ impl Entry {
     fn accepts(self, phase: Option<Phase>) -> bool {
         match self {
             Self::UpgradeCache | Self::Abort | Self::FirstBoot => true,
-            Self::Supervise | Self::Serve => phase.is_none_or(Phase::serves),
-            Self::Store { .. } | Self::Restore => phase.is_none_or(|p| p == Phase::Done),
+            // Spec 043 D-22: the verbs that open the store accept every
+            // state the image serves at, so the entrypoint's deploy step
+            // (031 D-5, 036 B-3) runs at `floored` and `rauthy-done` too.
+            Self::Supervise | Self::Serve | Self::Store { .. } => phase.is_none_or(Phase::serves),
+            Self::Restore => phase.is_none_or(|p| p == Phase::Done),
         }
     }
 

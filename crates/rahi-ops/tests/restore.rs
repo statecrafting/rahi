@@ -195,3 +195,92 @@ async fn the_wrong_key_does_not_open_the_archive() {
     assert!(matches!(err, Error::Unauthorized(_)), "{err}");
     assert!(!config.keys_dir().exists());
 }
+
+/// Spec 043 B-6c, D-8 and AC-6 (e): every restore owes the floor its
+/// restore instant, read after the archive verified and before the volume
+/// changed; the first open raises it, the floor never drops below the
+/// archive's own, and a later open changes nothing.
+#[tokio::test]
+async fn every_restore_raises_the_revocation_floor_to_its_instant_at_the_first_open() {
+    let source = tempfile::tempdir().unwrap();
+    let stub = common::stub(b"rauthy-snapshot", false).await;
+    let config = common::config(source.path(), stub.addr);
+    let keys = common::write_keys(&config.keys_dir());
+    let store = common::open_store(&config, &keys).await;
+    let ledger = common::open_ledger(&store, &keys).await;
+    // A floor the archive carries, and a token revoked by jti before it.
+    store.raise_revocation_floor(1_000).await.unwrap();
+    let hash = ledger.genesis_parent().to_string();
+    let env: BTreeMap<&str, &str> = BTreeMap::new();
+    let outcome = backup::run(
+        &store,
+        &stub.api(),
+        &keys,
+        &hash,
+        &Destination::default_for(&config),
+        &env,
+    )
+    .await
+    .unwrap();
+    let backed_up_at = rahi_ops::unix_now();
+    // After the backup point: a revocation the archive does not carry.
+    store
+        .record_jti_revocation("revoked-after-the-backup", backed_up_at)
+        .await
+        .unwrap();
+    store.shutdown().await.unwrap();
+    let archive_path = backups_dir(&config).join(outcome.name);
+
+    let fresh = tempfile::tempdir().unwrap();
+    let config = common::config(fresh.path(), common::free_addr());
+    let key = KeySource::File(keys.path(rahi_ops::BACKUP_KEY_FILE));
+    let Outcome::Restored(marker, _) =
+        restore::run(&config, &archive_path, &key, &common::compatibility())
+            .await
+            .unwrap()
+    else {
+        panic!("the restore applies");
+    };
+    let owed = marker
+        .pending_floor
+        .expect("every restore owes a floor (D-8)");
+    assert!(
+        owed >= backed_up_at,
+        "the restore instant follows the backup"
+    );
+
+    let restored_keys = KeySet::of(&config);
+    let store = common::open_store(&config, &restored_keys).await;
+    assert_eq!(
+        store.revocation_floor().await.unwrap(),
+        Some(1_000),
+        "the archive's own floor came back with it"
+    );
+    assert_eq!(
+        store
+            .jti_revoked_at("revoked-after-the-backup")
+            .await
+            .unwrap(),
+        None,
+        "the revocation after the backup point is lost with the archive"
+    );
+    assert_eq!(
+        restore::raise_pending_floor(&config, &store.handle())
+            .await
+            .unwrap(),
+        Some(owed)
+    );
+    assert_eq!(store.revocation_floor().await.unwrap(), Some(owed));
+    // The token that revocation named was issued before it, so before the
+    // restore instant: the floor refuses it (B-6b, iat <= before).
+    assert!(backed_up_at <= owed);
+    // A later open raises nothing further.
+    assert_eq!(
+        restore::raise_pending_floor(&config, &store.handle())
+            .await
+            .unwrap(),
+        Some(owed)
+    );
+    assert_eq!(store.revocation_floor().await.unwrap(), Some(owed));
+    store.shutdown().await.unwrap();
+}

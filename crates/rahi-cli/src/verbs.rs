@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use rahi_types::{Error, Result};
 
 /// The verbs, in the order `--help` lists them.
-pub const VERBS: [&str; 10] = [
+pub const VERBS: [&str; 11] = [
     "serve",
     "preflight",
     "migrate",
@@ -17,6 +17,7 @@ pub const VERBS: [&str; 10] = [
     "ledger reindex",
     "supervise",
     "first-boot",
+    "upgrade-cache",
 ];
 
 /// What argv asked for.
@@ -79,8 +80,7 @@ pub enum Verb {
         archive: PathBuf,
     },
     /// Spec 043 B-4: `upgrade-cache --backup <archive>`, or `--abort`
-    /// (B-5a). Parsed, and outside [`VERBS`] and the usage until spec 030
-    /// B-1's argv list names it (043 D-19).
+    /// (B-5a); in spec 030 B-1's argv list since 030 D-11.
     UpgradeCache {
         /// The verified pre-upgrade archive; `None` with `--abort`.
         backup: Option<PathBuf>,
@@ -142,6 +142,10 @@ pub fn usage() -> String {
         (
             "first-boot",
             "generate keys and rauthy's environment once (spec 031)",
+        ),
+        (
+            "upgrade-cache --backup <archive> | --abort",
+            "MUTATES: cross the hiqlite 0.15 cache boundary once (spec 043)",
         ),
     ];
     for (verb, what) in lines {

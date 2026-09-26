@@ -265,6 +265,21 @@ nor artifact publication changes that target or proves a consumer rollout.
 
 ### 2.0.1 The hiqlite lock-handler patch, and what a consumer must configure
 
+**Superseded on `main` by spec 043 (the next release after 0.3.0).** The
+workspace no longer carries a `[patch.crates-io]`: it depends on the
+published `hiqlite-patched`, `hiqlite-wal-patched` and
+`hiqlite-derive-patched` at exactly `=0.15.0-patched.3` from crates.io,
+aliased as `hiqlite` (043 B-1, D-15), which carry the lock-handler fix and
+hiqlite's durability, startup and recovery repairs. A consumer of that
+release resolves them through the registry stanza alone and must **drop**
+its copy of the patch below; `cargo tree -i hiqlite-patched` shows
+`0.15.0-patched.3` from crates.io, and no `hiqlite 0.14.0` appears. The
+app store moves from `<data>/hiqlite` to `<data>/app-store` and a volume
+from 0.3.x or earlier crosses once with `rahi upgrade-cache --backup
+<archive>` (`deploy/README.md`, "Upgrading from 0.3.x or earlier").
+`Config::hiqlite_dir()` answers the new path; `<data>/hiqlite` is a
+permanent fence. The rest of this section is the 0.3.0 reading.
+
 Releasing a stale lease after another holder has taken it over on TTL can
 panic hiqlite 0.14.0's lock handler and take unrelated locks down with it.
 Upstream fixed it in PR #352, merged 2026-08-11. **No published hiqlite
@@ -712,9 +727,10 @@ stages envelopes also runs the drain loop (spec 012 §6).
 
 **Verified** (specs 030 to 032, `crates/rahi-ops/src/{backup,restore,supervise}.rs`):
 
-- Two state systems per replica: the app's hiqlite (`/data/hiqlite`, the
-  chain inside it) and rauthy's (`/data/rauthy`), separate Raft clusters,
-  one key set for both.
+- Two state systems per replica: the app's hiqlite (`/data/hiqlite`
+  through 0.3.0, `/data/app-store` from spec 043 on, the chain inside it)
+  and rauthy's (`/data/rauthy`), separate Raft clusters, one key set for
+  both.
 - `rahi backup` builds one archive of the app snapshot, rauthy's snapshot
   fetched over its HTTP API, and the keys, sealed to the backup key. A
   missing part is an error. *Resolved 2026-09-17 (spec 037 B-1):* rauthy

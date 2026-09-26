@@ -61,7 +61,9 @@ if [ "${SMOKE_PAGE:-0}" = "1" ]; then
   [ "$page" = "200" ] || fail "the cell's page answered $page, expected 200"
 fi
 
-docker stop -t 30 "$name" >/dev/null
+# Spec 043 B-9: the documented grace, SERVE_GRACE (40 s) plus Rauthy's stop
+# (10 s); rahi-cli tests/stop_budget.rs reads this value.
+docker stop -t 50 "$name" >/dev/null
 code="$(docker inspect -f '{{.State.ExitCode}}' "$name")"
 [ "$code" = "0" ] || fail "the container exited $code on SIGTERM, expected 0"
 

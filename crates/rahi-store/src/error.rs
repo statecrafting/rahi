@@ -51,6 +51,17 @@ pub fn is_terminal(err: &Error) -> bool {
     }
 }
 
+/// Whether an error is hiqlite's `Error::Timeout`: what `Client::shutdown`
+/// answers when its caller-side wait ([`crate::SHUTDOWN_WAIT`]) elapses
+/// (spec 043 B-9, B-10's `store_timeout`).
+#[must_use]
+pub fn is_timeout(err: &Error) -> bool {
+    match err {
+        Error::Upstream(msg) => msg.starts_with("Timeout:"),
+        _ => false,
+    }
+}
+
 /// Whether an error represents hiqlite's recovering state (spec 043 D-15).
 #[must_use]
 pub fn is_recovering(err: &Error) -> bool {
@@ -97,6 +108,16 @@ mod tests {
         assert!(is_terminal(&mapped));
         assert!(!is_recovering(&mapped));
         assert_eq!(mapped.exit_code(), 3);
+    }
+
+    #[test]
+    fn a_shutdown_timeout_is_told_apart() {
+        let mapped = map(hiqlite::Error::Timeout(
+            "the shutdown did not finish".into(),
+        ));
+        assert!(is_timeout(&mapped));
+        assert!(!is_terminal(&mapped) && !is_recovering(&mapped));
+        assert!(!is_timeout(&map(hiqlite::Error::Error("other".into()))));
     }
 
     #[test]
