@@ -1,0 +1,165 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-23",
+    "dependsOn": [
+      "020-edge-server",
+      "021-idp-proxy-and-discovery",
+      "030-operational-verbs",
+      "031-single-container-packaging",
+      "032-cluster-topology",
+      "036-manifest-and-schema-evolution",
+      "037-identity-recovery-and-live-proof"
+    ],
+    "domain": "ops",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "deploy/n3-split/"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-cli/tests/split.rs"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "020-edge-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/probes.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "021-idp-proxy-and-discovery",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/config.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "021-idp-proxy-and-discovery",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/discovery.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/backup.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_api.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_env.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "032-cluster-topology",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/k8s-validate.sh"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "032-cluster-topology",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/README.md"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 3
+    },
+    "id": "044-n3-split-composition",
+    "implementation": "pending",
+    "kind": "feature",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-consumer-contract.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-operational-prerequisites.md"
+        }
+      }
+    ],
+    "risk": "critical",
+    "sectionDigests": {
+      "044-n-3-split-composition": "021424313a7c08da30ec477604910f13e4880128c915970e41222c1ba5540740",
+      "1-purpose": "bd08d27f4cd841320c48bfd5b745de6847c2ee7e479c88e20dedbe15c33e3bde",
+      "2-territory": "78172f8753a422b645191aa7c28262196812402ffc9afda3274f167db226cd57",
+      "3-behavior": "1f2954aa7251e56d6f61966e42a46d1e5384b8971d3a931898a391227044b570",
+      "4-functional-requirements": "aa892115c426725986e6cef91ac25fc1e8cd44bc1a1273fefbeba9b05c51156a",
+      "5-acceptance-criteria": "169f7fcf21df69f38314017790f8c25070fb0fe386637e8475d6a8806099164e",
+      "6-out-of-scope": "9c4c3f29934883c9865be3bb7f11d9749a7bf42e502d39d7ee9628deef6006d3",
+      "7-resolved-decisions": "54612d8a1fe897ff1974b32b4192eb62e365d4bf6efbde595e95fe29fe9b9676",
+      "backup-replaces-the-single-volume-cut": "685f344b219cca435b68b80884464829f0cef1ce8ca0e115228119d0517e9e43",
+      "disruption-and-storage": "30913a289f56c751bd82704d56dd15ed2c8e77c3993c797ef1cbd6f51352e8bf",
+      "proposals-2026-09-23": "9da1287a49d6af22b7484012f6e6f35e560762b1ced2e393750ccac33a32208e",
+      "proposed-amendments-to-complete-specs-n-3-only": "b96c7ee65670d4232002f8de61bccdc614ea8516605fb9d438036c640c2751e0",
+      "readiness-and-liveness-replaces-die-together": "6a24778a8a75dcf481525abce13213bfc1e02871d3e305402d5f125bd9e75add",
+      "routing-and-trust-replaces-loopback": "b979778d74fd1ae4216072a0cbfef31042bd6516e75d91f6cf5971e93aee3895",
+      "verification": "3790ad6b249d804ade30f9034c1f5c985cb0bcb9fd674a6d41eb0fcb39d972b1"
+    },
+    "sectionHeadings": [
+      "044: N=3 split composition",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "Proposed amendments to complete specs (N=3 only)",
+      "Routing and trust (replaces loopback)",
+      "Readiness and liveness (replaces die-together)",
+      "Disruption and storage",
+      "Backup (replaces the single-volume cut)",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Proposals (2026-09-23)",
+      "Verification"
+    ],
+    "specPath": "specs/044-n3-split-composition/spec.md",
+    "status": "draft",
+    "summary": "The owner decided on 2026-09-23 (hiqlite proposal D-14, recorded at bartekus/hiqlite@da4c910) that an N=3 cell is one namespace holding two StatefulSets, rahi and rauthy, three replicas each, one hiqlite node per pod, and that the single-container supervised composition of spec 031 stays the N=1 profile. This spec is rahi's share of that decision. It amends 031 and 032 for N=3 only: rahi starts without rauthy, reaches it only through the internal ClusterIP Service rauthy-internal.<namespace>.svc.cluster.local over Rauthy's TLS or a mesh's mTLS, fails readiness and never liveness while rauthy is unavailable, and keeps peer discovery independent of readiness. It carries the proposal's routing, NetworkPolicy, per-StatefulSet disruption and storage requirements, and backup obligations. It changes no dependency and claims no N=3 support: that follows only from recorded qualification on a named release.\n",
+    "title": "N=3 split composition: two StatefulSets, rahi and rauthy, one hiqlite node per pod, rahi reaching rauthy only through an encrypted internal Service and losing readiness, never liveness, without it"
+  },
+  "shardHash": "548388d46c91ee4e3841c4aa545b005d806114b5a28d300fdd572dc9487d2f40",
+  "specVersion": "1.8.0"
+}

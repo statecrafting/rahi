@@ -1,0 +1,233 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '044-n3-split-composition' file unit 'deploy/n3-split/' does not exist",
+        "path": "deploy/n3-split/"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '044-n3-split-composition' file unit 'crates/rahi-cli/tests/split.rs' does not exist",
+        "path": "crates/rahi-cli/tests/split.rs"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "020-edge-server",
+      "021-idp-proxy-and-discovery",
+      "030-operational-verbs",
+      "031-single-container-packaging",
+      "032-cluster-topology",
+      "036-manifest-and-schema-evolution",
+      "037-identity-recovery-and-live-proof"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/rahi-cli/src/serve.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/probes.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/config.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/discovery.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/backup.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/rauthy_api.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/rauthy_env.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/README.md",
+        "source": "spec-edge"
+      },
+      {
+        "path": "scripts/k8s-validate.sh",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/split.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/n3-split/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/serve.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/probes.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/probes.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/config.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/config.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/discovery.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/discovery.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/backup.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/backup.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/rauthy_api.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_api.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/rauthy_env.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_env.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "deploy/README.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/README.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "scripts/k8s-validate.sh"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/k8s-validate.sh"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/01-consumer-contract.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-consumer-contract.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/02-operational-prerequisites.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-operational-prerequisites.md"
+        }
+      }
+    ],
+    "specId": "044-n3-split-composition",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "db63261a59c4f3cbbdef04692f3d83284b7dd477d6cd0288752dcb5ced641aaa"
+}
