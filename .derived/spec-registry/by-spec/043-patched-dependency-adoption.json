@@ -428,7 +428,7 @@
     ],
     "risk": "critical",
     "sectionDigests": {
-      "043-patched-dependency-adoption": "e0143c14a84951acb4e2e4f9384bd7c89cb0653da6af72760b31e8d9e6f358bd",
+      "043-patched-dependency-adoption": "5f5a44d7b1d596bac86d7cef1e5f61058226c062d09203709375a31d6b0a0755",
       "1-purpose": "ce9362b0087b7937b6194295f1fb22e8773c027309835ecc4fa7fccb8db2aea2",
       "2-territory": "c3cb4e4c58f1a5c3793550b39e0b8678ea0953d6b16bd7728470a63bd2a6cc83",
       "3-behavior": "7ecc0b62a6a06c7a6e9492a174a36d49c91499dd4794da5eea8ceed51e237e25",
@@ -440,7 +440,7 @@
       "7-3-revision-2-corrections-2026-09-23": "b2df166aeaea61500e034dd00d6a95bae99d7f6ef051ac2fcedcda3a834b310c",
       "7-4-revision-3-corrections-2026-09-23": "82f140cd33dd28b04401552026c8646274eb3820bcc2503dfb6fad97a4a0f81e",
       "7-5-revision-4-corrections-2026-09-23": "03662c461a24ffd9bb9b335a88c9645040f3f9a641d010f6b534ad83c0ce6ab5",
-      "7-resolved-decisions": "64e7acccad7adc7f7c8fbe82fb7e66ad3daa8a2244de57c99a0b3d7f1a0d5e03",
+      "7-resolved-decisions": "f6ad4a42f2d344a724d2300a06849022927308b64a49d63b81df30fbbf41ea79",
       "crossing-the-cache-boundary": "51283cff0a1f879a68aeac5b19f5d1f71db4b3de143968210662b8f8b1982d98",
       "identities": "512e69a12a4197d490d6791c522521872b259db30759d9ee3161d3eda86a3939",
       "revocation-across-cache-loss": "a659c63ba58d6b02335f343d04c34edb9237bca931b9ba498f9bd342aac79809",
@@ -474,6 +474,6 @@
     "summary": "rahi's application store runs hiqlite 0.14.0 through a root git patch that registry consumers never inherit, and its co-deployed identity provider runs upstream Rauthy 0.36.2. Published downstream builds exist for both, hiqlite-patched 0.15.0-patched.1 and rauthy-patched 0.36.2-patched.2, each qualified by its producer at N=1. This spec adopts exactly those two artifacts for the N=1 cell under a narrow recorded exception to 011's no-fork rule. It crosses the one incompatible on-disk boundary (the cache raft log) by relocating the app store behind a permanent fence that every pre-043 binary refuses at its old path, installed whole and verified quiescent before anything moves, and a second fence at rahi's rendered Rauthy environment that makes every published pre-043 supervisor that reads it afterwards exit before it spawns Rauthy; it names what neither fence can stop (an old process already past its read or its lock-free start phase, and the two destructive hiqlite variables in an old process's environment) as preconditions the operator establishes by stopping and removing every old process first. Every new-binary entry point takes its locks before it reads the state file; Rauthy moves its own cache under consent, and the resumable upgrade is released only on a Rauthy build whose interrupted move is repaired. It keeps every revocation accepted before the upgrade refused by a permanent issued-at floor that needs no historical lifetime, bounds every admitted token by an enforced lifetime ceiling and a hard 86,400-second maximum, keeps durable revocations against a backward clock step after any prune (retained, or pruned under a persisted watermark, by owner choice), states the restore boundary, including what a stale Rauthy restore revives, turns a proven terminal storage failure into a bounded exit, and reports every stop's observed outcome with a non-zero exit when completion is not confirmed. It changes no topology and claims no N=3 support.\n",
     "title": "Patched dependency adoption: the N=1 cell runs the published, provenance-pinned hiqlite and Rauthy builds, crosses their cache boundary only through a fenced, resumable, backed-up transition, keeps every accepted revocation through it, and stops within a validated budget with an honest outcome"
   },
-  "shardHash": "981dcd7c2bc9671a1e8c8a0ce74f3cc33077a11af9fdcffc17bfcd5f50e6dfa7",
+  "shardHash": "f326cb5bdc39fc1340cd6741cf73b1659dd12ed30decad5c3c12e0dcbafabbcf",
   "specVersion": "1.8.0"
 }

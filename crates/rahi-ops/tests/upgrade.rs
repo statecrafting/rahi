@@ -251,14 +251,23 @@ async fn every_interruption_resumes_to_the_same_end_state() {
     assert!(n > 15, "the verb exposes its fault points: {n}");
 }
 
+/// AC-3 and D-23: without a verifying archive the verb refuses before it
+/// records `begin`, so it writes no guard, no fence and no record.
 #[tokio::test]
-async fn the_verb_without_a_verifying_archive_refuses_and_changes_nothing_after_t1() {
+async fn the_verb_without_a_verifying_archive_refuses_and_changes_nothing() {
     let volume = pre043().await;
+    let config = volume.config();
     std::fs::write(&volume.archive, b"not an archive").unwrap();
+    let marker = rahi_ops::legacy_marker(&config);
+    let before = std::fs::read(&marker).ok();
     assert!(run(&volume, &NoFaults).await.is_err());
-    let record = upgrade::read(&volume.config()).unwrap().unwrap();
-    assert_eq!(record.phase, Phase::Verifying, "nothing moved");
-    assert!(!volume.config().hiqlite_dir().join("state_machine").exists());
+    assert!(upgrade::read(&config).unwrap().is_none(), "no record");
+    assert_eq!(std::fs::read(&marker).ok(), before, "no guard");
+    assert!(
+        config.data_dir.join("rauthy").join("rauthy.env").is_file(),
+        "no supervisor fence"
+    );
+    assert!(!config.hiqlite_dir().join("state_machine").exists());
 }
 
 /// AC-5: a live pre-043 node (its log lock held) refuses T1 and leaves the

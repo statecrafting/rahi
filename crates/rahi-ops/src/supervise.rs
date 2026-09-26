@@ -368,6 +368,52 @@ pub async fn custody_client(
     })
 }
 
+/// Re-apply the rendered API key access to rauthy's key, through the
+/// backup admin's session (spec 043 D-24).
+///
+/// rauthy applies `BOOTSTRAP_API_KEY`'s access only when it initializes a
+/// fresh database, not at every start, so a key first rendered before a
+/// later spec widened [`rauthy_env::API_KEY_ACCESS`] (038 widened it with
+/// `Scopes` and `Sessions`) keeps its old access on an upgraded volume, and
+/// the widened calls are refused. The key cannot widen itself (rauthy asks
+/// for the `ApiKeys` group, which it is never given), so the passkey-only
+/// backup admin (037 B-1) logs in and sets the key's access to exactly the
+/// rendered value: nothing broader than 031 D-8 allows.
+///
+/// # Errors
+///
+/// [`Error::Unauthorized`] when the key set holds no backup passkey or
+/// rauthy refuses the admin; [`Error::Upstream`] when rauthy refuses the
+/// update.
+pub async fn reapply_api_key_access(api: &RauthyApi, keys: &KeySet) -> Result<()> {
+    let token = keys.admin_token()?;
+    let name = token
+        .split_once('$')
+        .map(|(name, _)| name.to_owned())
+        .ok_or_else(|| Error::Config("the admin token is not name$secret".to_owned()))?;
+    let passkey = keys.backup_passkey()?.ok_or_else(|| {
+        Error::Unauthorized(format!(
+            "rauthy's API key {name} lacks the access this version renders, and this key set              holds no {} to widen it with",
+            crate::BACKUP_PASSKEY_FILE
+        ))
+    })?;
+    let access: serde_json::Value = serde_json::from_str(rauthy_env::API_KEY_ACCESS)
+        .map_err(|err| Error::Config(format!("the rendered API key access is not JSON: {err}")))?;
+    let mut session = crate::rauthy_session::AdminSession::new(api.base())?;
+    session.login(&passkey).await?;
+    let body = serde_json::json!({ "name": name, "exp": null, "access": access });
+    let path = format!("/auth/v1/api_keys/{name}");
+    let (status, text) = session
+        .call(reqwest::Method::PUT, &path, Some(&body))
+        .await?;
+    if !status.is_success() {
+        return Err(Error::Upstream(format!(
+            "rauthy answered {status} to {path}: {text}"
+        )));
+    }
+    Ok(())
+}
+
 /// Give rauthy the refresh token lifetime the manifest names (038 B-4,
 /// D-11).
 ///

@@ -1335,6 +1335,40 @@ None remains open: D-7 to D-13 record the owner's approval and choices.
   stated as gaps in the changelog, the release notes and the README, beside
   D-12's two items; the release record carries that decision.
 
+- **D-23 (2026-09-25, build decision; where the archive is first
+  verified).** B-4's table verifies the archive at T1a, after T1 has
+  written the guard, installed the supervisor fence and moved the old
+  rendered file to evidence; AC-3 requires that "the verb without a
+  verifying archive refuses and changes nothing". The live legs showed
+  both cannot hold on T1a alone. Both hold when the verb also verifies the
+  archive, with the same read-only 030 verification, before it records
+  `begin` (and, on a resumed run, before it continues from `begin`,
+  `guarded` or `verifying`): a missing or unverifiable archive is refused
+  with nothing written but the gate's two lock files, which B-5a names as
+  left. T1a is unchanged and still records `verifying` and `verified` with
+  the digest. Rejected: moving T1a before T1 in the table (it is B-4's text)
+  and treating the guard as "nothing" (it is the change a pre-043 node
+  meets).
+
+- **D-24 (2026-09-25, build decision; a v0.2.0 volume's API key).** The
+  live legs found a v0.2.0 volume that reached `rauthy-done` and then could
+  not serve hello-cell: rauthy refused the admin API key 038's native-client
+  provisioning uses, because the key lacks `Scopes`. 031 D-8 says rauthy
+  re-applies the rendered key's access at every start, so a later spec
+  widens it by re-rendering; rauthy's source says otherwise
+  (`src/data/src/migration/bootstrap/mod.rs` runs `api_key::bootstrap` only
+  while it initializes a fresh database), so a key first rendered before
+  038 widened `API_KEY_ACCESS` keeps its old access on every volume that
+  predates 038, whether or not it crosses this spec's boundary. This build
+  keeps 031 D-8's rule true by acting on it: when the custody step is
+  refused `unauthorized`, `supervise` logs in as the passkey-only backup
+  admin (037 B-1), sets the key's access to exactly the rendered value with
+  rauthy's `PUT /auth/v1/api_keys/{name}` (the key cannot do this itself;
+  rauthy asks for the `ApiKeys` group, which it is never given), and runs
+  the custody step once more. The amending edge on `supervise.rs` covers
+  it. Rejected: minting a broad key (031 D-8), and an operator step in the
+  README, which every pre-038 volume would meet as a failed start.
+
 ### 7.1 Proposals (2026-09-23)
 
 - **P-6 (withdrawn 2026-09-23, after independent review).** An earlier

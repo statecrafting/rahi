@@ -38,6 +38,14 @@ fail() {
 }
 unexecuted() { record UNEXECUTED "$1"; }
 
+# The host port, and so the public origin, of `volume`: fixed for the
+# volume's life, because Rauthy's client is registered with that origin.
+vol_port() {
+  f="${portfile}.port.$1"
+  [ -f "$f" ] || next_port > "$f"
+  cat "$f"
+}
+
 # The next host port; a file, because most callers run in a subshell.
 next_port() {
   n=$(($(cat "$portfile") + 1))
@@ -48,7 +56,7 @@ next_port() {
 cleanup() {
   for c in $(docker ps -aq --filter "name=${run_id}-"); do docker rm -f "$c" >/dev/null 2>&1 || true; done
   for v in $(docker volume ls -q --filter "name=${run_id}-"); do docker volume rm "$v" >/dev/null 2>&1 || true; done
-  rm -f "$portfile"
+  rm -f "$portfile" "${portfile}".port.*
 }
 trap cleanup EXIT
 
@@ -68,7 +76,7 @@ start() {
 # One verb of `image` to completion on a stopped volume; its exit code.
 verb() {
   image="$1"; volume="$2"; shift 2
-  docker run --rm -e RAHI_PUBLIC_URL="http://localhost:1" -v "${volume}:/data" \
+  docker run --rm -e RAHI_PUBLIC_URL="http://localhost:$(vol_port "$volume")" -v "${volume}:/data" \
     ${CRASH_AT:+-e RAHI_TEST_UPGRADE_CRASH_AT="$CRASH_AT"} \
     --entrypoint /usr/local/bin/rahi "$image" "$@"
 }
@@ -95,7 +103,8 @@ tree() {
   volume="$1"; sub="${2:-.}"
   docker run --rm -v "${volume}:/data" --entrypoint sh "$new" -c "
     cd /data && [ -e '$sub' ] || exit 0
-    find '$sub' -type d | sort | sed 's/^/dir /'
+    find '$sub' -type d ! -path './rauthy-env' ! -path './rauthy-env/*' | sort | sed 's/^/dir /' \
+      | { if [ -d app-store ] && [ -z \"\$(ls -A app-store)\" ]; then grep -vx 'dir ./app-store'; else cat; fi; }
     find '$sub' -type f ! -name cell.lock ! -name transition.lock ! -path './rauthy-env/*' \
       -exec sha256sum {} + | sort -k2"
 }
@@ -103,7 +112,7 @@ tree() {
 # A v0.2.0 volume that served, with an archive taken while it ran; echoes
 # the archive's path inside the volume.
 old_volume() {
-  volume="$1"; p="$(next_port)"; name="${run_id}-prep-${volume}"
+  volume="$1"; p="$(vol_port "$volume")"; name="${run_id}-prep-${volume}"
   docker volume create "$volume" >/dev/null
   start "$name" "$old" "$volume" "$p"
   if ! ready_within "$p" 180 "$name"; then
@@ -122,14 +131,22 @@ old_volume() {
   echo "$archive"
 }
 
+# The app store's tree and the fence marker's bytes: what AC-3a and AC-4 (d)
+# hold unchanged. Debris a refused old start leaves beside the fence is
+# allowed (B-5) and not compared.
+guarded_state() {
+  tree "$1" app-store
+  tree "$1" hiqlite/state_machine/lock
+}
+
 # The v0.2.0 image, in each of its three forms, on `volume` for `seconds`:
-# it must serve nothing, spawn no Rauthy, and change nothing under the app
-# store and the fence.
+# it must serve nothing, spawn no Rauthy, and change neither the app store
+# nor the fence.
 old_serves_nothing() {
   label="$1"; volume="$2"; seconds="$3"
-  before="$(tree "$volume" app-store; tree "$volume" hiqlite)"
+  before="$(guarded_state "$volume")"
   for form in entrypoint supervise serve; do
-    p="$(next_port)"; name="${run_id}-old-${form}-${p}"
+    p="$(vol_port "$volume")"; name="${run_id}-old-${form}-${p}"
     case "$form" in
       entrypoint) start "$name" "$old" "$volume" "$p" ;;
       *) start "$name" "$old" "$volume" "$p" "$form" ;;
@@ -141,7 +158,7 @@ old_serves_nothing() {
       sleep 1; i=$((i + 1))
     done
     docker rm -f "$name" >/dev/null
-    after="$(tree "$volume" app-store; tree "$volume" hiqlite)"
+    after="$(guarded_state "$volume")"
     [ "$after" = "$before" ] || show_change "$before" "$after"
     if [ "$served" = no ] && [ "$spawned" = no ] && [ "$before" = "$after" ]; then
       pass "$label: v0.2.0 $form serves nothing, spawns no Rauthy, changes no path"
@@ -153,7 +170,7 @@ old_serves_nothing() {
 
 # The new image's default entrypoint on `volume` reaches ready and `done`.
 new_reaches_done() {
-  label="$1"; volume="$2"; p="$(next_port)"; name="${run_id}-new-${p}"
+  label="$1"; volume="$2"; p="$(vol_port "$volume")"; name="${run_id}-new-${p}-$$-$(date +%s)"
   start "$name" "$new" "$volume" "$p"
   if ! ready_within "$p" 180 "$name"; then
     docker logs "$name" >&2 2>&1 || true
@@ -185,7 +202,7 @@ ac3() {
   keys_before="$(tree "$vol" keys)"
   before="$(tree "$vol")"
 
-  p="$(next_port)"; name="${run_id}-ac3-refused"
+  p="$(vol_port "$vol")"; name="${run_id}-ac3-refused"
   start "$name" "$new" "$vol" "$p"
   docker wait "$name" >/dev/null 2>&1 &
   waiter=$!
@@ -238,10 +255,10 @@ ac3() {
   if [ "$(tree "$vol" keys)" = "$keys_before" ]; then pass "AC-3: the key set is unchanged"; else fail "AC-3: the key set changed"; fi
   prefix="$(docker run --rm -v "${vol}:/data" --entrypoint sh "$new" -c '
     n=$(wc -l < /data/pre-upgrade-chain.jsonl)
-    head -n "$n" /data/post-upgrade-chain.jsonl | cmp -s - /data/pre-upgrade-chain.jsonl && echo same')"
+    head -n "$n" /data/post-upgrade-chain.jsonl | cmp -s - /data/pre-upgrade-chain.jsonl && echo same' || true)"
   if [ "$prefix" = same ]; then pass "AC-3: the chain is unchanged"; else fail "AC-3: the chain changed"; fi
 
-  p="$(next_port)"; name="${run_id}-ac3-second"
+  p="$(vol_port "$vol")"; name="${run_id}-ac3-second"
   start "$name" "$new" "$vol" "$p"
   if ready_within "$p" 180 "$name" && ! docker logs "$name" 2>&1 | grep -q "the transition is"; then
     pass "AC-3: a second boot needs nothing"
@@ -255,7 +272,7 @@ ac3() {
 ac3a() {
   vol="${run_id}-ac3a"
   docker volume create "$vol" >/dev/null
-  p="$(next_port)"; name="${run_id}-ac3a-new"
+  p="$(vol_port "$vol")"; name="${run_id}-ac3a-new"
   start "$name" "$new" "$vol" "$p"
   if ready_within "$p" 180 "$name"; then
     pass "AC-3a: the new image's first boot on an empty volume reaches ready without the verb"
@@ -291,7 +308,7 @@ ac4d() {
     if [ "$code" != 137 ]; then fail "AC-4 (d) $state: the verb did not stop there (exit $code)"; continue; fi
     if [ "$state" = begin ]; then
       # No guard yet: the old image may serve on the untouched legacy store.
-      p="$(next_port)"; name="${run_id}-ac4-begin-old"
+      p="$(vol_port "$vol")"; name="${run_id}-ac4-begin-old"
       start "$name" "$old" "$vol" "$p"
       if ready_within "$p" 180 "$name"; then
         pass "AC-4 (d) begin: v0.2.0 serves on the untouched legacy store"
@@ -316,7 +333,7 @@ ac4d() {
 ac5() {
   vol="${run_id}-ac5"
   archive="$(old_volume "$vol")" || { fail "AC-5: preparation"; return; }
-  p="$(next_port)"; name="${run_id}-ac5-live"
+  p="$(vol_port "$vol")"; name="${run_id}-ac5-live"
   start "$name" "$old" "$vol" "$p"
   ready_within "$p" 180 "$name" || { fail "AC-5: the v0.2.0 cell did not start"; return; }
   out="$(verb "$new" "$vol" upgrade-cache --backup "$archive" 2>&1 || true)"
@@ -335,7 +352,7 @@ ac5() {
   fi
   for var in HQL_CACHE_LEGACY_MOVE_ASIDE HQL_DANGER_RAFT_STATE_RESET HQL_BACKUP_RESTORE; do
     before="$(tree "$vol")"
-    if docker run --rm -e RAHI_PUBLIC_URL=http://localhost:1 -e "$var=true" -v "${vol}:/data" \
+    if docker run --rm -e RAHI_PUBLIC_URL="http://localhost:$(vol_port "$vol")" -e "$var=true" -v "${vol}:/data" \
         --entrypoint /usr/local/bin/rahi "$new" serve >/dev/null 2>&1; then
       fail "AC-5: serve with $var set did not refuse"
     elif [ "$(tree "$vol")" = "$before" ]; then

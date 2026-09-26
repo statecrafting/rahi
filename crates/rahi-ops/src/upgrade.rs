@@ -372,6 +372,10 @@ pub async fn run(
                 ));
             }
             Legacy::Other { .. } => {
+                // D-23: the archive is verified, read-only, before the first
+                // byte is written, so a verb without a verifying archive
+                // changes nothing (AC-3); T1a verifies it again, recorded.
+                verify_archive(config, archive)?;
                 let record = Record::begin(crate::random_id()?);
                 write(config, &record)?;
                 faults.hit("begin")?;
@@ -386,6 +390,14 @@ pub async fn run(
         return Ok(Outcome::Already {
             phase: record.phase,
         });
+    }
+    if matches!(
+        record.phase,
+        Phase::Begin | Phase::Guarded | Phase::Verifying
+    ) {
+        // D-23: a resumed run whose verification is still ahead checks the
+        // archive before it changes anything more.
+        verify_archive(config, archive)?;
     }
     recover_evidence(config, &mut record)?;
     loop {

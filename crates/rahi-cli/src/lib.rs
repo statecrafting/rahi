@@ -230,7 +230,21 @@ async fn supervise<C: Cell>(env: &dyn EnvReader) -> Result<i32> {
                 "supervise: rauthy moved its cache under consent; the transition is rauthy-done"
             );
         }
-        let custodied = sup::custody_client(&config, &keys, &manifest).await?;
+        let custodied = match sup::custody_client(&config, &keys, &manifest).await {
+            // Spec 043 D-24: a key rendered before 038 widened its access
+            // keeps the old access, because rauthy applies it only when it
+            // initializes; the backup admin re-applies the rendered access
+            // once and the custody step runs again.
+            Err(Error::Unauthorized(why)) => {
+                eprintln!(
+                    "supervise: {why}; re-applying the rendered API key access through the \
+                     backup admin"
+                );
+                sup::reapply_api_key_access(&api, &keys).await?;
+                sup::custody_client(&config, &keys, &manifest).await?
+            }
+            other => other?,
+        };
         let mut said = steps.render();
         let native = custodied.render();
         if !native.is_empty() {
