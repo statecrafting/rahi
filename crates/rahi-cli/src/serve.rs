@@ -669,13 +669,20 @@ pub const DRAIN_BUDGET: std::time::Duration = std::time::Duration::from_secs(10)
 
 /// B-2: boot, compose, listen until SIGTERM or Ctrl-C.
 ///
+/// Both signals are armed before anything else runs (spec 048 B-7): one
+/// that arrives while the node starts, or while the chain is verified, is
+/// held until the listener is up and then stops serve in B-9's order, rather
+/// than ending the process with hiqlite's unclean-stop marker on disk.
+///
 /// # Errors
 ///
 /// As [`Booted::open`] and [`compose`], plus [`Error::Io`] when the address
-/// cannot be bound, and [`Error::Io`] naming every reason when the stop was
-/// unconfirmed (spec 043 B-10, exit `3`).
+/// cannot be bound or the signal handlers cannot be installed, and
+/// [`Error::Io`] naming every reason when the stop was unconfirmed (spec 043
+/// B-10, exit `3`).
 pub async fn serve<C: Cell>(env: &dyn EnvReader) -> Result<()> {
-    serve_until::<C>(env, shutdown_signal()).await
+    let stopping = rahi_store::stop_on_signal()?;
+    serve_until::<C>(env, stopping.requested()).await
 }
 
 /// Which gate a `serve` runs under (spec 043 B-4a).
@@ -1099,29 +1106,6 @@ fn back_channel(idp: &IdpConfig, endpoint: &str) -> String {
         || endpoint.to_owned(),
         |path| format!("{}{path}", idp.loopback_base),
     )
-}
-
-async fn shutdown_signal() {
-    let ctrl_c = tokio::signal::ctrl_c();
-    #[cfg(unix)]
-    {
-        let mut term =
-            match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
-                Ok(term) => term,
-                Err(_) => {
-                    let _ = ctrl_c.await;
-                    return;
-                }
-            };
-        tokio::select! {
-            _ = ctrl_c => {},
-            _ = term.recv() => {},
-        }
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = ctrl_c.await;
-    }
 }
 
 #[cfg(test)]

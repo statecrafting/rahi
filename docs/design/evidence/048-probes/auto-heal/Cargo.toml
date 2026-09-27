@@ -1,0 +1,20 @@
+# Spec 048 D-3's probe: is hiqlite's `auto-heal` rebuild of an N=1 state
+# machine complete after snapshots and log purges? A standalone package, not
+# a workspace member, because the feature under test must never reach a
+# rahi build: Cargo features are additive, and one crate enabling
+# `auto-heal` on hiqlite enables it for every consumer in that graph.
+[package]
+name = "probe-auto-heal"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+# rahi's pin and feature set (Cargo.toml, spec 043 D-15), plus `auto-heal`.
+hiqlite = { package = "hiqlite-patched", version = "=0.15.0-patched.3", default-features = false, features = ["sqlite", "cache", "counters", "dlock", "listen_notify_local", "backup", "s3", "auto-heal"] }
+tokio = { version = "1", features = ["full"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[workspace]

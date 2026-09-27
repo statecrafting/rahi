@@ -22,8 +22,9 @@ hiqlite = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 # Spec 037 B-2: one process takes one backup at a time, and waiting out
-# hiqlite's suppression window is an await, not a blocked thread.
-tokio = { workspace = true, features = ["rt", "sync", "time"] }
+# hiqlite's suppression window is an await, not a blocked thread. Spec 048
+# B-4: `Store::run` arms SIGTERM and SIGINT before the node starts.
+tokio = { workspace = true, features = ["macros", "rt", "signal", "sync", "time"] }
 
 [dev-dependencies]
 serde_bytes = { workspace = true }

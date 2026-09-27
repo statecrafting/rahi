@@ -10,6 +10,36 @@ Every chassis crate carries one version, and a release is an annotated tag
 `vX.Y.Z` on a `main` commit whose `make ci` passed. Pre-1.0, a minor bump may
 change the consumer contract and a patch bump may not.
 
+## Unreleased
+
+- **The node's lifetime as one scope (spec 048).** hiqlite leaves its
+  unclean-stop marker, `state_machine/lock`, on every exit that skips
+  `Store::shutdown`, and the next open then refuses. `rahi_store::Store::run`
+  (and `run_until`, `close_after`) opens the node, arms SIGTERM and SIGINT
+  first, and shuts the node down whether the body returns `Ok`, returns
+  `Err`, panics, or outlives a stop by `STOP_GRACE` (ten seconds).
+  `stop_on_signal`, `Stopping` and `is_stopped` are public for programs that
+  need the armed signal elsewhere. Dropping a node-owning `Store` that was
+  never shut down now prints a warning. **Consumers:** replace
+  `Store::open(..)?` ... `store.shutdown()` with `Store::run`, and stop
+  arming only Ctrl-C: SIGTERM is what an orchestrator sends. The crate docs
+  of `rahi-store` give the pattern and the single-voter recovery.
+- `rahi serve` arms both signals before it opens the node, so a SIGTERM
+  during boot is held until the listener is up and then stops serve in order
+  with exit `0`, instead of killing the process. `migrate`, `backup` and the
+  `ledger` verbs arm them too and give their work `STOP_GRACE` before
+  abandoning it; an abandoned verb exits `3`. `preflight` and
+  `upgrade-cache` hold a stop until they end.
+- Three paths that returned with the node open now stop it first:
+  `Store::open` when creating the chassis tables fails, `preflight` when the
+  opened node is not healthy, and `backup --to` with a destination that does
+  not parse (now refused before the node opens).
+- hiqlite's `auto-heal` stays off. Its rebuild was verified complete for a
+  single voter after snapshots and log purges (spec 048 D-3), but a Cargo
+  feature cannot be enabled for one cell without being enabled for every
+  consumer, and an automatic rebuild would hide the unclean stop this
+  release removes the causes of.
+
 ## 0.4.0, release candidate 2026-09-26
 
 Every change since `v0.3.0`. All nine chassis crates move together. This
