@@ -6,7 +6,7 @@ kind: kernel
 domain: store
 created: "2026-09-27"
 authors: ["Bartek Kus"]
-implementation: in-progress
+implementation: complete
 risk: high
 wave: 3
 depends_on:

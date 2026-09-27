@@ -87,7 +87,7 @@
       "wave": 3
     },
     "id": "048-store-clean-shutdown",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "kind": "kernel",
     "obligations": [
       {
@@ -165,6 +165,6 @@
     "summary": "hiqlite creates an unclean-stop marker, state_machine/lock, when a node starts and removes it only in a graceful shutdown; without the auto-heal feature the next start refuses until someone repairs the directory by hand. The travel-memory service hit this with a ? between Store::open and Store::shutdown and a Ctrl-C-only handler. This spec gives rahi-store one scope for the node's lifetime, Store::run, which arms SIGTERM and SIGINT before the node starts and shuts it down on every way out of the body; it closes the three paths in rahi's own verbs that returned with the node open and the signal window in serve's boot; it documents the single-voter recovery and verifies it; and it records why auto-heal stays off after a probe showed its rebuild complete.\n",
     "title": "Make every exit of a program that opened the app node pass through its shutdown"
   },
-  "shardHash": "3891e8c53d1832153b8422333c5102b6ee74cdd78240a948bdd2b79f95a3193b",
+  "shardHash": "3a1cc1aa39e01bf8de7e7654472d8a347192a8bdd334111c3ca5661756f39baa",
   "specVersion": "1.8.0"
 }
