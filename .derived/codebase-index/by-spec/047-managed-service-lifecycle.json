@@ -1,0 +1,135 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '047-managed-service-lifecycle' file unit 'crates/rahi-cli/src/service.rs' does not exist",
+        "path": "crates/rahi-cli/src/service.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '047-managed-service-lifecycle' file unit 'crates/rahi-cli/tests/services.rs' does not exist",
+        "path": "crates/rahi-cli/tests/services.rs"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "030-operational-verbs",
+      "035-denials-survive-shutdown",
+      "043-patched-dependency-adoption"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/rahi-cli/src/cell.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/serve.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/tests/stop_budget.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/stop.rs",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/service.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/services.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/cell.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/cell.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/serve.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/tests/stop_budget.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/stop_budget.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/stop.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/stop.rs"
+        }
+      }
+    ],
+    "specId": "047-managed-service-lifecycle",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "8b1bc59bf94f626e721bb8af9032c541a4e1566c6aa137807b341836fcd81a6b"
+}
