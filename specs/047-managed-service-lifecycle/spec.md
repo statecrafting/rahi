@@ -102,14 +102,17 @@ public `Metrics::registry()` surface after observability has initialized.
   All remaining services receive the same cancellation event. Later causes
   MAY add observations but MUST NOT replace the first process result.
 - **B-5 (ordered shutdown).** Cancellation starts concurrently with graceful
-  stream and connection draining. Once request handling has ended, Rahi MUST
-  join every managed service, then drain kernel denials, then begin application
-  store shutdown. No managed future or its owned child work may remain alive
-  when store shutdown begins.
+  stream and connection draining, and the B-6 bound runs concurrently with
+  both. Once request handling has ended, Rahi MUST finish joining every
+  managed service, then drain kernel denials, then begin application store
+  shutdown. Finishing the join awaits only handles that have completed or that
+  B-6 has already aborted; it never defers the B-6 abort. No managed future or
+  its owned child work may remain alive when store shutdown begins.
 - **B-6 (bounded join).** The service join bound MUST be ten seconds measured
   from the cancellation broadcast, not ten additional seconds after connection
-  draining. A service still running at the bound MUST be aborted and its join
-  handle MUST be awaited before store shutdown. The stop MUST be unconfirmed
+  draining. A service still running at the bound MUST be aborted at the
+  bound, whether or not request handling has ended, and its join handle MUST
+  be awaited before store shutdown. The stop MUST be unconfirmed
   and non-zero, naming every service that exceeded the bound. Because the bound
   overlaps the existing stream and connection drains and is no larger than
   their composed bound, `SERVE_GRACE` remains forty seconds and
