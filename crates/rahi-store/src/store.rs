@@ -100,9 +100,18 @@ fn sql_seconds(seconds: u64) -> Result<i64, Error> {
 }
 
 /// The running hiqlite node. Owns the lifecycle; hands out [`StoreHandle`]s.
+///
+/// Every way out of a program that opened the node must pass through
+/// [`Store::shutdown`], or hiqlite's unclean-stop marker stays on disk and
+/// the next open refuses (spec 048 B-1). [`Store::run`] is the scope that
+/// guarantees it; dropping a node-owning `Store` that was never shut down
+/// says so on stderr, and that is all a synchronous `Drop` can do.
 pub struct Store {
     handle: StoreHandle,
     cfg: StoreConfig,
+    /// Set by the first [`Store::shutdown`], whatever it answered: from
+    /// then on hiqlite's own task finishes the sequence (spec 043 B-9).
+    shut: std::sync::atomic::AtomicBool,
 }
 
 /// A cheap clone of the store's client, held by every other crate.
@@ -182,10 +191,15 @@ impl Store {
             let _ = handle.client.shutdown().await;
             return Err(refused);
         }
-        ensure_chassis_tables(&handle).await?;
+        // Spec 048 B-5: every failure after the node started stops it first.
+        if let Err(failed) = ensure_chassis_tables(&handle).await {
+            let _ = handle.client.shutdown().await;
+            return Err(failed);
+        }
         Ok(Self {
             handle,
             cfg: cfg.clone(),
+            shut: std::sync::atomic::AtomicBool::new(false),
         })
     }
 
@@ -264,6 +278,7 @@ impl Store {
         Ok(Self {
             handle,
             cfg: cfg.clone(),
+            shut: std::sync::atomic::AtomicBool::new(false),
         })
     }
 
@@ -296,7 +311,25 @@ impl Store {
         if self.is_attached() {
             return Ok(());
         }
+        self.shut.store(true, std::sync::atomic::Ordering::Relaxed);
         self.handle.client.shutdown().await.map_err(map)
+    }
+}
+
+impl Drop for Store {
+    /// The safety net of spec 048 B-6, and only that: shutting the node down
+    /// is async and a `Drop` is not, so a node-owning store dropped without
+    /// [`Store::shutdown`] is named on stderr and nothing else happens.
+    fn drop(&mut self) {
+        if !self.is_attached() && !self.shut.load(std::sync::atomic::Ordering::Relaxed) {
+            eprintln!(
+                "rahi-store: the store at {} was dropped without Store::shutdown; its node runs \
+                 until the process ends and then leaves hiqlite's unclean-stop marker, which \
+                 makes the next open refuse. Use Store::run, or shut the store down on every \
+                 path (spec 048)",
+                self.cfg.data_dir.display()
+            );
+        }
     }
 }
 

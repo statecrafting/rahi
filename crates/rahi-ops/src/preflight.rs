@@ -380,7 +380,12 @@ async fn open_store(
     let secrets = keys.store_secrets()?;
     let cfg = crate::store_config(config, env, secrets)?;
     let store = Store::open(&cfg).await?;
-    store.health().await?;
+    // Spec 048 B-5: a failure after the node started stops it first, or the
+    // check that reported it would leave the marker that fails the next.
+    if let Err(unhealthy) = store.health().await {
+        let _ = store.shutdown().await;
+        return Err(unhealthy);
+    }
     let role = if store.is_leader().await {
         "leader"
     } else {

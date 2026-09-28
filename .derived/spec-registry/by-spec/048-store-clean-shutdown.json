@@ -1,0 +1,170 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-09-27",
+    "dependsOn": [
+      "011-store-hiqlite",
+      "030-operational-verbs",
+      "031-single-container-packaging",
+      "043-patched-dependency-adoption"
+    ],
+    "domain": "store",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "crates/rahi-store/src/lifecycle.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-store/tests/lifecycle.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-cli/tests/clean_shutdown.rs"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "011-store-hiqlite",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/store.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "011-store-hiqlite",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "011-store-hiqlite",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/Cargo.toml"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/lib.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/preflight.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "039-release-and-out-of-tree-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "CHANGELOG.md"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 3
+    },
+    "id": "048-store-clean-shutdown",
+    "implementation": "complete",
+    "kind": "kernel",
+    "obligations": [
+      {
+        "anchor": "3-behavior",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "A program that opens the app node through Store::run shuts the node down before run returns or its panic resumes, whether the body returned Ok, returned Err, panicked, or was abandoned after a stop."
+      },
+      {
+        "anchor": "3-behavior",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "No rahi verb that opens the app node returns between the open and the shutdown, and every such verb has SIGTERM and SIGINT armed before the open."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "cargo test -p rahi-store --locked --lib lifecycle",
+          "cargo test -p rahi-store --locked --test lifecycle",
+          "cargo test -p rahi-cli --locked --test clean_shutdown"
+        ],
+        "kind": "verification",
+        "text": "Real processes that error, panic, receive SIGTERM or SIGINT, ignore a stop, and are signalled from their first instant each leave a directory the next process opens; controls without the pattern leave the marker."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/10-hiqlite-unclean-stop-upstream-issue.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/evidence/048-probes/README.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "CHANGELOG.md"
+        }
+      }
+    ],
+    "risk": "high",
+    "sectionDigests": {
+      "048-clean-shutdown-of-the-app-node": "079d12efb124ef3ffd87b0a15c136e6325de231d62c86ce19aaba98b2dfee8ff",
+      "1-purpose": "b5b29dff30378294e279ab38e7bd227d2cd7739b1e500ec2f048b3c5a5102e45",
+      "2-territory": "51a571d129c84bb08bfb36c9078e879e3137d308fcc45336f14d3e7dada5f2bb",
+      "3-behavior": "cd787fab394ecb65448942536b894a12798526a4ebc10ccf89f6f3387fb9961e",
+      "4-functional-requirements": "4079e5368ae681c9c0b5bdc04c1c0b62f07f7f0ba7985eced5660a7a3451ab28",
+      "5-acceptance-criteria": "366db194833f53afd9d73d6cb55a62f0dc8d06065314c98d5f5b66c5260fbb71",
+      "6-out-of-scope": "4c1da3f863592e7c6fbaed467d1803743d236dd2194e99479e75117a2d636d12",
+      "7-resolved-decisions": "39d442457f22862b4260d9303b736d9a101796d581d97d1c04c3c96ed6f4748e",
+      "verification": "62f1dd0245837777bc9d0d2556bf65edd6f55668da56d0dabd2ba5419a8ced34"
+    },
+    "sectionHeadings": [
+      "048: Clean shutdown of the app node",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/048-store-clean-shutdown/spec.md",
+    "status": "approved",
+    "summary": "hiqlite creates an unclean-stop marker, state_machine/lock, when a node starts and removes it only in a graceful shutdown; without the auto-heal feature the next start refuses until someone repairs the directory by hand. The travel-memory service hit this with a ? between Store::open and Store::shutdown and a Ctrl-C-only handler. This spec gives rahi-store one scope for the node's lifetime, Store::run, which arms SIGTERM and SIGINT before the node starts and shuts it down on every way out of the body; it closes the three paths in rahi's own verbs that returned with the node open and the signal window in serve's boot; it documents the single-voter recovery and verifies it; and it records why auto-heal stays off after a probe showed its rebuild complete.\n",
+    "title": "Make every exit of a program that opened the app node pass through its shutdown"
+  },
+  "shardHash": "3a1cc1aa39e01bf8de7e7654472d8a347192a8bdd334111c3ca5661756f39baa",
+  "specVersion": "1.8.0"
+}

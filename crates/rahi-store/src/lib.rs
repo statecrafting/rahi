@@ -28,6 +28,57 @@
 //! revision that makes notify a hint rather than a guarantee. The tables
 //! those primitives need are DDL like any other, applied by the `migrate`
 //! verb through [`coordination_migration`].
+//!
+//! # Opening and shutting down (spec 048)
+//!
+//! hiqlite writes an unclean-stop marker, `state_machine/lock`, when the node
+//! starts, and removes it only inside [`Store::shutdown`]. A process that ends
+//! any other way leaves it, and the next [`Store::open`] of that directory
+//! refuses with "did not stop cleanly" until an operator recovers it. Three
+//! things end a process without the shutdown: a `?` or early `return`
+//! between open and shutdown, a panic, and SIGTERM or SIGINT with no handler
+//! (a program that only listens for Ctrl-C still dies on SIGTERM, which is
+//! what every orchestrator sends).
+//!
+//! A program that owns a node therefore opens it through [`Store::run`]:
+//!
+//! ```no_run
+//! # async fn serve(
+//! #     store: rahi_store::StoreHandle,
+//! #     stop: impl std::future::Future<Output = ()>,
+//! # ) -> Result<(), rahi_types::Error> { Ok(()) }
+//! # async fn f(cfg: &rahi_store::StoreConfig) -> Result<(), rahi_types::Error> {
+//! rahi_store::Store::run(cfg, |store, stopping| async move {
+//!     store.migrate(&[]).await?;
+//!     // Drain on SIGTERM or SIGINT; the node is shut down afterwards.
+//!     serve(store, stopping.requested()).await
+//! })
+//! .await
+//! # }
+//! ```
+//!
+//! `run` arms SIGTERM and SIGINT before the node starts, hands the body a
+//! [`Stopping`] to watch, and shuts the node down when the body returns
+//! `Ok` or `Err`, when it panics (the panic resumes afterwards), and when a
+//! stop was requested and the body is still running [`STOP_GRACE`] later
+//! (the body is dropped, and the answer is an error [`is_stopped`]
+//! recognises). [`Store::run_until`] takes the caller's [`Stopping`] instead
+//! of the signals, and [`Store::close_after`] gives the same guarantee to a
+//! store the caller opened with [`Store::open`]. Arm [`stop_on_signal`] in the
+//! binary, not in a library: once armed, the process no longer terminates on
+//! either signal by default.
+//!
+//! Dropping a node-owning [`Store`] that was never shut down prints a warning
+//! on stderr; it cannot shut the node down, because shutting down is async.
+//!
+//! What no pattern covers is a process that cannot run its shutdown at all:
+//! SIGKILL (an orchestrator's grace ran out), an abort, power loss. For a
+//! single voter the recovery, with no process on the directory, is to move
+//! `state_machine/db` and `state_machine/lock` aside and start again: the
+//! node rebuilds its database from the latest snapshot and the Raft log
+//! (spec 048 B-8), or to restore a backup. hiqlite's `auto-heal` feature,
+//! which does the same automatically, is deliberately not enabled
+//! (spec 048 D-3).
 
 #![forbid(unsafe_code)]
 
@@ -36,6 +87,7 @@ pub mod blob;
 pub mod cache;
 pub mod config;
 mod error;
+pub mod lifecycle;
 pub mod lock;
 pub mod migrate;
 pub mod migration_set;
@@ -52,6 +104,7 @@ pub use backup::{BackupId, BackupListing};
 pub use blob::{Blob, DEFAULT_PAGE_ROWS, EXTENSIONS, EngineReport, MAX_VALUE_BYTES};
 pub use config::{EncKey, EncKeys, Peer, S3Backup, StoreConfig, StoreSecrets};
 pub use error::{is_recovering, is_terminal, is_timeout};
+pub use lifecycle::{STOP_GRACE, Stopping, is_stopped, stop_on_signal};
 
 /// How long `Store::shutdown` waits for hiqlite's shutdown sequence before
 /// it answers a timeout: hiqlite's own caller-side wait, which it does not

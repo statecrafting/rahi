@@ -1,9 +1,10 @@
 {
   "mapping": {
     "dependsOn": [
-      "020-edge-server",
-      "023-observability",
-      "025-api-tokens-and-resource-server"
+      "011-store-hiqlite",
+      "030-operational-verbs",
+      "031-single-container-packaging",
+      "043-patched-dependency-adoption"
     ],
     "implementingPaths": [
       {
@@ -11,39 +12,39 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-cli/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-cli/src/serve.rs",
         "source": "spec-edge"
       },
       {
-        "path": "crates/rahi-edge/Cargo.toml",
+        "path": "crates/rahi-cli/tests/clean_shutdown.rs",
         "source": "spec-edge"
       },
       {
-        "path": "crates/rahi-edge/src/error.rs",
+        "path": "crates/rahi-ops/src/preflight.rs",
         "source": "spec-edge"
       },
       {
-        "path": "crates/rahi-edge/src/lib.rs",
+        "path": "crates/rahi-store/Cargo.toml",
         "source": "spec-edge"
       },
       {
-        "path": "crates/rahi-edge/src/obs/metrics.rs",
+        "path": "crates/rahi-store/src/lib.rs",
         "source": "spec-edge"
       },
       {
-        "path": "crates/rahi-edge/src/router.rs",
+        "path": "crates/rahi-store/src/lifecycle.rs",
         "source": "spec-edge"
       },
       {
-        "path": "crates/rahi-edge/src/stream.rs",
+        "path": "crates/rahi-store/src/store.rs",
         "source": "spec-edge"
       },
       {
-        "path": "crates/rahi-edge/tests/stream.rs",
-        "source": "spec-edge"
-      },
-      {
-        "path": "crates/rahi-edge/tests/stream_gauge.rs",
+        "path": "crates/rahi-store/tests/lifecycle.rs",
         "source": "spec-edge"
       }
     ],
@@ -51,40 +52,40 @@
       {
         "locations": [
           {
-            "file": "crates/rahi-edge/src/stream.rs"
+            "file": "crates/rahi-cli/tests/clean_shutdown.rs"
           }
         ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
           "kind": "file",
-          "path": "crates/rahi-edge/src/stream.rs"
+          "path": "crates/rahi-cli/tests/clean_shutdown.rs"
         }
       },
       {
         "locations": [
           {
-            "file": "crates/rahi-edge/tests/stream.rs"
+            "file": "crates/rahi-store/src/lifecycle.rs"
           }
         ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
           "kind": "file",
-          "path": "crates/rahi-edge/tests/stream.rs"
+          "path": "crates/rahi-store/src/lifecycle.rs"
         }
       },
       {
         "locations": [
           {
-            "file": "crates/rahi-edge/tests/stream_gauge.rs"
+            "file": "crates/rahi-store/tests/lifecycle.rs"
           }
         ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
           "kind": "file",
-          "path": "crates/rahi-edge/tests/stream_gauge.rs"
+          "path": "crates/rahi-store/tests/lifecycle.rs"
         }
       },
       {
@@ -103,6 +104,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-cli/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-cli/src/serve.rs"
           }
         ],
@@ -116,72 +130,98 @@
       {
         "locations": [
           {
-            "file": "crates/rahi-edge/Cargo.toml"
+            "file": "crates/rahi-ops/src/preflight.rs"
           }
         ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
           "kind": "file",
-          "path": "crates/rahi-edge/Cargo.toml"
+          "path": "crates/rahi-ops/src/preflight.rs"
         }
       },
       {
         "locations": [
           {
-            "file": "crates/rahi-edge/src/error.rs"
+            "file": "crates/rahi-store/Cargo.toml"
           }
         ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
           "kind": "file",
-          "path": "crates/rahi-edge/src/error.rs"
+          "path": "crates/rahi-store/Cargo.toml"
         }
       },
       {
         "locations": [
           {
-            "file": "crates/rahi-edge/src/lib.rs"
+            "file": "crates/rahi-store/src/lib.rs"
           }
         ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
           "kind": "file",
-          "path": "crates/rahi-edge/src/lib.rs"
+          "path": "crates/rahi-store/src/lib.rs"
         }
       },
       {
         "locations": [
           {
-            "file": "crates/rahi-edge/src/obs/metrics.rs"
+            "file": "crates/rahi-store/src/store.rs"
           }
         ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
           "kind": "file",
-          "path": "crates/rahi-edge/src/obs/metrics.rs"
+          "path": "crates/rahi-store/src/store.rs"
         }
       },
       {
         "locations": [
           {
-            "file": "crates/rahi-edge/src/router.rs"
+            "file": "CHANGELOG.md"
           }
         ],
-        "ownership": true,
-        "sourceField": "extends",
+        "ownership": false,
+        "sourceField": "references",
         "unit": {
           "kind": "file",
-          "path": "crates/rahi-edge/src/router.rs"
+          "path": "CHANGELOG.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/10-hiqlite-unclean-stop-upstream-issue.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/10-hiqlite-unclean-stop-upstream-issue.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/evidence/048-probes/README.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/evidence/048-probes/README.md"
         }
       }
     ],
-    "specId": "026-streaming-responses",
+    "specId": "048-store-clean-shutdown",
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "4263f96cda5b53cafb87a4c6ddc5fbdad8c79eb0b9099ec4c8237b720c1bc892"
+  "shardHash": "bf3da6e698e1db09b1ed3683d69ef3d0bac78a2f7d7b94f4696787ad679b6551"
 }

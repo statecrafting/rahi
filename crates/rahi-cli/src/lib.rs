@@ -101,7 +101,13 @@ async fn dispatch<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<i32> {
             Ok(0)
         }
         Verb::FirstBoot { export: false } => first_boot::<C>(env).await.map(|()| 0),
-        Verb::UpgradeCache { backup } => upgrade_cache(backup, env).await.map(|()| 0),
+        Verb::UpgradeCache { backup } => {
+            // Spec 048 B-7: the transition opens the node for one `txn` at T3
+            // and is resumable at every step, so a stop is held until the
+            // verb ends rather than ending it with the node open.
+            let _held = rahi_store::stop_on_signal()?;
+            upgrade_cache(backup, env).await.map(|()| 0)
+        }
         other => verbs_030::<C>(other, env).await.map(|()| 0),
     }
 }
@@ -301,6 +307,18 @@ async fn supervise<C: Cell>(env: &dyn EnvReader) -> Result<i32> {
     Ok(exit.code)
 }
 
+/// Run a verb's `work` on its node (spec 048 B-7): a SIGTERM or SIGINT, armed
+/// in `stopping` before the node was opened, leaves `work` its grace and then
+/// abandons it, and the node is shut down on every way out.
+async fn on_node(
+    booted: &Booted,
+    stopping: &rahi_store::Stopping,
+    work: impl std::future::Future<Output = Result<()>>,
+) -> Result<()> {
+    let result = stopping.bounded(work).await;
+    stop_after(booted, result).await
+}
+
 /// Shut a verb's node and answer the verb's own result. A shutdown that did
 /// not confirm is said on stderr: the verb's work is done and committed, and
 /// B-10's outcome and exit status belong to the long-running entry points
@@ -322,6 +340,10 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
         | Verb::UpgradeCache { .. } => Ok(()),
         Verb::Serve => serve::serve::<C>(env).await,
         Verb::Preflight => {
+            // Spec 048 B-7: preflight holds the node for a bounded set of
+            // checks, so a stop is held until it has shut the node down and
+            // the process ends right after, rather than ending it mid-check.
+            let _held = rahi_store::stop_on_signal()?;
             let report = rahi_ops::preflight::run(env, C::manifest()).await;
             println!("{report}");
             if report.passed() {
@@ -335,24 +357,31 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
             adopt_manifest,
             plan,
         } => {
+            let stopping = rahi_store::stop_on_signal()?;
             let booted = Booted::open_or_attach::<C>(env).await?;
-            let result = if plan {
-                rahi_ops::migrate::plan_sets(&booted.store, C::migrations(), &C::migration_sets())
+            let work = async {
+                if plan {
+                    rahi_ops::migrate::plan_sets(
+                        &booted.store,
+                        C::migrations(),
+                        &C::migration_sets(),
+                    )
                     .await
                     .map(|steps| println!("{}", rahi_ops::migrate::render_plan(&steps)))
-            } else {
-                migrate::<C>(&booted, backup, adopt_manifest, env).await
+                } else {
+                    migrate::<C>(&booted, backup, adopt_manifest, env).await
+                }
             };
-            stop_after(&booted, result).await
+            on_node(&booted, &stopping, work).await
         }
         Verb::Backup { to } => {
+            // Spec 048 B-5: everything that can refuse is read before the
+            // node opens; a `?` after it would end the verb with the node up.
+            let to = to.as_deref().map(Destination::parse).transpose()?;
+            let stopping = rahi_store::stop_on_signal()?;
             let booted = Booted::open_or_attach::<C>(env).await?;
-            let to = match to {
-                Some(raw) => Destination::parse(&raw)?,
-                None => Destination::default_for(&booted.config),
-            };
-            let result = backup(&booted, &to, env).await;
-            stop_after(&booted, result).await
+            let to = to.unwrap_or_else(|| Destination::default_for(&booted.config));
+            on_node(&booted, &stopping, backup(&booted, &to, env)).await
         }
         Verb::Restore {
             archive,
@@ -407,18 +436,19 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
             Ok(())
         }
         Verb::LedgerVerify { full } => {
+            let stopping = rahi_store::stop_on_signal()?;
             let booted = Booted::open::<C>(env).await?;
-            let result = ledger_verify(&booted, full, env).await;
-            stop_after(&booted, result).await
+            on_node(&booted, &stopping, ledger_verify(&booted, full, env)).await
         }
         Verb::LedgerReindex { archive } => {
+            let stopping = rahi_store::stop_on_signal()?;
             let booted = Booted::open::<C>(env).await?;
-            let result = ledger_reindex(&booted, &archive).await;
-            stop_after(&booted, result).await
+            on_node(&booted, &stopping, ledger_reindex(&booted, &archive)).await
         }
         Verb::LedgerExport { path } => {
+            let stopping = rahi_store::stop_on_signal()?;
             let booted = Booted::open::<C>(env).await?;
-            let result = async {
+            let work = async {
                 // Spec 042 B-10 and B-15: export works on an uncovered
                 // chain, because an operator diagnosing that state needs it
                 // most, and it prints the uncovered count so no reader
@@ -452,9 +482,8 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
                     coverage.unstamped_resident()
                 );
                 Ok(())
-            }
-            .await;
-            stop_after(&booted, result).await
+            };
+            on_node(&booted, &stopping, work).await
         }
     }
 }
