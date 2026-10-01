@@ -1,113 +1,258 @@
 #!/usr/bin/env bash
-# The organization's authored-content rules (U+2014, session links).
+# Spec: specs/001-agentic-harness/spec.md
 #
-# The two rules, made mechanical.
+# Repository-wide authored-content and commit-identity rules.
 #
-#   1. No authored file contains U+2014 (EM DASH).
-#   2. No authored file carries an agent-session URL or a session-tracking
-#      trailer.
+#   (no argument)        authored tree, plus BASE_SHA..HEAD identities when set
+#   --text FILE...       pull request text or a commit message
+#   --range BASE HEAD    authored files changed by a candidate range
+#   --identity BASE HEAD author and committer identities in a candidate range
+#   --self-test          offline acceptance samples
 #
-# Scope is git-tracked files plus staged additions, minus the compiler-owned
-# derived tree and minus this script for rule 2 (it necessarily contains the
-# patterns it searches for). Findings are reported per rule, so one does not
-# mask the other, and every finding names its file and line.
-#
-# `--text FILE...` applies the same two rules to text that is not a tracked
-# file: a pull request's title and body, or a commit message, which become
-# history under merge commits (AGENTS.md, "How a pull request is merged"). No
-# file is exempt in that mode.
-#
-# Exit 0 clean, 1 findings, 3 usage/environment.
+# Exit 0 clean, 1 finding, 2 refused, 3 usage, 4 failed.
 
+if [ -z "${BASH_VERSION:-}" ]; then
+  echo "check-authored-content.sh requires bash" >&2
+  exit 3
+fi
 set -uo pipefail
 
-SELF="scripts/check-authored-content.sh"
 status=0
 mode=tree
-if [ "${1:-}" = "--text" ]; then
-  mode=text
-  shift
-  [ "$#" -gt 0 ] || { echo "check-authored-content: --text needs at least one file" >&2; exit 3; }
-  SELF=""
-else
-  cd "$(git rev-parse --show-toplevel 2>/dev/null)" || {
-    echo "check-authored-content: not inside a git work tree" >&2
-    exit 3
-  }
-fi
-
-# Bash 3.2 is the floor (macOS system bash). Refuse anything older loudly rather
-# than reporting a clean tree we never actually read.
-if [ "${BASH_VERSINFO[0]:-0}" -lt 3 ]; then
-  echo "check-authored-content: needs bash 3.2 or newer, found ${BASH_VERSION:-unknown}" >&2
-  exit 3
-fi
-
-# Text files under version control. -z plus a NUL read keeps paths with spaces
-# intact; the derived tree is compiler output and is not authored.
-#
-# Built with a read loop rather than `mapfile -d ''`, which needs bash 4.4.
-# macOS ships /bin/bash 3.2, so a contributor whose PATH resolves to it would
-# otherwise get an empty file list and a vacuous pass. This form runs on 3.2.
+identity_base=""
+identity_head=""
 files=()
-if [ "$mode" = text ]; then
-  for f in "$@"; do
-    [ -f "$f" ] || { echo "check-authored-content: no such file: $f" >&2; exit 3; }
-    files+=("$f")
-  done
-else
-  while IFS= read -r -d '' f; do
-    case "$f" in
-      .statecraft/derived/*|*.png|*.jpg|*.jpeg|*.gif|*.ico|*.pdf|*.node) continue ;;
-    esac
-    [ -f "$f" ] || continue
-    files+=("$f")
-  done < <(git ls-files -z --cached --others --exclude-standard)
-fi
 
-if [ "${#files[@]}" -eq 0 ]; then
-  echo "check-authored-content: no authored files found" >&2
+usage() {
+  echo "usage: check-authored-content.sh [--text FILE...] [--range BASE HEAD] [--identity BASE HEAD] [--self-test]" >&2
   exit 3
+}
+
+in_repo() {
+  root=$(git rev-parse --show-toplevel 2>/dev/null) || {
+    echo "check-authored-content: not inside a git work tree" >&2
+    exit 2
+  }
+  cd "$root" || exit 4
+}
+
+agent_identities='noreply@anthropic.com
+81847+claude@users.noreply.github.com
+claude@users.noreply.github.com'
+
+attribution_patterns='https://codex[.]ai/code/session_[0-9a-z_]{8}
+claude[.]ai/(chat|code)/[0-9a-f]{8}-
+claude[.]ai/code/(session_|project/)[0-9a-z_]{8}
+chatgpt[.]com/codex/tasks/task_[0-9a-z_]{8}
+^[[:space:]]*co-authored-by[:].*[@.](anthropic|openai)[.]com
+^[[:space:]]*co-authored-by[:].*([+])?(claude|copilot|gemini-code-assist[[]bot[]]|chatgpt-codex-connector[[]bot[]])@users[.]noreply[.]github[.]com
+generated (with|by) [[]?(claude code|codex)
+ccr-projects[-]attribution
+^[[:space:]]*(agent-)?session-(id|url)[:][[:space:]]*[^[:space:]]{8}'
+
+if [ "${1:-}" = "--self-test" ]; then
+  [ "$#" -eq 1 ] || usage
+  me=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/rahi-authored.XXXXXX") || exit 4
+  trap 'rm -rf "$tmp"' EXIT
+  failed=0
+  unset BASE_SHA
+  expect() {
+    want=$1
+    shift
+    "$me" "$@" >/dev/null 2>&1
+    got=$?
+    if [ "$got" -ne "$want" ]; then
+      echo "self-test: expected exit $want, got $got: $*" >&2
+      failed=1
+      return 1
+    fi
+    return 0
+  }
+  n=0
+  while IFS='|' read -r want a b; do
+    [ -n "$want" ] || continue
+    n=$((n + 1))
+    printf '%s%s\n' "$a" "$b" > "$tmp/sample-$n.txt"
+    expect "$want" --text "$tmp/sample-$n.txt"
+  done <<'SAMPLES'
+1|HTTPS://CODEX.AI/|CODE/SESSION_example1
+1|see https://claude.ai/|chat/0123abcd-4567-89ef-0123-456789abcdef
+1|see https://claude.ai/|code/0123abcd-4567-89ef-0123-456789abcdef
+1|see https://claude.ai/|code/session_01AbCdEfGhIjKlMn
+1|see https://claude.ai/|code/project/chan_018okA7v3QYsUu
+1|see https://chatgpt.com/|codex/tasks/task_e_68d4c0ffee01
+1|Co-Authored|-By: Claude <noreply@anthropic.com>
+1|Co-authored|-by: Some Bot <bot@openai.com>
+1|Co-authored|-by: Copilot <198982749+Copilot@users.noreply.github.com>
+1|Co-authored|-by: Gemini <176961590+gemini-code-assist[bot]@users.noreply.github.com>
+1|Co-authored|-by: Codex <199175422+chatgpt-codex-connector[bot]@users.noreply.github.com>
+1|Generated with [Clau|de Code](https://example.invalid)
+1|_Generated by Co|dex_
+1|<!-- ccr-projects|-attribution: {"github_login":"someone"} -->
+1|Session|-Id: 0123456789abcdef
+1|Agent-Session|-URL: https://example.invalid/s/0123456789
+0|Session-Id: short|
+0|claude.ai/code is the product page|
+0|https://codex.ai/code/session_|
+0|Co-authored-by: A Person <person@example.com>|
+0|Co-authored-by: Claude Dupont <claude.dupont@example.com>|
+0|a plain sentence|
+SAMPLES
+  printf '\342\200\224\n' > "$tmp/forbidden-dash.txt"
+  expect 1 --text "$tmp/forbidden-dash.txt"
+  expect 3 --text
+  expect 3 --unknown
+  expect 3 --identity HEAD
+  expect 0 --text "$me"
+  mkdir "$tmp/range repo" || exit 4
+  (
+    cd "$tmp/range repo" || exit 4
+    git init -q
+    git config user.email self-test@example.invalid
+    git config user.name self-test
+    git config commit.gpgsign false
+    printf '%s\n' clean > clean.txt
+    git add clean.txt
+    git commit -qm base
+    base=$(git rev-parse HEAD)
+    expect 0 --range HEAD HEAD || exit 1
+    expect 0 --identity HEAD HEAD || exit 1
+    printf '%s\n' human > human.txt
+    git add human.txt
+    GIT_AUTHOR_NAME=Claude GIT_COMMITTER_NAME=Claude git commit -qm human
+    expect 0 --identity "$base" HEAD || exit 1
+    export BASE_SHA=$base
+    expect 0 || exit 1
+    unset BASE_SHA
+    human=$(git rev-parse HEAD)
+    printf '%s\n' agent > agent.txt
+    git add agent.txt
+    GIT_AUTHOR_EMAIL=NoReply@Anthropic.com git commit -qm agent
+    expect 1 --identity "$base" HEAD || exit 1
+    export BASE_SHA=$base
+    expect 1 || exit 1
+    unset BASE_SHA
+    git reset -q --hard "$human"
+    printf '%s\n' agent > agent.txt
+    git add agent.txt
+    GIT_COMMITTER_EMAIL=81847+claude@users.noreply.github.com git commit -qm agent
+    expect 1 --identity "$base" HEAD || exit 1
+    export BASE_SHA=0000000000000000000000000000000000000000
+    expect 0 || exit 1
+    export BASE_SHA=not-a-commit
+    expect 2 || exit 1
+  ) || failed=1
+  [ "$failed" -eq 0 ] || exit 1
+  echo "check-authored-content: self-test passed ($n text samples)"
+  exit 0
 fi
 
-# --- Rule 1: U+2014 ---------------------------------------------------------
-# The byte sequence is built rather than written, so this file does not trip
-# its own check and a reader can see exactly which codepoint is refused.
-emdash=$(printf '\xe2\x80\x94')
-em_hits=$(grep -n -F -- "$emdash" "${files[@]}" 2>/dev/null)
-if [ -n "$em_hits" ]; then
-  echo "U+2014 (EM DASH) is refused by the organization's authored-content rules (U+2014, session links):"
-  printf '%s\n' "$em_hits" | sed 's/^/  /'
-  echo "  Use a colon, semicolon, comma, parentheses, or two sentences."
-  status=1
-fi
+case "${1:-}" in
+  "")
+    in_repo
+    while IFS= read -r -d '' file; do
+      case "$file" in
+        .derived/*|.statecraft/derived/*|*.png|*.jpg|*.jpeg|*.gif|*.ico|*.pdf|*.node) continue ;;
+      esac
+      [ -f "$file" ] && files+=("$file")
+    done < <(git ls-files -z --cached --others --exclude-standard) || exit 4
+    case "${BASE_SHA:-}" in
+      "" | 0000000000000000000000000000000000000000) ;;
+      *)
+        git rev-parse --verify -q "${BASE_SHA}^{commit}" >/dev/null 2>&1 || {
+          echo "check-authored-content: BASE_SHA does not name a commit: $BASE_SHA" >&2
+          exit 2
+        }
+        identity_base=$BASE_SHA
+        identity_head=HEAD
+        ;;
+    esac
+    ;;
+  --text)
+    mode=text
+    shift
+    [ "$#" -gt 0 ] || usage
+    for file in "$@"; do
+      [ -f "$file" ] || { echo "check-authored-content: no such file: $file" >&2; exit 3; }
+      files+=("$file")
+    done
+    ;;
+  --range | --identity)
+    [ "$#" -eq 3 ] || usage
+    in_repo
+    git rev-parse --verify "${2}^{commit}" >/dev/null 2>&1 \
+      && git rev-parse --verify "${3}^{commit}" >/dev/null 2>&1 || {
+        echo "check-authored-content: the ${1#--} endpoints must name commits" >&2
+        exit 3
+      }
+    if [ "$1" = --identity ]; then
+      mode=identity
+      identity_base=$2
+      identity_head=$3
+    else
+      mode=range
+      while IFS= read -r -d '' file; do
+        case "$file" in
+          .derived/*|.statecraft/derived/*|*.png|*.jpg|*.jpeg|*.gif|*.ico|*.pdf|*.node) continue ;;
+        esac
+        [ -f "$file" ] && files+=("$file")
+      done < <(git diff --name-only -z "$2...$3" --) || exit 4
+    fi
+    ;;
+  *) usage ;;
+esac
 
-# --- Rule 2: agent-session URLs and session-tracking trailers ---------------
-scan=()
-for f in "${files[@]}"; do
-  [ "$f" = "$SELF" ] || scan+=("$f")
-done
-
-# One pattern per line, extended regex. Each is a link or trailer that ties
-# repository content to an agent session; spec 001 section 3.6.2 refuses all of
-# them, and refuses substituting another tracking link.
-patterns='claude\.ai/(chat|code)/[0-9a-f-]{8}
-Co-[Aa]uthored-[Bb]y:.*(Claude|Codex|Copilot|Gemini|noreply@anthropic)
-Generated with \[?(Claude Code|Codex)
-(Session|Agent-Session|Run)-(Id|URL): *[0-9a-zA-Z_-]{8}
-https?://[a-z0-9.-]*(anthropic|openai)\.com/[a-z/]*session'
-
-if [ "${#scan[@]}" -gt 0 ]; then
-  link_hits=$(printf '%s\n' "$patterns" | grep -v '^$' \
-    | while IFS= read -r p; do grep -n -E -- "$p" "${scan[@]}" 2>/dev/null; done)
-  if [ -n "$link_hits" ]; then
-    echo "agent-session links and session trailers are refused by the organization's authored-content rules (U+2014, session links):"
-    printf '%s\n' "$link_hits" | sed 's/^/  /'
+dash=$(printf '\342\200\224')
+hits="${TMPDIR:-/tmp}/rahi-authored-hits.$$"
+: > "$hits" 2>/dev/null || { echo "check-authored-content: could not create findings file" >&2; exit 4; }
+trap 'rm -f "$hits"' EXIT
+for ((i = 0; i < ${#files[@]}; i++)); do
+  file=${files[$i]}
+  LC_ALL=C grep -nI -F -- "$dash" "$file" | tee "$hits" >/dev/null
+  scan_status=("${PIPESTATUS[@]}")
+  if [ "${scan_status[1]}" -ne 0 ] || [ "${scan_status[0]}" -gt 1 ]; then exit 4; fi
+  if [ "${scan_status[0]}" -eq 0 ]; then
+    echo "U+2014 is refused in $file:"
+    sed 's/^/  /' "$hits"
     status=1
   fi
+  : > "$hits" || exit 4
+  while IFS= read -r pattern; do
+    [ -n "$pattern" ] || continue
+    LC_ALL=C grep -niI -E -- "$pattern" "$file" | tee -a "$hits" >/dev/null
+    scan_status=("${PIPESTATUS[@]}")
+    if [ "${scan_status[1]}" -ne 0 ] || [ "${scan_status[0]}" -gt 1 ]; then exit 4; fi
+  done <<< "$attribution_patterns"
+  if [ -s "$hits" ]; then
+    echo "agent-session links and agent attribution are refused in $file:"
+    sort -t: -k1,1n -u "$hits" | sed 's/^/  /'
+    status=1
+  fi
+done
+
+commits=0
+if [ -n "$identity_base" ]; then
+  log=$(git log --format='%h%x09%ae%x09%ce' "$identity_base..$identity_head" --) || exit 4
+  while IFS=$'\t' read -r short author committer; do
+    [ -n "$short" ] || continue
+    commits=$((commits + 1))
+    for role in author committer; do
+      if [ "$role" = author ]; then addr=$author; else addr=$committer; fi
+      lower=$(printf '%s' "$addr" | tr '[:upper:]' '[:lower:]')
+      if printf '%s\n' "$agent_identities" | grep -qxF -- "$lower"; then
+        echo "commit $short has an agent $role identity <$addr>; promote the work into commits under your own identity"
+        status=1
+      fi
+    done
+  done <<< "$log"
 fi
 
 if [ "$status" -eq 0 ]; then
-  echo "check-authored-content: ${#files[@]} authored $([ "$mode" = text ] && echo text || echo file)(s) clean (U+2014, session links)"
+  if [ "$mode" = identity ]; then
+    echo "check-authored-content: $commits commit identit(ies) clean ($identity_base..$identity_head)"
+  else
+    echo "check-authored-content: ${#files[@]} authored file(s) clean ($mode)${identity_base:+, $commits commit identit(ies) clean}"
+  fi
 fi
 exit "$status"

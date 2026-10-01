@@ -65,6 +65,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "scripts/check-authored-content.sh",
+        "source": "spec-edge"
+      },
+      {
         "path": "scripts/spec-dag.sh",
         "source": "spec-edge"
       },
@@ -280,6 +284,19 @@
       {
         "locations": [
           {
+            "file": "scripts/check-authored-content.sh"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/check-authored-content.sh"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "scripts/spec-dag.sh"
           }
         ],
@@ -334,5 +351,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "70f40030a7dec5e30f51dd81be4e8c3b1731a5f31f9ab9060691fc881981de9f"
+  "shardHash": "50763cc502e3f0d36504bdfebd932471ba528b77e030aa5f2297316212d25fc1"
 }

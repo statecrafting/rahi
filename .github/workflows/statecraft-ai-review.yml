@@ -1,5 +1,5 @@
-# Rendered by Statecraft from profile github-actions-rust revision 9
-# (identity 426b82624c84e14172e96d82ed0e03ac4cfc7a925529f593a51fc182aa1a453f). A managed file and a member of this
+# Rendered by Statecraft from profile github-actions-rust revision 12
+# (identity 62a6bc6010e0b6677c4df517373a44adb97c7c8cdf8d6fbd7b58d6cbe596f083). A managed file and a member of this
 # repository's authority set. Called by statecraft-ci.yml only; it declares
 # the two credentials it may use by name (revision 8: the API key when set,
 # else the OAuth token) and is never given `secrets: inherit`.
@@ -55,13 +55,22 @@ jobs:
           HEAD_REF: ${{ github.head_ref }}
           ACTOR: ${{ github.actor }}
           IS_DRAFT: ${{ github.event.pull_request.draft }}
-          DIFF_CAP: '2000'
+          DIFF_CAP: '20000'
+          CONTEXT_TOKENS: '200000'
+          MAX_CALLS: '4'
+          DELETION_CAP: '20000'
           EXCLUDE: '.statecraft/derived'
           RELEASE_PATTERN: 'release/*'
           CLAUDE_CLI_VERSION: '2.1.116'
-          PROFILE_IDENTITY: '426b82624c84e14172e96d82ed0e03ac4cfc7a925529f593a51fc182aa1a453f'
+          PROFILE_IDENTITY: '62a6bc6010e0b6677c4df517373a44adb97c7c8cdf8d6fbd7b58d6cbe596f083'
         run: |
           script="${RUNNER_TEMP}/statecraft-ai-review.sh"
+          # Revision 12: only a readable base without the script is the
+          # adoption; an unreadable base stops before the candidate is read.
+          if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            echo "cannot read the base commit ${BASE_SHA}; ai-review.sh is never taken from the candidate in its place" >&2
+            exit 2
+          fi
           if git show "${BASE_SHA}:scripts/statecraft/ai-review.sh" > "$script" 2>/dev/null; then
             echo "ai-review.sh: read at the base ${BASE_SHA}"
           else
