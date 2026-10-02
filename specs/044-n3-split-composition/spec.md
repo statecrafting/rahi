@@ -289,6 +289,27 @@ Still open before approval:
   a separate workload holds for N=1 and must be amended by a Statecraft spec
   adopting D-14; this spec does not do it and does not depend on it.
 
+### Bootstrap blocker disposition (2026-10-02)
+
+The historical conflict and open-question list above describe the
+2026-09-23 state. The owner's explicit bootstrap act approved the
+instrument at commit `9bbe773f52b004cea882226760f92a76148aee08`, blob
+`5e010c1effabbb78cdc2cbba270c6a7c0e597893`. Its application replaces spec
+000's named anchor and aligns Constitution VI together. That disposes of
+the bootstrap-tier prohibition on split N=3, subject to the approved
+re-verification before reliance. The approval and application evidence are
+recorded in spec 000's Amendments received and
+`docs/design/08-owner-instrument-one-deployment-unit.md`.
+
+This spec remains `draft` and `pending`. P-1 through P-4 and the coherent
+export disposition remain open; no implementation choice or operator
+qualification is approved here. The anchor requires one public origin and
+an encrypted internal identity Service restricted to the app's pods. Any
+remaining alternative must satisfy it; a mesh requiring sidecars is
+excluded by the approved anchor. The obligations of 040, 041, 042 and
+032 AC-2 remain owed. Neither this disposition nor passing N=1 checks
+establishes N=3 support.
+
 ## Verification
 
 These commands are the acceptance gate for a future implementation of this

@@ -16,16 +16,17 @@
     },
     "risk": "critical",
     "sectionDigests": {
-      "000-bootstrap-spec-system-for-rahi": "795cffdb755b3d659fadf03e6815bad66e4752b0bb9e6fe9749bf3293931e17d",
+      "000-bootstrap-spec-system-for-rahi": "e1e2a8084e2ad1d9d7393ecd350f52e6222338ee6451f13e547607acba5dc595",
       "1-the-authoring-derived-boundary": "17aedcd6f358873333e4ebc721dc1c5842eb340d2d3754bfe168f483f11d5573",
       "2-identity-directory-name-equals-id": "02db7d365d28610ca4bb6b84ecaf8273529161048011fa752af7742704f0fb12",
       "3-the-typed-authority-graph": "c7cc9696d4aac6f2bc3aa0887d1796543698bff49f81a78c8e125a97abaa126a",
       "4-determinism": "8cb7a9a0fc53914b522a28a54518fd8741ac8f1ffd1c8e2636d92a9cc6434500",
       "5-the-refusal-rule": "fa17fdfc280f0345df738b8695a574e34324969a08180215a1f9ffb011f43aba",
-      "6-the-frozen-chassis-invariants": "9a9096a97f0c87ab99372c7b61321b5e35d02fc30f0fb2aaab712228635e6617",
+      "6-the-frozen-chassis-invariants": "b0cb7e9134d478e790b07303d8c51b699e66a9671e47e9be9c8c39de3dc818cc",
       "7-corpus-conventions": "a404b31947b5d11c9944d51dbe0b92ec2c39d5f1958ddbd3cd64cd152469dbe6",
       "8-lifecycle-as-scheduling": "3703fd4454cd599d7416badc2a82d63cae55e9ab938ed81ecc0d72aa01c9dce9",
-      "9-bootstrap-order": "8279db2d7b17667552b81566c70199c52c7bc3975c81ac461932b5e41ce420b6"
+      "9-bootstrap-order": "aa4a483c60f3802246db49c91a41f01d5222056858aced2b44ff7e70af20ac10",
+      "amendments-received": "8b433fd0d5f738ccb02cbfecb593127221d08d84af793fcfac7eea2e333a4718"
     },
     "sectionHeadings": [
       "000: Bootstrap spec system for rahi",
@@ -37,7 +38,8 @@
       "6. The frozen chassis invariants",
       "7. Corpus conventions",
       "8. Lifecycle as scheduling",
-      "9. Bootstrap order"
+      "9. Bootstrap order",
+      "Amendments received"
     ],
     "specPath": "specs/000-rahi-bootstrap/spec.md",
     "status": "approved",
@@ -59,6 +61,6 @@
       "layer-direction"
     ]
   },
-  "shardHash": "97b6401e6a1110f8491fb5e8d268a45350cec2d873915380841f481e50fabd00",
+  "shardHash": "c5e95444b8bfedbd3b1fb2b92045b48147bda4f797fa473f377914e4257521ba",
   "specVersion": "1.9.0"
 }

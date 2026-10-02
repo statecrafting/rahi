@@ -115,9 +115,16 @@ tier 1, so that no ordinary spec and no amendment to the constitution can
 weaken them. Each is stated in full in the constitution; the anchor is the
 freeze.
 
-- A governed cell is one container, one volume, one public origin; rauthy
-  is inside it and reached only through the app's origin. *(anchor:
-  `one-deployment-unit`)*
+- A governed cell has one public origin, rauthy is reached by users only
+  through the app's origin, and the app's store and rauthy's store are
+  never shared. At N=1 the cell is one container and one volume with
+  rauthy inside it. At N=3 the cell is one of exactly two layouts: three
+  replicas of the N=1 unit, one container and one volume per pod; or, in
+  one namespace, the app's pods and rauthy's pods as separate workloads,
+  each pod with its own volume, the app reaching rauthy only through one
+  internal Service that is encrypted and admits only the app's pods. No
+  sidecar arrangement, shared volume, or other topology is a governed
+  cell. *(anchor: `one-deployment-unit`)*
 - rauthy's `sub` is the only principal identifier; no local account row;
   session validity, rotation, and revocation are the IdP's. *(anchor:
   `idp-authority`)*
@@ -182,3 +189,44 @@ freeze.
 3. Spec 010 creates the Cargo workspace and the first crate. From then on
    each driven session implements exactly one spec's territory, and the
    corpus governs the code it produced.
+
+## Amendments received
+
+- **2026-10-02, owner act at the bootstrap tier (re-founding of
+  `one-deployment-unit`).** Provenance: hiqlite owner decision D-14
+  (2026-09-23, the N=3 cell as two StatefulSets); rahi spec 044 (draft);
+  `docs/design/08-owner-instrument-one-deployment-unit.md`. Section 6's
+  `one-deployment-unit` bullet is replaced by the text now in section 6.
+  The anchor keeps its name and stays in `unamendable`. This entry is the
+  owner's act and the only instrument by which the anchor changed; it is
+  not a precedent that an ordinary spec, a session or an agent may change
+  an anchor. Constitution VI is aligned in the same change. The owner's
+  approval message identifies the instrument's commit and blob. Every
+  affected spec is re-verified under section 4 before it is next relied
+  on; the evidence record identifies the normative commit and per-spec
+  outcomes. Pending outcomes remain explicit blockers.
+
+  **Approval provenance (2026-10-02).** The owner explicitly approved PR
+  #99's instrument at commit
+  `9bbe773f52b004cea882226760f92a76148aee08`, document blob
+  `5e010c1effabbb78cdc2cbba270c6a7c0e597893`. The actual approval states:
+
+  > On 2026-10-02, I approved PR #99's owner instrument at commit
+  > 9bbe773f52b004cea882226760f92a76148aee08,
+  > document blob 5e010c1effabbb78cdc2cbba270c6a7c0e597893,
+  > for docs/design/08-owner-instrument-one-deployment-unit.md.
+  >
+  > Apply sections 2.1, 2.2, and 2.3, and execute section 4's bounded
+  > re-verification. This is my bootstrap owner act. It permits both
+  > co-located and split N=3 layouts while preserving N=1, one public
+  > origin, store separation, and encrypted restricted internal identity
+  > transport. It does not approve spec 044 or claim N=3 support. Record
+  > this approval accurately in the application PR and amendment
+  > provenance. No further approval of these exact terms is needed.
+  > Material changes to the approved terms require a new owner decision.
+
+  The appended application evidence record in
+  `docs/design/08-owner-instrument-one-deployment-unit.md` identifies the
+  frozen normative commit and per-spec outcomes. Until that record supplies
+  passing evidence and applicable operator acceptance, affected completed
+  specs remain blocked from reliance under section 7's amendment rule.
