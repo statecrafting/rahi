@@ -30,6 +30,7 @@ establishes:
   - "CODEOWNERS"
   - ".gitattributes"
   - ".githooks/"
+  - "scripts/check-authored-content.sh"
   - "scripts/spec-dag.sh"
 summary: >
   The governed-development loop every human and every driven session runs
@@ -930,6 +931,42 @@ left both the tracked diff and untracked content byte-identical. The render's
 local governance gate then passed with all 18 unresolved claims reported as
 warnings.
 
+D-19 (2026-09-30, owner instruction; CI profile revision 12 and
+authored-content identity refusal). Match the current Statecraft CI
+contract used by statecraft-cli while retaining Rahi's two declared extra
+required jobs and its intentional `governance.fail_on_unresolved = false`.
+Render `github-actions-rust` revision 12 from statecraft-cli commit
+`5ebae5c9158673e5dd4da8e39eb4645412292d68`. Keep
+`governance.require_ratified` at its default `true`: implementation paths
+owned by a draft spec are refused, and ratification is a separate owner flow
+whose `draft` to `approved` pull request needs the
+`statecraft-review-exception` Environment approval.
+
+The upstream two-path automation is not yet part of that shipped floor.
+Spec-spine spec 168 defines `Ratify, then build` and `Ratify at merge`, but is
+still `status: draft` and `implementation: pending` at spec-spine commit
+`113048e4`. Rahi records that dependency and does not claim that revision 12
+implements it. Until its producer ships the contract, Rahi uses the deployed
+ratification pull-request flow above.
+
+The declared authored-content checker is now explicit territory of this
+spec. It refuses agent-session attribution in authored files and text, and it
+also checks every commit in the candidate range for the agent author and
+committer addresses named by statecraft-cli spec 028. A human whose display
+name happens to match an agent remains allowed because identity is judged by
+address. The checker keeps Rahi's existing Unicode and session-link rules,
+uses the Statecraft exit family, and carries an offline self-test.
+`.claude/settings.json` also suppresses commit, pull-request, and session URL
+attribution before authored content is generated.
+
+This profile adoption deliberately retains the exact spec-spine 0.26.0 pin.
+The revision-9 base gate links its selected binary into each temporary commit
+worktree. Spec-spine 0.28.0 refuses that out-of-tree link under its containment
+contract, so combining the profile and engine upgrades creates a branch the
+base gate cannot judge. Revision 12 copies the binary into each temporary
+worktree. After this authority change merges, a separate pull request may move
+the exact pin to 0.28.0 while being judged by the corrected base gate.
+
 ## Verification
 
 ```verify:cli
@@ -992,10 +1029,17 @@ sh -c '! grep -qE "git (-C [^ ]+ )?add" .githooks/pre-commit'
 # B-10 / D-13: the flag is local-only. CI's coupling verdict must not depend
 # on the state of a runner's working tree (spec-spine spec 102 3.4).
 sh -c '! grep -rq -- "--include-uncommitted" .github/workflows/'
-# D-16 (replacing D-15's line): the pin is 0.26.0 wherever the pin is stated,
-# and spec-spine.toml states it exactly rather than as a floor.
+# D-19 retains D-16's 0.26.0 pin for the profile-only bridge. A later change
+# may move it after revision 12 is the base gate.
 sh -c 'test "$(sed -n "s/^SPEC_SPINE_VERSION ?= //p" Makefile)" = 0.26.0'
 grep -qx 'required_version = "=0.26.0"' spec-spine.toml
+# D-19: profile revision 12 and its ratification and attribution controls.
+grep -q 'statecraft-setup:github-actions-rust@12' .statecraft/environment.json
+grep -q '"require_ratified": true' .statecraft/setup/github-actions-rust.json
+python3 -c 'import json; a = json.load(open(".claude/settings.json"))["attribution"]; assert a == {"commit": "", "pr": "", "sessionUrl": False}, a'
+grep -q -- '--identity BASE HEAD' scripts/check-authored-content.sh
+grep -q 'identity_base=$BASE_SHA' scripts/check-authored-content.sh
+scripts/check-authored-content.sh --self-test
 # D-15 / B-5: the ten skills are the frozen v0.20.0 bytes, one hash per file.
 # sha256sum where GNU coreutils has it, shasum (BSD and macOS) otherwise.
 sh -c 'test "$(grep -c . .claude/skills.sha256)" = 10'

@@ -223,13 +223,17 @@ add it here.
 
 ## Continuous integration
 
-CI is the Statecraft setup profile `github-actions-rust`, revision 7
-(spec 001 D-17). The one required check is `ci-gate` in
+CI is the Statecraft setup profile `github-actions-rust`, revision 12
+(spec 001 D-19). The one required check is `ci-gate` in
 `.github/workflows/statecraft-ci.yml`: governance, the cargo gate, an AI
 review of every pull request, and the two declared extra required jobs,
 `govern` (`govern.yml`: `make gate` with `scripts/spec-dag.sh`, the
 Kubernetes manifests, the corpus attestation) and `supply-chain` (`ci.yml`:
-cargo-deny). The managed files (`.github/workflows/statecraft-*.yml`,
+cargo-deny). With `governance.require_ratified` at its default `true`, code
+owned by a draft spec is refused. Ratification is a separate owner flow: a
+pull request that changes a spec from `draft` to `approved` needs approval of
+that run's `statecraft-review-exception` Environment before it can merge.
+The managed files (`.github/workflows/statecraft-*.yml`,
 `scripts/statecraft/*`, `.statecraft/setup/*`) change only by editing
 `project.setup.parameters` in `.statecraft/environment.json` and
 re-rendering with `statecraft-cli init plan` / `init apply`, never by hand.
