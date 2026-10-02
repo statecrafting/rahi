@@ -36,7 +36,7 @@ jobs:
       has_cargo: ${{ steps.tree.outputs.has_cargo }}
       has_deny: ${{ steps.tree.outputs.has_deny }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           # Full history so the coupling gate can diff against the merge base.
           fetch-depth: 0
@@ -140,7 +140,7 @@ jobs:
     needs: spine
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
       - name: Install spec-spine (pinned in the Makefile)
