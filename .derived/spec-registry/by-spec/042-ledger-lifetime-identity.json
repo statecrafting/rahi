@@ -224,5 +224,5 @@
     "title": "Lifetime identity: one id names one decision for the life of the chain, and absence is proven rather than assumed"
   },
   "shardHash": "04d3efa4c6ea050b3cdc082e0094b646917544c3a4b0118dc2267c778e08ffaa",
-  "specVersion": "1.8.0"
+  "specVersion": "1.9.0"
 }

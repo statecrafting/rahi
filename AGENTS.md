@@ -17,8 +17,8 @@ design, every ordinary spec is `approved` and `implementation: pending`, and
 spec ordinals are the build order. Code arrives one spec per session under
 `crates/`, `apps/`, `docker/`, and `deploy/`.
 
-Governance is `spec-spine` **0.26.0** on your `PATH` (CI pins the same
-version, read out of the `Makefile`). All governed reads of `.derived/` go
+Governance is the exact `spec-spine.toml` pin on your `PATH` (CI pins the same
+version, read out of `spec-spine.toml`). All governed reads of `.derived/` go
 through its CLI.
 
 ## New Sessions
@@ -223,8 +223,8 @@ add it here.
 
 ## Continuous integration
 
-CI is the Statecraft setup profile `github-actions-rust`, revision 12
-(spec 001 D-19). The one required check is `ci-gate` in
+CI is the Statecraft setup profile `github-actions-rust`, revision 13
+(spec 001 D-20). The one required check is `ci-gate` in
 `.github/workflows/statecraft-ci.yml`: governance, the cargo gate, an AI
 review of every pull request, and the two declared extra required jobs,
 `govern` (`govern.yml`: `make gate` with `scripts/spec-dag.sh`, the

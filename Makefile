@@ -9,9 +9,8 @@ SHELL := /bin/bash
 
 SPEC_SPINE ?= spec-spine
 
-# The one place the governance pin is stated. CI reads this literal out of this
-# file (spec 001 D-9), so the pin moves in exactly one place.
-SPEC_SPINE_VERSION ?= 0.26.0
+# The exact governance pin is authored in spec-spine.toml.
+SPEC_SPINE_VERSION ?= $(shell sed -n 's/^required_version = "=\(.*\)"/\1/p' spec-spine.toml)
 
 # The coupling base follows the branch this repository actually has, rather
 # than being assumed to be `origin/main` (spec-spine spec 072). The same three

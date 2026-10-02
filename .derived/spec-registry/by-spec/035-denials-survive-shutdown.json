@@ -179,5 +179,5 @@
     "title": "Denials survive a graceful shutdown, and every lost denial is counted by its cause"
   },
   "shardHash": "5ef971d1025024b40ea9e2a4f563a50a6a5f89c4c6767bc31786b3112b10edfd",
-  "specVersion": "1.8.0"
+  "specVersion": "1.9.0"
 }

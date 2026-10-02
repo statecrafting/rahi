@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rendered by Statecraft from profile github-actions-rust revision 12.
+# Rendered by Statecraft from profile github-actions-rust revision 13.
 # The AI review: subject, invocation, classification and the evidence record.
 #
 # Contributor content is data. The diff and the context reach the reviewer on

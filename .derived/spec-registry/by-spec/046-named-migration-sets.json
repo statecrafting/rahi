@@ -307,5 +307,5 @@
     "title": "Named migration sets: a linked library brings its own versioned, checksummed migration sequence, and never renumbers into the host's"
   },
   "shardHash": "64a735f1154e1593f2c0ee9c283e4805d82e94da52a020a09dfb351027f81fd7",
-  "specVersion": "1.8.0"
+  "specVersion": "1.9.0"
 }

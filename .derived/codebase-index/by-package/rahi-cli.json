@@ -5,6 +5,6 @@
     "path": "crates/rahi-cli",
     "specRef": "030-operational-verbs"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "5b2d10bfa38357fb065fbbc903ee6b91257dd2f5d81ba93081a6637169b65288"
+  "schemaVersion": "1.2.0",
+  "shardHash": "0a434e10e92f61a3f5866aa051bc4367cc400f30382235e2e2689e4a6b4fb478"
 }

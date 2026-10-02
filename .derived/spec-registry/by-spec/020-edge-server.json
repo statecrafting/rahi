@@ -116,5 +116,5 @@
     "title": "The edge: axum router, middleware chain, probes, static slot, error mapping"
   },
   "shardHash": "66cc739017bb1464e7404f3a656492a6f734a3597c9d165b7fba835256079bea",
-  "specVersion": "1.8.0"
+  "specVersion": "1.9.0"
 }

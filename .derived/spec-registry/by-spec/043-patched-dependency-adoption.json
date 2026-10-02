@@ -483,5 +483,5 @@
     "title": "Patched dependency adoption: the N=1 cell runs the published, provenance-pinned hiqlite and Rauthy builds, crosses their cache boundary only through a fenced, resumable, backed-up transition, keeps every accepted revocation through it, and stops within a validated budget with an honest outcome"
   },
   "shardHash": "ab76deba8dbc478ce5ec9a45652dca77c425bd2fa3170c626c78f3e065ecb823",
-  "specVersion": "1.8.0"
+  "specVersion": "1.9.0"
 }

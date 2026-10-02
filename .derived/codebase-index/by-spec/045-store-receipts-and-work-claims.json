@@ -226,6 +226,6 @@
     "specId": "045-store-receipts-and-work-claims",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "d9a0767e7a174b305e2821f2e0f2620196b051294e87c1c161c8fd9e3ffe1d7d"
+  "schemaVersion": "1.2.0",
+  "shardHash": "31a032f4256a99afadcff48a42de2181a124c467162359d27a05a6d7d35bd4b3"
 }

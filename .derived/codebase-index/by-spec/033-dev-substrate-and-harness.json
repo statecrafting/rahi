@@ -167,6 +167,6 @@
     "specId": "033-dev-substrate-and-harness",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "5b27d1124681d68b60dabe22bb0b3cf7c0f5817f7764da3c9b39ca10642db3c4"
+  "schemaVersion": "1.2.0",
+  "shardHash": "c2979d61bfd9eb1a051c55e7894a2c365ed8090e1785e253259002dabfb0253f"
 }

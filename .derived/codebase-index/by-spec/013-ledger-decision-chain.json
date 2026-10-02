@@ -236,6 +236,6 @@
     "specId": "013-ledger-decision-chain",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "b997864c8bf8c8018e251b9c9a52d0ba92b9d37808d49cdbf437c9d7009c4828"
+  "schemaVersion": "1.2.0",
+  "shardHash": "b5a0855fae5cc40aea93f742f1b26793b527c34df2f6e4aa9e7ef0bd9ffa0899"
 }

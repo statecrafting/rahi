@@ -5,6 +5,6 @@
     "path": "crates/rahi-kernel",
     "specRef": "015-kernel-manifest-and-adjudication"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "7fad426ef54e56bce055cb908593a1f679d1f743161c3c58140eee6e76e707a3"
+  "schemaVersion": "1.2.0",
+  "shardHash": "bc5583d9639cabc74e5486d43c9996a8ad796cc1290a8a77711778a3388ff1af"
 }

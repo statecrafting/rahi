@@ -97,5 +97,5 @@
     "title": "Manage application background services through the cell lifecycle"
   },
   "shardHash": "8cca900954d2b115351ebc3b20f79673b6f1f0e793a6a7240907e1d492324fdb",
-  "specVersion": "1.8.0"
+  "specVersion": "1.9.0"
 }

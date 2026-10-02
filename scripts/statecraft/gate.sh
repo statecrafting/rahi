@@ -1,8 +1,8 @@
 #!/bin/sh
-# Rendered by Statecraft from profile github-actions-rust revision 12.
+# Rendered by Statecraft from profile github-actions-rust revision 13.
 # The one definition of this repository's gate: `make gate` and `make code`
 # run it locally, and CI runs the same script, so the two cannot drift. Only
-# the repository-local .tooling/bin/spec-spine is used; a spec-spine elsewhere
+# the repository-local .bin/spec-spine is used; a spec-spine elsewhere
 # on PATH never answers for this repository.
 #
 # In CI this script is read at the base commit and run against the candidate's
@@ -25,7 +25,7 @@ leave() {
 }
 trap 'rc=$?; if [ "$rc" -ne 0 ]; then echo "gate.sh: a command failed (exit $rc) and stopped the gate; reported as failed (4)" >&2; exit 4; fi' EXIT
 
-SS=.tooling/bin/spec-spine
+SS=.bin/spec-spine
 BASE_SHA="${BASE_SHA:-}"
 case "$BASE_SHA" in 0000000000000000000000000000000000000000) BASE_SHA="" ;; esac
 # This script's own path, for the commit walk, which judges each commit with
@@ -424,8 +424,8 @@ case "$MODE" in
         # it, and spec-spine refuses to read a repository through a link that
         # leaves it (its spec 144, from 0.28.0). The copy is a regular file
         # inside the worktree, and it goes when the worktree does.
-        contained="$wt/.tooling/bin/spec-spine"
-        if [ -n "$bin" ] && mkdir -p "$wt/.tooling/bin" && rm -f "$contained" \
+        contained="$wt/.bin/spec-spine"
+        if [ -n "$bin" ] && mkdir -p "$wt/.bin" && rm -f "$contained" \
           && cp "$bin" "$contained" && chmod 755 "$contained" \
           && [ -f "$contained" ] && [ ! -L "$contained" ] \
           && (cd "$wt" && sh "$script" governance && cargo fmt --all --check) > "$log" 2>&1; then

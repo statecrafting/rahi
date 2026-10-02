@@ -9,7 +9,7 @@
 # states the same version and CI reads it there (B-3). Any other binary,
 # older or newer, refuses the corpus by name at exit 3 instead of judging
 # shards it did not write, whichever binary a hook resolves first.
-required_version = "=0.26.0"
+required_version = "=0.28.0"
 
 [manifest]
 # Cargo `[package.metadata.spec-spine].spec` names each crate's founding spec.
