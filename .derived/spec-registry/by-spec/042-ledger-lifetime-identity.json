@@ -193,14 +193,14 @@
     ],
     "risk": "critical",
     "sectionDigests": {
-      "042-lifetime-identity": "c3199009b4defdc4534880f3e316253bc9841de195e4b9fe46f9e3ccc7bda0b9",
+      "042-lifetime-identity": "f0820488fd8d202e3aaabbb1cf7f1da4c1e264ff571752dfb4bfadbd2530b0cc",
       "1-purpose": "584fc602a49c25316486378a2a4283614c0599748e30423143f3e97669a8d1b9",
       "2-territory": "3f4b75123eeaa75247d7e05d0dbda02516b52fc0db926975f5070a623fbc2788",
       "3-behavior": "7a76429f95106b7d7c29626780fdf3cca09201cebc8134b0d9ac6bf4090ddeab",
       "4-functional-requirements": "c19c5f75eac099a9aa5cf8e5d296b33f9a650c1fabf007bac8a896ea988e763f",
       "5-acceptance-criteria": "b3984d9e01ec490785f046ce0ffc537bd8c98bd580ea29798030cdbf9507f2b4",
       "6-out-of-scope": "44ca5764623b0d86bf6fb474b58ae24a0d4d124c6c343d0f4db59ef8fc9ca3c9",
-      "7-resolved-decisions": "fcb45c72e5d1fb2de347e8fde5919e80ec3ced6fafa68ca12ee771969cd22457",
+      "7-resolved-decisions": "48c8ceee2e6a2b76dd18e02e31e087820d1c9031e8750e163e9d9e39ce702c8f",
       "8-owner-decisions-answered": "2484f522ae98d77192e007ce39e1582dc4c659a33bd24a5e4f04614534f96655",
       "verification": "7b2d677d4e59c6140777620237f92c7b0c47dd7f43d046b0bd0d4d4247837b3a",
       "what-is-reserved-and-what-it-does-not-block": "ee94f68fa3ec96fb4a1df99134e31fdf2f1696d0078418649ce4fe639f651ecc"
@@ -223,6 +223,6 @@
     "summary": "The chain can say what happened but not whether a given decision ever happened, because spec 013 D-5 tells a lost compare-and-swap from a duplicate id by asking whether the id is resident and spec 014 deletes the row when its segment is sealed. Past the hot window a retried append therefore writes a second record under the same id, and full verification passes because a duplicate id is not a broken link. This spec gives every decision a narrow resident identity row that survives sealing, makes that row's primary key the arbitration inside the append transaction rather than a read before it, stamps the row in the seal transaction, and answers presence, proven absence, unproven history and proven ambiguity as four different answers. A chain sealed before this spec has no rows for its archived ids, so a cell refuses to serve until `rahi ledger reindex` has rebuilt them: the upgrade costs a stop, and the alternative is a cell that serves while its audit proof is silently wrong. The refusal, the reindex's behavior on damaged or ambiguous history, the cutover from a binary that does not stamp, and the permanent resident cost are all stated here rather than discovered in production.\n",
     "title": "Lifetime identity: one id names one decision for the life of the chain, and absence is proven rather than assumed"
   },
-  "shardHash": "888783cfd6092142df3f427ef831800d0749e9c22bdabe6a0769c92b7a12eeff",
+  "shardHash": "04d3efa4c6ea050b3cdc082e0094b646917544c3a4b0118dc2267c778e08ffaa",
   "specVersion": "1.8.0"
 }
