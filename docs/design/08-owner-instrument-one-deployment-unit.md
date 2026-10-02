@@ -214,3 +214,167 @@ Approval must identify the final proposal's full commit and blob. The
 application PR records the owner's actual message and date rather than
 claiming approval from this template. Changes to sections 2 or 4 after that
 approval require the owner to approve the revised text.
+
+## 7. Application and bounded re-verification record (2026-10-02)
+
+### Owner approval and normative commit
+
+The preparation status at the beginning of this document is historical. On
+2026-10-02 the owner explicitly approved PR #99's instrument at commit
+`9bbe773f52b004cea882226760f92a76148aee08`, document blob
+`5e010c1effabbb78cdc2cbba270c6a7c0e597893`. Spec 000's Amendments received
+entry records the owner's actual approval message. This appendix preserves
+the approved document as its exact byte prefix, including sections 2 and 4.
+It records execution of that approval and changes none of its terms.
+
+The frozen normative verification commit is
+`0ef9dca4401f2a488c06d5b80751440f3b31c141`. It replaces the named anchor
+under section 2.1, records the dated bootstrap act under section 2.2, and
+aligns Constitution VI under section 2.3 together. The anchor remains in
+`unamendable`. Spec 044 remains draft and pending. Its bootstrap prohibition
+is disposed of subject to this re-verification; its other blockers remain.
+
+### Frozen set, engine and method
+
+The completed set was read through the pinned CLI on the frozen commit:
+001, 010 to 016, 020 to 026, 030 to 039, 042, 045, 046 and 048, 29 specs.
+Each `spec-spine verify <id> --plan` and acceptance section was read before
+execution. `make gate` passed on the frozen commit. Each spec then received
+exactly one local `make verify SPEC=<id>` execution, sequentially, without
+changing the tracked tree or normative commit during that pass.
+
+The engine was `spec-spine 0.28.0` at
+`/Users/bart/.cargo/bin/spec-spine`, binary SHA-256
+`9e93eca21424b22154965e537a85deee006e5ad5f18234679dd99ba7571ca875`.
+The local host was macOS 26.5.1 arm64. Cargo used the configured shared
+target at `~/.statecraft/worktrees/rahi/target`; `CARGO_TARGET_DIR` was unset.
+The already built shared rahi binary was supplied as `RAHI_TEST_BINARY`.
+
+All 29 declared CLI plans exited 0. This is a per-spec command verdict,
+subject to the prerequisite and operator limitations below. It does not
+replace acceptance criteria outside those commands. In 001, the nested
+`spec-spine verify 000-rahi-bootstrap` reports no declared plan and exits
+0; it is not evidence of a separate bootstrap verification. No failed frozen plan
+was retried or relaxed.
+
+### Per-spec outcomes
+
+In the table, the log is `<spec-id>-verify.log` and the saved plan is
+`<spec-id>-frozen-plan.txt`. Every command ran at the frozen commit above.
+The manifest records full log and plan hashes, start and end times, exit
+codes, and emitted prerequisite skips.
+
+| Spec id | CLI exit | Commands | Acceptance and prerequisite disposition |
+|---|---:|---:|---|
+| `001-agentic-harness` | 0 | 57 | 57 commands passed; AC-4 linear-history setting fails operator review. |
+| `010-workspace-and-core-types` | 0 | 2 | Declared commands passed. |
+| `011-store-hiqlite` | 0 | 1 | S3 integration skipped locally: RAHI_TEST_S3 absent. |
+| `012-store-coordination` | 0 | 2 | Declared commands passed. |
+| `013-ledger-decision-chain` | 0 | 2 | Independent attest-ledger unavailable; in-process verification ran. |
+| `014-ledger-sealing-and-archive` | 0 | 1 | Declared commands passed. |
+| `015-kernel-manifest-and-adjudication` | 0 | 1 | Declared commands passed. |
+| `016-store-binary-values-and-extensions` | 0 | 1 | Declared commands passed. |
+| `020-edge-server` | 0 | 2 | Declared commands passed. |
+| `021-idp-proxy-and-discovery` | 0 | 2 | Declared commands passed. |
+| `022-session-and-principal` | 0 | 2 | Declared commands passed. |
+| `023-observability` | 0 | 1 | Declared commands passed. |
+| `024-hardening` | 0 | 1 | Declared commands passed. |
+| `025-api-tokens-and-resource-server` | 0 | 1 | Live Rauthy skipped locally; frozen live workflow supplies that proof. |
+| `026-streaming-responses` | 0 | 2 | Declared commands passed. |
+| `030-operational-verbs` | 0 | 2 | Live Rauthy and admin export skipped locally; frozen live workflow supplies the live suite. |
+| `031-single-container-packaging` | 0 | 2 | Fresh local Docker build and smoke plus both hosted architecture smokes passed. |
+| `032-cluster-topology` | 0 | 1 | Manifests passed; no real three-node qualification run. |
+| `033-dev-substrate-and-harness` | 0 | 1 | Live local harness cases skipped; frozen live workflow and Compose validation supplement them. |
+| `034-hello-cell` | 0 | 2 | Live local cases skipped; frozen live workflow passed. Independent verifier unavailable. |
+| `035-denials-survive-shutdown` | 0 | 3 | Declared commands passed. |
+| `036-manifest-and-schema-evolution` | 0 | 4 | Ledger, store, operations and evolution commands passed; live local skips supplemented by frozen live suite. |
+| `037-identity-recovery-and-live-proof` | 0 | 3 | Recovery commands passed; frozen live workflow supplies fresh live proof. |
+| `038-native-clients-and-bearer-revocation` | 0 | 4 | Bearer and revocation commands passed; frozen live workflow supplies fresh live proof. |
+| `039-release-and-out-of-tree-packaging` | 0 | 4 | Packaging commands passed; release-checkpoint operator evidence was not refreshed. |
+| `042-ledger-lifetime-identity` | 0 | 5 | Identity, append, seal, verification and CLI proof commands passed. |
+| `045-store-receipts-and-work-claims` | 0 | 6 | Declared commands passed. |
+| `046-named-migration-sets` | 0 | 4 | Declared commands passed. |
+| `048-store-clean-shutdown` | 0 | 3 | Declared commands passed. |
+
+### Prerequisites and supplementary operator evidence
+
+Local Cargo, Rust, the pinned engine, Docker and kubectl were available.
+Standalone kustomize and kubeconform were absent; the validation script
+used its kubectl kustomize fallback and its declared optional-schema-check
+behavior. No S3 endpoint, named three-node cluster, local Rauthy binary or
+Rauthy credentials, or independent attest-ledger binary were supplied.
+Those absences are recorded, not silently converted into acceptance. Spec
+011 FR-003 permits the named S3 skip; 013 FR-004 and 034 FR-003 permit
+the named independent-verifier skip. These clauses explain the passing
+command verdicts and do not claim the absent external proof was obtained.
+
+The following reviewed workflows ran at the same frozen normative SHA:
+
+- [Live proof run 37050143344](https://github.com/statecrafting/rahi/actions/runs/37050143344)
+  passed. Its full workspace suite used pinned Rauthy with
+  `RAHI_REQUIRE_RAUTHY=1`; real login, hello-cell and bearer proof ran.
+  Its separate final-stop series also passed. This is fresh N=1 live
+  evidence, including the cases that the local plans skip without Rauthy.
+  The final-stop series does not mark spec 043 complete.
+- [Image run 37050991488](https://github.com/statecrafting/rahi/actions/runs/37050991488)
+  passed amd64 and arm64 builds and empty-cell and hello-cell smokes.
+  Publication was skipped, as appropriate for a branch dispatch.
+- A fresh local Docker build and `docker/smoke.sh` passed readiness,
+  same-origin identity, client custody and clean termination. The image
+  was `rahi:bootstrap-0ef9dca`. Compose configuration validation passed.
+- Locked dependency trees confirmed the downward crate boundaries for
+  store, ledger, kernel and edge; edge had no idp dependency.
+
+These proofs supplement the local per-spec pass. Neither these workflows
+nor green ordinary CI substitute for the recorded 29-spec pass.
+
+### Remaining blockers to reliance
+
+- **001 AC-4:** the audited main branch protection had
+  `required_linear_history.enabled=false`. The required `ci-gate`, signed
+  commits, administrator enforcement, and force-push/deletion restrictions
+  matched the other checked requirements, but AC-4's linear-history
+  requirement did not. Its local 57-command plan does not test that remote
+  setting. This operator criterion remains failed until the governed
+  branch policy is corrected and witnessed; this application does not
+  change that shared policy or claim AC-4 satisfied.
+- **039 release checkpoints:** this pass did not publish a release, pull
+  newly published artifacts anonymously, or prove a fresh crates.io
+  consumer resolution. AC-2, AC-3 and AC-4 retain their named-release
+  operator evidence requirements. Historical release records are not a
+  fresh publication verdict for this commit. No new publication or
+  published-only consumer acceptance is claimed.
+- **S3 and independent verification:** no fresh S3-backed proof or
+  independent attest-ledger result was obtained. Where a plan explicitly
+  permits their absence, its command verdict is still 0; any reliance that
+  requires those external proofs remains blocked until they are supplied.
+- **N=3:** manifest validation is not three-node qualification. Spec 032's
+  recorded operator procedure remains available, but neither N=3 layout
+  is newly qualified by this application. Spec 044's P-1 through P-4,
+  coherent export, prerequisites involving 040, 041 and 042, and the
+  032 AC-2 obligation remain owed. Its AC-3 and AC-4 still require a named
+  release and real operator evidence. It remains draft and pending.
+
+The anchor permits the two named N=3 layouts. Permission, merging this
+amendment, historical completion labels, and ordinary CI are not N=3
+support or clearance of missing acceptance evidence. Passing results above
+may be relied on only within their recorded scope; each failed or missing
+required criterion remains a blocker to the affected reliance. Any
+remediation has its own scope and checks, without relaxing the anchor.
+
+### Evidence locations and integrity
+
+The durable local archive is
+`/Users/bart/DevWork/rahi/data/evidence/bootstrap-owner-application/2026-10-02-0ef9dca/`.
+It is ignored evidence, not a committed source directory. Per-spec logs and
+plans use the filenames specified above. `verification-manifest.json`
+records their hashes and outcomes; its SHA-256 is
+`05b40978ad92be2aaa9809a70cbc92a4bae94fbac92b61d383753fbb170283d7`.
+
+`frozen-registry.json`, `frozen-spec-set.json`, `engine.txt`,
+`prerequisites.json`, `normative-gate.log`, `make-ci.log`,
+`frozen-main-protection.json`, `dependency-acceptance.json`,
+`frozen-live-workflow.log`, `frozen-image-workflow.log`,
+`frozen-docker-build.log`, `frozen-docker-smoke.log` and
+`frozen-compose-config.log` preserve the supporting evidence. The workflow
+URLs above provide the corresponding durable hosted results.
