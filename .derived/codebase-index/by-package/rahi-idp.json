@@ -5,6 +5,6 @@
     "path": "crates/rahi-idp",
     "specRef": "021-idp-proxy-and-discovery"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "7dbd166da77d42e0e59f253db0eb9598887683a70e8ee66990365e3e7ca556a3"
+  "schemaVersion": "1.2.0",
+  "shardHash": "658e6efcf228ed9a88c909e43d75486dbb7422804c8fb97a3bc12204492bfa4b"
 }

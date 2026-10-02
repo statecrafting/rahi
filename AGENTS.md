@@ -17,7 +17,7 @@ design, every ordinary spec is `approved` and `implementation: pending`, and
 spec ordinals are the build order. Code arrives one spec per session under
 `crates/`, `apps/`, `docker/`, and `deploy/`.
 
-Governance is `spec-spine` **0.26.0** on your `PATH` (CI pins the same
+Governance is `spec-spine` **0.28.0** on your `PATH` (CI pins the same
 version, read out of the `Makefile`). All governed reads of `.derived/` go
 through its CLI.
 
@@ -42,7 +42,8 @@ to derive its plan; anything added here is picked up on the next prime.
    tree, so there is no ordering):
    - `spec-spine --version`: the binary that will answer every read below.
      Read it before believing any exit code; `spec-spine.toml`'s `[meta]
-     required_version` floor makes an older binary refuse at exit 3, and this
+     required_version` pin refuses an incompatible binary (exit 2 under the
+     current exit family), and this
      read names which binary a stray `PATH` entry handed you
    - `CLAUDE.md`: what Claude Code needs beyond this file
    - `README.md`: project description and status
@@ -52,7 +53,7 @@ to derive its plan; anything added here is picked up on the next prime.
    - `spec-spine registry status-report --json --nonzero-only`: lifecycle counts
    - `spec-spine registry list --ids-only`: the spec inventory
    - `spec-spine registry plan`: the ready set (spec-spine 038): which specs can be worked on now and what blocks the rest; `/next` applies the approval and in-flight rules on top of it
-   - `spec-spine index coverage`: which source files no spec claims (exit 2 if stale)
+   - `spec-spine index coverage`: which source files no spec claims (exit 1 if stale)
    - `scripts/spec-dag.sh`: the DAG is acyclic and every dependency is lower-numbered
    - `ls crates/ apps/ docker/ deploy/ 2>/dev/null`: what has been built so far (absent directories are expected before their spec lands)
    - `ls specs/ docs/design/`
@@ -71,21 +72,19 @@ to derive its plan; anything added here is picked up on the next prime.
 `spec-spine` subcommands.
 
 **Freshness:** `spec-spine check` reads both committed trees without
-writing, and reports each on its own line. Its exit code is the more severe
-of the two, so read the lines, not only the code. Exit `0` is fresh. Exit `2`
-is stale: report which tree moved and that the fix is `make refresh` plus a
-commit of the regenerated shards, and say the lifecycle counts are the
-committed (stale) ones. Exit `1` means the corpus fails validation: surface
-the violations, report counts as unverified, and make fixing them the first
-task. Since spec-spine 0.20.0 (its specs 098 and 101) an **unresolved claim**
-is part of that exit `1`, not of exit `2`: a spec claims a unit that does not
-resolve, and re-running `index` never clears it, so report it as a corpus
-violation and never as a shard to regenerate. Exit `2` is staleness and
-nothing else. Exit `3` means the read was not performed at all, most often a
-binary older than 0.18.0 that predates the verb; report the version it does answer
-and send the reader to `/setup`, never call it staleness. Never substitute a
-plain `spec-spine compile` or `index` here; `/prime` reports, it does not
-mutate.
+writing and reports each separately. Under the pinned 0.28.0 exit family,
+`0` means pass, `1` means a finding (including stale artifacts or validation
+violations), `2` means a refused read, `3` means an invocation error, and
+`4` means an operational error.
+Read the diagnostic lines or the typed verdict, not only the exit code.
+For stale trees, name which tree moved, report lifecycle counts as the
+committed (stale) ones, and give `make refresh` plus a commit of regenerated
+shards as the remedy. For validation violations, surface them, mark counts
+unverified, and make fixing them the first task. An unresolved claim is a
+corpus violation, not staleness: re-running `index` never clears a claim
+whose unit does not resolve. For a refused or failed read, report its reason
+and do not infer freshness or lifecycle counts. A pin mismatch goes to
+`/setup`. Never substitute a writing `compile` or `index` during `/prime`.
 
 `spec-spine check` also prints the unwitnessed-claim count and how much of it
 `[lint] unwitnessed_allowed` covers. Report both numbers as the check prints

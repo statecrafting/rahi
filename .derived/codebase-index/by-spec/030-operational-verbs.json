@@ -364,6 +364,6 @@
     "specId": "030-operational-verbs",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "9c3ddc3ffecc54aca451d4dc9009c5fa627d94d0782af69b154794a2022b127a"
+  "schemaVersion": "1.2.0",
+  "shardHash": "9f0d0106fd5617867e55cbe1670bb0700b9703a7d4a505b8418422395a28e8b2"
 }

@@ -5,6 +5,6 @@
     "path": "crates/rahi-edge",
     "specRef": "020-edge-server"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "bea687673528702fd4491a0ce4ca5403333525aa5163434af1fed8215ee05bb0"
+  "schemaVersion": "1.2.0",
+  "shardHash": "c9fec91cb7190b8a7aa300c1f43ac574368744a779756f6b86fa0b3f83cce459"
 }

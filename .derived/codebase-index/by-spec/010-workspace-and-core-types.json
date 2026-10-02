@@ -201,6 +201,6 @@
     "specId": "010-workspace-and-core-types",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "2794ef28c2f8bbf7485f153fb8c4daeaa3eeddfc4c78d774c2b5c9e192c83c42"
+  "schemaVersion": "1.2.0",
+  "shardHash": "4c64f7b96704bb88c455aeaa2791d0de285113d9d4f6068c467c29fe70c05d85"
 }

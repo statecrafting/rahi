@@ -43,9 +43,10 @@ scripts/spec-dag.sh           # depends_on is acyclic and only points to lower-n
 cargo test -p rahi-store --locked --test txn
 ```
 
-Exit codes of `spec-spine`: `0` ok, `1` validation failure or drift, `2`
-stale, `3` I/O, parse, schema, or config. The `rahi` binary (spec 030)
-adopts the same four.
+Exit codes of `spec-spine` 0.28.0: `0` pass, `1` finding (including
+staleness or validation failure), `2` refused, `3` invocation error,
+`4` operational error. The
+`rahi` binary retains spec 030's separate exit contract.
 
 ## Architecture in one screen
 

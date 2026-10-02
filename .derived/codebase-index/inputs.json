@@ -1,0 +1,272 @@
+{
+  "inputs": {
+    ".claude/agents/architect.md": {
+      "contentHash": "f88567fa1c47aa09d8d261b2f407ac0bfc35e544008daa6ffe828a9a80f74baa"
+    },
+    ".claude/agents/explorer.md": {
+      "contentHash": "fd73b9a57f4e3090cc002d50a1de3857d4b58dd0e715af16813a753dcf7407c3"
+    },
+    ".claude/agents/implementer.md": {
+      "contentHash": "e71172ce09f4845a4edd71c6294010e2e2a09efcbaeb8c3037b73bc801207888"
+    },
+    ".claude/agents/reviewer.md": {
+      "contentHash": "dbfad89460973c4f309c2f1f22f75680544f4e57ec5b2b8d241c72db51688f41"
+    },
+    ".claude/rules/adversarial-prompt-refusal.md": {
+      "contentHash": "b4fda9edb8c02de27fbb8a12e44e5f38dc74f08a8794c3f41fca2a4d8d7f24b3"
+    },
+    ".claude/rules/build-commands.md": {
+      "contentHash": "1d9cdafc8662e1391a652b9631c4a1872512d513946b2a9199613aef3647f560"
+    },
+    ".claude/rules/chassis-invariants.md": {
+      "contentHash": "2fc58563879e19de602d850f8bc409f13100c90987ceab7a20d138f357ae93d1"
+    },
+    ".claude/rules/derived-artifacts-are-compiler-output.md": {
+      "contentHash": "5bbb2e5b3f5d41deaa8cd7d2e702d750f59cc93446ea801c060a95cb705614bc"
+    },
+    ".claude/rules/governed-artifact-reads.md": {
+      "contentHash": "48849d68e478a309667de8f4bc680f807a65d38efb53dd5a0f8c014b8b9e82d5"
+    },
+    ".claude/rules/orchestrator-rules.md": {
+      "contentHash": "5e39637ab19f54b29c19154a13161c94da5511ad696b8ff1626950da68412e29"
+    },
+    ".claude/settings.json": {
+      "contentHash": "587977f76044ea315e4b6954cb5713e1de6faa6bef4675b646a166463255e9cd"
+    },
+    ".claude/skills.sha256": {
+      "contentHash": "72792b6c24ccafb6e6c20efd349867262907915e2c2b0b95e59480f583687b00"
+    },
+    ".claude/skills/build/SKILL.md": {
+      "contentHash": "ec0da9456c8324b71207a0b53cb27b2e29bebe60c4aa957ad360491825a0f676"
+    },
+    ".claude/skills/code-review/SKILL.md": {
+      "contentHash": "4d7cf54543511f8dc67d4f6eb096bb9c2f0b33e35626ad5aca50bae436448349"
+    },
+    ".claude/skills/commit/SKILL.md": {
+      "contentHash": "dc959564cdd71638aa355ff1b1831965e9ccea4213f927a36583638a7c156591"
+    },
+    ".claude/skills/next/SKILL.md": {
+      "contentHash": "85f27c50b67ac64d0ec455e198a46a10e41664a970796f4828f383bc9d5be355"
+    },
+    ".claude/skills/prime/SKILL.md": {
+      "contentHash": "765db1e6bc5cfc84791a0f175eebc2d1a2b71c8a97fec11e74c61b6f6593ebef"
+    },
+    ".claude/skills/setup/SKILL.md": {
+      "contentHash": "8ef4a14df8b66224e6dea619b7b6a80c11e65c8a5b7f4199d2c5456d41ef9554"
+    },
+    ".claude/skills/shepherd/SKILL.md": {
+      "contentHash": "5e63f043e9f969558f95d3b8ae07824cc0588fdfcbd2a82914e0775bb475cfaf"
+    },
+    ".claude/skills/ship/SKILL.md": {
+      "contentHash": "d928634a1810b303790d30262dff8022728aa9bd8bfafdc42312c6a1f6f3aba1"
+    },
+    ".claude/skills/spec/SKILL.md": {
+      "contentHash": "cb5d3e4dcfc111c5b1a6f0b12ff2c3de021af9abc70a993c48f4dc8d8d376983"
+    },
+    ".claude/skills/verify/SKILL.md": {
+      "contentHash": "7bfa43dd22323b9c16ff46916f61b70b33c0e853f11a35996f2c6ec1854a0b33"
+    },
+    ".gitattributes": {
+      "contentHash": "13818de259a9f92c0b29b4febc8ff831cd9664dc6d603acb539fd2eb5c21cb9f"
+    },
+    ".githooks/enable-hooks.sh": {
+      "contentHash": "6614f89d430a01408a919c9a13cc4bd5be7e2289ccdea22642c904b93019d1ef"
+    },
+    ".githooks/enable-merge-driver.sh": {
+      "contentHash": "b0b529f0bd739a9d463f2e13819b22c41ac7a3e295f8027d2f72816275aaca63"
+    },
+    ".githooks/merge-derived-index.sh": {
+      "contentHash": "db2adc9daa741b04b6ab1e75bcc1eeacfec078f1e4a0134d299103f1c9304b81"
+    },
+    ".githooks/pre-commit": {
+      "contentHash": "907bf25e2d2915ffb08049cc8f6150084a7e4eee9f620fdfd73936511f90aa33"
+    },
+    ".github/consumer-cell/Cargo.registry.toml.in": {
+      "contentHash": "e3d51f9bb3d19865fa3552f07b9cf8b1e285616fb9c099c1dcd79b1246909f02"
+    },
+    ".github/consumer-cell/Cargo.toml.in": {
+      "contentHash": "48390aa36ad6d8042f013e99cc17a9f0a40b8c67adb638610046f5be8af8a42e"
+    },
+    ".github/consumer-cell/manifest.toml": {
+      "contentHash": "57a95ccef3e76b82b6d23950c6d086da57f53dbd75025a235e2083528a3f431d"
+    },
+    ".github/consumer-cell/prove.sh": {
+      "contentHash": "aad8670f80b51ee050a5d048771eddbe1ea349fa3d4d545efa167bf34a6c7339"
+    },
+    ".github/consumer-cell/src/main.rs": {
+      "contentHash": "421ec6d1b6d83c1f1b7e6df9fbfe97767f9d0f3475aad186c390ad6233d73ce5"
+    },
+    ".github/dependabot.yml": {
+      "contentHash": "21910202c856397455fa3544d79854f9e6594c57bd4a340e31eb30cd1360d9b4"
+    },
+    ".github/publish-crate.sh": {
+      "contentHash": "f797913c6842434b95f5e4904f12c24d9914fb1cc12ee57f76c4fbbe4b5ae32b"
+    },
+    ".github/workflows/ci.yml": {
+      "contentHash": "41e2c0f3e7579559edff04f47b25871eb6bf7f168f241ca3981e06fb6922dee5"
+    },
+    ".github/workflows/govern.yml": {
+      "contentHash": "486bc83e8b717bc0c7d1db1c6cf82580fc594c1122f2df2d9a15b5a235df8e82"
+    },
+    ".github/workflows/image.yml": {
+      "contentHash": "644a3ff6e32af864dd3fdb93672b5412f300c58fb420a62634f69fd42c813058"
+    },
+    ".github/workflows/live.yml": {
+      "contentHash": "ef0a7ad7804343e35779e8fa126ad1d9b6976f2b545793a16264d9ad0998f5c3"
+    },
+    ".github/workflows/release.yml": {
+      "contentHash": "2c03ff36f7157bb914ef0ae52867c45c80051d373b5db7821b5f2a7829f8197f"
+    },
+    ".github/workflows/statecraft-ai-review.yml": {
+      "contentHash": "daa0cd0400d1aab5195440c0ac9a3df13f11fe110263f504d8310f3ba9878d5c"
+    },
+    ".github/workflows/statecraft-ci.yml": {
+      "contentHash": "656689de4cb82fa8ccbfe9a6703fc76768f4a859f501e7989bbc1d8aece14d16"
+    },
+    ".mcp.json": {
+      "contentHash": "267962ad307e5707f2a025ce1fa40b80d52cd0cf3f8c8bdb25d03a6459366a1a"
+    },
+    "AGENTS.md": {
+      "contentHash": "956c6956dd9994ab4d0d2d2ec1b6b4f63d206dc762e18189427cd24d99f12301"
+    },
+    "CLAUDE.md": {
+      "contentHash": "41d5620394e0e9ad7fa3867d699d04a57b17f2fad53306c15119d22051f0f033"
+    },
+    "CODEOWNERS": {
+      "contentHash": "be9b4a2ce0c6f28cfbcce6e455c79929f85229a3751d3b1634d4230d41aae3b0"
+    },
+    "Makefile": {
+      "contentHash": "0226f5bff74df4b4d8be76e83e531cc2f7c9a2d4721276904adaddf870908330"
+    },
+    "crates/rahi-ops/rauthy.env.template": {
+      "contentHash": "b42cdcd91b2924570084da34d73ec3c3773f4c401a96fbc1b3561327ce5b24e3"
+    },
+    "deny.toml": {
+      "contentHash": "bc8d2802f8c4993a41f75faf2adf13100fd3acab12c6c049857d7b94d2ed4e89"
+    },
+    "deploy/k8s/backup-cronjob.yaml": {
+      "contentHash": "3476fa2afae38edde1d0daf0d58823e1b47243866a723846ee32a7f9936bf524"
+    },
+    "deploy/k8s/configmap.yaml": {
+      "contentHash": "b131a146b747341544ad809bd7c09841f7591e4ad811b20fae146085d0e7b571"
+    },
+    "deploy/k8s/ingress.yaml": {
+      "contentHash": "04a94b1664d7ffe87d79b850960eeea781bf4519aceef8338fe22fca501570f9"
+    },
+    "deploy/k8s/kustomization.yaml": {
+      "contentHash": "0474e7180e9b88b697d43a33c80a5504afc3384911521222307602855027eac4"
+    },
+    "deploy/k8s/migrate-job.yaml": {
+      "contentHash": "6744d244ac101a266b46539d44706aa789f86e87c8a5f11292e8fc199beb84b1"
+    },
+    "deploy/k8s/secret.example.yaml": {
+      "contentHash": "1c247ca46f2de494ed34e5049f8f9ccb2b2e3afcd40af2a2e55c44487efb5598"
+    },
+    "deploy/k8s/service.yaml": {
+      "contentHash": "ac739b83fa7242c578082f138f0df9146b03407df7fb860cd48e2906917ec340"
+    },
+    "deploy/k8s/servicemonitor.yaml": {
+      "contentHash": "cc20676550ae328bf850a1e0c0db30d1f31ae00ea34d7544c921c4379bd0c54c"
+    },
+    "deploy/k8s/statefulset.yaml": {
+      "contentHash": "3a477877f5ec1bff36f9aec00e8f92de154a0a2fbcd66089c12629bf9f597088"
+    },
+    "deploy/n3/kustomization.yaml": {
+      "contentHash": "6d88e3c333ad5ee8949fc93153f49c7fe74fbc4d1e8e76f5669729d511efb7a1"
+    },
+    "deploy/n3/peers.yaml": {
+      "contentHash": "3ac94b9105ab576f0056a2f28a2f81315afb01d9c2af6a6d15a3d42053837bca"
+    },
+    "deploy/n3/replicas.yaml": {
+      "contentHash": "a4b4d73979c39bb36f20b8fb21d0827a8d088221dc26ad4d0cb5b42e772979f1"
+    },
+    "docker/Dockerfile": {
+      "contentHash": "32c81faed37fb3caaadd5fcdffd585bdc77d903dd0fa1b4f2febf1adbc2e3773"
+    },
+    "docker/compose.yml": {
+      "contentHash": "9d852e142a464b6df1376fb9ce7da13e8ff5b957edc32b88cdfdf0cb531728a9"
+    },
+    "docker/entrypoint.sh": {
+      "contentHash": "b2d4dfb85897999b63a6e177a03b1b1f15a8cb28b74b2c138ed5acb5b54e5cfb"
+    },
+    "docker/runtime.Dockerfile": {
+      "contentHash": "bbd2a221c9f66c0874545fca256b05c5903b97a8bfca8477d83bfb2091d066c0"
+    },
+    "docker/smoke.sh": {
+      "contentHash": "6ffa5596201477ded845b25569e0862b3819facdffc451763ccaf2dac04619c3"
+    },
+    "docker/upgrade-live.sh": {
+      "contentHash": "afc65eb6083e141ab14cff5682dd7b9270d2d2577963d687c5ef98cfeeb5312d"
+    },
+    "docs/design/00-architecture.md": {
+      "contentHash": "d22a98e616e6c66d69857a1d0ee3c1f59b742430f7d12ada2ddf370ee40e185d"
+    },
+    "docs/design/00-lineage.md": {
+      "contentHash": "b1973b69dc9b53dce163a2da56e52b1ce119b7f8079cc6cc302140d1a5be94c5"
+    },
+    "docs/design/01-consumer-contract.md": {
+      "contentHash": "c928ea2d6817f397240956c48f294f53bf92c6a45c9032378dd224fb3fd9afee"
+    },
+    "docs/design/02-operational-prerequisites.md": {
+      "contentHash": "b834d0d5e6971dfb858883d9fa6a5192d837db10cd9c89fabd67a58f0b0652bf"
+    },
+    "docs/design/03-decision-handoff-2026-09.md": {
+      "contentHash": "35e19523473c0a02ce6b8b7ad5fce906bdf1d3d70a43a55b7d1d1478c1546a26"
+    },
+    "docs/design/04-patched-adoption-producer-requests.md": {
+      "contentHash": "e0762d88bf95389f02dd4c1b38ebf850bbdecb7d701e8546a768a6e2097a010f"
+    },
+    "docs/design/05-patched-adoption-delivery-plan.md": {
+      "contentHash": "96e3d227062f334b18596b7c2335d09305002bc5f0b7b9fc00bdfa5940c80cb7"
+    },
+    "docs/design/06-owner-decision-packet-2026-09-23.md": {
+      "contentHash": "383aba18aba457d00d1110cc87f7e272bcfc2af6e63930c9067f808e12be597e"
+    },
+    "docs/design/07-owner-decision-packet-rev3-2026-09-23.md": {
+      "contentHash": "7c82722df1c8d4d3d57aec35f92be68decba0e66fb04e421853ac234ede22730"
+    },
+    "docs/design/08-owner-instrument-one-deployment-unit.md": {
+      "contentHash": "d18fd41a6935b39e85e47e3787a515e2e94af39c403b058c692a21a7fb7eda4c"
+    },
+    "docs/design/09-owner-decision-packet-rev4-2026-09-23.md": {
+      "contentHash": "a1df120f3332a2198c1a4ef9ec2ac37e1ff2991d09f58dc0bcea3ed6c3defad9"
+    },
+    "docs/design/10-hiqlite-unclean-stop-upstream-issue.md": {
+      "contentHash": "8738b5093f678db15907cd7d4e9604992fd03088bf23989ab007d13d0cead7af"
+    },
+    "docs/design/evidence/043-probes/README.md": {
+      "contentHash": "c3a1607eb56fd093ca39a758258e6c9abf2d02a2b4b520813202ea347b238ddd"
+    },
+    "docs/design/evidence/048-probes/README.md": {
+      "contentHash": "c2bf67e41938adbc7c441214c9af5fcea3fe29b73c5f6d9e892e2abd15afb4e6"
+    },
+    "rust-toolchain.toml": {
+      "contentHash": "5948d33d665cb64976d3babc36fd8d53e356753f2e3ee521488f459da7f4d1d4"
+    },
+    "scripts/check-authored-content.sh": {
+      "contentHash": "f29ecfab602778e37107e96e8e5dd9e5891529179d7f48669c41adea2954b89f"
+    },
+    "scripts/k8s-validate.sh": {
+      "contentHash": "4335499d67376e9860f2797935b504c7b7fbf07389303ef049179da306289c2c"
+    },
+    "scripts/spec-dag.sh": {
+      "contentHash": "84d4793c8a1a811ab25ce7d45b9a66d92364015883bd4a72c8741b9898ab1d05"
+    },
+    "spec-spine.toml": {
+      "contentHash": "b46b9692ea38f6d96cb75b184007179362a72a4a8c9b7dcbb089daa74805d9bf"
+    },
+    "standards/spec/constitution.md": {
+      "contentHash": "64c385238ea7aed110333217a2c7405fda48e3518fa1f8b3bcc59a67d020acf4"
+    },
+    "standards/spec/contract.md": {
+      "contentHash": "9727d864802c2ad73c5f95b8e1ae155110ec12f873f6f487cab99004dbae9881"
+    },
+    "standards/spec/templates/constitution-template.md": {
+      "contentHash": "9422c45aeea54a1765b9da797f6c7e958dd2e7d4e74a7e3b788f3ec281a97900"
+    },
+    "standards/spec/templates/spec-template.md": {
+      "contentHash": "af0c52c7f61c91a8abe38b1fa7c1e3ef331542e082038aecd2ca6df0ea028896"
+    }
+  },
+  "schemaVersion": "1.2.0"
+}

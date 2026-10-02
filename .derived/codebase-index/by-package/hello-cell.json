@@ -5,6 +5,6 @@
     "path": "apps/hello-cell",
     "specRef": "034-hello-cell"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "c2d09eb7a4097a2fcb5085813e4387ef6e8c78bf8b12e276df5b6842b57a0ee0"
+  "schemaVersion": "1.2.0",
+  "shardHash": "6a16249ef6889fd5fe0ab001d609631ada9d2bf0137623c9ed5c341acbbd7bad"
 }

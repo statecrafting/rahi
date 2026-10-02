@@ -161,5 +161,5 @@
     "title": "N=3 split composition: two StatefulSets, rahi and rauthy, one hiqlite node per pod, rahi reaching rauthy only through an encrypted internal Service and losing readiness, never liveness, without it"
   },
   "shardHash": "508a5d5375bb008eadd670cc0186872966453177bf91621dbba7bf0f2eb960b3",
-  "specVersion": "1.8.0"
+  "specVersion": "1.9.0"
 }

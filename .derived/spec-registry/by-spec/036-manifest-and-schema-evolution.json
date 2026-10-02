@@ -339,5 +339,5 @@
     "title": "Manifest and schema evolution: a ledgered manifest transition, a checked migration history, and a restore that refuses what it cannot serve"
   },
   "shardHash": "881b69af9a0b38be4c374bd8ada25119e564adcde30079c9ebf02be80e4d7926",
-  "specVersion": "1.8.0"
+  "specVersion": "1.9.0"
 }

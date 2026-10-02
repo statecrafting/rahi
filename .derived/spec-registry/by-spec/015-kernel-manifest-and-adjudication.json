@@ -110,5 +110,5 @@
     "title": "The kernel: a declared capability ceiling, verified at build, enforced at runtime, denials ledgered"
   },
   "shardHash": "b0dc8569ea040b9eb79e0efbad45dadafeb8815a8d37ccca7b3da734613ffc9d",
-  "specVersion": "1.8.0"
+  "specVersion": "1.9.0"
 }

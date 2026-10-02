@@ -166,5 +166,5 @@
     "title": "Make every exit of a program that opened the app node pass through its shutdown"
   },
   "shardHash": "3a1cc1aa39e01bf8de7e7654472d8a347192a8bdd334111c3ca5661756f39baa",
-  "specVersion": "1.8.0"
+  "specVersion": "1.9.0"
 }

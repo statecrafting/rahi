@@ -350,6 +350,6 @@
     "specId": "001-agentic-harness",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "098ef4971b3d5b8a0a3dfa19b155dd98fd4d8b50c57fadbb315c3f862f79f36e"
+  "schemaVersion": "1.2.0",
+  "shardHash": "4635951af5707cf9b36ca81bac6732af1cd4bfa10671028ffbe8c9e24f98730f"
 }

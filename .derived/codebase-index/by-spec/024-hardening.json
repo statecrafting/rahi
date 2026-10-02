@@ -130,6 +130,6 @@
     "specId": "024-hardening",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "72704a6b66879862905c4e11f275ca0a59245b555e9f77064f20d7238ee337de"
+  "schemaVersion": "1.2.0",
+  "shardHash": "d8f6c0ca637de90843d228b752ffca1ac4872189cb545742a7c106579ee918ed"
 }

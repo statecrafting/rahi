@@ -293,6 +293,6 @@
     "specId": "035-denials-survive-shutdown",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "1d66df75cb62285ad66ca01c2d08e34d7f9678b9bbdc581752826555cca5a31d"
+  "schemaVersion": "1.2.0",
+  "shardHash": "5ef971d1025024b40ea9e2a4f563a50a6a5f89c4c6767bc31786b3112b10edfd"
 }

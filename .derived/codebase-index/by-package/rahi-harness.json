@@ -5,6 +5,6 @@
     "path": "crates/rahi-harness",
     "specRef": "033-dev-substrate-and-harness"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "635e99161e19a96e50b913e0b9835a8f36acfb4e6e55ff4ac867cbd96494c895"
+  "schemaVersion": "1.2.0",
+  "shardHash": "19ddcb67f0c621f1daec24de5664f1bf1a37fdb770057360f0a230113d39bfdb"
 }

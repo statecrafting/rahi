@@ -22,6 +22,6 @@
     "specId": "002-chassis-thesis",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "823add1335bcb45f086dc72677473d4d628790380a94807bc6df873d59dbc988"
+  "schemaVersion": "1.2.0",
+  "shardHash": "4884443b82d8469baa66971d74f18a339643ad5b37f18db955b1a51b1ac1871f"
 }

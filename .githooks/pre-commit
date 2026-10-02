@@ -45,14 +45,13 @@ refuse() {
 # which is the property that lets a hook call it at all.
 code=0
 out=$("$sc" --repo "$root" check 2>&1) || code=$?
+# The exact 0.28.0 pin uses the Statecraft exit family.
 case "$code" in
   0) ;;
-  2) echo "$out"
-     refuse 'a committed shard tree is stale' 'make refresh, then stage the regenerated shards' ;;
   1) echo "$out"
-     refuse 'the corpus does not validate' 'resolve the violations printed above' ;;
-  3) echo "$out"
-     refuse 'the freshness read could not be performed' 'read the error above; a read that did not answer is not a pass' ;;
+     refuse 'freshness or corpus validation has findings' 'read the diagnostics above; refresh stale shards or resolve validation violations' ;;
+  2|3|4) echo "$out"
+     refuse 'the freshness read was refused or failed' 'read the error above; a read that did not answer is not a pass' ;;
   *) echo "$out"
      refuse "unknown exit code $code from the freshness read" 'confirm the binary with spec-spine --version' ;;
 esac
@@ -107,8 +106,8 @@ out=$("$sc" --repo "$root" couple --base "$base" --head HEAD --include-uncommitt
 cc=${cc:-0}
 case "$cc" in
   0) ;;
-  3) echo "$out"
-     echo "[pre-commit] coupling check could not run (exit 3); the commit is NOT blocked on a read that did not answer" ;;
+  2|3|4) echo "$out"
+     refuse 'the coupling read was refused or failed' 'read the error above; a read that did not answer is not a pass' ;;
   *) echo "$out"
      refuse 'the change being committed drifts from its owning spec' 'claim the file in the spec you are implementing, or take the refusal to a human; a Spec-Drift-Waiver: is a PR-body instrument and is judged there' ;;
 esac
