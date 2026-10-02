@@ -236,6 +236,6 @@
     "specId": "012-store-coordination",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "7e197c8c1f5034c2a73296cfd72d6c84fd44c0081f7a986487752ddc7bf7d8b6"
+  "schemaVersion": "1.2.0",
+  "shardHash": "80985bafeeaaa5a0ba39b41e2143ac4a41d6f56d25ad019fe7a7bd1164b83c1d"
 }

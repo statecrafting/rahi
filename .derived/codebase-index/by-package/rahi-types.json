@@ -5,6 +5,6 @@
     "path": "crates/rahi-types",
     "specRef": "010-workspace-and-core-types"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "c997a7bc5f90316a6f91dd544a380865e98b659a163a0f7fc92c2b612342f8da"
+  "schemaVersion": "1.2.0",
+  "shardHash": "cd9d5c22992a85fe7a37769d89b86d8206cfdb2c3194c091c372869242d1135c"
 }

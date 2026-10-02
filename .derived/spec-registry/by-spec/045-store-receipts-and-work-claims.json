@@ -219,5 +219,5 @@
     "title": "Receipts and work claims: an inbound item is recorded once per content revision, processed once per processor revision, and never silently dropped"
   },
   "shardHash": "e5d1c7977348ac7f8e4a94a42ee2208e4098d0beb3e2799171e64a7deb5bdc6b",
-  "specVersion": "1.8.0"
+  "specVersion": "1.9.0"
 }

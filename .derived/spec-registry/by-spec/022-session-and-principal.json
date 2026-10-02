@@ -140,5 +140,5 @@
     "title": "Sessions and the principal: the signed envelope, renewal as a round-trip, the IdP subject as the only id"
   },
   "shardHash": "b0958bb509283648af2f0a758bfc3960d92b9390d0ab5a4df5777767a9f85239",
-  "specVersion": "1.8.0"
+  "specVersion": "1.9.0"
 }

@@ -236,6 +236,6 @@
     "specId": "015-kernel-manifest-and-adjudication",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "2136d678b16d6ceda41172d8a3836e32ac4fbcf77a3fb02fa15fd0c56c802a9c"
+  "schemaVersion": "1.2.0",
+  "shardHash": "2f390d059aecbef33883c62583a7170fdb1b6561d10304107ae1c2090516a1f5"
 }

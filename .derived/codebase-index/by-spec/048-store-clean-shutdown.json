@@ -222,6 +222,6 @@
     "specId": "048-store-clean-shutdown",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "4311600c0c365730c69bb18da8c5763e43949caad43b624c3f01adcc894c89c5"
+  "schemaVersion": "1.2.0",
+  "shardHash": "3a1cc1aa39e01bf8de7e7654472d8a347192a8bdd334111c3ca5661756f39baa"
 }

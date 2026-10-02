@@ -182,6 +182,6 @@
     "specId": "025-api-tokens-and-resource-server",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "b3373f677bbc4ae826b5a026225f69f3a620a1100953afc8118511b6b817d29f"
+  "schemaVersion": "1.2.0",
+  "shardHash": "ad40f4472268cc2da1b2268803649987ce1e3c0bb268a2d5e143ed0fd0081cc2"
 }

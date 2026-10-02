@@ -503,6 +503,6 @@
     "specId": "032-cluster-topology",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "dec25f50dd56b58ff1cf2308d029dcd393b951bea78ebcd1a1f66d4f2e27b8e1"
+  "schemaVersion": "1.2.0",
+  "shardHash": "72fb28d3a0984e2907649318d0f16f619ec0c9a9064943e9f793160a08fdb76e"
 }

@@ -88,5 +88,5 @@
     "title": "Hardening: trusted client identity, the operator role gate, exposure review of every route"
   },
   "shardHash": "d8f6c0ca637de90843d228b752ffca1ac4872189cb545742a7c106579ee918ed",
-  "specVersion": "1.8.0"
+  "specVersion": "1.9.0"
 }

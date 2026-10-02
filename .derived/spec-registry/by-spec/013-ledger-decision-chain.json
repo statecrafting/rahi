@@ -110,5 +110,5 @@
     "title": "The decision chain: hash-linked records, CAS append, verification at boot"
   },
   "shardHash": "944df06bea90fac6cb259c7d53c80a15607a837101ab16b264f7eba5ef3e082c",
-  "specVersion": "1.8.0"
+  "specVersion": "1.9.0"
 }
