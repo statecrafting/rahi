@@ -1730,6 +1730,26 @@ sets.
   explanation of what `order_chain` proves is corrected in place, dated, with
   its mechanism left standing.
 
+- **D-19 (2026-10-01, remediation session; AC-9 persists its NONE header
+  before opening the store).** PR #77's Linux CI reproduced an AC-9 fixture
+  defect: after the 100,000-decision run, `auto_vacuum` was INCREMENTAL rather
+  than the NONE that the measurement requires. Setting NONE on an otherwise
+  empty SQLite file does not persist its database header, so hiqlite's
+  asynchronous connection setup could choose INCREMENTAL before the first
+  table was created. A deterministic regression reproduces this by reopening
+  the prepared file, requesting INCREMENTAL, and creating an application table.
+
+  The fixture now creates and drops a temporary table after selecting NONE,
+  before `Store::open`, so the header is committed and subsequent connections
+  cannot change that choice without rebuilding the database. No fixture table
+  remains, no application table is rewritten, and no VACUUM runs. AC-9's exact
+  decision count, sealing policy, drop-and-freelist procedure and D-7's ceiling
+  of 800 bytes per decision are unchanged. This is test initialization only;
+  runtime store configuration is unchanged.
+
+  Rejected: rerunning the same race, accepting INCREMENTAL in the assertion,
+  or widening the tolerance, none of which measures the fixture AC-9 fixes.
+
 ## 8. Owner decisions, answered
 
 The four questions this draft raised are answered. Each named a requirement

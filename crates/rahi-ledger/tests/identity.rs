@@ -2950,6 +2950,37 @@ fn used_bytes(db: &rusqlite::Connection) -> i64 {
     (page_count - freelist) * page_size
 }
 
+fn prepare_cost_measurement_db(path: &Path) {
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    let db = rusqlite::Connection::open(path).unwrap();
+    db.pragma_update(None, "auto_vacuum", 0).unwrap();
+    // Setting NONE on an empty file does not persist a database header.
+    // Commit one without leaving a fixture table or repacking any pages.
+    db.execute_batch("CREATE TABLE ac9_header (value INTEGER); DROP TABLE ac9_header;")
+        .unwrap();
+}
+
+#[test]
+fn the_cost_fixture_keeps_auto_vacuum_none_when_a_store_connection_requests_incremental() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("hiqlite.db");
+    prepare_cost_measurement_db(&path);
+
+    // Reopening and requesting INCREMENTAL reproduces hiqlite's setup on a
+    // second connection, before the first application table is created.
+    let db = rusqlite::Connection::open(&path).unwrap();
+    db.pragma_update(None, "auto_vacuum", 2).unwrap();
+    db.execute("CREATE TABLE application_data (value INTEGER)", [])
+        .unwrap();
+    let auto_vacuum: i64 = db
+        .query_row("PRAGMA auto_vacuum", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(
+        auto_vacuum, 0,
+        "the measurement must retain its NONE header"
+    );
+}
+
 /// AC-9, D-7. The permanent resident cost of lifetime identity, measured
 /// against B-9's estimate at the fixture AC-9 fixes.
 ///
@@ -2981,10 +3012,7 @@ async fn the_resident_cost_per_decision_is_within_the_tolerance_fixed_before_it_
     let dir = tempfile::tempdir().unwrap();
     let data_dir = dir.path().join("hiqlite");
     let db_path = data_dir.join("state_machine/db/hiqlite.db");
-    std::fs::create_dir_all(db_path.parent().unwrap()).unwrap();
-    let db = rusqlite::Connection::open(&db_path).unwrap();
-    db.pragma_update(None, "auto_vacuum", 0).unwrap();
-    drop(db);
+    prepare_cost_measurement_db(&db_path);
     let store = rahi_store::Store::open(&common::config(&data_dir))
         .await
         .expect("single-voter node opens");
