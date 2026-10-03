@@ -1,7 +1,7 @@
 {
   "inputs": {
     ".claude/agents/architect.md": {
-      "contentHash": "1cd21e58cd1077b15fdef0fcfc24934b50bcd6c85382946639262e2e146d013e"
+      "contentHash": "f88567fa1c47aa09d8d261b2f407ac0bfc35e544008daa6ffe828a9a80f74baa"
     },
     ".claude/agents/explorer.md": {
       "contentHash": "fd73b9a57f4e3090cc002d50a1de3857d4b58dd0e715af16813a753dcf7407c3"
@@ -31,7 +31,7 @@
       "contentHash": "5e39637ab19f54b29c19154a13161c94da5511ad696b8ff1626950da68412e29"
     },
     ".claude/settings.json": {
-      "contentHash": "bda7cf52b614ba2eb37f15efcf0bcace2076b48eee3e1de5e9efc256a9a196ef"
+      "contentHash": "587977f76044ea315e4b6954cb5713e1de6faa6bef4675b646a166463255e9cd"
     },
     ".claude/skills.sha256": {
       "contentHash": "72792b6c24ccafb6e6c20efd349867262907915e2c2b0b95e59480f583687b00"
@@ -79,7 +79,7 @@
       "contentHash": "db2adc9daa741b04b6ab1e75bcc1eeacfec078f1e4a0134d299103f1c9304b81"
     },
     ".githooks/pre-commit": {
-      "contentHash": "93fad04560b9b2be6a99df2563ee2de8a8428a2b72fe6b05c1752a3a47341ca2"
+      "contentHash": "907bf25e2d2915ffb08049cc8f6150084a7e4eee9f620fdfd73936511f90aa33"
     },
     ".github/consumer-cell/Cargo.registry.toml.in": {
       "contentHash": "e3d51f9bb3d19865fa3552f07b9cf8b1e285616fb9c099c1dcd79b1246909f02"
@@ -127,16 +127,16 @@
       "contentHash": "267962ad307e5707f2a025ce1fa40b80d52cd0cf3f8c8bdb25d03a6459366a1a"
     },
     "AGENTS.md": {
-      "contentHash": "b296deb6b2640a0605d4720eb8e6f1ff1baa8e6cfd20a95c38558ae4c5777a79"
+      "contentHash": "b8be3b3b36397f4d093a2a3575103494da453f4d400e525a85da2d82decf4c23"
     },
     "CLAUDE.md": {
-      "contentHash": "516ea6a98309a883f711460a140e691898f6492e6b6b7204e3748b589853a90a"
+      "contentHash": "41d5620394e0e9ad7fa3867d699d04a57b17f2fad53306c15119d22051f0f033"
     },
     "CODEOWNERS": {
       "contentHash": "be9b4a2ce0c6f28cfbcce6e455c79929f85229a3751d3b1634d4230d41aae3b0"
     },
     "Makefile": {
-      "contentHash": "3728babc941974196035bb8f39896e516543f02b2b66c4743e1612901acb8ecb"
+      "contentHash": "5d8f87b7cf9e20861e94634f77336a2f457172076076646e136424ee30bf133e"
     },
     "crates/rahi-ops/rauthy.env.template": {
       "contentHash": "b42cdcd91b2924570084da34d73ec3c3773f4c401a96fbc1b3561327ce5b24e3"
@@ -226,7 +226,7 @@
       "contentHash": "7c82722df1c8d4d3d57aec35f92be68decba0e66fb04e421853ac234ede22730"
     },
     "docs/design/08-owner-instrument-one-deployment-unit.md": {
-      "contentHash": "d18fd41a6935b39e85e47e3787a515e2e94af39c403b058c692a21a7fb7eda4c"
+      "contentHash": "38f0043374ab9a5f59dc4262c1ccf08dae4346e072cc9a8ea5f29d10bc9b38ff"
     },
     "docs/design/09-owner-decision-packet-rev4-2026-09-23.md": {
       "contentHash": "a1df120f3332a2198c1a4ef9ec2ac37e1ff2991d09f58dc0bcea3ed6c3defad9"
@@ -253,10 +253,10 @@
       "contentHash": "84d4793c8a1a811ab25ce7d45b9a66d92364015883bd4a72c8741b9898ab1d05"
     },
     "spec-spine.toml": {
-      "contentHash": "dba1390031509a66d1626e970620468175dd92cce181390b57ae2642de969033"
+      "contentHash": "8a7f00269e56b9fee9548cf74cb307d2e9b249bfc18454b14aa12a5f545a7d08"
     },
     "standards/spec/constitution.md": {
-      "contentHash": "64c385238ea7aed110333217a2c7405fda48e3518fa1f8b3bcc59a67d020acf4"
+      "contentHash": "4d61a25ddc4a913cc7a12da8b3ec0d8adb34e96794ec334c814981d0564fde0a"
     },
     "standards/spec/contract.md": {
       "contentHash": "9727d864802c2ad73c5f95b8e1ae155110ec12f873f6f487cab99004dbae9881"

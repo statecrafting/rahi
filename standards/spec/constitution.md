@@ -68,12 +68,12 @@ owns them; the citation is context, never authority.
 
 ## VI. One deployment unit
 
-A governed cell is one container, one volume, one public origin, one
-command. rauthy is co-deployed inside that unit and reached only through the
-app's origin. N=1 is the primary mode and pays nothing for the existence of
-N=3. A spec that adds a sidecar, a second exposed port, a managed database,
-or a cloud prerequisite must justify it in its Purpose section. *(Bootstrap
-anchor: `one-deployment-unit`.)*
+A governed cell is one public origin and one command, in one of the
+layouts `specs/000` section 6 names. rauthy is reached by users only
+through the app's origin. N=1 is the primary mode and pays nothing for
+the existence of N=3. A spec that adds a sidecar, a second exposed port, a
+managed database, or a cloud prerequisite must justify it in its Purpose
+section. *(Bootstrap anchor: `one-deployment-unit`.)*
 
 ## VII. The IdP is the principal authority
 

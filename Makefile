@@ -9,7 +9,7 @@ SHELL := /bin/bash
 
 SPEC_SPINE ?= spec-spine
 
-# The exact governance pin is authored in spec-spine.toml.
+# The exact governance pin is authored in spec-spine.toml (spec 001 D-21).
 SPEC_SPINE_VERSION ?= $(shell sed -n 's/^required_version = "=\(.*\)"/\1/p' spec-spine.toml)
 
 # The coupling base follows the branch this repository actually has, rather
