@@ -67,7 +67,7 @@
       "contentHash": "7bfa43dd22323b9c16ff46916f61b70b33c0e853f11a35996f2c6ec1854a0b33"
     },
     ".gitattributes": {
-      "contentHash": "13818de259a9f92c0b29b4febc8ff831cd9664dc6d603acb539fd2eb5c21cb9f"
+      "contentHash": "3ced9c49d9849c0822f452d1fc6a44e9ac2b7da2d3c5aa28ce86ec2250f80381"
     },
     ".githooks/enable-hooks.sh": {
       "contentHash": "6614f89d430a01408a919c9a13cc4bd5be7e2289ccdea22642c904b93019d1ef"
@@ -106,7 +106,7 @@
       "contentHash": "41e2c0f3e7579559edff04f47b25871eb6bf7f168f241ca3981e06fb6922dee5"
     },
     ".github/workflows/govern.yml": {
-      "contentHash": "486bc83e8b717bc0c7d1db1c6cf82580fc594c1122f2df2d9a15b5a235df8e82"
+      "contentHash": "e6b188537a0447867886bb2f2ec2c575e6b254613e4c509485d3eb7216e3ce0f"
     },
     ".github/workflows/image.yml": {
       "contentHash": "644a3ff6e32af864dd3fdb93672b5412f300c58fb420a62634f69fd42c813058"
@@ -118,16 +118,16 @@
       "contentHash": "2c03ff36f7157bb914ef0ae52867c45c80051d373b5db7821b5f2a7829f8197f"
     },
     ".github/workflows/statecraft-ai-review.yml": {
-      "contentHash": "daa0cd0400d1aab5195440c0ac9a3df13f11fe110263f504d8310f3ba9878d5c"
+      "contentHash": "9f00644582115ee46103cd954bbe1575feb83323ff058fcbf12f4a2fc9dca40c"
     },
     ".github/workflows/statecraft-ci.yml": {
-      "contentHash": "656689de4cb82fa8ccbfe9a6703fc76768f4a859f501e7989bbc1d8aece14d16"
+      "contentHash": "3d81edd8f9d6487c4a0614fce608637d503b5f14207277ff333b1999ae0831af"
     },
     ".mcp.json": {
       "contentHash": "267962ad307e5707f2a025ce1fa40b80d52cd0cf3f8c8bdb25d03a6459366a1a"
     },
     "AGENTS.md": {
-      "contentHash": "956c6956dd9994ab4d0d2d2ec1b6b4f63d206dc762e18189427cd24d99f12301"
+      "contentHash": "b8be3b3b36397f4d093a2a3575103494da453f4d400e525a85da2d82decf4c23"
     },
     "CLAUDE.md": {
       "contentHash": "41d5620394e0e9ad7fa3867d699d04a57b17f2fad53306c15119d22051f0f033"
@@ -136,7 +136,7 @@
       "contentHash": "be9b4a2ce0c6f28cfbcce6e455c79929f85229a3751d3b1634d4230d41aae3b0"
     },
     "Makefile": {
-      "contentHash": "0226f5bff74df4b4d8be76e83e531cc2f7c9a2d4721276904adaddf870908330"
+      "contentHash": "5d8f87b7cf9e20861e94634f77336a2f457172076076646e136424ee30bf133e"
     },
     "crates/rahi-ops/rauthy.env.template": {
       "contentHash": "b42cdcd91b2924570084da34d73ec3c3773f4c401a96fbc1b3561327ce5b24e3"
@@ -253,7 +253,7 @@
       "contentHash": "84d4793c8a1a811ab25ce7d45b9a66d92364015883bd4a72c8741b9898ab1d05"
     },
     "spec-spine.toml": {
-      "contentHash": "b46b9692ea38f6d96cb75b184007179362a72a4a8c9b7dcbb089daa74805d9bf"
+      "contentHash": "8a7f00269e56b9fee9548cf74cb307d2e9b249bfc18454b14aa12a5f545a7d08"
     },
     "standards/spec/constitution.md": {
       "contentHash": "4d61a25ddc4a913cc7a12da8b3ec0d8adb34e96794ec334c814981d0564fde0a"

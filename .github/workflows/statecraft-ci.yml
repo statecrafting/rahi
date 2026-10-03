@@ -1,5 +1,5 @@
-# Rendered by Statecraft from profile github-actions-rust revision 12
-# (identity 62a6bc6010e0b6677c4df517373a44adb97c7c8cdf8d6fbd7b58d6cbe596f083). A managed file and a member of this
+# Rendered by Statecraft from profile github-actions-rust revision 13
+# (identity 6167a12e110b30ec27d37909344c7de0178ba477d5ad1ab91a0053430a89e17b). A managed file and a member of this
 # repository's authority set: an edit here changes the gate that judges every
 # pull request, and `statecraft doctor` names it. The policy the aggregate gate
 # enforces is .statecraft/setup/github-actions-rust.json, read at the base.
@@ -121,7 +121,7 @@ jobs:
       - name: Cache spec-spine
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: .tooling/bin/spec-spine
+          path: .bin/spec-spine
           key: spec-spine-${{ steps.pin.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
       - name: Install the pinned spec-spine
         run: sh "${STATECRAFT_INSTALL:?}"
@@ -223,7 +223,7 @@ jobs:
       - name: Cache spec-spine
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: .tooling/bin/spec-spine
+          path: .bin/spec-spine
           key: spec-spine-${{ steps.pin.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
       - name: Install the pinned spec-spine
         run: sh "${STATECRAFT_INSTALL:?}"

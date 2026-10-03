@@ -980,6 +980,17 @@ refuses a coupling read that did not answer. Historical decisions retain the
 versions they describe. This upgrade changes no spec approval or implementation state and grants no
 bootstrap authority to draft spec 044.
 
+D-21 (2026-10-02, profile migration reconciliation). Adopt Statecraft
+profile revision 13 rendered by statecraft-cli `8f718e2`, following the
+merged engine upgrade in D-20. The exact pin remains 0.28.0 in
+`spec-spine.toml`; Makefile and the reusable governance workflow derive
+it there. The installer uses `.bin/`, while `.tooling/` remains ignored
+for existing installations. Preserve D-20's contributor-hook exit
+contract and refusal of unanswered coupling reads. Existing govern and
+supply-chain jobs remain required. Regenerate both artifact trees against
+the merged corpus, including spec 044 and the bootstrap owner act.
+The inputs shard uses the existing derived-regeneration merge driver.
+
 ## Verification
 
 ```verify:cli
@@ -1022,9 +1033,9 @@ grep -q '^  merge_group:' .github/workflows/statecraft-ci.yml
 # B-3: the coupling gate diffs the event's frozen SHAs, never the merge ref.
 grep -q 'HEAD_SHA: ..{ github.event.pull_request.head.sha }' .github/workflows/govern.yml
 sh -c '! grep -q -- "--head HEAD" .github/workflows/govern.yml'
-# B-3: the pin is stated in the Makefile, and CI reads it from there.
+# D-21: Makefile and CI derive the pin from spec-spine.toml.
 sh -c 'test -n "$(sed -n "s/^SPEC_SPINE_VERSION ?= //p" Makefile)"'
-grep -q "SPEC_SPINE_VERSION ?= " .github/workflows/govern.yml
+grep -q "required_version" .github/workflows/govern.yml
 # B-9: LF normalization, the merge-driver attribute, and the driver itself.
 grep -q 'text=auto eol=lf' .gitattributes
 grep -q 'merge=spec-spine-derived-regen' .gitattributes
@@ -1042,11 +1053,10 @@ sh -c '! grep -qE "git (-C [^ ]+ )?add" .githooks/pre-commit'
 # B-10 / D-13: the flag is local-only. CI's coupling verdict must not depend
 # on the state of a runner's working tree (spec-spine spec 102 3.4).
 sh -c '! grep -rq -- "--include-uncommitted" .github/workflows/'
-# D-20: the engine upgrade follows the merged revision-12 base gate.
-sh -c 'test "$(sed -n "s/^SPEC_SPINE_VERSION ?= //p" Makefile)" = 0.28.0'
+# D-21: the exact released pin and profile revision are recorded once.
 grep -qx 'required_version = "=0.28.0"' spec-spine.toml
-# D-19: profile revision 12 and its ratification and attribution controls.
-grep -q 'statecraft-setup:github-actions-rust@12' .statecraft/environment.json
+sh -c "printf '%s\n' 'print-spine-version:;@echo \$(SPEC_SPINE_VERSION)' | make -s -f Makefile -f - print-spine-version | grep -qx '0.28.0'"
+grep -q 'statecraft-setup:github-actions-rust@13' .statecraft/environment.json
 grep -q '"require_ratified": true' .statecraft/setup/github-actions-rust.json
 python3 -c 'import json; a = json.load(open(".claude/settings.json"))["attribution"]; assert a == {"commit": "", "pr": "", "sessionUrl": False}, a'
 grep -q -- '--identity BASE HEAD' scripts/check-authored-content.sh

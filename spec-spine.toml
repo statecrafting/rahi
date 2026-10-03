@@ -6,7 +6,7 @@
 
 [meta]
 # The exact pin (spec 001 D-16; a floor under D-14 and D-15). The Makefile
-# states the same version and CI reads it there (B-3). Any other binary,
+# and CI derive the version here (D-21). Any other binary,
 # older or newer, must refuse the corpus instead of judging shards it did
 # not write. A pin mismatch is exit 2 under the current exit family.
 required_version = "=0.28.0"

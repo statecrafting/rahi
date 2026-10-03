@@ -113,7 +113,7 @@ crate must be specifically claimed by a spec; a session that adds a file
 claims it in the spec it is implementing.
 
 ```sh
-cargo install spec-spine-cli --version =0.28.0 --locked   # pinned in the Makefile
+sh scripts/statecraft/install-spec-spine.sh   # reads spec-spine.toml
 make gate
 spec-spine registry list
 scripts/spec-dag.sh

@@ -50,23 +50,23 @@
     ],
     "governance": [
       [
-        ".tooling/bin/spec-spine",
+        ".bin/spec-spine",
         "check",
         "--fail-on-warn"
       ],
       [
-        ".tooling/bin/spec-spine",
+        ".bin/spec-spine",
         "lint",
         "--fail-on-warn"
       ],
       [
-        ".tooling/bin/spec-spine",
+        ".bin/spec-spine",
         "index",
         "coverage",
         "--fail-on-untraced"
       ],
       [
-        ".tooling/bin/spec-spine",
+        ".bin/spec-spine",
         "index",
         "check"
       ],
@@ -77,38 +77,38 @@
   },
   "files": [
     {
-      "digest": "fb0e171aa1ae4dba68e4d973291d6a758927982d51b0dbe8834811b0c2c6cc96",
+      "digest": "23e4e8384f1f9548151b51766c7dd5aaddc012b93ae060b46433f03b543e8d63",
       "path": ".github/workflows/statecraft-ci.yml",
       "role": "workflow"
     },
     {
-      "digest": "4d23f5f7542e60039e04cb747d832ed03de98609e260a9ed885e28d37b9864cd",
+      "digest": "5762bbdb2eb24c9d919249e3ed5b95c6578764e508df2027bcffdcbd30020c41",
       "path": ".github/workflows/statecraft-ai-review.yml",
       "role": "workflow"
     },
     {
-      "digest": "ed6cb7156fccd623c93e756fdc45aedddd2138f36d7a1bdeeeaafbbcd48f2cad",
+      "digest": "ccc88e796d424adefe943696048c0e785ad62a3ff1cbbc3a6683453835daacc5",
       "path": "scripts/statecraft/install-spec-spine.sh",
       "role": "script"
     },
     {
-      "digest": "2073ead9aae9f855fc1ddc13de49e3b93f2f37ba7ee39d53d0c40b20c9b5251e",
+      "digest": "bbcf77699c26c6819dfaf96db670634b1a8a9bea20be91ec37fd513e76ae7809",
       "path": "scripts/statecraft/gate.sh",
       "role": "script"
     },
     {
-      "digest": "e6017e43b6ae586b43114ce25d3c43542910e95d8cdb8ff22549b252182daca0",
+      "digest": "0163ae9783cb01a8a1ed17f80617a5dc4407e151f1af30efd6a9be48d15b4829",
       "path": "scripts/statecraft/ci-gate.sh",
       "role": "script"
     },
     {
-      "digest": "ecb3028a04aec09819a4fc6504504f9c15fa4f9acdc4f4055dff9da557daea75",
+      "digest": "48aa0d594654df5365c3bbdf4d6f6e4e5a0cffed72f707e3321d8f7b994e8d44",
       "path": "scripts/statecraft/ai-review.sh",
       "role": "script"
     }
   ],
   "id": "github-actions-rust",
-  "identity": "62a6bc6010e0b6677c4df517373a44adb97c7c8cdf8d6fbd7b58d6cbe596f083",
+  "identity": "6167a12e110b30ec27d37909344c7de0178ba477d5ad1ab91a0053430a89e17b",
   "jobs": {
     "ai-review": {
       "merge_group": "recorded-review",
@@ -213,6 +213,7 @@
     "revision 10: review.diff_cap defaults to 3000 changed lines; an explicit value from 1 through 20000 remains an operator choice and is preserved on upgrade (spec 017)",
     "revision 11: the commit walk copies the spec-spine binary into each commit's temporary worktree as a regular file instead of linking to a binary outside it, so spec-spine's containment rule (its spec 144, from 0.28.0) can read every commit's tree; the walk's verdicts are otherwise unchanged (spec 023)",
     "revision 12: the AI review leaves a managed file out only when its bytes match the digest the policy records, sends a file that only removes lines as a list under review.deletion_cap, measures the change in estimated tokens (bytes / 3) against a call budget of half review.context_tokens and a ceiling of review.max_calls calls, and reviews a larger change in file groups whose verdicts are merged; review.diff_cap is an added-line backstop, 20000 unless declared. With governance.require_ratified (default true) the coupling steps refuse a changed path a draft spec owns, and a pull request that moves a spec to approved needs the owner exception (spec 024)",
+    "revision 13: the repository-local spec-spine is installed at .bin/spec-spine. The installer builds in a scratch root outside the repository and atomically moves only the executable into .bin; rendered gates, workflow caches, commit checks, policy commands, delivered hooks and local resolution use that one location. The previous .tooling ignore remains on upgrade, and .bin is also ignored (spec 031)",
     "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)"
   ],
   "review": {
@@ -237,5 +238,5 @@
     "tool": "claude-code",
     "tool_version": "2.1.116"
   },
-  "revision": 12
+  "revision": 13
 }

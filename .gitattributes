@@ -30,3 +30,5 @@ Makefile text eol=lf
 .derived/spec-registry/by-spec/*.json     merge=spec-spine-derived-regen
 .derived/codebase-index/by-spec/*.json    merge=spec-spine-derived-regen
 .derived/codebase-index/by-package/*.json merge=spec-spine-derived-regen
+
+.derived/codebase-index/inputs.json       merge=spec-spine-derived-regen
