@@ -40,7 +40,7 @@ jobs:
     name: cargo package (the nine chassis crates)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
       # Spec 039 B-6 and FR-001: every chassis crate packages. `rahi-ops`
       # used to fail here, because it included a template from outside its
@@ -88,7 +88,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
       # Spec 039 B-7: the stanza available before publication is a git
       # dependency on a tag. Once a release is published the same job proves
@@ -132,7 +132,7 @@ jobs:
     env:
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
       - name: The token is present
         run: |
@@ -162,7 +162,7 @@ jobs:
     needs: publish-crates
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
       - name: Assemble the cell outside the workspace
         run: |
