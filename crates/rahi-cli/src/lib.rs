@@ -138,17 +138,71 @@ async fn first_boot<C: Cell>(env: &dyn EnvReader) -> Result<()> {
 /// real binary stopped at a persistent state, with no cleanup after it.
 pub const ENV_UPGRADE_CRASH_AT: &str = "RAHI_TEST_UPGRADE_CRASH_AT";
 
-/// The fault injector [`ENV_UPGRADE_CRASH_AT`] selects: at its point the
-/// process exits `137`, the code of a SIGKILL, without unwinding.
-struct CrashAt(Option<String>);
+/// Spec 043 D-31: `<point>:<dir>` holds the transition verb at one of its
+/// fault points, so a live harness can stop or start a real pre-043 node at
+/// a chosen offset inside T1. At the point the verb creates `<dir>/held`,
+/// then waits for `<dir>/go` to exist before it continues. A test seam, as
+/// [`ENV_UPGRADE_CRASH_AT`] is.
+pub const ENV_UPGRADE_HOLD_AT: &str = "RAHI_TEST_UPGRADE_HOLD_AT";
 
-impl rahi_ops::upgrade::Faults for CrashAt {
+/// How long a held verb waits for `go` before it fails.
+const HOLD_LIMIT: std::time::Duration = std::time::Duration::from_secs(120);
+
+/// The fault injector [`ENV_UPGRADE_CRASH_AT`] and [`ENV_UPGRADE_HOLD_AT`]
+/// select: at the crash point the process exits `137`, the code of a
+/// SIGKILL, without unwinding; at the hold point it waits for its harness.
+struct TestFaults {
+    crash_at: Option<String>,
+    hold_at: Option<(String, std::path::PathBuf)>,
+}
+
+impl rahi_ops::upgrade::Faults for TestFaults {
     fn hit(&self, point: &str) -> Result<()> {
-        if self.0.as_deref() == Some(point) {
+        if self.crash_at.as_deref() == Some(point) {
             eprintln!("upgrade-cache: {ENV_UPGRADE_CRASH_AT} ends the process at `{point}`");
             std::process::exit(137);
         }
+        if let Some((at, dir)) = &self.hold_at
+            && at == point
+        {
+            hold(dir)?;
+        }
         Ok(())
+    }
+}
+
+/// Announce the hold in `dir` and wait, polling, for the harness's `go`.
+fn hold(dir: &std::path::Path) -> Result<()> {
+    let held = dir.join("held");
+    std::fs::write(&held, b"")
+        .map_err(|err| Error::Io(format!("{} cannot be written: {err}", held.display())))?;
+    let go = dir.join("go");
+    let start = std::time::Instant::now();
+    while !go.exists() {
+        if start.elapsed() > HOLD_LIMIT {
+            return Err(Error::Io(format!(
+                "{ENV_UPGRADE_HOLD_AT}: {} did not appear within {} s",
+                go.display(),
+                HOLD_LIMIT.as_secs()
+            )));
+        }
+        std::thread::sleep(std::time::Duration::from_micros(50));
+    }
+    Ok(())
+}
+
+/// [`ENV_UPGRADE_HOLD_AT`]'s `<point>:<dir>`, read from `env`.
+fn hold_at(env: &dyn EnvReader) -> Result<Option<(String, std::path::PathBuf)>> {
+    let Some(value) = env.get(ENV_UPGRADE_HOLD_AT).filter(|v| !v.is_empty()) else {
+        return Ok(None);
+    };
+    match value.split_once(':') {
+        Some((point, dir)) if !point.is_empty() && !dir.is_empty() => {
+            Ok(Some((point.to_owned(), std::path::PathBuf::from(dir))))
+        }
+        _ => Err(Error::Config(format!(
+            "{ENV_UPGRADE_HOLD_AT} is {value:?}; it takes <point>:<dir>"
+        ))),
     }
 }
 
@@ -156,7 +210,10 @@ impl rahi_ops::upgrade::Faults for CrashAt {
 async fn upgrade_cache(backup: Option<std::path::PathBuf>, env: &dyn EnvReader) -> Result<()> {
     use rahi_ops::upgrade::{self, Outcome};
     let config = rahi_types::Config::from_env(env)?;
-    let faults = CrashAt(env.get(ENV_UPGRADE_CRASH_AT).filter(|p| !p.is_empty()));
+    let faults = TestFaults {
+        crash_at: env.get(ENV_UPGRADE_CRASH_AT).filter(|p| !p.is_empty()),
+        hold_at: hold_at(env)?,
+    };
     let outcome = match backup {
         Some(archive) => {
             println!("{}", upgrade::PRECONDITIONS);

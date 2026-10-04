@@ -381,12 +381,141 @@ ac5() {
   done
 }
 
+# ------------------------------------------------- AC-5 races (D-P12, D-P13)
+# A copy of the prepared volume `src` as `dst`.
+clone_volume() {
+  docker volume create "$2" >/dev/null
+  docker run --rm --user 0 -v "$1:/s" -v "$2:/data" --entrypoint sh "$new" -c 'cp -a /s/. /data/'
+}
+
+# A container of the old image on `volume`, idle, with the new binary at
+# /tmp/rahi-new: both nodes then run on one clock against one volume, and
+# the harness times them in-process rather than across `docker run`. The
+# public origin is that of the source volume named third, since every clone
+# carries the Rauthy client registered with it.
+race_box() {
+  name="$1"; volume="$2"; p="$(vol_port "$3")"
+  docker run -d --name "$name" -p "${p}:8443" -e RAHI_PUBLIC_URL="http://localhost:${p}" \
+    -v "${volume}:/data" --entrypoint sh "$old" -c 'sleep infinity' >/dev/null
+  docker cp "${portfile}.rahi-new" "${name}:/tmp/rahi-new" >/dev/null
+}
+
+# The real v0.2.0 cell stopped cleanly while T1 runs (D-P12). Its
+# supervisor is brought up to ready; the verb is held at `t1.start`; the
+# supervisor is sent SIGTERM, and T1 is released `offset` seconds after the
+# node's first stop event, the removal of `logs_cache/lock.hql` (a busy
+# wait, so the offset is not a poll interval); the verb stops at `guarded`
+# if it gets there. Prints one line: the verb's exit, whether the node's
+# SQLite files were still there when the verb ended, whether any legacy
+# path changed after it, and the verb's error.
+stop_race() {
+  name="$1"; archive="$2"; offset="$3"; origin_of="$4"
+  docker exec -d "$name" sh -c 'cd /data && echo $$ >/tmp/supervise.pid && exec rahi supervise >/tmp/supervise.log 2>&1'
+  if ! ready_within "$(vol_port "$origin_of")" 180 "$name"; then
+    echo "result=old-cell-never-ready"; return
+  fi
+  docker exec "$name" sh -c "
+    cd /data
+    spid=\$(cat /tmp/supervise.pid)
+    mkdir -p /tmp/h
+    RAHI_TEST_UPGRADE_CRASH_AT=guarded RAHI_TEST_UPGRADE_HOLD_AT=t1.start:/tmp/h \
+      /tmp/rahi-new upgrade-cache --backup '$archive' >/tmp/verb.log 2>&1 & vpid=\$!
+    until [ -e /tmp/h/held ] || ! kill -0 \$vpid 2>/dev/null; do sleep 0.01; done
+    kill -TERM \$spid
+    while [ -e hiqlite/logs_cache/lock.hql ] && kill -0 \$spid 2>/dev/null; do :; done
+    sleep $offset; : > /tmp/h/go
+    wait \$vpid; code=\$?
+    if ls hiqlite/state_machine/db/*-wal hiqlite/state_machine/db/*-shm >/dev/null 2>&1; then open=yes; else open=no; fi
+    snap() { find hiqlite -path hiqlite/state_machine/lock -prune -o -type f -print | sort | xargs -r sha256sum; }
+    before=\$(snap)
+    while kill -0 \$spid 2>/dev/null; do sleep 0.1; done
+    after=\$(snap)
+    if [ \"\$before\" = \"\$after\" ]; then changed=no; else changed=yes; fi
+    echo \"result=ok verb=\$code db_open_at_verb_end=\$open legacy_changed_after=\$changed why=\$(grep -m1 ^error /tmp/verb.log)\"
+  " | grep '^result='
+}
+
+# The real v0.2.0 node started while T1 runs (D-P13). The verb is held at
+# `t1.start`; with `order` node-first the node is started and T1 released
+# `offset` seconds later, with verb-first T1 is released and the node
+# started `offset` seconds later. Prints the verb's exit, whether the node
+# was still running 20 s later, and the verb's error.
+start_race() {
+  name="$1"; archive="$2"; order="$3"; offset="$4"
+  case "$order" in
+    node-first) first='rahi serve >/tmp/serve.log 2>&1 & spid=$!'; second=': > /tmp/h/go' ;;
+    *) first=': > /tmp/h/go'; second='rahi serve >/tmp/serve.log 2>&1 & spid=$!' ;;
+  esac
+  docker exec "$name" sh -c "
+    cd /data
+    mkdir -p /tmp/h
+    RAHI_TEST_UPGRADE_HOLD_AT=t1.start:/tmp/h \
+      /tmp/rahi-new upgrade-cache --backup '$archive' >/tmp/verb.log 2>&1 & vpid=\$!
+    until [ -e /tmp/h/held ] || ! kill -0 \$vpid 2>/dev/null; do sleep 0.01; done
+    $first
+    sleep $offset
+    $second
+    wait \$vpid; code=\$?
+    sleep 20
+    if kill -0 \$spid 2>/dev/null; then alive=yes; else alive=no; fi
+    echo \"result=ok verb=\$code old_running=\$alive why=\$(grep -m1 ^error /tmp/verb.log)\"
+  " | grep '^result='
+}
+
+ac5_races() {
+  src="${run_id}-race-src"
+  archive="$(old_volume "$src")" || { fail "AC-5 races: preparation"; return; }
+  helper="${run_id}-race-bin"
+  docker create --name "$helper" "$new" >/dev/null
+  docker cp "${helper}:/usr/local/bin/rahi" "${portfile}.rahi-new" >/dev/null
+  docker rm "$helper" >/dev/null
+  chmod 0755 "${portfile}.rahi-new"
+
+  guarded=0; refused=0; before="$failures"
+  for offset in 0 0.002 0.005 0.01 0.1 1 3 4 4.25 4.5 5 6; do
+    tag="$(printf '%s' "$offset" | tr '.' '-')"
+    vol="${run_id}-stop-${tag}"; box="${run_id}-box-stop-${tag}"
+    clone_volume "$src" "$vol"; race_box "$box" "$vol" "$src"
+    line="$(stop_race "$box" "$archive" "$offset" "$src")"
+    docker rm -f "$box" >/dev/null
+    say "stop race +${offset}s: $line"
+    case "$line" in
+      *"verb=137 "*"db_open_at_verb_end=no legacy_changed_after=no "*) guarded=$((guarded + 1)) ;;
+      *"verb=1 "*) refused=$((refused + 1)) ;;
+      *) fail "AC-5 stop race at +${offset}s: $line" ;;
+    esac
+  done
+  [ "$failures" = "$before" ] && pass "AC-5 stop race, 12 offsets (0 ms to 6 s after the cell's first stop event): $guarded reached guarded with the old database closed and no legacy path changed after, $refused refused at T1"
+
+  served=0; proceeded=0; refused=0
+  for case_ in verb-first:0.005 verb-first:0.003 verb-first:0.002 verb-first:0.001 \
+      node-first:0 node-first:0.001 node-first:0.002 node-first:0.003 node-first:0.004 \
+      node-first:0.005 node-first:0.006 node-first:0.008; do
+    order="${case_%%:*}"; offset="${case_#*:}"
+    tag="${order}-$(printf '%s' "$offset" | tr '.' '-')"
+    vol="${run_id}-start-${tag}"; box="${run_id}-box-start-${tag}"
+    clone_volume "$src" "$vol"; race_box "$box" "$vol" "$src"
+    line="$(start_race "$box" "$archive" "$order" "$offset")"
+    docker rm -f "$box" >/dev/null
+    say "start race ${order} ${offset}s: $line"
+    case "$line" in
+      *"verb=0 old_running=no "*) proceeded=$((proceeded + 1)) ;;
+      *"verb=0 old_running=yes "*) served=$((served + 1)); fail "AC-5 start race ${order} ${offset}s: the old node runs after the verb passed T1" ;;
+      *"verb=1 "*) refused=$((refused + 1)) ;;
+      *) fail "AC-5 start race ${order} ${offset}s: $line" ;;
+    esac
+  done
+  if [ "$served" = 0 ]; then
+    pass "AC-5 start race, 12 orders and offsets (T1 5 ms before to 8 ms after the old start): $proceeded passed T1 and the old node did not survive, $refused refused at T1"
+  fi
+}
+
 ac3
 ac3a
 ac4d begin guarded t2.move.0 relocated floored
 ac5
+ac5_races
 unexecuted "AC-4 (g): no seam in the pinned Rauthy build injects a crash between its two cache renames (hiqlite F-130); the outcome of that interruption is not recorded by this run"
-unexecuted "AC-5: the real v0.2.0 stop and start races at offsets around T1 (D-P12, D-P13) need a harness that times a signal inside T1; FR-012's library interleavings cover the orders"
 
 # AC-9's v0.1.0 leg: a volume the new chassis fenced, which v0.1.0 must
 # not serve. The transition legs need an archive of a v0.1.0 volume, and

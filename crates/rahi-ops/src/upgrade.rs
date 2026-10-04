@@ -505,6 +505,9 @@ fn t1(config: &Config, record: &mut Record, faults: &dyn Faults) -> Result<()> {
     let marker = crate::legacy_marker(config);
     let guard = guard_content(&record.id);
     let temp = state_machine.join(format!(".rahi-guard-{}", record.id));
+    // Before T1 reads anything: where a live harness holds the verb to race
+    // a pre-043 node against the whole of T1 (spec 043 D-31).
+    faults.hit("t1.start")?;
 
     // (b) The guard, whole or not at all.
     match read_marker(&marker)? {

@@ -1586,3 +1586,65 @@ fn the_verb_stopped_at_a_persistent_state_resumes_to_floored() {
     assert_eq!(run.code, 0, "{}{}", run.stdout, run.stderr);
     assert_eq!(phase(), "floored");
 }
+
+/// Spec 043 D-31: `RAHI_TEST_UPGRADE_HOLD_AT` holds the real binary at a
+/// fault point, after the state it names is durable, until the harness
+/// creates `go`; the verb then continues to `floored`.
+#[test]
+fn the_verb_held_at_a_point_waits_for_go_and_then_continues() {
+    let volume = Volume::new();
+    let data = volume.path();
+    assert_eq!(volume.run(&["migrate"]).code, 0);
+    std::fs::remove_dir_all(data.join("hiqlite")).unwrap();
+    std::fs::remove_dir_all(data.join("rauthy").join("rauthy.env")).unwrap();
+    std::fs::rename(data.join("app-store"), data.join("hiqlite")).unwrap();
+    std::fs::write(data.join("rauthy").join("rauthy.env"), b"OLD=1\n").unwrap();
+
+    let keys = KeySet::at(data.join("keys"));
+    let parts = vec![
+        rahi_ops::archive::Part::new(rahi_ops::archive::APP_DIR, "a.sqlite", b"app".to_vec()),
+        rahi_ops::archive::Part::new(rahi_ops::archive::RAUTHY_DIR, "r.sqlite", b"r".to_vec()),
+        rahi_ops::archive::Part::new(rahi_ops::archive::KEYS_DIR, "ledger.key", b"k".to_vec()),
+    ];
+    let manifest =
+        rahi_ops::archive::ArchiveManifest::over(&parts, 1, "sha256:test".to_owned(), None);
+    let sealed =
+        rahi_ops::archive::seal(&parts, &manifest, &keys.backup_recipient().unwrap()).unwrap();
+    let archive = data.join("pre-upgrade.tar.age");
+    std::fs::write(&archive, sealed).unwrap();
+    let phase = || {
+        let text = std::fs::read_to_string(data.join(rahi_ops::upgrade::STATE_FILE)).unwrap();
+        serde_json::from_str::<serde_json::Value>(&text).unwrap()["phase"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+
+    let harness = tempfile::tempdir().unwrap();
+    let mut held = Command::new(env!("CARGO_BIN_EXE_rahi"));
+    held.args(["upgrade-cache", "--backup", archive.to_str().unwrap()]);
+    for (k, v) in &volume.env {
+        held.env(k, v);
+    }
+    held.env(
+        rahi_cli::ENV_UPGRADE_HOLD_AT,
+        format!("begin:{}", harness.path().display()),
+    );
+    held.stdout(std::process::Stdio::piped());
+    held.stderr(std::process::Stdio::piped());
+    let child = held.spawn().unwrap();
+    let start = std::time::Instant::now();
+    while !harness.path().join("held").exists() {
+        assert!(
+            start.elapsed() < std::time::Duration::from_secs(60),
+            "the verb never held"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    std::thread::sleep(std::time::Duration::from_millis(200));
+    assert_eq!(phase(), "begin", "the held verb went on without go");
+    std::fs::write(harness.path().join("go"), b"").unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    assert_eq!(phase(), "floored");
+}
