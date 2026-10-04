@@ -349,38 +349,105 @@ pub fn fence_content() -> String {
     format!("{FENCE_PREFIX}{}", env!("CARGO_PKG_VERSION"))
 }
 
-/// Create the legacy fence on a volume with no legacy path: the directories
-/// and the marker, published whole by `link(2)` (B-4a step (4)).
+/// The prefix of a fence's temporary: a legacy fence being built in the
+/// data directory, or a supervisor fence being built in Rauthy's.
+pub const FENCE_TEMP_PREFIX: &str = ".rahi-fence-";
+
+/// Create both fences on a volume with no legacy path and no transition
+/// record (B-4a step (4)), so that a crash at any instant leaves a volume the
+/// next entry point fences again.
+///
+/// The supervisor fence goes first, so a legacy fence in place implies a
+/// supervisor fence in place: the gate only fences a volume whose legacy
+/// path is absent, and would never finish the pair otherwise. The legacy
+/// fence is then built whole in a temporary directory beside its path, its
+/// marker published inside it by `link(2)`, and put in place by one
+/// no-replace rename, so the legacy path is absent or the whole fence and
+/// never an empty `state_machine/` that every later start refuses as
+/// pre-043 (spec 048 D-6, spec 043 D-28). With `sweep`, temporaries a
+/// crashed run left are removed first; only the holder of `cell.lock`
+/// sweeps, since an attaching process may be building its own.
+///
+/// `faults` is called after every step, as [`upgrade::Faults`] is for the
+/// verb; the gate passes [`upgrade::NoFaults`].
 ///
 /// # Errors
 ///
-/// [`Error::Conflict`] when a marker appeared that is not a fence;
-/// [`Error::Io`] when a step fails.
-pub fn create_legacy_fence(config: &Config) -> Result<()> {
-    let state_machine = config.legacy_hiqlite_dir().join("state_machine");
+/// [`Error::Conflict`] when what appeared at the legacy path while the
+/// fence was being built is not a fence; [`Error::Io`] when a step fails;
+/// whatever `faults` returns.
+pub fn create_fences(config: &Config, sweep: bool, faults: &dyn upgrade::Faults) -> Result<()> {
+    if sweep {
+        sweep_fence_temps(&config.data_dir)?;
+        sweep_fence_temps(&crate::rauthy_dir(config))?;
+        faults.hit("fence.sweep")?;
+    }
+    if inspect_supervisor_fence(config)? == SupervisorFence::Absent {
+        let built = build_supervisor_fence(config)?;
+        faults.hit("fence.supervisor.build")?;
+        match place_supervisor_fence(config, &built) {
+            Ok(()) => {}
+            // Another process placed one first: ours is a temporary.
+            Err(Error::Conflict(_)) => remove_temp(&built)?,
+            Err(err) => return Err(err),
+        }
+        faults.hit("fence.supervisor.place")?;
+    }
+    create_legacy_fence(config, faults)
+}
+
+/// Build the legacy fence beside its path and rename it into place.
+fn create_legacy_fence(config: &Config, faults: &dyn upgrade::Faults) -> Result<()> {
+    let legacy = config.legacy_hiqlite_dir();
+    let temp = config
+        .data_dir
+        .join(format!("{FENCE_TEMP_PREFIX}{}", crate::random_id()?));
+    let state_machine = temp.join("state_machine");
     std::fs::create_dir_all(&state_machine).map_err(|err| {
         Error::Io(format!(
             "{} cannot be created: {err}",
             state_machine.display()
         ))
     })?;
-    crate::set_mode(&config.legacy_hiqlite_dir(), 0o700)?;
+    crate::set_mode(&temp, 0o700)?;
     crate::set_mode(&state_machine, 0o700)?;
-    let marker = crate::legacy_marker(config);
-    let temp = format!(".rahi-fence-{}", crate::random_id()?);
-    match crate::publish_whole(&marker, &temp, fence_content().as_bytes())? {
-        crate::Published::Created => {}
-        crate::Published::Exists => {
-            let content = std::fs::read_to_string(&marker).unwrap_or_default();
+    faults.hit("fence.legacy.build")?;
+    let marker = temp.join(crate::HIQLITE_LOCK_FILE);
+    let marker_temp = format!("{FENCE_TEMP_PREFIX}{}", crate::random_id()?);
+    crate::publish_whole(&marker, &marker_temp, fence_content().as_bytes())?;
+    crate::fsync_dir(&temp)?;
+    faults.hit("fence.legacy.marker")?;
+    match crate::rename_noreplace(&temp, &legacy) {
+        Ok(()) => {}
+        Err(Error::Conflict(_)) => {
+            remove_temp(&temp)?;
+            let content = std::fs::read_to_string(crate::legacy_marker(config)).unwrap_or_default();
             if !is_fence_content(content.trim()) {
                 return Err(Error::Conflict(format!(
                     "{} appeared while the fence was being created and is not a fence",
-                    marker.display()
+                    legacy.display()
                 )));
             }
         }
+        Err(err) => return Err(err),
     }
-    crate::fsync_dir(&config.data_dir)
+    crate::fsync_dir(&config.data_dir)?;
+    faults.hit("fence.legacy.place")
+}
+
+/// Remove every fence temporary directly in `dir`.
+fn sweep_fence_temps(dir: &Path) -> Result<()> {
+    for name in list(dir)? {
+        if name.to_string_lossy().starts_with(FENCE_TEMP_PREFIX) {
+            remove_temp(&dir.join(name))?;
+        }
+    }
+    Ok(())
+}
+
+fn remove_temp(path: &Path) -> Result<()> {
+    std::fs::remove_dir_all(path)
+        .map_err(|err| Error::Io(format!("{} cannot be removed: {err}", path.display())))
 }
 
 /// The supervisor fence's `FENCE` text.
@@ -406,7 +473,7 @@ pub fn build_supervisor_fence(config: &Config) -> Result<PathBuf> {
     std::fs::create_dir_all(&rauthy)
         .map_err(|err| Error::Io(format!("{} cannot be created: {err}", rauthy.display())))?;
     crate::set_mode(&rauthy, crate::KEY_DIR_MODE)?;
-    let temp = rauthy.join(format!(".rahi-fence-{}", crate::random_id()?));
+    let temp = rauthy.join(format!("{FENCE_TEMP_PREFIX}{}", crate::random_id()?));
     std::fs::create_dir(&temp)
         .map_err(|err| Error::Io(format!("{} cannot be created: {err}", temp.display())))?;
     let file = temp.join(SUPERVISOR_FENCE_FILE);
@@ -432,16 +499,6 @@ pub fn place_supervisor_fence(config: &Config, built: &Path) -> Result<()> {
     let path = crate::rauthy_env::legacy_env_path(config);
     crate::rename_noreplace(built, &path)?;
     crate::fsync_dir(&crate::rauthy_dir(config))
-}
-
-/// Create the supervisor fence on a volume where its path is absent.
-///
-/// # Errors
-///
-/// As [`build_supervisor_fence`] and [`place_supervisor_fence`].
-pub fn create_supervisor_fence(config: &Config) -> Result<()> {
-    let built = build_supervisor_fence(config)?;
-    place_supervisor_fence(config, &built)
 }
 
 /// What the gate found and holds.
@@ -597,10 +654,7 @@ pub fn gate_with_env(
     // the app store.
     let mut fenced = false;
     if entry.creates_fences() && record.is_none() && legacy == Legacy::Absent {
-        create_legacy_fence(config)?;
-        if supervisor_fence == SupervisorFence::Absent {
-            create_supervisor_fence(config)?;
-        }
+        create_fences(config, cell.is_some(), &upgrade::NoFaults)?;
         legacy = inspect_legacy(config)?;
         supervisor_fence = inspect_supervisor_fence(config)?;
         fenced = true;
