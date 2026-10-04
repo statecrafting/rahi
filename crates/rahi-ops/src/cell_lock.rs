@@ -366,7 +366,8 @@ pub const FENCE_TEMP_PREFIX: &str = ".rahi-fence-";
 /// never an empty `state_machine/` that every later start refuses as
 /// pre-043 (spec 048 D-6, spec 043 D-28). With `sweep`, temporaries a
 /// crashed run left are removed first; only the holder of `cell.lock`
-/// sweeps, since an attaching process may be building its own.
+/// sweeps, and it removes only a temporary no live process holds (see
+/// [`FenceTemp`]), since an attaching process may be building its own.
 ///
 /// `faults` is called after every step, as [`upgrade::Faults`] is for the
 /// verb; the gate passes [`upgrade::NoFaults`].
@@ -385,10 +386,10 @@ pub fn create_fences(config: &Config, sweep: bool, faults: &dyn upgrade::Faults)
     if inspect_supervisor_fence(config)? == SupervisorFence::Absent {
         let built = build_supervisor_fence(config)?;
         faults.hit("fence.supervisor.build")?;
-        match place_supervisor_fence(config, &built) {
+        match place_supervisor_fence(config, built.path()) {
             Ok(()) => {}
             // Another process placed one first: ours is a temporary.
-            Err(Error::Conflict(_)) => remove_temp(&built)?,
+            Err(Error::Conflict(_)) => remove_temp(built.path())?,
             Err(err) => return Err(err),
         }
         faults.hit("fence.supervisor.place")?;
@@ -399,28 +400,27 @@ pub fn create_fences(config: &Config, sweep: bool, faults: &dyn upgrade::Faults)
 /// Build the legacy fence beside its path and rename it into place.
 fn create_legacy_fence(config: &Config, faults: &dyn upgrade::Faults) -> Result<()> {
     let legacy = config.legacy_hiqlite_dir();
-    let temp = config
-        .data_dir
-        .join(format!("{FENCE_TEMP_PREFIX}{}", crate::random_id()?));
+    let held = FenceTemp::create(&config.data_dir)?;
+    let temp = held.path();
     let state_machine = temp.join("state_machine");
-    std::fs::create_dir_all(&state_machine).map_err(|err| {
+    std::fs::create_dir(&state_machine).map_err(|err| {
         Error::Io(format!(
             "{} cannot be created: {err}",
             state_machine.display()
         ))
     })?;
-    crate::set_mode(&temp, 0o700)?;
+    crate::set_mode(temp, 0o700)?;
     crate::set_mode(&state_machine, 0o700)?;
     faults.hit("fence.legacy.build")?;
     let marker = temp.join(crate::HIQLITE_LOCK_FILE);
     let marker_temp = format!("{FENCE_TEMP_PREFIX}{}", crate::random_id()?);
     crate::publish_whole(&marker, &marker_temp, fence_content().as_bytes())?;
-    crate::fsync_dir(&temp)?;
+    crate::fsync_dir(temp)?;
     faults.hit("fence.legacy.marker")?;
-    match crate::rename_noreplace(&temp, &legacy) {
+    match crate::rename_noreplace(temp, &legacy) {
         Ok(()) => {}
         Err(Error::Conflict(_)) => {
-            remove_temp(&temp)?;
+            remove_temp(temp)?;
             let content = std::fs::read_to_string(crate::legacy_marker(config)).unwrap_or_default();
             if !is_fence_content(content.trim()) {
                 return Err(Error::Conflict(format!(
@@ -435,11 +435,111 @@ fn create_legacy_fence(config: &Config, faults: &dyn upgrade::Faults) -> Result<
     faults.hit("fence.legacy.place")
 }
 
-/// Remove every fence temporary directly in `dir`.
+/// A fence temporary this process is building, and the lock that says so.
+///
+/// The temporary's own directory is locked exclusively, non-blocking, for as
+/// long as this value lives, and the kernel releases the lock when the
+/// process dies. A sweep therefore removes only a temporary it can lock: one
+/// a crashed run left, never one a live process is still building (spec 043
+/// D-29).
+#[derive(Debug)]
+pub struct FenceTemp {
+    path: PathBuf,
+    _lock: File,
+}
+
+impl FenceTemp {
+    /// How many fresh names [`FenceTemp::create`] tries before it gives up.
+    const ATTEMPTS: usize = 8;
+
+    /// Create a fresh temporary directly in `dir` and take its lock.
+    ///
+    /// Between creating the directory and locking it a sweep may lock and
+    /// remove it, so the locked directory must still be the one at the path;
+    /// when it is not, a fresh name is tried.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Io`] when a step fails, or when every attempt was swept.
+    fn create(dir: &Path) -> Result<Self> {
+        for _ in 0..Self::ATTEMPTS {
+            let path = dir.join(format!("{FENCE_TEMP_PREFIX}{}", crate::random_id()?));
+            std::fs::create_dir(&path)
+                .map_err(|err| Error::Io(format!("{} cannot be created: {err}", path.display())))?;
+            let Some(lock) = lock_temp(&path)? else {
+                // A sweep holds it and is removing it.
+                continue;
+            };
+            if is_at(&lock, &path)? {
+                return Ok(Self { path, _lock: lock });
+            }
+        }
+        Err(Error::Io(format!(
+            "no fence temporary in {} outlived a concurrent sweep in {} attempts",
+            dir.display(),
+            Self::ATTEMPTS
+        )))
+    }
+
+    /// The temporary's path.
+    #[must_use]
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+/// Open `path` and lock it exclusively, non-blocking: `None` when it is gone
+/// or another descriptor holds the lock.
+fn lock_temp(path: &Path) -> Result<Option<File>> {
+    let file = match File::open(path) {
+        Ok(file) => file,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(err) => {
+            return Err(Error::Io(format!(
+                "{} cannot be opened: {err}",
+                path.display()
+            )));
+        }
+    };
+    match file.try_lock() {
+        Ok(()) => Ok(Some(file)),
+        Err(TryLockError::WouldBlock) => Ok(None),
+        Err(TryLockError::Error(err)) => Err(Error::Io(format!(
+            "{} cannot be locked: {err}",
+            path.display()
+        ))),
+    }
+}
+
+/// Whether `held` is still the file at `path`.
+fn is_at(held: &File, path: &Path) -> Result<bool> {
+    use std::os::unix::fs::MetadataExt as _;
+    let held = held
+        .metadata()
+        .map_err(|err| Error::Io(format!("{} cannot be inspected: {err}", path.display())))?;
+    match std::fs::symlink_metadata(path) {
+        Ok(meta) => Ok(meta.dev() == held.dev() && meta.ino() == held.ino()),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(err) => Err(Error::Io(format!(
+            "{} cannot be inspected: {err}",
+            path.display()
+        ))),
+    }
+}
+
+/// Remove every fence temporary directly in `dir` that no live process holds.
 fn sweep_fence_temps(dir: &Path) -> Result<()> {
     for name in list(dir)? {
-        if name.to_string_lossy().starts_with(FENCE_TEMP_PREFIX) {
-            remove_temp(&dir.join(name))?;
+        if !name.to_string_lossy().starts_with(FENCE_TEMP_PREFIX) {
+            continue;
+        }
+        let path = dir.join(name);
+        // Held while it is removed, so its creator, if it is still between
+        // creating and locking it, sees it gone and tries a fresh name.
+        if let Some(lock) = lock_temp(&path)?
+            && is_at(&lock, &path)?
+        {
+            remove_temp(&path)?;
         }
     }
     Ok(())
@@ -462,20 +562,19 @@ pub fn supervisor_fence_text(config: &Config) -> String {
 }
 
 /// Build the supervisor fence in a temporary directory beside its path and
-/// return that directory, not yet in place (B-5, T1 (e)).
+/// return that directory, held and not yet in place (B-5, T1 (e)).
 ///
 /// # Errors
 ///
 /// [`Error::Io`] when a step fails.
-pub fn build_supervisor_fence(config: &Config) -> Result<PathBuf> {
+pub fn build_supervisor_fence(config: &Config) -> Result<FenceTemp> {
     use std::io::Write as _;
     let rauthy = crate::rauthy_dir(config);
     std::fs::create_dir_all(&rauthy)
         .map_err(|err| Error::Io(format!("{} cannot be created: {err}", rauthy.display())))?;
     crate::set_mode(&rauthy, crate::KEY_DIR_MODE)?;
-    let temp = rauthy.join(format!("{FENCE_TEMP_PREFIX}{}", crate::random_id()?));
-    std::fs::create_dir(&temp)
-        .map_err(|err| Error::Io(format!("{} cannot be created: {err}", temp.display())))?;
+    let held = FenceTemp::create(&rauthy)?;
+    let temp = held.path();
     let file = temp.join(SUPERVISOR_FENCE_FILE);
     let mut out = std::fs::OpenOptions::new()
         .write(true)
@@ -485,9 +584,9 @@ pub fn build_supervisor_fence(config: &Config) -> Result<PathBuf> {
     out.write_all(supervisor_fence_text(config).as_bytes())
         .and_then(|()| out.sync_all())
         .map_err(|err| Error::Io(format!("{} cannot be written: {err}", file.display())))?;
-    crate::fsync_dir(&temp)?;
+    crate::fsync_dir(temp)?;
     crate::fsync_dir(&rauthy)?;
-    Ok(temp)
+    Ok(held)
 }
 
 /// Put a built supervisor fence in place by a no-replace rename.

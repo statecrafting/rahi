@@ -251,6 +251,41 @@ fn a_crash_at_every_point_of_fencing_leaves_a_volume_the_next_start_fences() {
     assert!(crashed >= 5, "every step has a fault point: {crashed}");
 }
 
+/// Spec 043 D-29: the holder's sweep removes a temporary a crashed run left
+/// and keeps one an attaching process is still building, whose place then
+/// loses to the holder's fence as a handled conflict.
+#[test]
+fn a_sweep_keeps_a_temporary_a_live_process_is_building() {
+    let dir = tempfile::tempdir().unwrap();
+    let config = config(dir.path());
+    let rauthy = rahi_ops::rauthy_dir(&config);
+    std::fs::create_dir_all(&rauthy).unwrap();
+    let stale = config
+        .data_dir
+        .join(format!("{}stale", cell_lock::FENCE_TEMP_PREFIX));
+    std::fs::create_dir(&stale).unwrap();
+    // The attacher has built its supervisor fence and not yet placed it.
+    let attacher = cell_lock::build_supervisor_fence(&config).unwrap();
+
+    cell_lock::create_fences(&config, true, &upgrade::NoFaults).unwrap();
+    assert!(!stale.exists());
+    assert!(attacher.path().is_dir());
+    assert_eq!(
+        cell_lock::inspect_supervisor_fence(&config).unwrap(),
+        SupervisorFence::Fence
+    );
+    let err = cell_lock::place_supervisor_fence(&config, attacher.path()).unwrap_err();
+    assert!(matches!(err, Error::Conflict(_)), "{err}");
+
+    // Once its builder is gone, the next sweep removes it.
+    let left = attacher.path().to_path_buf();
+    drop(attacher);
+    cell_lock::create_fences(&config, true, &upgrade::NoFaults).unwrap();
+    assert!(!left.exists());
+    assert!(fence_temps(&rauthy).is_empty());
+    assert!(fence_temps(&config.data_dir).is_empty());
+}
+
 #[test]
 fn a_fence_another_process_placed_first_is_kept_and_a_foreign_one_refused() {
     let dir = tempfile::tempdir().unwrap();
@@ -269,6 +304,62 @@ fn a_fence_another_process_placed_first_is_kept_and_a_foreign_one_refused() {
     assert!(matches!(err, Error::Conflict(_)), "{err}");
     assert_eq!(tree(&config.legacy_hiqlite_dir()), legacy);
     assert!(fence_temps(&config.data_dir).is_empty());
+}
+
+/// Pauses an attaching process at `point` and runs the owner's whole
+/// fencing, sweep first, there, while the attacher holds an in-progress
+/// temporary.
+struct OwnerFencesAt<'a> {
+    point: &'static str,
+    config: &'a Config,
+    ran: AtomicUsize,
+}
+
+impl Faults for OwnerFencesAt<'_> {
+    fn hit(&self, point: &str) -> rahi_types::Result<()> {
+        if point == self.point && self.ran.fetch_add(1, Ordering::SeqCst) == 0 {
+            cell_lock::create_fences(self.config, true, &upgrade::NoFaults)?;
+        }
+        Ok(())
+    }
+}
+
+/// Spec 043 D-29: the owner's sweep keeps a temporary an attaching process
+/// is building; the attacher's place then loses to the owner's fences as a
+/// handled conflict, it succeeds instead of failing its gate, and nothing
+/// is left behind.
+#[test]
+fn an_attacher_paused_mid_build_survives_the_owners_fencing() {
+    for point in [
+        "fence.supervisor.build",
+        "fence.legacy.build",
+        "fence.legacy.marker",
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let config = config(dir.path());
+        let owner = OwnerFencesAt {
+            point,
+            config: &config,
+            ran: AtomicUsize::new(0),
+        };
+        cell_lock::create_fences(&config, false, &owner)
+            .unwrap_or_else(|err| panic!("{point}: {err}"));
+        assert_eq!(owner.ran.load(Ordering::SeqCst), 1, "{point}");
+        assert!(
+            matches!(cell_lock::inspect_legacy(&config).unwrap(), Legacy::Fence { debris, .. } if debris.is_empty()),
+            "{point}"
+        );
+        assert_eq!(
+            cell_lock::inspect_supervisor_fence(&config).unwrap(),
+            SupervisorFence::Fence,
+            "{point}"
+        );
+        assert!(fence_temps(&config.data_dir).is_empty(), "{point}");
+        assert!(
+            fence_temps(&rahi_ops::rauthy_dir(&config)).is_empty(),
+            "{point}"
+        );
+    }
 }
 
 #[test]

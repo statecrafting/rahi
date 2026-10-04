@@ -1439,6 +1439,27 @@ None remains open: D-7 to D-13 record the owner's approval and choices.
   D-6's open question for the owner. Rejected: treating an empty
   `state_machine/` as absent (that judgment), and a marker-first recovery
   in place (a pre-043 node's own unclean marker would read the same).
+- **D-29 (2026-10-04, build decision; the sweep spares a live
+  temporary).** D-28 (d) let only the holder of `cell.lock` sweep, so that
+  an attaching process could build undisturbed, but B-4a lets an attaching
+  verb take `transition.lock` shared beside the holder, so both can be in
+  step (4) at once and the holder's sweep could remove a temporary the
+  attacher had built and not yet placed. The attacher's rename then failed
+  on a missing source, an I/O error rather than the handled conflict, and
+  its start was refused. Each fence temporary is now locked by its builder:
+  the directory itself, exclusively and non-blocking as B-4a requires of
+  every lock, from creation until it is placed or removed, and the kernel
+  releases it when the builder dies. A sweep removes only a temporary it
+  can lock and that is still the directory at its path, and holds that lock
+  while it removes it; a builder that finds its new directory locked or
+  gone tries a fresh name. A temporary a crashed run left is still swept,
+  and one a live process holds is kept. `tests/cell_lock.rs` pauses an
+  attacher at each build step, runs the holder's whole fencing there, and
+  requires the attacher to succeed with no temporary left; it fails
+  without the lock, as the PR's AI review predicted. Rejected: a dedicated lock taken
+  around step (4), which would either wait, which B-4a forbids, or refuse
+  an attaching start that the gate admits today; and having the attacher
+  rebuild after an I/O error, which misreads a real failure as a race.
 
 ### 7.1 Proposals (2026-09-23)
 

@@ -18,8 +18,9 @@ change the consumer contract and a patch bump may not.
   (spec 048 D-6), or the legacy fence without the supervisor fence. The
   supervisor fence is now placed first and the legacy fence is built in
   `<data>/.rahi-fence-<id>/` and renamed into place whole, so the next start
-  finishes fencing and removes what the crash left. A volume an earlier
-  build already left in that state is still refused.
+  finishes fencing and removes what the crash left, sparing a temporary
+  another live process is still building (spec 043 D-29). A volume an
+  earlier build already left in that state is still refused.
 - **The node's lifetime as one scope (spec 048).** hiqlite leaves its
   unclean-stop marker, `state_machine/lock`, on every exit that skips
   `Store::shutdown`, and the next open then refuses. `rahi_store::Store::run`
