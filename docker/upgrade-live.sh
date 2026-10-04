@@ -392,16 +392,17 @@ unexecuted "AC-5: the real v0.2.0 stop and start races at offsets around T1 (D-P
 # not serve. The transition legs need an archive of a v0.1.0 volume, and
 # none can be taken (spec 043 D-30).
 if [ -n "$v010_new" ]; then
+  main_new="$new"; main_old="$old"
   new="$v010_new"; old="$v010_old"; old_name=v0.1.0; leg="[v0.1.0] "; vs="-v010"
   ac3a
-  leg=""
-  unexecuted "v0.1.0: AC-3 and AC-4 (d) need a verifying archive of a v0.1.0 volume, and none can be taken: v0.1.0's backup authenticates to Rauthy with the admin API key, which Rauthy refuses (401), and 0.2.0's refuses on a pre-037 key set (spec 043 D-30)"
+  unexecuted "AC-3 and AC-4 (d) need a verifying archive of a v0.1.0 volume, and none can be taken: v0.1.0's backup authenticates to Rauthy with the admin API key, which Rauthy refuses (401), and 0.2.0's refuses on a pre-037 key set (spec 043 D-30)"
+  new="$main_new"; old="$main_old"; old_name=v0.2.0; leg=""; vs=""
 else
   unexecuted "v0.1.0: RAHI_UPGRADE_V010_NEW names no bare chassis image built from this change; v0.1.0's exclusion stays source-established (AC-9)"
 fi
 
 say ""
-say "spec 043 live upgrade legs against $new (old: $old):"
+say "spec 043 live upgrade legs against $new (old: $old)${v010_new:+, and $v010_new (old: $v010_old)}:"
 printf '%s' "$results" >&2
 if [ "$failures" -gt 0 ]; then
   say "$failures leg(s) failed"
