@@ -69,6 +69,7 @@ extends:
   - { spec: "031-single-container-packaging", unit: "docker/Dockerfile", nature: amending }
   - { spec: "031-single-container-packaging", unit: ".github/workflows/image.yml", nature: additive }
   - { spec: "039-release-and-out-of-tree-packaging", unit: "docker/runtime.Dockerfile", nature: amending }
+  - { spec: "039-release-and-out-of-tree-packaging", unit: "CHANGELOG.md", nature: additive }
   - { spec: "032-cluster-topology", unit: "deploy/README.md", nature: amending }
   - { spec: "032-cluster-topology", unit: "deploy/k8s/statefulset.yaml", nature: amending }
   - { spec: "037-identity-recovery-and-live-proof", unit: ".github/workflows/live.yml", nature: additive }
@@ -1407,6 +1408,37 @@ None remains open: D-7 to D-13 record the owner's approval and choices.
   clean-marker recovery claim. The test now keeps the two peers alive until
   the restarted member is ready and has stopped, then stops them. The
   marker-present refusal branch is unchanged.
+- **D-28 (2026-10-04, build decision; fresh-volume fencing survives a
+  crash).** B-4a step (4) creates both fences on a volume with no legacy
+  path and no record, before the app store, and AC-3a requires a v0.2.0
+  image afterwards to serve nothing and spawn no Rauthy. Spec 048 D-6
+  reported that the first build broke this under a crash: it created
+  `<legacy>/state_machine/` in place and then published the marker, so a
+  kill between the two left a directory with no marker, which every later
+  start refuses as pre-043 (`state_machine/lock is absent`) and only an
+  operator can clear. A second window had the same root: the legacy fence
+  went first, and the gate fences only a volume whose legacy path is
+  absent, so a kill between the two fences left the supervisor fence
+  missing for good and a pre-043 `supervise` free to render and spawn
+  Rauthy. Both are closed by order and by building aside, not by a new
+  judgment about pre-043 volumes: (a) the supervisor fence is placed first,
+  so a legacy fence in place implies both; (b) the legacy fence is built
+  whole in `<data>/.rahi-fence-<id>/`, its marker published inside it by
+  `link(2)` of a whole temporary as step (4) says, and put at the legacy
+  path by one FR-011 no-replace rename, so the legacy path is absent or the
+  whole fence; (c) a rename that finds the path taken removes its own
+  temporary and accepts only a fence there; (d) the holder of `cell.lock`
+  sweeps `.rahi-fence-*` temporaries in the data directory and in Rauthy's
+  before fencing, and an attaching process without it does not, since the
+  holder may be building one. `cell_lock::create_fences` takes the verb's
+  `Faults` seam, and `tests/cell_lock.rs` crashes it at every point and
+  asserts the next start completes both fences with no temporary left;
+  placing the legacy fence first fails that test. Not changed: a volume a
+  pre-change build already left with an empty `state_machine/` is still
+  refused, because whether such a directory may be read as absent is 048
+  D-6's open question for the owner. Rejected: treating an empty
+  `state_machine/` as absent (that judgment), and a marker-first recovery
+  in place (a pre-043 node's own unclean marker would read the same).
 
 ### 7.1 Proposals (2026-09-23)
 
