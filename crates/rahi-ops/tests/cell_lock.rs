@@ -7,12 +7,13 @@
 use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Barrier};
 
 use rahi_ops::cell_lock::{
     self, CELL_LOCK_FILE, Entry, Legacy, SupervisorFence, TRANSITION_LOCK_FILE,
 };
-use rahi_ops::upgrade::{self, Phase, Record};
+use rahi_ops::upgrade::{self, Faults, Phase, Record};
 use rahi_ops::{Published, first_boot, publish_whole, rauthy_env, rename_noreplace};
 use rahi_types::{Config, Error};
 
@@ -171,6 +172,103 @@ fn a_fresh_volume_gets_both_fences_before_any_app_store() {
             PathBuf::from("state_machine/lock")
         ]
     );
+}
+
+/// Fails at the `n`th fault point, as a kill there would leave the volume.
+struct CrashAt {
+    n: usize,
+    seen: AtomicUsize,
+}
+
+impl Faults for CrashAt {
+    fn hit(&self, point: &str) -> rahi_types::Result<()> {
+        if self.seen.fetch_add(1, Ordering::SeqCst) + 1 == self.n {
+            return Err(Error::Io(format!("injected crash at {point}")));
+        }
+        Ok(())
+    }
+}
+
+/// The fence temporaries left directly in `dir`.
+fn fence_temps(dir: &Path) -> Vec<String> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    entries
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .filter(|n| n.starts_with(cell_lock::FENCE_TEMP_PREFIX))
+        .collect()
+}
+
+/// Spec 048 D-6, spec 043 D-28: a crash at any instant of fresh-volume
+/// fencing leaves the legacy path absent or the whole fence, never a
+/// `state_machine/` without its marker, and the next entry point completes
+/// both fences and clears what the crash left.
+#[test]
+fn a_crash_at_every_point_of_fencing_leaves_a_volume_the_next_start_fences() {
+    let mut crashed = 0;
+    for n in 1.. {
+        let dir = tempfile::tempdir().unwrap();
+        let config = config(dir.path());
+        let faults = CrashAt {
+            n,
+            seen: AtomicUsize::new(0),
+        };
+        if cell_lock::create_fences(&config, true, &faults).is_ok() {
+            break;
+        }
+        crashed += 1;
+        // What the crash left: no half fence, and a legacy fence only with
+        // the supervisor fence beside it.
+        match cell_lock::inspect_legacy(&config).unwrap() {
+            Legacy::Absent => {}
+            Legacy::Fence { debris, .. } => {
+                assert!(debris.is_empty(), "crash {n}: {debris:?}");
+                assert_eq!(
+                    cell_lock::inspect_supervisor_fence(&config).unwrap(),
+                    SupervisorFence::Fence,
+                    "crash {n}: a legacy fence without the supervisor fence"
+                );
+            }
+            other @ Legacy::Other { .. } => panic!("crash {n} left {other:?}"),
+        }
+
+        let first = gate(&config, Entry::FirstBoot).unwrap();
+        assert!(
+            matches!(first.legacy(), Legacy::Fence { debris, .. } if debris.is_empty()),
+            "crash {n}: {:?}",
+            first.legacy()
+        );
+        assert_eq!(first.supervisor_fence(), SupervisorFence::Fence);
+        assert!(fence_temps(&config.data_dir).is_empty(), "crash {n}");
+        assert!(
+            fence_temps(&rahi_ops::rauthy_dir(&config)).is_empty(),
+            "crash {n}"
+        );
+        drop(first);
+        gate(&config, Entry::Serve).unwrap();
+    }
+    assert!(crashed >= 5, "every step has a fault point: {crashed}");
+}
+
+#[test]
+fn a_fence_another_process_placed_first_is_kept_and_a_foreign_one_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let config = config(dir.path());
+    cell_lock::create_fences(&config, true, &upgrade::NoFaults).unwrap();
+    let before = tree(dir.path());
+    // An attaching process lost the race: it neither sweeps nor replaces.
+    cell_lock::create_fences(&config, false, &upgrade::NoFaults).unwrap();
+    assert_eq!(tree(dir.path()), before);
+
+    let other = tempfile::tempdir().unwrap();
+    let config = self::config(other.path());
+    legacy_store(&config);
+    let legacy = tree(&config.legacy_hiqlite_dir());
+    let err = cell_lock::create_fences(&config, true, &upgrade::NoFaults).unwrap_err();
+    assert!(matches!(err, Error::Conflict(_)), "{err}");
+    assert_eq!(tree(&config.legacy_hiqlite_dir()), legacy);
+    assert!(fence_temps(&config.data_dir).is_empty());
 }
 
 #[test]
