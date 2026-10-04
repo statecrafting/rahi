@@ -26,6 +26,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "CHANGELOG.md",
+        "source": "spec-edge"
+      },
+      {
         "path": "Cargo.toml",
         "source": "spec-edge"
       },
@@ -399,6 +403,19 @@
         "unit": {
           "kind": "file",
           "path": ".github/workflows/live.yml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "CHANGELOG.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "CHANGELOG.md"
         }
       },
       {
@@ -965,5 +982,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "ab76deba8dbc478ce5ec9a45652dca77c425bd2fa3170c626c78f3e065ecb823"
+  "shardHash": "068dfd8f27e2c70417cf77e7f90039a84fdc5fb84ce1b1874df0704b3808fecb"
 }

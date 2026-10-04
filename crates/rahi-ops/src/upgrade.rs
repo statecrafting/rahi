@@ -655,7 +655,7 @@ fn install_supervisor_fence(
     if fence == SupervisorFence::File {
         to_evidence(config, record, "t1e", &old, Path::new("rauthy.env"), faults)?;
     }
-    crate::cell_lock::place_supervisor_fence(config, &built)?;
+    crate::cell_lock::place_supervisor_fence(config, built.path())?;
     faults.hit("t1e.place")
 }
 
