@@ -5,6 +5,10 @@
 #
 #   docker/upgrade-live.sh <new-image> [old-image]
 #
+# With RAHI_UPGRADE_V010_NEW naming the bare chassis image built from this
+# change, AC-3a's leg also runs against the published v0.1.0 image, by
+# digest (AC-9's v0.1.0 leg): v0.1.0 published only the bare chassis.
+#
 # Every leg prints PASS or FAIL with what it checked; legs this script cannot
 # execute are printed as UNEXECUTED with the reason, so a reader sees what
 # was and was not run. Exit 1 when any executed leg failed. Needs docker,
@@ -13,6 +17,13 @@ set -eu
 
 new="${1:?usage: docker/upgrade-live.sh <new-image> [old-image]}"
 old="${2:-ghcr.io/statecrafting/rahi-hello-cell:0.2.0@sha256:494a566d1ea97aa348a0ccbe0adda4a87522f0b67a87518a46f980d68b66f06b}"
+old_name=v0.2.0
+v010_new="${RAHI_UPGRADE_V010_NEW:-}"
+v010_old="${RAHI_UPGRADE_V010_OLD:-ghcr.io/statecrafting/rahi:0.1.0@sha256:3e70a339d971fb834d1f7340b194d587d1233bd24c72c121cb676319825ecea3}"
+# What tells one run of the legs from another: a label prefix and a volume
+# suffix, both empty for the v0.2.0 run.
+leg=""
+vs=""
 run_id="upg$$"
 portfile="$(mktemp)"
 echo 18600 > "$portfile"
@@ -21,9 +32,9 @@ results=""
 
 say() { printf '%s\n' "$*" >&2; }
 record() {
-  results="${results}$1  $2
+  results="${results}$1  ${leg}$2
 "
-  say "$1  $2"
+  say "$1  ${leg}$2"
 }
 pass() { record PASS "$1"; }
 # What changed between two tree listings, on stderr.
@@ -118,7 +129,7 @@ old_volume() {
   if ! ready_within "$p" 180 "$name"; then
     docker logs "$name" >&2 2>&1 || true
     docker rm -f "$name" >/dev/null 2>&1 || true
-    say "the v0.2.0 image did not become ready on $volume"
+    say "the $old_name image did not become ready on $volume"
     return 1
   fi
   docker exec "$name" rahi backup >&2
@@ -161,9 +172,9 @@ old_serves_nothing() {
     after="$(guarded_state "$volume")"
     [ "$after" = "$before" ] || show_change "$before" "$after"
     if [ "$served" = no ] && [ "$spawned" = no ] && [ "$before" = "$after" ]; then
-      pass "$label: v0.2.0 $form serves nothing, spawns no Rauthy, changes no path"
+      pass "$label: $old_name $form serves nothing, spawns no Rauthy, changes no path"
     else
-      fail "$label: v0.2.0 $form served=$served spawned_rauthy=$spawned tree_changed=$([ "$before" = "$after" ] && echo no || echo yes)"
+      fail "$label: $old_name $form served=$served spawned_rauthy=$spawned tree_changed=$([ "$before" = "$after" ] && echo no || echo yes)"
     fi
   done
 }
@@ -197,8 +208,8 @@ new_reaches_done() {
 
 # ---------------------------------------------------------------- AC-3
 ac3() {
-  vol="${run_id}-ac3"
-  archive="$(old_volume "$vol")" || { fail "AC-3: the v0.2.0 volume could not be prepared"; return; }
+  vol="${run_id}-ac3${vs}"
+  archive="$(old_volume "$vol")" || { fail "AC-3: the $old_name volume could not be prepared"; return; }
   keys_before="$(tree "$vol" keys)"
   before="$(tree "$vol")"
 
@@ -270,7 +281,7 @@ ac3() {
 
 # --------------------------------------------------------------- AC-3a
 ac3a() {
-  vol="${run_id}-ac3a"
+  vol="${run_id}-ac3a${vs}"
   docker volume create "$vol" >/dev/null
   p="$(vol_port "$vol")"; name="${run_id}-ac3a-new"
   start "$name" "$new" "$vol" "$p"
@@ -300,8 +311,8 @@ ac3a() {
 
 # ---------------------------------------------------------- AC-4 (d)
 ac4d() {
-  for state in begin guarded t2.move.0 relocated floored; do
-    vol="${run_id}-ac4-$(printf '%s' "$state" | tr '.' '-')"
+  for state in "$@"; do
+    vol="${run_id}-ac4-$(printf '%s' "$state" | tr '.' '-')${vs}"
     archive="$(old_volume "$vol")" || { fail "AC-4 (d) $state: preparation"; continue; }
     code=0
     out=""
@@ -316,9 +327,9 @@ ac4d() {
       p="$(vol_port "$vol")"; name="${run_id}-ac4-begin-old"
       start "$name" "$old" "$vol" "$p"
       if ready_within "$p" 180 "$name"; then
-        pass "AC-4 (d) begin: v0.2.0 serves on the untouched legacy store"
+        pass "AC-4 (d) begin: $old_name serves on the untouched legacy store"
       else
-        fail "AC-4 (d) begin: v0.2.0 did not serve before the guard"
+        fail "AC-4 (d) begin: $old_name did not serve before the guard"
       fi
       docker stop -t 50 "$name" >/dev/null; docker rm "$name" >/dev/null
     else
@@ -372,11 +383,22 @@ ac5() {
 
 ac3
 ac3a
-ac4d
+ac4d begin guarded t2.move.0 relocated floored
 ac5
 unexecuted "AC-4 (g): no seam in the pinned Rauthy build injects a crash between its two cache renames (hiqlite F-130); the outcome of that interruption is not recorded by this run"
 unexecuted "AC-5: the real v0.2.0 stop and start races at offsets around T1 (D-P12, D-P13) need a harness that times a signal inside T1; FR-012's library interleavings cover the orders"
-unexecuted "v0.1.0: not run by this script; v0.1.0's exclusion stays source-established (AC-9)"
+
+# AC-9's v0.1.0 leg: a volume the new chassis fenced, which v0.1.0 must
+# not serve. The transition legs need an archive of a v0.1.0 volume, and
+# none can be taken (spec 043 D-30).
+if [ -n "$v010_new" ]; then
+  new="$v010_new"; old="$v010_old"; old_name=v0.1.0; leg="[v0.1.0] "; vs="-v010"
+  ac3a
+  leg=""
+  unexecuted "v0.1.0: AC-3 and AC-4 (d) need a verifying archive of a v0.1.0 volume, and none can be taken: v0.1.0's backup authenticates to Rauthy with the admin API key, which Rauthy refuses (401), and 0.2.0's refuses on a pre-037 key set (spec 043 D-30)"
+else
+  unexecuted "v0.1.0: RAHI_UPGRADE_V010_NEW names no bare chassis image built from this change; v0.1.0's exclusion stays source-established (AC-9)"
+fi
 
 say ""
 say "spec 043 live upgrade legs against $new (old: $old):"

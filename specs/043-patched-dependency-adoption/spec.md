@@ -1460,6 +1460,30 @@ None remains open: D-7 to D-13 record the owner's approval and choices.
   around step (4), which would either wait, which B-4a forbids, or refuse
   an attaching start that the gate admits today; and having the attacher
   rebuild after an I/O error, which misreads a real failure as a race.
+- **D-30 (2026-10-04, build decision; the v0.1.0 leg, and what it cannot
+  run).** AC-9 runs a v0.1.0 leg when a v0.1.0 image is still published.
+  One is: v0.1.0 pushed only the bare chassis, as
+  `ghcr.io/statecrafting/rahi:0.1.0`, and D-21 (c)'s reason for leaving the
+  leg unexecuted no longer holds. `live.yml`'s `upgrade` job now builds the
+  bare chassis from the change beside hello-cell, pulls v0.1.0 by digest,
+  and `docker/upgrade-live.sh` runs AC-3a's leg with them: the new
+  chassis fences an empty volume, and v0.1.0's entrypoint, `supervise` and
+  `serve` each serve nothing, spawn no Rauthy and change no path. Run
+  locally on 2026-10-04 (linux/arm64, both images), all six checks passed,
+  so v0.1.0's exclusion from a fresh volume is executed, not only
+  source-established. AC-3 and AC-4 (d) for v0.1.0 cannot run, and the
+  script prints them UNEXECUTED with the reason: both need a verifying
+  archive of a v0.1.0 volume (B-4, D-23), and none can be taken. The same
+  run found that v0.1.0's `rahi backup` fails with
+  `rauthy refused the admin token at .../auth/v1/backup (401)`, since
+  Rauthy takes a backup only under an MFA session (037 B-1), and 0.2.0's
+  backup refuses on a pre-037 key set, which has no
+  `backup_passkey.json`. **For the owner:** a v0.1.0 deployment therefore
+  has no supported crossing to this version, and nothing in the README or
+  the changelog says so; whether to supply one, or to state v0.1.0 as
+  unsupported for the crossing, is not this build's to decide. Not
+  changed: no requirement text; the v0.2.0 legs; the leg's job name, which
+  branch protection may cite.
 
 ### 7.1 Proposals (2026-09-23)
 
