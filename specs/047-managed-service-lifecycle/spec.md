@@ -1,7 +1,7 @@
 ---
 id: "047-managed-service-lifecycle"
 title: "Manage application background services through the cell lifecycle"
-status: draft
+status: approved
 kind: kernel
 domain: ops
 created: "2026-09-27"
@@ -223,6 +223,17 @@ acts after this draft is approved, implemented, verified, and merged.
   initialized before `Cell::services` is called. Application collectors use
   `Metrics::registry()` there. A second registry or a Rahi API specialized for
   one worker is rejected.
+
+- **D-6 (2026-09-30, owner direction).** The contract is approved as
+  written. Its recommended defaults are the approved behavior: one-way
+  cancellation, no in-process restart, a ten-second join bound overlapping
+  existing HTTP drains, service join before denial drain, and reuse of the
+  existing metrics registry.
+
+- **D-7 (2026-10-05, owner decision; approval).** The owner directed,
+  verbatim: "Approve all; proceed with increased velocity development."
+  The spec moves to `approved` with D-6's defaults as the approved
+  behavior. No requirement text changed.
 
 ## Verification
 

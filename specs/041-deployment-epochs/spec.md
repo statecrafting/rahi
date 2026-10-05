@@ -1,7 +1,7 @@
 ---
 id: "041-deployment-epochs"
 title: "Deployment epochs: the chain records each deployment it serves under, appended at the deploy step, linked to external build and deployment records it never rewrites"
-status: draft
+status: approved
 kind: kernel
 domain: ledger
 created: "2026-09-11"
@@ -188,8 +188,10 @@ composes.
 ### What a replica does with it
 
 - **B-8 (bind at boot, report, do not refuse).** `serve` reads the current
-  epoch after the ledger opens and before it listens, and 040's document
-  gains `epoch {number, record_hash}` and `match`: `bound` when the
+  epoch after the ledger opens and before it listens, and populates the
+  two members 040 reserves (040 B-7, section 3.1): `epoch.ref`, the epoch
+  reference `{type, chain, epoch, number}` with basis `measured`, and
+  `epoch.match`, whose value is: `bound` when the
   measured binary, the declared image (when both sides declare one), and
   the booted manifest equal the epoch's; `mismatch` with the kinds that
   differ, from the closed set `binary`, `image`, `manifest`; `unbound` at
@@ -288,7 +290,7 @@ composes.
   consumer's logic, not a chassis feature): snapshot to Statement
   materials; Statement subjects to the epoch's `artifact.binary` and
   `artifact.image`; deployment record digest to `refs.deployment`; the
-  epoch record hash to `/binding`'s `epoch.record_hash`; the denial's
+  epoch record hash to `/binding`'s `epoch.ref.value.epoch`; the denial's
   `epoch` and `instance` to the binding. It asserts that each digest was
   computed over bytes containing only digests of records earlier in that
   order.
@@ -392,8 +394,28 @@ is re-run.
   the CLI now, without building the binding system. The spec stays `draft`
   until a human flips it.
 
-Still open before approval, and the first item needs the other
-repositories:
+- **D-5 (2026-10-05, owner decision; approval).** The owner directed,
+  verbatim: "Approve all; proceed with increased velocity development."
+  The spec moves to `approved`. D-4's deferral is discharged with 040's
+  ratification (040 D-3). The same change reconciled two references
+  mechanically to 040's ratified section 3.1: B-8 now populates 040's
+  reserved `epoch.ref` and `epoch.match` instead of adding an
+  `epoch {number, record_hash}` member, and FR-003 joins on
+  `epoch.ref.value.epoch`. The third open item below (040's schema
+  version) is closed by 040's additive rule: 041 needs no bump. No other
+  requirement text changed. **For the build session:** the remaining open
+  items below are not decided by this approval. Each is resolved as a dated
+  D-n when the build reaches it, taking the text's proposed answer where
+  one is stated (two record kinds; a mismatch stays a signal; the ledger's
+  `schema_version` does not move), and the cross-repository type URIs and
+  member names are carried as rahi's counterproposal below, marked
+  provisional in the fixture, unless a producer has answered by then. The
+  sealed-segment key reuse after a restore at N=3 is investigated, not
+  assumed. The `match` value vocabulary (`bound`, `mismatch` with kinds,
+  `unbound`, and `unknown` per kind) is B-8's.
+
+Open at drafting (2026-09-12), carried to the build by D-5; the first
+item needs the other repositories:
 
 - the reference type URIs and the three member names, agreed with
   Statecraft (the deployment record and the composing envelope),

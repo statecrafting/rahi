@@ -1036,8 +1036,12 @@ continue the numbered lists above.
    one fixture. The epoch record (draft 041 B-3) stores `{type, digest,
    id}` for it and never parses it.
 7. Decide whether the composing envelope wraps a replica's `/binding`
-   document or references it by digest, and name the schema you will
-   accept (`rahi.binding/v0` in draft 040 is a placeholder).
+   document or references a digest of retained original bytes, and name
+   the schema you will accept. Draft 040 section 3.1 now fixes Rahi's
+   proposed producer document as `rahi.binding/v0`: one path per value,
+   wrapped bases, closed absence reasons, named store sets and declared
+   component identities. Consumer acceptance and the envelope remain
+   consumer-owned.
 8. Key runtime observations by `service.instance.id` and the epoch's
    record hash. Do not ask the chassis for a digest, an instance id, or a
    deployment id as a metric label (draft 040 B-9).
@@ -1125,7 +1129,8 @@ build provenance     the build platform        in-toto Statement, SLSA predicate
 deployment record    Statecraft or operator    names the provenance and the image
 epoch record         rahi chain (041)          names deployment, provenance, snapshot,
                                                 measured binary, declared image, current manifest
-replica binding      rahi /binding (040, 041)  names its epoch, binary, manifest, instance
+replica binding      rahi /binding (040, 041)  names the epoch it booted under, its binary,
+                                                manifest and instance; boot-bound, never newest
 decisions            rahi chain (041 B-9)      name their epoch, instance, and manifest
 observations         the consumer's collector  name instance, epoch, interval, coverage
 ```
@@ -1191,8 +1196,13 @@ it does not stand against an adversary inside the process.
 ### 11.5 Trust windows and audit bundles
 
 **Recommendation**. For a validity predicate revalidated at effect time,
-the chassis supplies the current epoch's record hash on `/binding` and in
-the chain as a freshness input; the broker evaluates the predicate. The
+the chassis supplies the current epoch's record hash from the chain as a
+freshness input; the broker evaluates the predicate. `/binding` is not
+that input: draft 040 makes it boot-bound and byte-identical for the life
+of the process, so a replica that has not restarted since the newest
+deployment reports the older epoch correctly. Polling it is not an atomic
+authorization of an effect. Whether a current-epoch observation surface
+exists, and its consistency and race semantics, belongs to draft 041. The
 chassis evaluates no trust window (015 §6 leaves that to a later spec; the
 sibling `trust-window` crate is not a chassis dependency). For an
 independent audit bundle, the chassis supplies the `ledger export` lines
