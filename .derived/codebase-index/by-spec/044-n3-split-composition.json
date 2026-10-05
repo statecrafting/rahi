@@ -226,8 +226,8 @@
       }
     ],
     "specId": "044-n3-split-composition",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "b8b89a74faf7c13db64fefcc28aeb47e418e4b7fb66b65a807f70d2179f898da"
+  "shardHash": "a3a94e37684e930b74c60ad54e4daf57e750862d49019085beadd17cc4fae33f"
 }

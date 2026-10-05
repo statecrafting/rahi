@@ -1,7 +1,7 @@
 ---
 id: "044-n3-split-composition"
 title: "N=3 split composition: two StatefulSets, rahi and rauthy, one hiqlite node per pod, rahi reaching rauthy only through an encrypted internal Service and losing readiness, never liveness, without it"
-status: draft
+status: approved
 kind: feature
 domain: ops
 created: "2026-09-23"
@@ -309,6 +309,27 @@ remaining alternative must satisfy it; a mesh requiring sidecars is
 excluded by the approved anchor. The obligations of 040, 041, 042 and
 032 AC-2 remain owed. Neither this disposition nor passing N=1 checks
 establishes N=3 support.
+
+### Owner approval (2026-10-05)
+
+- **D-1 (2026-10-05, owner decision; approval and the open choices).** The
+  owner approved this spec, verbatim: "Approve all; proceed with increased
+  velocity development." The bootstrap-tier conflict above was disposed of
+  by the owner act of 2026-10-02 (spec 000, Amendments received), which
+  re-founded `one-deployment-unit` to admit the split N=3 layout; the
+  anchor kept its name and stays `unamendable`. Constitution VI was aligned
+  by that act, so this spec carries no further constitution amendment. The
+  open choices are taken as recommended: P-1 Rauthy native TLS with a CA
+  mounted into rahi, no mesh; P-2 Rauthy reached by users only through
+  rahi's origin, its HTTP port admitting rahi's pods only; P-3
+  `OrderedReady` for first bootstrap until hiqlite F-118 is repaired,
+  `Parallel` afterwards; P-4 Statecraft's own rule is Statecraft's to
+  amend and this spec does not depend on it. B-11's coherent export is
+  approved held: it waits for a hiqlite release carrying the offline
+  export, and its acceptance stays unexecuted until then. Not changed: no
+  B-n, FR or AC text. The approval does not establish N=3 support; AC-3
+  and AC-4 still need operator evidence on a named release, and the
+  obligations of 040, 041, 042 and 032 AC-2 named above remain owed.
 
 ## Verification
 
