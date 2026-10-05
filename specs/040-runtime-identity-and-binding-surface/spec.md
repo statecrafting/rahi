@@ -173,7 +173,8 @@ of.
   own (B-7).
 - **B-2 (build identity, and exactly what is measured).** At boot, after
   the ledger opens and before the listener binds, the composer hashes its
-  own executable once:
+  own executable once; `rahi version --binding` (B-13), which opens no
+  ledger, hashes it the same way once before it prints:
   - **what.** sha256 over the bytes the process reads by opening the path
     `std::env::current_exe()` returns, read to end of file, reported as
     `build.binary.sha256`, basis `measured`.
@@ -223,7 +224,10 @@ of.
 - **B-4 (the instance).** `instance.node` is the hiqlite node id (declared
   by the deployment through `RAHI_HIQ_NODE_ID` or the pod ordinal).
   `instance.id` is `<node>-<32 lowercase hex>`: 128 bits drawn once per
-  process from the operating system's entropy source, basis `minted`. The
+  process from the operating system's entropy source, basis `minted`.
+  Where `instance.node` is `absent` (B-13's version output outside a
+  cell), the prefix is `0`. The prefix is part of an opaque id: a consumer
+  reads the node from `instance.node`, never from the id. The
   kernel's ids stay free of randomness (015 D-8); the composer, like the
   edge's trace id (023 D-4), may use entropy.
   - **The guarantee, stated as a probability.** Two boots of one replica
@@ -487,23 +491,23 @@ the Unix epoch.
 |---|---|---|
 | `schema` | bare string, `"rahi.binding/v0"` | not a wrapper |
 | `instance.id` | wrapper, string `<node>-<32 hex>` | `minted` |
-| `instance.node` | wrapper, integer | `declared` |
+| `instance.node` | wrapper, integer | `declared`, or `absent`/`not_applicable` (B-13) |
 | `instance.pod` | wrapper, string | `declared`, or `absent`/`not_declared` |
 | `instance.started` | wrapper, integer seconds | `measured` |
 | `build.binary.sha256` | wrapper, digest | `measured`, or `absent`/`unreadable` |
 | `build.binary.platform` | wrapper, OCI platform | `declared`, or `absent`/`unmapped` |
 | `build.rahi_version` | wrapper, semver string | `declared` |
 | `build.revision` | wrapper, string | `declared`, or `absent`/`not_declared` |
-| `manifest.hash` | wrapper, digest | `measured` |
-| `manifest.app.name` | wrapper, string | `declared` |
-| `manifest.app.org` | wrapper, string | `declared` |
-| `manifest.contract_version` | wrapper, semver string | `declared` |
+| `manifest.hash` | wrapper, digest | `measured`, or `absent`/`not_applicable` (B-13) |
+| `manifest.app.name` | wrapper, string | `declared`, or `absent`/`not_applicable` (B-13) |
+| `manifest.app.org` | wrapper, string | `declared`, or `absent`/`not_applicable` (B-13) |
+| `manifest.contract_version` | wrapper, semver string | `declared`, or `absent`/`not_applicable` (B-13) |
 | `artifact.image` | wrapper, image reference | `declared`, or `absent`/`not_declared` |
 | `components.hiqlite` | wrapper, object of exact locked package names to versions | `declared` |
 | `components.rauthy.image` | wrapper, image reference | `declared`, or `absent`/`not_applicable` |
-| `store.layout` | wrapper, string `app-store` | `declared` |
-| `store.schema_version` | wrapper, integer | `measured` |
-| `store.migration_sets` | wrapper, object of set name to integer version | `measured` |
+| `store.layout` | wrapper, string `app-store` | `declared`, or `absent`/`not_applicable` (B-13) |
+| `store.schema_version` | wrapper, integer | `measured`, or `absent`/`not_applicable` (B-13) |
+| `store.migration_sets` | wrapper, object of set name to integer version | `measured`, or `absent`/`not_applicable` (B-13) |
 | `epoch.ref` | wrapper, epoch reference object | `absent`/`not_implemented` here (B-7) |
 | `epoch.match` | wrapper, vocabulary owned by 041 | `absent`/`not_implemented` here (B-7) |
 | `observation` | plain object | not a wrapper |
@@ -852,6 +856,17 @@ itself.
   unchanged; `app-store`, named set versions and exact declared hiqlite and
   Rauthy identities; and 039 B-1 applying from the first release that
   carries 040. Not changed: no B-n, FR or AC text.
+
+- **D-4 (2026-10-05, approval review; consistency of the ratified text).**
+  The approving change's review found three places where the normative
+  text disagreed with example 3, which AC-4 also takes as test input. Each
+  is resolved toward the example, which B-13 already required: section
+  3.1's table now admits `absent`/`not_applicable` for `instance.node`,
+  `manifest.*` and `store.*` (B-13's version output); B-4 states that the
+  id's prefix is `0` when `instance.node` is absent and that consumers read
+  the node from `instance.node`; B-2 states that `rahi version --binding`
+  measures the executable once before printing, since it opens no ledger.
+  No other behavior changed.
 
 ### Owner choices at ratification (resolved by D-3)
 
