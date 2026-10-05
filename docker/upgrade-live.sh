@@ -511,6 +511,8 @@ ac5_races() {
   if [ "$served" = 0 ]; then
     pass "AC-5 start race, 12 orders and offsets (T1 5 ms before to 8 ms after the old start): $proceeded passed T1 and the old node did not survive, $refused refused at T1"
   fi
+  docker volume rm "$src" >/dev/null
+  rm -f "${portfile}.rahi-new"
 }
 
 ac3
