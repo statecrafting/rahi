@@ -410,8 +410,10 @@ of.
   print exactly `rahi <CARGO_PKG_VERSION>` on one line to stdout and exit
   0. Extended build identity is the separate, explicit invocation `rahi
   version --binding`, which prints the same `rahi.binding/v0` document, with the members a process
-  outside a booted cell cannot produce (`manifest`, `store`, `epoch`)
-  `absent` with reason `not_applicable` (3.1, example 3). Its invocation is
+  outside a booted cell cannot produce (`instance.node`, `manifest`,
+  `store`) `absent` with reason `not_applicable`, and `epoch` `absent`
+  with reason `not_implemented` as B-7 states for every 040 producer
+  (3.1, example 3). Its invocation is
   part of this contract. No existing line of output changes
   shape, order, or exit code; a script that greps today's line keeps
   working.
@@ -865,8 +867,9 @@ itself.
   `manifest.*` and `store.*` (B-13's version output); B-4 states that the
   id's prefix is `0` when `instance.node` is absent and that consumers read
   the node from `instance.node`; B-2 states that `rahi version --binding`
-  measures the executable once before printing, since it opens no ledger.
-  No other behavior changed.
+  measures the executable once before printing, since it opens no ledger;
+  B-13 names `epoch` as `not_implemented`, as B-7 and example 3 do, and
+  `instance.node` as `not_applicable`. No other behavior changed.
 
 ### Owner choices at ratification (resolved by D-3)
 
