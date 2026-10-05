@@ -636,7 +636,7 @@ guessed, and no reason carries a path or an error string.
   "store": {
     "layout": { "value": "app-store", "basis": "declared" },
     "schema_version": { "value": 1, "basis": "measured" },
-    "migration_sets": { "value": {}, "basis": "measured" }
+    "migration_sets": { "value": { "rahi.coordination": 1, "rahi.receipts": 1 }, "basis": "measured" }
   },
   "epoch": {
     "ref":   { "basis": "absent", "reason": "not_implemented", "source": "041-deployment-epochs" },
@@ -789,7 +789,8 @@ itself.
   test -p rahi-edge --locked --test obs` pass, and
   `scripts/k8s-validate.sh` exits 0. The binding test covers FR-001 through
   FR-006, FR-007a, FR-008, and boot stability: two reads in one boot are
-  byte-identical and a restart mints a different instance id.
+  byte-identical and a restart mints a different instance id. The obs
+  test covers FR-007.
 - **AC-2.** Spec 020's and 023's acceptance criteria still hold: the edge
   gains no dependency on `rahi-ops` or `rahi-idp`.
 - **AC-3.** Nothing in this spec writes to the chain: the implementing
@@ -880,8 +881,9 @@ itself.
   declares the same Rauthy image; B-9 names `not_applicable` for trace
   export and sampler outside a cell, as example 3 shows, and B-13 lists
   `components.rauthy.image` among the `not_applicable` members there;
-  AC-1's binding test names FR-006, which no step covered. No other
-  behavior changed.
+  AC-1's binding test names FR-006 and its obs test FR-007, which no
+  step named; example 2's migration sets equal example 1's, the same
+  cell's. No other behavior changed.
 
 ### Owner choices at ratification (resolved by D-3)
 
