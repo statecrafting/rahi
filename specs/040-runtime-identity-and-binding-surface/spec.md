@@ -332,8 +332,8 @@ of.
     observation surface, it is a separate surface with separate
     guarantees; this spec does not propose one.
 - **B-9 (what is not observed, stated).** `observation` states coverage
-  and loss rather than implying completeness: `traces` (export on or off,
-  the sampler, `export_loss: "uncounted"`, the ring capacity),
+  and loss rather than implying completeness: `traces` (export `on` or
+  `off`, the sampler, both `not_applicable` outside a cell (B-13), `export_loss: "uncounted"`, the ring capacity),
   `metrics.unobserved` (`/metrics`, `/binding`, and requests that matched
   no route, 023 D-3), and `decisions` (`allows: "not recorded"` per 015
   D-5, the denial queue's capacity, and the names of the counters that
@@ -629,7 +629,7 @@ guessed, and no reason carries a path or an error string.
   },
   "components": {
     "hiqlite": { "value": { "hiqlite-patched": "0.15.0-patched.3", "hiqlite-wal-patched": "0.15.0-patched.3", "hiqlite-derive-patched": "0.15.0-patched.3" }, "basis": "declared" },
-    "rauthy": { "image": { "basis": "absent", "reason": "not_applicable" } }
+    "rauthy": { "image": { "value": "ghcr.io/bartekus/rauthy-patched:0.36.2-patched.3@sha256:d75cac0f708f3e238c458b622fea2f0b7dda9b67e9435eeafa37698d88a2a3c8", "basis": "declared" } }
   },
   "store": {
     "layout": { "value": "app-store", "basis": "declared" },
@@ -874,7 +874,10 @@ itself.
   B-13 names `epoch` as `not_implemented`, as B-7 and example 3 do, and
   `instance.node` as `not_applicable`; section 3.1's image-reference
   syntax admits the tagged form B-5 and example 1 use for
-  `components.rauthy.image`. No other behavior changed.
+  `components.rauthy.image`; example 2, the same cell as example 1, now
+  declares the same Rauthy image; B-9 names `not_applicable` for trace
+  export and sampler outside a cell, as example 3 shows. No other
+  behavior changed.
 
 ### Owner choices at ratification (resolved by D-3)
 
