@@ -411,7 +411,9 @@ of.
   0. Extended build identity is the separate, explicit invocation `rahi
   version --binding`, which prints the same `rahi.binding/v0` document, with the members a process
   outside a booted cell cannot produce (`instance.node`, `manifest`,
-  `store`) `absent` with reason `not_applicable`, and `epoch` `absent`
+  `store`, and `components.rauthy.image`, which B-5 has the image build
+  declare, so a binary run outside its image has none) `absent` with
+  reason `not_applicable`, and `epoch` `absent`
   with reason `not_implemented` as B-7 states for every 040 producer
   (3.1, example 3). Its invocation is
   part of this contract. No existing line of output changes
@@ -876,8 +878,9 @@ itself.
   syntax admits the tagged form B-5 and example 1 use for
   `components.rauthy.image`; example 2, the same cell as example 1, now
   declares the same Rauthy image; B-9 names `not_applicable` for trace
-  export and sampler outside a cell, as example 3 shows. No other
-  behavior changed.
+  export and sampler outside a cell, as example 3 shows, and B-13 lists
+  `components.rauthy.image` among the `not_applicable` members there.
+  No other behavior changed.
 
 ### Owner choices at ratification (resolved by D-3)
 
