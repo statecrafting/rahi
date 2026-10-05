@@ -483,7 +483,10 @@ is a plain object of coverage facts about this chassis's own telemetry
 
 **Digest and reference syntax.** A digest is the string `sha256:` followed
 by 64 lowercase hex characters. An image reference is
-`<repository>@sha256:<64 lowercase hex>`. A platform is `<os>/<arch>` in
+`<repository>@sha256:<64 lowercase hex>`; `components.rauthy.image`, a
+composer constant (B-5), may also carry a tag, as
+`<repository>:<tag>@sha256:<64 lowercase hex>`, where the digest identifies
+the image and the tag is informative. A platform is `<os>/<arch>` in
 the OCI vocabulary (B-2). A wall time is an integer of whole seconds since
 the Unix epoch.
 
@@ -869,7 +872,9 @@ itself.
   the node from `instance.node`; B-2 states that `rahi version --binding`
   measures the executable once before printing, since it opens no ledger;
   B-13 names `epoch` as `not_implemented`, as B-7 and example 3 do, and
-  `instance.node` as `not_applicable`. No other behavior changed.
+  `instance.node` as `not_applicable`; section 3.1's image-reference
+  syntax admits the tagged form B-5 and example 1 use for
+  `components.rauthy.image`. No other behavior changed.
 
 ### Owner choices at ratification (resolved by D-3)
 
