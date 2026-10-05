@@ -112,7 +112,7 @@
       "contentHash": "644a3ff6e32af864dd3fdb93672b5412f300c58fb420a62634f69fd42c813058"
     },
     ".github/workflows/live.yml": {
-      "contentHash": "ef0a7ad7804343e35779e8fa126ad1d9b6976f2b545793a16264d9ad0998f5c3"
+      "contentHash": "09141dc8a782636091fac398cc2b8dadd81508ade7def0011e8873535db0bb2d"
     },
     ".github/workflows/release.yml": {
       "contentHash": "2c03ff36f7157bb914ef0ae52867c45c80051d373b5db7821b5f2a7829f8197f"
@@ -196,7 +196,7 @@
       "contentHash": "6ffa5596201477ded845b25569e0862b3819facdffc451763ccaf2dac04619c3"
     },
     "docker/upgrade-live.sh": {
-      "contentHash": "afc65eb6083e141ab14cff5682dd7b9270d2d2577963d687c5ef98cfeeb5312d"
+      "contentHash": "57eee86b3502d92bfe263c346d90c67adfa0f001eea69e96b5fda3aeee14feaf"
     },
     "docs/design/00-architecture.md": {
       "contentHash": "d22a98e616e6c66d69857a1d0ee3c1f59b742430f7d12ada2ddf370ee40e185d"

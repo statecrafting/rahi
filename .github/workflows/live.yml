@@ -197,7 +197,8 @@ jobs:
 
   # Spec 043 FR-010, AC-3, AC-3a, AC-4 (d), AC-5 and AC-9: the real v0.2.0
   # image, by digest, against the image built from this change, on real
-  # volumes. The script prints every leg as PASS, FAIL or UNEXECUTED with
+  # volumes, and the real v0.1.0 image against the bare chassis built from
+  # it (the job keeps its name, which branch protection may cite). The script prints every leg as PASS, FAIL or UNEXECUTED with
   # its reason, and fails the job on any failed leg.
   upgrade:
     name: the upgrade legs, v0.2.0 against this change
@@ -218,7 +219,21 @@ jobs:
             RAHI_BIN=hello-cell
             RAHI_STATIC_SRC=apps/hello-cell/web
           cache-from: type=gha,scope=amd64
+      - name: Build the bare chassis from this change
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64
+          load: true
+          tags: rahi:upgrade
+          cache-from: type=gha,scope=amd64
       - name: Pull the v0.2.0 image by digest
         run: docker pull ghcr.io/statecrafting/rahi-hello-cell:0.2.0@sha256:494a566d1ea97aa348a0ccbe0adda4a87522f0b67a87518a46f980d68b66f06b
+      # v0.1.0 published only the bare chassis (spec 043 AC-9's v0.1.0 leg).
+      - name: Pull the v0.1.0 image by digest
+        run: docker pull ghcr.io/statecrafting/rahi:0.1.0@sha256:3e70a339d971fb834d1f7340b194d587d1233bd24c72c121cb676319825ecea3
       - name: The upgrade legs
+        env:
+          RAHI_UPGRADE_V010_NEW: rahi:upgrade
         run: docker/upgrade-live.sh hello-cell:upgrade

@@ -12,6 +12,12 @@ change the consumer contract and a patch bump may not.
 
 ## Unreleased
 
+- **The live upgrade legs run a v0.1.0 leg (spec 043 D-30).** The
+  `upgrade` job also builds the bare chassis and checks that the published
+  v0.1.0 image serves nothing on a volume this version fenced. A v0.1.0
+  volume cannot take the crossing itself: `upgrade-cache` needs a verifying
+  archive, and v0.1.0's backup is refused by Rauthy, so the v0.1.0
+  transition legs are reported unexecuted.
 - **Fresh-volume fencing survives a crash (spec 043 D-28).** A first boot
   killed while it fenced a new volume could leave `<data>/hiqlite/state_machine/`
   without its marker, which every later start refused as a pre-043 volume
