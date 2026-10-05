@@ -12,6 +12,11 @@ change the consumer contract and a patch bump may not.
 
 ## Unreleased
 
+- **The live upgrade legs race a real v0.2.0 cell against T1 (spec 043
+  D-31).** The `upgrade` job stops and starts the v0.2.0 node at offsets
+  around the verb's first step, held there by the new test seam
+  `RAHI_TEST_UPGRADE_HOLD_AT`. In no run did the verb place its guard over
+  an open database, and in no run did the old node survive a guard.
 - **The live upgrade legs run a v0.1.0 leg (spec 043 D-30).** The
   `upgrade` job also builds the bare chassis and checks that the published
   v0.1.0 image serves nothing on a volume this version fenced. A v0.1.0

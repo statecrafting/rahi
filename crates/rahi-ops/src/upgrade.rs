@@ -297,6 +297,77 @@ impl Faults for NoFaults {
     }
 }
 
+/// Spec 043 D-31: `<point>:<dir>` in the verb's environment holds [`run`]
+/// at one of its fault points, so a live harness can stop or start a real
+/// pre-043 node at a chosen offset inside T1. At the point the verb creates
+/// `<dir>/held`, then waits for `<dir>/go` to exist before it continues. A
+/// test seam, as the binary's `RAHI_TEST_UPGRADE_CRASH_AT` is.
+pub const ENV_HOLD_AT: &str = "RAHI_TEST_UPGRADE_HOLD_AT";
+
+/// How long a held verb waits for `go` before it fails.
+const HOLD_LIMIT: std::time::Duration = std::time::Duration::from_secs(120);
+
+/// The caller's faults, and [`ENV_HOLD_AT`]'s hold after them.
+struct WithHold<'a> {
+    inner: &'a dyn Faults,
+    hold_at: Option<(String, PathBuf)>,
+}
+
+impl<'a> WithHold<'a> {
+    fn from_env(env: &dyn rahi_types::EnvReader, inner: &'a dyn Faults) -> Result<Self> {
+        let hold_at = match env.get(ENV_HOLD_AT).filter(|v| !v.is_empty()) {
+            None => None,
+            Some(value) => match value.split_once(':') {
+                Some((point, dir)) if !point.is_empty() && !dir.is_empty() => {
+                    Some((point.to_owned(), PathBuf::from(dir)))
+                }
+                _ => {
+                    return Err(Error::Config(format!(
+                        "{ENV_HOLD_AT} is {value:?}; it takes <point>:<dir>"
+                    )));
+                }
+            },
+        };
+        Ok(Self { inner, hold_at })
+    }
+}
+
+impl Faults for WithHold<'_> {
+    fn hit(&self, point: &str) -> Result<()> {
+        self.inner.hit(point)?;
+        if let Some((at, dir)) = &self.hold_at
+            && at == point
+        {
+            hold(dir)?;
+        }
+        Ok(())
+    }
+}
+
+/// How often a held verb looks for `go`: well under the millisecond
+/// windows D-31 times, without spinning.
+const HOLD_POLL: std::time::Duration = std::time::Duration::from_micros(200);
+
+/// Announce the hold in `dir` and wait, polling, for the harness's `go`.
+fn hold(dir: &Path) -> Result<()> {
+    let held = dir.join("held");
+    std::fs::write(&held, b"")
+        .map_err(|err| Error::Io(format!("{} cannot be written: {err}", held.display())))?;
+    let go = dir.join("go");
+    let start = std::time::Instant::now();
+    while !go.exists() {
+        if start.elapsed() > HOLD_LIMIT {
+            return Err(Error::Io(format!(
+                "{ENV_HOLD_AT}: {} did not appear within {} s",
+                go.display(),
+                HOLD_LIMIT.as_secs()
+            )));
+        }
+        std::thread::sleep(HOLD_POLL);
+    }
+    Ok(())
+}
+
 /// How a run of the verb ended.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Outcome {
@@ -353,6 +424,8 @@ pub async fn run(
     faults: &dyn Faults,
 ) -> Result<Outcome> {
     use crate::cell_lock::{Entry, Legacy, gate};
+    let held = WithHold::from_env(env, faults)?;
+    let faults: &dyn Faults = &held;
     // T0: the locks, then the record and the layout.
     let gate = gate(config, Entry::UpgradeCache)?;
     let mut record = match gate.record() {
@@ -505,6 +578,9 @@ fn t1(config: &Config, record: &mut Record, faults: &dyn Faults) -> Result<()> {
     let marker = crate::legacy_marker(config);
     let guard = guard_content(&record.id);
     let temp = state_machine.join(format!(".rahi-guard-{}", record.id));
+    // Before T1 reads anything: where a live harness holds the verb to race
+    // a pre-043 node against the whole of T1 (spec 043 D-31).
+    faults.hit("t1.start")?;
 
     // (b) The guard, whole or not at all.
     match read_marker(&marker)? {

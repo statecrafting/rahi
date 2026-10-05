@@ -1484,6 +1484,39 @@ None remains open: D-7 to D-13 record the owner's approval and choices.
   unsupported for the crossing, is not this build's to decide. Not
   changed: no requirement text; the v0.2.0 legs; the leg's job name, which
   branch protection may cite.
+- **D-31 (2026-10-04, build decision; the real v0.2.0 stop and start
+  races around T1).** AC-5 requires a real v0.2.0 node stopped cleanly
+  while T1 runs, at offsets covering its WAL-lock release, marker removal
+  and SQLite close (D-P12), and one started at offsets around T1 (D-P13);
+  D-21 (c) left both unexecuted for want of a harness that times an event
+  inside T1. The harness: (a) `RAHI_TEST_UPGRADE_HOLD_AT=<point>:<dir>`, a
+  test seam beside `RAHI_TEST_UPGRADE_CRASH_AT`, holds the verb at a fault
+  point until `<dir>/go` exists; `upgrade::run` reads it from the
+  environment it is given, so the binary's `rahi-cli/src/lib.rs`, which
+  draft specs also claim, is not touched; (b) a new fault point, `t1.start`, sits
+  before T1 reads anything, since `begin` is followed by a second archive
+  verification that would put tens of milliseconds between the release
+  and T1; (c) `docker/upgrade-live.sh` runs both nodes in one container of
+  the v0.2.0 image with the new binary copied in, on clones of one
+  prepared volume, so the offsets are timed by one clock, the stop offset
+  from the cell's first stop event by a busy wait. The stop race brings
+  the v0.2.0 `supervise` to ready and sends it SIGTERM; a standalone
+  `serve` is not a clean stop, since it waits for Rauthy in boot and dies
+  on the signal with its marker left. Measured on 2026-10-04 (linux/arm64,
+  the v0.2.0 image by digest): the cell frees `logs_cache/lock.hql` 2 ms
+  after SIGTERM, `logs/lock.hql` at 3.7 ms and the marker at 4.5 ms, and
+  keeps SQLite open about 4.3 s more while it drains, so for that span only
+  T1 (c)'s `-wal`/`-shm` check stands between T1 and an open database.
+  Twelve stop offsets, 0 ms to 6 s: one refusal on the marker, eight at T1
+  (c) with the database open (2 ms to 4.25 s), three reaching `guarded`
+  after the close with no legacy path changing afterwards. Twelve start
+  orders and offsets, T1 5 ms before to 8 ms after the old start: four
+  passed T1 and the old node then died on the guard; eight refused, at
+  each of T1's checks (the held log lock, `EEXIST` at the link, the old
+  marker). In no run did the verb reach `guarded` with the database open
+  or the old node run after T1 passed. The legs print their counts and
+  fail on either. Not changed: no requirement text; AC-4 (g) stays
+  unexecuted.
 
 ### 7.1 Proposals (2026-09-23)
 
