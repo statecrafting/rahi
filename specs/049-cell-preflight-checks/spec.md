@@ -78,11 +78,12 @@ scope: an application registers them through the existing
   `PreflightContext` to a `Send + 'static` future whose output is an
   `AppVerdict`. The declaration is an associated function, called without a
   store, so the check names are known before any check runs.
-- **B-2 (names).** A check name MUST match `[a-z][a-z0-9_]{0,47}` and be
-  unique within the cell. Preflight reports app check `x` as `app.x`, so an
+- **B-2 (a valid declaration).** A declaration MUST hold at most 32 checks,
+  and each check name MUST match `[a-z][a-z0-9_]{0,47}` and be unique within
+  the cell. Preflight reports app check `x` as `app.x`, so an
   app name can never equal or shadow a chassis check name. A declaration
-  with an invalid or duplicate name MUST produce exactly one line,
-  `FAIL app: <reason naming the offending name>`, run none of the cell's
+  of more than 32 checks, or with an invalid or duplicate name, MUST produce exactly one line,
+  `FAIL app: <reason naming the offending name, or the count>`, run none of the cell's
   checks, and fail preflight.
 - **B-3 (the context).** `PreflightContext` MUST carry exactly: a read-only
   store view over the opened app store, exposing only spec 011's query
@@ -123,8 +124,7 @@ scope: an application registers them through the existing
   report lines as `  | <line>`. Rahi MUST replace control characters in a
   detail or report line with `?`, truncate each to 240 characters, and keep
   at most 32 report lines per check, printing `  | (<n> more lines
-  omitted)` when it drops any. At most 32 app checks are run; a declaration
-  of more fails as an invalid declaration under B-2.
+  omitted)` when it drops any.
 - **B-8 (exit).** Preflight exits `0` when no chassis or app check failed
   and `1` otherwise, through spec 030's existing `Error::Validation` path.
   No new exit code is introduced.
