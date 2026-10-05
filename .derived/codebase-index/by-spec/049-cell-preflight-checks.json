@@ -1,0 +1,118 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '049-cell-preflight-checks' file unit 'crates/rahi-ops/src/preflight_app.rs' does not exist",
+        "path": "crates/rahi-ops/src/preflight_app.rs"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '049-cell-preflight-checks' file unit 'crates/rahi-cli/tests/preflight_app.rs' does not exist",
+        "path": "crates/rahi-cli/tests/preflight_app.rs"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "015-kernel-manifest-and-adjudication",
+      "030-operational-verbs",
+      "048-store-clean-shutdown"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/rahi-cli/src/cell.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/preflight.rs",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/preflight_app.rs"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/preflight_app.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/cell.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/cell.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/preflight.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/preflight.rs"
+        }
+      }
+    ],
+    "specId": "049-cell-preflight-checks",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "447f934c7b9ca96d1a206f057517cb5bb9c955ab1dbc3ce733e97fc7e7171f62"
+}
