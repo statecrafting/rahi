@@ -788,7 +788,7 @@ itself.
 - **AC-1.** `cargo test -p rahi-cli --locked --test binding` and `cargo
   test -p rahi-edge --locked --test obs` pass, and
   `scripts/k8s-validate.sh` exits 0. The binding test covers FR-001 through
-  FR-005, FR-007a, FR-008, and boot stability: two reads in one boot are
+  FR-006, FR-007a, FR-008, and boot stability: two reads in one boot are
   byte-identical and a restart mints a different instance id.
 - **AC-2.** Spec 020's and 023's acceptance criteria still hold: the edge
   gains no dependency on `rahi-ops` or `rahi-idp`.
@@ -879,8 +879,9 @@ itself.
   `components.rauthy.image`; example 2, the same cell as example 1, now
   declares the same Rauthy image; B-9 names `not_applicable` for trace
   export and sampler outside a cell, as example 3 shows, and B-13 lists
-  `components.rauthy.image` among the `not_applicable` members there.
-  No other behavior changed.
+  `components.rauthy.image` among the `not_applicable` members there;
+  AC-1's binding test names FR-006, which no step covered. No other
+  behavior changed.
 
 ### Owner choices at ratification (resolved by D-3)
 
