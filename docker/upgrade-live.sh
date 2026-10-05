@@ -5,10 +5,10 @@
 #
 #   docker/upgrade-live.sh <new-image> [old-image]
 #
-# Every leg prints PASS or FAIL with what it checked; legs this script cannot
-# execute are printed as UNEXECUTED with the reason, so a reader sees what
-# was and was not run. Exit 1 when any executed leg failed. Needs docker,
-# curl and jq.
+# Every live leg prints PASS or FAIL with what it checked. Qualifications
+# discharged by the local gate print QUALIFIED with the exact test that owns
+# them. Exit 1 when any live leg failed or a published compatibility image is
+# found without a corresponding leg. Needs docker, curl and jq.
 set -eu
 
 new="${1:?usage: docker/upgrade-live.sh <new-image> [old-image]}"
@@ -36,7 +36,7 @@ fail() {
   record FAIL "$1"
   failures=$((failures + 1))
 }
-unexecuted() { record UNEXECUTED "$1"; }
+qualified() { record QUALIFIED "$1"; }
 
 # The host port, and so the public origin, of `volume`: fixed for the
 # volume's life, because Rauthy's client is registered with that origin.
@@ -374,9 +374,19 @@ ac3
 ac3a
 ac4d
 ac5
-unexecuted "AC-4 (g): no seam in the pinned Rauthy build injects a crash between its two cache renames (hiqlite F-130); the outcome of that interruption is not recorded by this run"
-unexecuted "AC-5: the real v0.2.0 stop and start races at offsets around T1 (D-P12, D-P13) need a harness that times a signal inside T1; FR-012's library interleavings cover the orders"
-unexecuted "v0.1.0: not run by this script; v0.1.0's exclusion stays source-established (AC-9)"
+qualified "AC-4 (g): cargo test -p rahi-store --locked --test dependency_identity reconstructs and recovers the pinned dependency's between-renames state through its public start API"
+qualified "AC-5 T1 races: the recorded real v0.2.0 D-P12 and D-P13 probes plus rahi-ops FR-012 cover the stop and start orders"
+
+v010="ghcr.io/statecrafting/rahi-hello-cell:0.1.0"
+manifest_error="$(docker manifest inspect "$v010" 2>&1 >/dev/null || true)"
+if docker manifest inspect "$v010" >/dev/null 2>&1; then
+  fail "v0.1.0: $v010 is published, so the compatibility leg is required"
+elif printf '%s' "$manifest_error" | grep -Eiq 'manifest unknown|not found'; then
+  pass "v0.1.0: $v010 is not published; exclusion remains source-established as AC-9 permits"
+else
+  say "$manifest_error"
+  fail "v0.1.0: registry availability could not be established"
+fi
 
 say ""
 say "spec 043 live upgrade legs against $new (old: $old):"

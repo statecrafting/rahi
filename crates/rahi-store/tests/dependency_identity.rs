@@ -9,6 +9,8 @@ const HIQLITE_PATCHED_CHECKSUM: &str =
     "9d3586f7db4e971836ffc5982086bcfa1de0c0293492a194efd7d4ac21ff5ebf";
 const HIQLITE_WAL_PATCHED_CHECKSUM: &str =
     "df82af141317c61b135d600a93c0ec2283c40f2761ab956b20568b2c23bc2746";
+const F130_CHILD_DIR: &str = "RAHI_TEST_F130_DIR";
+const F130_CHILD_MODE: &str = "RAHI_TEST_F130_MODE";
 
 #[derive(Default)]
 struct LockPkg {
@@ -187,4 +189,113 @@ fn dependency_identity_and_checksums() {
             "Target {target}: hiqlite-wal-patched not in metadata"
         );
     }
+}
+
+fn free_port() -> u16 {
+    std::net::TcpListener::bind(("127.0.0.1", 0))
+        .expect("bind an ephemeral port")
+        .local_addr()
+        .expect("read the ephemeral port")
+        .port()
+}
+
+fn f130_config(dir: &str) -> hiqlite::NodeConfig {
+    let mut config = hiqlite::NodeConfig {
+        node_id: 1,
+        nodes: vec![hiqlite::Node {
+            id: 1,
+            addr_raft: format!("127.0.0.1:{}", free_port()),
+            addr_api: format!("127.0.0.1:{}", free_port()),
+        }],
+        data_dir: dir.to_owned().into(),
+        secret_raft: "SuperSecureSecret1337".to_owned(),
+        secret_api: "SuperSecureSecret1337".to_owned(),
+        cache_storage_disk: true,
+        ..Default::default()
+    };
+    config.enc_keys.enc_key_active = "k1".into();
+    config.enc_keys.enc_keys = vec![("k1".into(), vec![7_u8; 32])];
+    config
+}
+
+/// Child half of the F-130 qualification. The parent supplies the environment
+/// before process start so the Rust 2024 test never mutates process-wide state.
+#[tokio::test]
+async fn f130_child_starts_the_pinned_dependency() {
+    let Ok(dir) = std::env::var(F130_CHILD_DIR) else {
+        return;
+    };
+    let mode = std::env::var(F130_CHILD_MODE).expect("the parent supplies a child mode");
+    let result = hiqlite::start_node(f130_config(&dir)).await;
+    match mode.as_str() {
+        "refuse" => {
+            let error = match result {
+                Ok(client) => {
+                    let _ = client.shutdown().await;
+                    panic!("an interrupted move must refuse without consent")
+                }
+                Err(error) => error,
+            };
+            assert!(error.to_string().contains("interrupted between its two renames"));
+        }
+        "resume" => {
+            let client = result.expect("consent completes the interrupted move");
+            client.shutdown().await.expect("the recovered node stops cleanly");
+        }
+        other => panic!("unknown F-130 child mode: {other}"),
+    }
+}
+
+/// Spec 043 AC-4(g): reconstruct the exact state left by a crash between the
+/// published build's two cache renames, then exercise the pinned dependency
+/// through its public start API. It must refuse without consent, resume into
+/// the same evidence directory with consent, and start normally afterwards.
+#[test]
+fn interrupted_rauthy_cache_move_is_refused_then_resumed() {
+    let dir = tempfile::tempdir().expect("temporary cache volume");
+    let root = dir.path();
+    std::fs::create_dir_all(root.join("logs_cache")).unwrap();
+    std::fs::write(root.join("logs_cache/00000000000000000001.wal"), b"legacy wal").unwrap();
+    std::fs::create_dir_all(root.join("state_machine_cache/snapshots")).unwrap();
+    std::fs::write(root.join("state_machine_cache/snapshots/s1"), b"legacy snapshot").unwrap();
+    std::fs::create_dir_all(root.join("pre-upgrade-100")).unwrap();
+    std::fs::rename(root.join("logs_cache"), root.join("pre-upgrade-100/logs_cache")).unwrap();
+
+    let run = |mode: &str, consent: bool| {
+        let mut command = Command::new(std::env::current_exe().expect("current test executable"));
+        command
+            .args([
+                "--exact",
+                "f130_child_starts_the_pinned_dependency",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env(F130_CHILD_DIR, root)
+            .env(F130_CHILD_MODE, mode);
+        if consent {
+            command.env("HQL_CACHE_LEGACY_MOVE_ASIDE", "true");
+        } else {
+            command.env_remove("HQL_CACHE_LEGACY_MOVE_ASIDE");
+        }
+        let output = command.output().expect("run the F-130 child");
+        assert!(
+            output.status.success(),
+            "F-130 child {mode} failed:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    };
+
+    run("refuse", false);
+    assert!(root.join("state_machine_cache/snapshots/s1").is_file());
+    run("resume", true);
+    assert_eq!(
+        std::fs::read(root.join("pre-upgrade-100/state_machine_cache/snapshots/s1")).unwrap(),
+        b"legacy snapshot"
+    );
+    assert!(
+        !root.join("state_machine_cache/snapshots/s1").exists(),
+        "the legacy snapshot is not left where the new cache can restore it"
+    );
+    run("resume", false);
 }
