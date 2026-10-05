@@ -1024,7 +1024,7 @@ These are requests, not decisions made for those repositories.
    denials at shutdown and colliding denials at N=3 until spec 035 lands;
    evidence that must be complete belongs in hqgit's own records.
 4. Reference a rahi deployment epoch by its record hash, never by its
-   number alone, which a restore can reuse (section 11, draft 041 B-7).
+   number alone, which a restore can reuse (section 11, 041 B-7).
 
 The runtime binding of section 11 adds these, which are requests for
 agreement before either side implements, not decisions made here. They
@@ -1033,21 +1033,21 @@ continue the numbered lists above.
 **Statecraft**, continued from item 5:
 
 6. Name the deployment record's type URI and schema version and publish
-   one fixture. The epoch record (draft 041 B-3) stores `{type, digest,
+   one fixture. The epoch record (041 B-3) stores `{type, digest,
    id}` for it and never parses it.
 7. Decide whether the composing envelope wraps a replica's `/binding`
    document or references a digest of retained original bytes, and name
-   the schema you will accept. Draft 040 section 3.1 now fixes Rahi's
+   the schema you will accept. 040 section 3.1 fixes Rahi's
    proposed producer document as `rahi.binding/v0`: one path per value,
    wrapped bases, closed absence reasons, named store sets and declared
    component identities. Consumer acceptance and the envelope remain
    consumer-owned.
 8. Key runtime observations by `service.instance.id` and the epoch's
    record hash. Do not ask the chassis for a digest, an instance id, or a
-   deployment id as a metric label (draft 040 B-9).
+   deployment id as a metric label (040 B-11).
 9. When you deploy a cell, set `RAHI_ARTIFACT_IMAGE` to the digest you
    pinned and `RAHI_DEPLOYMENT_REFS` on the migration Job, and after a
-   restore run the Job before the replicas start (draft 041 B-12).
+   restore run the Job before the replicas start (041 B-12).
 10. Keep effect-time revalidation in the broker: compare the epoch a
     permit was issued against with the cell's current one. The chassis
     reports the epoch; it evaluates no validity predicate.
@@ -1084,9 +1084,9 @@ the evidence for each, plus the decisions owned by Statecraft and hqgit.
 | image for out-of-tree cells | a published base image carrying rauthy and the entrypoint, or a documented Dockerfile each consumer copies | draft 039 |
 | the raw store handle | keep, or replace with a facade factory in a release line | section 4 |
 | a decision id across replicas | a node segment in the id (proposed), the node folded into the nonce, or a counter offset per node; each changes the shape 015 D-8 records | draft 035 B-6 |
-| where `/binding` is exposed | beside `/metrics`, kept off the ingress (proposed), behind the operator role, or behind a bearer scope | draft 040 |
+| where `/binding` is exposed | beside `/metrics`, kept off the ingress (proposed), behind the operator role, or behind a bearer scope | 040 (resolved by D-3: beside `/metrics`, off the ingress) |
 | manifest transition and deployment epoch | two record kinds (proposed, so 036 is not held by the cross-repository agreement 041 needs) or one | drafts 036, 041 |
-| a binding mismatch at boot | a signal only (proposed) or refusable under a manifest option | draft 041 B-8 |
+| a binding mismatch at boot | a signal only (proposed) or refusable under a manifest option | 041 B-8 |
 | the sequencing plan | the drafts sit outside thesis §5's waves; adding them there is a thesis change | spec 002 |
 
 ## 11. Runtime binding
@@ -1152,7 +1152,7 @@ it does not stand against an adversary inside the process.
 
 ### 11.3 Upgrade, changed manifest, rollback, restore
 
-**Recommendation** (draft 041, whose worked example is the reference):
+**Recommendation** (041, whose worked example is the reference):
 
 - **Upgrade.** The deploy step (the Job at N=3, the entrypoint at N=1)
   applies migrations, appends 036's transition when the manifest changed,
@@ -1189,7 +1189,7 @@ it does not stand against an adversary inside the process.
   `ledger verify` and `ledger export` use `Booted::open`, which starts a
   node on the data directory, so they run on a stopped volume only. A
   consumer cannot mark a deployment by the chain head without stopping a
-  replica. Draft 041 B-14 proposes the attach path for both.
+  replica. 041 B-14 proposes the attach path for both.
 - Attribute a decision to a replica: **not possible** today. The id names
   no replica and collides at N=3 (section 5).
 
@@ -1198,16 +1198,16 @@ it does not stand against an adversary inside the process.
 **Recommendation**. For a validity predicate revalidated at effect time,
 the chassis supplies the current epoch's record hash from the chain as a
 freshness input; the broker evaluates the predicate. `/binding` is not
-that input: draft 040 makes it boot-bound and byte-identical for the life
+that input: 040 makes it boot-bound and byte-identical for the life
 of the process, so a replica that has not restarted since the newest
 deployment reports the older epoch correctly. Polling it is not an atomic
 authorization of an effect. Whether a current-epoch observation surface
-exists, and its consistency and race semantics, belongs to draft 041. The
+exists, and its consistency and race semantics, belongs to 041. The
 chassis evaluates no trust window (015 §6 leaves that to a later spec; the
 sibling `trust-window` crate is not a chassis dependency). For an
 independent audit bundle, the chassis supplies the `ledger export` lines
 as the original bytes, the verifying public key, the segment references,
-and, with draft 041 B-13, a coverage file that states what the export
+and, with 041 B-13, a coverage file that states what the export
 does not contain: allows, lost denials, and archived segments. The
 bundle's envelope is the consumer's.
 

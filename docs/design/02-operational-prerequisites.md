@@ -441,7 +441,7 @@ identifies (041 B-7):
 }
 ```
 
-A replica's `/binding` document is defined normatively by draft 040 section
+A replica's `/binding` document is defined normatively by 040 section
 3.1. This historical note's example is removed because it disagreed on the
 binary path, treated a minted instance id as measured, exposed a free-text
 absence reason, omitted named migration sets and patched component
@@ -458,18 +458,18 @@ reserved as `absent`/`not_implemented`; only spec 041 may populate them.
 The document is assembled once at boot and remains byte-identical for the
 process lifetime. It identifies the boot, not the newest deployment, so it
 is neither a freshness source nor deploy authorization. Consumer envelope
-and retention policy remain consumer-owned. The examples in draft 040 are
+and retention policy remain consumer-owned. The examples in 040 are
 future conformance input, not implemented behavior.
 
 A decision payload after 041 carries `manifest`, `epoch` (the record hash),
-`epoch_number`, and `instance` (041 B-9 as revised on this branch).
+`epoch_number`, and `instance` (041 B-9 as approved).
 
 Rules proposed with the shapes:
 
 - **Identity keys.** A consumer keys a runtime observation by `instance.id`
   plus the epoch reference, never by epoch number, pod name, or node alone.
 - **No identity in labels.** No digest, reference, instance id, pod, or
-  deployment id is a metric label (040 B-9, 041 B-10); the only additions are
+  deployment id is a metric label (040 B-11, 041 B-10); the only additions are
   `rahi_build_info{rahi_version, contract_version}`, a label-free epoch-number
   gauge for dashboards, and a mismatch gauge whose label is a closed set.
 - **Observed is not permitted.** `/binding` and the epoch record say what
