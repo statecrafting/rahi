@@ -1491,7 +1491,9 @@ None remains open: D-7 to D-13 record the owner's approval and choices.
   D-21 (c) left both unexecuted for want of a harness that times an event
   inside T1. The harness: (a) `RAHI_TEST_UPGRADE_HOLD_AT=<point>:<dir>`, a
   test seam beside `RAHI_TEST_UPGRADE_CRASH_AT`, holds the verb at a fault
-  point until `<dir>/go` exists; (b) a new fault point, `t1.start`, sits
+  point until `<dir>/go` exists; `upgrade::run` reads it from the
+  environment it is given, so the binary's `rahi-cli/src/lib.rs`, which
+  draft specs also claim, is not touched; (b) a new fault point, `t1.start`, sits
   before T1 reads anything, since `begin` is followed by a second archive
   verification that would put tens of milliseconds between the release
   and T1; (c) `docker/upgrade-live.sh` runs both nodes in one container of

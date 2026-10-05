@@ -1627,7 +1627,7 @@ fn the_verb_held_at_a_point_waits_for_go_and_then_continues() {
         held.env(k, v);
     }
     held.env(
-        rahi_cli::ENV_UPGRADE_HOLD_AT,
+        rahi_ops::upgrade::ENV_HOLD_AT,
         format!("begin:{}", harness.path().display()),
     );
     held.stdout(std::process::Stdio::piped());

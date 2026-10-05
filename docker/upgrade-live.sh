@@ -422,6 +422,9 @@ stop_race() {
       /tmp/rahi-new upgrade-cache --backup '$archive' >/tmp/verb.log 2>&1 & vpid=\$!
     until [ -e /tmp/h/held ] || ! kill -0 \$vpid 2>/dev/null; do sleep 0.01; done
     kill -TERM \$spid
+    # A busy wait on purpose: \`sleep\` would spawn a process per check, about
+    # a millisecond each, wider than the windows timed here. It ends with
+    # the first stop event, about 2 ms after the signal, or with the cell.
     while [ -e hiqlite/logs_cache/lock.hql ] && kill -0 \$spid 2>/dev/null; do :; done
     sleep $offset; : > /tmp/h/go
     wait \$vpid; code=\$?
@@ -477,7 +480,7 @@ ac5_races() {
     vol="${run_id}-stop-${tag}"; box="${run_id}-box-stop-${tag}"
     clone_volume "$src" "$vol"; race_box "$box" "$vol" "$src"
     line="$(stop_race "$box" "$archive" "$offset" "$src")"
-    docker rm -f "$box" >/dev/null
+    docker rm -f "$box" >/dev/null; docker volume rm "$vol" >/dev/null
     say "stop race +${offset}s: $line"
     case "$line" in
       *"verb=137 "*"db_open_at_verb_end=no legacy_changed_after=no "*) guarded=$((guarded + 1)) ;;
@@ -496,7 +499,7 @@ ac5_races() {
     vol="${run_id}-start-${tag}"; box="${run_id}-box-start-${tag}"
     clone_volume "$src" "$vol"; race_box "$box" "$vol" "$src"
     line="$(start_race "$box" "$archive" "$order" "$offset")"
-    docker rm -f "$box" >/dev/null
+    docker rm -f "$box" >/dev/null; docker volume rm "$vol" >/dev/null
     say "start race ${order} ${offset}s: $line"
     case "$line" in
       *"verb=0 old_running=no "*) proceeded=$((proceeded + 1)) ;;
