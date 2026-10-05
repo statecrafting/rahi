@@ -1539,18 +1539,20 @@ fn a_pre043_volume_is_refused_then_transitioned_then_served_to_done() {
     );
 }
 
-/// Spec 043 D-21 (c): `RAHI_TEST_UPGRADE_CRASH_AT` stops the real binary at
-/// a persistent state as a crash would (exit 137, nothing after it), and a
-/// rerun of the verb resumes from there to `floored`.
-#[test]
-fn the_verb_stopped_at_a_persistent_state_resumes_to_floored() {
-    let volume = Volume::new();
+/// Rebuild `volume`, after `migrate`, as a pre-043 volume with an archive
+/// the verb verifies; the archive's path. `migrate` leaves this version's
+/// layout: both fences, the supervisor fence being the directory
+/// `rauthy/rauthy.env` that holds `FENCE` (spec 043 B-5), so it goes with
+/// `remove_dir_all`, and the old rendered file takes its place.
+fn pre043_layout(volume: &Volume) -> std::path::PathBuf {
     let data = volume.path();
     assert_eq!(volume.run(&["migrate"]).code, 0);
     std::fs::remove_dir_all(data.join("hiqlite")).unwrap();
-    std::fs::remove_dir_all(data.join("rauthy").join("rauthy.env")).unwrap();
+    let fence = data.join("rauthy").join("rauthy.env");
+    assert!(fence.is_dir(), "the supervisor fence is a directory");
+    std::fs::remove_dir_all(&fence).unwrap();
     std::fs::rename(data.join("app-store"), data.join("hiqlite")).unwrap();
-    std::fs::write(data.join("rauthy").join("rauthy.env"), b"OLD=1\n").unwrap();
+    std::fs::write(&fence, b"OLD=1\n").unwrap();
 
     let keys = KeySet::at(data.join("keys"));
     let parts = vec![
@@ -1564,6 +1566,17 @@ fn the_verb_stopped_at_a_persistent_state_resumes_to_floored() {
         rahi_ops::archive::seal(&parts, &manifest, &keys.backup_recipient().unwrap()).unwrap();
     let archive = data.join("pre-upgrade.tar.age");
     std::fs::write(&archive, sealed).unwrap();
+    archive
+}
+
+/// Spec 043 D-21 (c): `RAHI_TEST_UPGRADE_CRASH_AT` stops the real binary at
+/// a persistent state as a crash would (exit 137, nothing after it), and a
+/// rerun of the verb resumes from there to `floored`.
+#[test]
+fn the_verb_stopped_at_a_persistent_state_resumes_to_floored() {
+    let volume = Volume::new();
+    let data = volume.path();
+    let archive = pre043_layout(&volume);
     let phase = || {
         let text = std::fs::read_to_string(data.join(rahi_ops::upgrade::STATE_FILE)).unwrap();
         serde_json::from_str::<serde_json::Value>(&text).unwrap()["phase"]
@@ -1594,24 +1607,7 @@ fn the_verb_stopped_at_a_persistent_state_resumes_to_floored() {
 fn the_verb_held_at_a_point_waits_for_go_and_then_continues() {
     let volume = Volume::new();
     let data = volume.path();
-    assert_eq!(volume.run(&["migrate"]).code, 0);
-    std::fs::remove_dir_all(data.join("hiqlite")).unwrap();
-    std::fs::remove_dir_all(data.join("rauthy").join("rauthy.env")).unwrap();
-    std::fs::rename(data.join("app-store"), data.join("hiqlite")).unwrap();
-    std::fs::write(data.join("rauthy").join("rauthy.env"), b"OLD=1\n").unwrap();
-
-    let keys = KeySet::at(data.join("keys"));
-    let parts = vec![
-        rahi_ops::archive::Part::new(rahi_ops::archive::APP_DIR, "a.sqlite", b"app".to_vec()),
-        rahi_ops::archive::Part::new(rahi_ops::archive::RAUTHY_DIR, "r.sqlite", b"r".to_vec()),
-        rahi_ops::archive::Part::new(rahi_ops::archive::KEYS_DIR, "ledger.key", b"k".to_vec()),
-    ];
-    let manifest =
-        rahi_ops::archive::ArchiveManifest::over(&parts, 1, "sha256:test".to_owned(), None);
-    let sealed =
-        rahi_ops::archive::seal(&parts, &manifest, &keys.backup_recipient().unwrap()).unwrap();
-    let archive = data.join("pre-upgrade.tar.age");
-    std::fs::write(&archive, sealed).unwrap();
+    let archive = pre043_layout(&volume);
     let phase = || {
         let text = std::fs::read_to_string(data.join(rahi_ops::upgrade::STATE_FILE)).unwrap();
         serde_json::from_str::<serde_json::Value>(&text).unwrap()["phase"]
