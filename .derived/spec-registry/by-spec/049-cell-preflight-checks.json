@@ -1,0 +1,93 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-10-05",
+    "dependsOn": [
+      "015-kernel-manifest-and-adjudication",
+      "030-operational-verbs",
+      "048-store-clean-shutdown"
+    ],
+    "domain": "ops",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "crates/rahi-ops/src/preflight_app.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-cli/tests/preflight_app.rs"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/preflight.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/cell.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/lib.rs"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 3
+    },
+    "id": "049-cell-preflight-checks",
+    "implementation": "pending",
+    "kind": "kernel",
+    "risk": "medium",
+    "sectionDigests": {
+      "049-cell-preflight-checks": "1ac5b90ea3b23eec59d3dad0ca5a6b9ebab0a0ef983889fa99687c9a4692d287",
+      "1-purpose": "bdd4e4aa0a03592c18cbfc0febd6431aa17d953772d9e6b3a47cf7773ef746dc",
+      "2-territory": "1f7ec5c9da7b57ed091c975a8f4b309944ae960f33db69cc2b8689328a311147",
+      "3-behavior": "d32a95be5cec3a23c71d2b104fbc0c776d2041b5cc8d3d2294719ba9859727f1",
+      "4-functional-requirements": "1e75be415dd820f0a0dcd8141e46f14adf5399c65cba4033d18c5035ecdea79d",
+      "5-acceptance-criteria": "55487f2e20c5cdf04f811ff0f037649133cff85852a4a1a4dc2287bf9231622a",
+      "6-out-of-scope": "ff1e064a4a7940549112a5238988124c8c822829d5730539dc3ef170e343c629",
+      "7-resolved-decisions": "6555591498125731bca4503766d794c97b47ae41a9fc4a8846ffe119e798bbb7",
+      "verification": "664504a9f11b9168d27111e649af63babc91eacda1ad98de30414d1808e2107b"
+    },
+    "sectionHeadings": [
+      "049: Cell preflight checks",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/049-cell-preflight-checks/spec.md",
+    "status": "draft",
+    "summary": "`rahi preflight` answers whether serve would start here, but only for the chassis: an application cannot report its own readiness facts or refuse a deployment whose application configuration the manifest ceiling does not cover. This spec adds a default-empty `Cell::preflight_checks` declaration of named checks that preflight runs after its own twelve, against a read-only view of the opened app store, the parsed manifest, and the same environment reader, each under a time bound. Results are reported as `app.<name>` lines with optional bounded report lines; any failing app check fails preflight with exit 1, and no app check can mask, reorder, or replace a chassis check.\n",
+    "title": "Let a cell contribute named, bounded, read-only checks to preflight"
+  },
+  "shardHash": "3bdfb47f4acfb095871b56073f03c292c21deaee1755d0c8a14902e86102f79e",
+  "specVersion": "1.9.0"
+}
