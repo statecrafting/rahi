@@ -153,7 +153,7 @@
       "wave": 3
     },
     "id": "040-runtime-identity-and-binding-surface",
-    "implementation": "pending",
+    "implementation": "in-progress",
     "kind": "feature",
     "references": [
       {
@@ -203,6 +203,6 @@
     "summary": "A consumer that correlates an immutable artifact, an authority snapshot, a deployment, and a running replica needs the replica to say what it is. Today it says almost nothing: rahi version prints the crate version, the manifest hash is visible only inside a ledger export or a backup, the OTel resource carries service.name alone, the image has no labels, and the deploy manifests pin no digest. This spec makes a replica report its measured executable digest, its booted manifest hash, its declared image and application revision, and a per-boot minted instance id, each with its basis (measured, declared, minted, or absent with a reason from a closed set), on one unguarded document at /binding kept off the ingress like /metrics, on the OTel resource, and in one build-info metric whose labels are versions only. Section 3.1 fixes the document normatively: one schema name, one path for every value, one wrapper shape, and an additive evolution rule. The document is boot-bound and immutable for the life of the process, so it is never a freshness proof and never an authorization. It states what the telemetry does not observe or count. It writes nothing to the chain; deployment epochs are spec 041. This contract, ratified on 2026-10-05 (D-3), is reconciled to released Rahi 0.4.0, including named migration sets and the exact patched component identities and limits carried by spec 043.\n",
     "title": "Runtime identity: a replica states which bits it runs, which ceiling it enforces, and which instance it is, with every value's basis named, on bounded surfaces"
   },
-  "shardHash": "f49dea5b266800863fbe17c7ecf86ca6c727bcc20ca3c461f4130c8878097038",
+  "shardHash": "fc4493c613d5b384ae0451cb383177b41c075d9eaeb66c7492c29489f8c22fed",
   "specVersion": "1.9.0"
 }
