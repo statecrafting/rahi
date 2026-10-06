@@ -441,56 +441,35 @@ identifies (041 B-7):
 }
 ```
 
-A replica's `/binding` document (040 B-6, with 041's members reserved per 040
-P-1):
+A replica's `/binding` document is defined normatively by 040 section
+3.1. This historical note's example is removed because it disagreed on the
+binary path, treated a minted instance id as measured, exposed a free-text
+absence reason, omitted named migration sets and patched component
+identities, and showed spec-041 values as if they existed.
 
-```json
-{
-  "schema": "rahi.binding/v0",
-  "instance": {
-    "id":      { "value": "2-9f1c04e2a7b3d815", "basis": "measured" },
-    "node":    { "value": 2, "basis": "declared" },
-    "pod":     { "value": "rahi-1", "basis": "declared" },
-    "started": { "value": 1789247129, "basis": "declared" }
-  },
-  "build": {
-    "binary_sha256": { "value": "sha256:54e8134b...", "basis": "measured" },
-    "platform":      { "value": "linux/arm64", "basis": "declared" },
-    "rahi_version":  { "value": "0.1.0", "basis": "declared" },
-    "revision":      { "basis": "absent", "reason": "RAHI_BUILD_REVISION not set at build" }
-  },
-  "manifest": {
-    "hash":             { "value": "sha256:...", "basis": "measured" },
-    "app":              { "value": "hello-cell", "basis": "declared" },
-    "org":              { "value": "statecrafting", "basis": "declared" },
-    "contract_version": { "value": "1.0.0", "basis": "declared" }
-  },
-  "artifact": {
-    "image": { "value": "ghcr.io/statecrafting/rahi@sha256:...", "basis": "declared" }
-  },
-  "store": { "schema_version": { "value": 1, "basis": "measured" } },
-  "epoch": {
-    "ref":   { "value": { "type": "rahi.epoch-ref/v0", "chain": "sha256:...", "epoch": "sha256:...", "number": 2 }, "basis": "measured" },
-    "match": { "value": "bound", "basis": "measured" }
-  },
-  "observation": {
-    "traces":    { "export": "off", "export_loss": "uncounted", "ring_capacity": 1000 },
-    "metrics":   { "unobserved": ["/metrics", "/binding", "unmatched routes"] },
-    "decisions": { "allows": "not recorded", "queue_capacity": 1024,
-                   "loss_counters": ["kernel_decisions_dropped_total", "kernel_decisions_abandoned_total", "kernel_ledger_failures_total"] }
-  }
-}
-```
+The ratification draft fixes one `rahi.binding/v0` producer shape. Every
+identity value is `{value, basis}` or `{basis: "absent", reason, source?}`;
+the basis is `measured`, `declared`, `minted`, or `absent`; absence uses a
+closed token. It reports the Rahi 0.4.0 app-store layout, named migration
+set versions, and exact Hiqlite and Rauthy build claims without promoting
+them to measurements or qualification. `epoch.ref` and `epoch.match` are
+reserved as `absent`/`not_implemented`; only spec 041 may populate them.
+
+The document is assembled once at boot and remains byte-identical for the
+process lifetime. It identifies the boot, not the newest deployment, so it
+is neither a freshness source nor deploy authorization. Consumer envelope
+and retention policy remain consumer-owned. The examples in 040 are
+future conformance input, not implemented behavior.
 
 A decision payload after 041 carries `manifest`, `epoch` (the record hash),
-`epoch_number`, and `instance` (041 B-9 as revised on this branch).
+`epoch_number`, and `instance` (041 B-9 as approved).
 
 Rules proposed with the shapes:
 
 - **Identity keys.** A consumer keys a runtime observation by `instance.id`
   plus the epoch reference, never by epoch number, pod name, or node alone.
 - **No identity in labels.** No digest, reference, instance id, pod, or
-  deployment id is a metric label (040 B-9, 041 B-10); the only additions are
+  deployment id is a metric label (040 B-11, 041 B-10); the only additions are
   `rahi_build_info{rahi_version, contract_version}`, a label-free epoch-number
   gauge for dashboards, and a mismatch gauge whose label is a closed set.
 - **Observed is not permitted.** `/binding` and the epoch record say what
@@ -1492,4 +1471,3 @@ async fn admin_version(cell: &Instance) -> String {
     }
 }
 ```
-
