@@ -37,13 +37,13 @@ minor bump under 039 B-1: `rahi-ops`'s public fencing functions changed
   owner declared it so: a v0.1.0 cell can take no backup Rauthy accepts, so
   `upgrade-cache` can never verify an archive of it; move a v0.1.0
   deployment by starting a fresh cell and recreating its data. The live
-  v0.1.0 leg reports its transition legs as not required; v0.1.0's exclusion from a fenced volume is still run.
+  v0.1.0 leg reports its transition legs as not required; v0.1.0's
+  exclusion from a fenced volume is still run.
 - **An empty abandoned fence reads as absent (spec 043 D-32, spec 048
   D-6).** A volume a build before D-28 left with an empty
   `<data>/hiqlite/state_machine/` and nothing else, by a kill while it
   fenced a fresh volume, is now fenced at the next start instead of refused
   as pre-043. Anything in or beside that directory is refused as before.
-
 - **The live upgrade legs race a real v0.2.0 cell against T1 (spec 043
   D-31).** The `upgrade` job stops and starts the v0.2.0 node at offsets
   around the verb's first step, held there by the new test seam
