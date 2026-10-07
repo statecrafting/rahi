@@ -10,8 +10,40 @@ Every chassis crate carries one version, and a release is an annotated tag
 `vX.Y.Z` on a `main` commit whose `make ci` passed. Pre-1.0, a minor bump may
 change the consumer contract and a patch bump may not.
 
-## Unreleased
+## 0.5.0, release candidate 2026-10-06
 
+Every change since `v0.4.0`. All nine chassis crates move together. It is a
+minor bump under 039 B-1: `rahi-ops`'s public fencing functions changed
+(below), and `serve` and the verbs change their exit behavior on a signal
+(spec 048). The hiqlite pin is unchanged, `0.15.0-patched.3`.
+
+- **The backup admin logs in on a public URL with no port (spec 037
+  D-11).** On `RAHI_PUBLIC_URL=https://<host>`, `rahi backup` could not log
+  its backup admin in to rauthy ("Invalid redirect uri"), so the archive
+  left out rauthy's half. The login sent the passkey's origin, which names
+  the default port (`:443`), while rauthy registers its callback under its
+  issuer, which does not. The login now reads the issuer from rauthy's
+  discovery document and sends the callback rauthy registered. The
+  backup admin's provisioning, which logs in the same way, is fixed with it
+  and resumes from where it stopped at the next boot. A 0.2.0 to 0.4.0
+  cell on a public URL with no port is affected: upgrade, let it boot, and
+  take a fresh backup.
+- **`rahi-ops` fencing API (spec 043 D-28, D-29).** `create_legacy_fence`
+  and `create_supervisor_fence` are removed in favour of
+  `create_fences(config, sweep, faults)`, and `build_supervisor_fence`
+  returns a `FenceTemp` instead of a `PathBuf`. A consumer that calls only
+  `rahi_cli::run` is unaffected.
+- **v0.1.0 is unsupported for the cache crossing (spec 043 D-32).** The
+  owner declared it so: a v0.1.0 cell can take no backup Rauthy accepts, so
+  `upgrade-cache` can never verify an archive of it; move a v0.1.0
+  deployment by starting a fresh cell and recreating its data. The live
+  v0.1.0 leg reports its transition legs as not required; v0.1.0's
+  exclusion from a fenced volume is still run.
+- **An empty abandoned fence reads as absent (spec 043 D-32, spec 048
+  D-6).** A volume a build before D-28 left with an empty
+  `<data>/hiqlite/state_machine/` and nothing else, by a kill while it
+  fenced a fresh volume, is now fenced at the next start instead of refused
+  as pre-043. Anything in or beside that directory is refused as before.
 - **The live upgrade legs race a real v0.2.0 cell against T1 (spec 043
   D-31).** The `upgrade` job stops and starts the v0.2.0 node at offsets
   around the verb's first step, held there by the new test seam
@@ -21,8 +53,7 @@ change the consumer contract and a patch bump may not.
   `upgrade` job also builds the bare chassis and checks that the published
   v0.1.0 image serves nothing on a volume this version fenced. A v0.1.0
   volume cannot take the crossing itself: `upgrade-cache` needs a verifying
-  archive, and v0.1.0's backup is refused by Rauthy, so the v0.1.0
-  transition legs are reported unexecuted.
+  archive, and v0.1.0's backup is refused by Rauthy (D-32 above).
 - **Fresh-volume fencing survives a crash (spec 043 D-28).** A first boot
   killed while it fenced a new volume could leave `<data>/hiqlite/state_machine/`
   without its marker, which every later start refused as a pre-043 volume
@@ -31,7 +62,7 @@ change the consumer contract and a patch bump may not.
   `<data>/.rahi-fence-<id>/` and renamed into place whole, so the next start
   finishes fencing and removes what the crash left, sparing a temporary
   another live process is still building (spec 043 D-29). A volume an
-  earlier build already left in that state is still refused.
+  earlier build already left in that state is fenced too, since D-32.
 - **The node's lifetime as one scope (spec 048).** hiqlite leaves its
   unclean-stop marker, `state_machine/lock`, on every exit that skips
   `Store::shutdown`, and the next open then refuses. `rahi_store::Store::run`
@@ -59,6 +90,21 @@ change the consumer contract and a patch bump may not.
   feature cannot be enabled for one cell without being enabled for every
   consumer, and an automatic rebuild would hide the unclean stop this
   release removes the causes of.
+
+Spec 043 remains `implementation: in-progress`. The transition retains a
+backward-clock revocation gap, and restoring stale identity state can revive
+refresh credentials. A SIGKILL or a shutdown timeout before the app store
+finishes its shutdown may still leave hiqlite's unclean marker, and the next
+boot then refuses, because automatic healing is not enabled; spec 048 removes
+every other exit that left it. The live suite does not execute Rauthy's
+mid-cache-rename interruption (AC-4 (g)), and a v0.1.0 volume has no
+supported crossing to this version (043 D-32). These are declared gaps, not
+passed acceptance.
+
+The tested revision is the commit the annotated `v0.5.0` tag names: the
+squash merge of this release pull request after its full PR checks and the
+post-merge `main` CI pass. Registry publication, anonymous image access,
+image digests, and the registry-only consumer are tag-time evidence.
 
 ## 0.4.0, release candidate 2026-09-26
 

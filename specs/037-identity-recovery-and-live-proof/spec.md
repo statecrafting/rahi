@@ -523,6 +523,29 @@ D-7 stands.
   consumes released rauthy" stands. The N=1 cell consumes one downstream
   build of released Rauthy 0.36.2, pinned by digest, under 011 D-14 and
   043 D-1, D-14, D-15. rahi authors no change to it and maintains no fork.
+- **D-11 (2026-10-06, bug fix; the backup admin's redirect URI).** A
+  production rollout on a public URL with no port (`https://<host>`) found
+  that `rahi backup` could not log the backup admin in, so B-1's backup
+  left out rauthy's half: rauthy answered "Invalid redirect uri". The login
+  built `redirect_uri` from the passkey's origin, which is `RP_ORIGIN`, and
+  `rauthy_env` renders `RP_ORIGIN` with the default port named
+  (`https://<host>:443`) because WebAuthn compares the port. rauthy
+  registers its own client's only redirect URI at every boot as
+  `{issuer}oidc/callback`, its issuer being `PUB_URL` under the public
+  scheme, and `PUB_URL` is the public URL's authority with no port added
+  (rauthy 0.36.2 `anti_lockout.rs` and `rauthy_config.rs`). The two differ
+  exactly when the public URL names no port; every test used a non-default
+  port, so none exercised it. The login and the provisioning's first login
+  now read the issuer from rauthy's discovery document over the loopback
+  and send `{issuer}oidc/callback`, the value rauthy registered, whatever
+  the public URL's form; the passkey's origin still signs the assertion.
+  Rejected: stripping a default port from the passkey's origin, which is
+  wrong for a public URL that names `:443` itself (rauthy then registers
+  the port), and passing the public URL into the session, which edits
+  `rahi-cli/src/lib.rs`, a unit draft specs also claim. The stub rauthy
+  now publishes a default-port issuer and refuses any other redirect URI
+  as rauthy does, and `tests/backup.rs` reproduces the rollout's refusal
+  against the old code. No requirement text changed.
 
 ### Evidence and proposals (2026-09-12)
 

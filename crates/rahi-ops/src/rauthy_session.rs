@@ -69,8 +69,13 @@ const CONTINUATION_HEADER: &str = "x-continuation-token";
 /// session for the app, only for rauthy's admin API.
 pub const RAUTHY_CLIENT_ID: &str = "rauthy";
 
-/// rauthy's own callback, relative to the public origin.
+/// rauthy's own callback, relative to the public origin. The login does
+/// not build the redirect URI from it: it reads the issuer rauthy registers
+/// the callback under (037 D-11).
 pub const RAUTHY_CALLBACK_PATH: &str = "/auth/v1/oidc/callback";
+
+/// rauthy's discovery document, relative to the loopback base.
+const DISCOVERY_PATH: &str = "/auth/v1/.well-known/openid-configuration";
 
 /// How long one call to rauthy may take.
 pub const CALL_TIMEOUT: Duration = Duration::from_secs(30);
@@ -552,6 +557,40 @@ impl AdminSession {
             .join("; ")
     }
 
+    /// The redirect URI rauthy registered for its own client.
+    ///
+    /// rauthy rewrites the `rauthy` client at every boot with one redirect
+    /// URI, `{issuer}oidc/callback`, its issuer being `PUB_URL` under the
+    /// public scheme. The passkey's origin is not that value: `RP_ORIGIN`
+    /// names the default port explicitly where the public URL does not, and
+    /// rauthy refuses the difference as "Invalid redirect uri" (037 D-11).
+    /// The issuer rauthy publishes is the value it registered.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Upstream`] when rauthy is unreachable or its discovery
+    /// document names no issuer.
+    async fn rauthy_callback(&mut self) -> Result<String> {
+        let (status, body) = self
+            .call(reqwest::Method::GET, DISCOVERY_PATH, None)
+            .await?;
+        if !status.is_success() {
+            return Err(Error::Upstream(format!(
+                "rauthy answered {status} to its discovery document: {}",
+                clip(&body)
+            )));
+        }
+        let issuer = field(&body, "issuer")
+            .filter(|issuer| !issuer.is_empty())
+            .ok_or_else(|| {
+                Error::Upstream(format!(
+                    "rauthy's discovery document names no issuer: {}",
+                    clip(&body)
+                ))
+            })?;
+        Ok(format!("{}/oidc/callback", issuer.trim_end_matches('/')))
+    }
+
     /// One call, carrying whatever cookies and CSRF token the session
     /// holds, absorbing whatever it is given back.
     ///
@@ -623,6 +662,7 @@ impl AdminSession {
     /// [`Error::Unauthorized`] when rauthy refuses the login or the
     /// assertion; [`Error::Upstream`] for anything else it answers.
     pub async fn login(&mut self, passkey: &Passkey) -> Result<()> {
+        let redirect_uri = self.rauthy_callback().await?;
         let (status, body) = self
             .call(reqwest::Method::POST, "/auth/v1/oidc/session", None)
             .await?;
@@ -653,7 +693,7 @@ impl AdminSession {
             "email": passkey.email(),
             "pow": pow,
             "client_id": RAUTHY_CLIENT_ID,
-            "redirect_uri": format!("{}{RAUTHY_CALLBACK_PATH}", passkey.origin()),
+            "redirect_uri": redirect_uri,
             "scopes": ["openid"],
             "code_challenge": code_challenge,
             "code_challenge_method": "S256",
@@ -1065,6 +1105,7 @@ async fn ensure_role(api: &AdminApiKey<'_>, role: &str) -> Result<()> {
 /// passkey only in the same session.
 async fn register_passkey(base: &str, id: &str, passkey: &Passkey, transient: &str) -> Result<()> {
     let mut session = AdminSession::new(base)?;
+    let redirect_uri = session.rauthy_callback().await?;
     let (status, body) = session
         .call(reqwest::Method::POST, "/auth/v1/oidc/session", None)
         .await?;
@@ -1094,7 +1135,7 @@ async fn register_passkey(base: &str, id: &str, passkey: &Passkey, transient: &s
                 "password": transient,
                 "pow": solve_pow(challenge.trim())?,
                 "client_id": RAUTHY_CLIENT_ID,
-                "redirect_uri": format!("{}{RAUTHY_CALLBACK_PATH}", passkey.origin()),
+                "redirect_uri": redirect_uri,
                 "scopes": ["openid"],
                 "code_challenge": b64u(digest(&SHA256, verifier.as_bytes()).as_ref()),
                 "code_challenge_method": "S256",

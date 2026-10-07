@@ -621,6 +621,21 @@ RH-05 and RH-06 of the revision-3 register), and approved the spec on
   behavior. The annotated signed tag is the publication checkpoint. A
   GitHub Release object remains owner-only and is not created by this grant.
 
+- **D-20 (2026-10-06, release coordination under B-1 and B-2; 0.5.0).**
+  The owner's work order of 2026-10-05 and 2026-10-06 ("Approve all;
+  proceed with increased velocity development", then a prioritized list of
+  three rollout problems: the backup admin's refused login, and spec 048's
+  and 043's fixes "merged but not released") is taken as the grant to
+  prepare, merge, tag and publish the release that carries those fixes, as
+  D-19 did for 0.4.0. The version is 0.5.0, not 0.4.1: since `v0.4.0`,
+  `rahi-ops` removed `create_legacy_fence` and `create_supervisor_fence`
+  and changed `build_supervisor_fence`'s return type (043 D-28, D-29), and
+  spec 048 changed the verbs' exit behavior on a signal, both changes to
+  public items B-1 allows only at a minor bump. The release lands as one
+  pull request and the tag names its squash merge (D-18). The release
+  record, README and consumer contract state 043's remaining gaps. No
+  GitHub Release object is created.
+
 ## Verification
 
 ```verify:cli

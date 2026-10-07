@@ -417,12 +417,57 @@ fn a_legacy_store_is_refused_by_every_entry_point_but_the_verb_and_first_boot() 
 fn a_foreign_or_absent_marker_is_refused() {
     let dir = tempfile::tempdir().unwrap();
     let config = config(dir.path());
-    std::fs::create_dir_all(config.legacy_hiqlite_dir().join("state_machine")).unwrap();
+    std::fs::create_dir_all(config.legacy_hiqlite_dir().join("state_machine/backups")).unwrap();
     let err = gate(&config, Entry::Serve).unwrap_err();
     assert!(err.message().contains("is absent"), "{err}");
     std::fs::write(rahi_ops::legacy_marker(&config), b"").unwrap();
     let err = gate(&config, Entry::Serve).unwrap_err();
     assert!(err.message().contains("not a fence"), "{err}");
+}
+
+/// Spec 043 D-32, spec 048 D-6: a pre-D-28 build killed between creating
+/// `state_machine/` and publishing its marker left an empty directory, which
+/// every later start refused. It now reads as absent and is fenced; the same
+/// directory with anything in it or beside it is refused as before.
+#[test]
+fn an_empty_abandoned_fence_is_fenced_as_fresh_and_nothing_more() {
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = config(dir.path());
+    std::fs::create_dir_all(cfg.legacy_hiqlite_dir().join("state_machine")).unwrap();
+    let gate_ = gate(&cfg, Entry::Serve).unwrap();
+    assert!(gate_.fenced());
+    assert!(matches!(gate_.legacy(), Legacy::Fence { debris, .. } if debris.is_empty()));
+    drop(gate_);
+
+    for extra in ["state_machine/db", "logs", "state_machine/x"] {
+        let dir = tempfile::tempdir().unwrap();
+        let cfg = config(dir.path());
+        std::fs::create_dir_all(cfg.legacy_hiqlite_dir().join("state_machine")).unwrap();
+        let path = cfg.legacy_hiqlite_dir().join(extra);
+        if extra.ends_with("x") {
+            std::fs::write(&path, b"").unwrap();
+        } else {
+            std::fs::create_dir_all(&path).unwrap();
+        }
+        let before = tree(&cfg.legacy_hiqlite_dir());
+        let err = gate(&cfg, Entry::Serve).unwrap_err();
+        assert!(err.message().contains("is absent"), "{extra}: {err}");
+        assert_eq!(tree(&cfg.legacy_hiqlite_dir()), before, "{extra}");
+    }
+
+    // An empty legacy directory, as a stop between the two removals leaves
+    // it, is fenced too, so that interruption is not a stuck volume.
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = config(dir.path());
+    std::fs::create_dir_all(cfg.legacy_hiqlite_dir()).unwrap();
+    assert!(gate(&cfg, Entry::Serve).unwrap().fenced());
+
+    // The verb does not fence, so it does not remove the directory either.
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = config(dir.path());
+    std::fs::create_dir_all(cfg.legacy_hiqlite_dir().join("state_machine")).unwrap();
+    let _ = gate(&cfg, Entry::UpgradeCache);
+    assert!(cfg.legacy_hiqlite_dir().join("state_machine").is_dir());
 }
 
 #[test]
