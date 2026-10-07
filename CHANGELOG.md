@@ -12,6 +12,17 @@ change the consumer contract and a patch bump may not.
 
 ## Unreleased
 
+- **v0.1.0 is unsupported for the cache crossing (spec 043 D-32).** The
+  owner declared it so: a v0.1.0 cell can take no backup Rauthy accepts, so
+  `upgrade-cache` can never verify an archive of it; move a v0.1.0
+  deployment by starting a fresh cell and recreating its data. The live v0.1.0 leg reports its transition legs as not required.
+  v0.1.0's exclusion from a fenced volume is still run.
+- **An empty abandoned fence reads as absent (spec 043 D-32, spec 048
+  D-6).** A volume a build before D-28 left with an empty
+  `<data>/hiqlite/state_machine/` and nothing else, by a kill while it
+  fenced a fresh volume, is now fenced at the next start instead of refused
+  as pre-043. Anything in or beside that directory is refused as before.
+
 - **The live upgrade legs race a real v0.2.0 cell against T1 (spec 043
   D-31).** The `upgrade` job stops and starts the v0.2.0 node at offsets
   around the verb's first step, held there by the new test seam
@@ -31,7 +42,7 @@ change the consumer contract and a patch bump may not.
   `<data>/.rahi-fence-<id>/` and renamed into place whole, so the next start
   finishes fencing and removes what the crash left, sparing a temporary
   another live process is still building (spec 043 D-29). A volume an
-  earlier build already left in that state is still refused.
+  earlier build already left in that state is fenced too, since D-32.
 - **The node's lifetime as one scope (spec 048).** hiqlite leaves its
   unclean-stop marker, `state_machine/lock`, on every exit that skips
   `Store::shutdown`, and the next open then refuses. `rahi_store::Store::run`
