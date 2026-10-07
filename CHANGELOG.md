@@ -33,6 +33,17 @@ minor bump under 039 B-1: `rahi-ops`'s public fencing functions changed
   `create_fences(config, sweep, faults)`, and `build_supervisor_fence`
   returns a `FenceTemp` instead of a `PathBuf`. A consumer that calls only
   `rahi_cli::run` is unaffected.
+- **v0.1.0 is unsupported for the cache crossing (spec 043 D-32).** The
+  owner declared it so: a v0.1.0 cell can take no backup Rauthy accepts, so
+  `upgrade-cache` can never verify an archive of it; move a v0.1.0
+  deployment by starting a fresh cell and recreating its data. The live
+  v0.1.0 leg reports its transition legs as not required; v0.1.0's exclusion from a fenced volume is still run.
+- **An empty abandoned fence reads as absent (spec 043 D-32, spec 048
+  D-6).** A volume a build before D-28 left with an empty
+  `<data>/hiqlite/state_machine/` and nothing else, by a kill while it
+  fenced a fresh volume, is now fenced at the next start instead of refused
+  as pre-043. Anything in or beside that directory is refused as before.
+
 - **The live upgrade legs race a real v0.2.0 cell against T1 (spec 043
   D-31).** The `upgrade` job stops and starts the v0.2.0 node at offsets
   around the verb's first step, held there by the new test seam
@@ -42,8 +53,7 @@ minor bump under 039 B-1: `rahi-ops`'s public fencing functions changed
   `upgrade` job also builds the bare chassis and checks that the published
   v0.1.0 image serves nothing on a volume this version fenced. A v0.1.0
   volume cannot take the crossing itself: `upgrade-cache` needs a verifying
-  archive, and v0.1.0's backup is refused by Rauthy, so the v0.1.0
-  transition legs are reported unexecuted.
+  archive, and v0.1.0's backup is refused by Rauthy (D-32 above).
 - **Fresh-volume fencing survives a crash (spec 043 D-28).** A first boot
   killed while it fenced a new volume could leave `<data>/hiqlite/state_machine/`
   without its marker, which every later start refused as a pre-043 volume
@@ -52,7 +62,7 @@ minor bump under 039 B-1: `rahi-ops`'s public fencing functions changed
   `<data>/.rahi-fence-<id>/` and renamed into place whole, so the next start
   finishes fencing and removes what the crash left, sparing a temporary
   another live process is still building (spec 043 D-29). A volume an
-  earlier build already left in that state is still refused.
+  earlier build already left in that state is fenced too, since D-32.
 - **The node's lifetime as one scope (spec 048).** hiqlite leaves its
   unclean-stop marker, `state_machine/lock`, on every exit that skips
   `Store::shutdown`, and the next open then refuses. `rahi_store::Store::run`
@@ -88,8 +98,7 @@ finishes its shutdown may still leave hiqlite's unclean marker, and the next
 boot then refuses, because automatic healing is not enabled; spec 048 removes
 every other exit that left it. The live suite does not execute Rauthy's
 mid-cache-rename interruption (AC-4 (g)), and a v0.1.0 volume has no
-supported crossing to this version: its backup is refused by Rauthy, so no
-verifying archive of it can be taken (043 D-30). These are declared gaps, not
+supported crossing to this version (043 D-32). These are declared gaps, not
 passed acceptance.
 
 The tested revision is the commit the annotated `v0.5.0` tag names: the

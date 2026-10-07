@@ -196,7 +196,7 @@
       "contentHash": "6ffa5596201477ded845b25569e0862b3819facdffc451763ccaf2dac04619c3"
     },
     "docker/upgrade-live.sh": {
-      "contentHash": "fae9ae0cb9c2c2fe2cbdedc24ba8e2c45c408a75047aa5d990fc9ab9c45a48a7"
+      "contentHash": "6342e938a9039efe71a14ceab8e7afe84a7cb0ac224f139968a8aace09e26ddc"
     },
     "docs/design/00-architecture.md": {
       "contentHash": "d22a98e616e6c66d69857a1d0ee3c1f59b742430f7d12ada2ddf370ee40e185d"
@@ -205,7 +205,7 @@
       "contentHash": "b1973b69dc9b53dce163a2da56e52b1ce119b7f8079cc6cc302140d1a5be94c5"
     },
     "docs/design/01-consumer-contract.md": {
-      "contentHash": "d9d9812569e0a4575f8714886463996d6b39c467545cecbd2e1ac571d882a7bc"
+      "contentHash": "119350a2b29e0e9c7ea88632d3ba555e52c06f894c0d8e4c683fe73031a7a2e3"
     },
     "docs/design/02-operational-prerequisites.md": {
       "contentHash": "3bfb1aafaf48390a4187bf6c769d328206b51cdecfeb96ae2eb55911c1c3e449"
