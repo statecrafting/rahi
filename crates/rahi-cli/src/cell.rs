@@ -77,6 +77,15 @@ pub trait Cell: Send + Sync + 'static {
     fn preflight_checks() -> Vec<AppCheck> {
         Vec::new()
     }
+
+    /// The application's source revision, reported as `build.revision` in
+    /// the binding document (spec 040 B-2, B-12). `None` by default, which
+    /// the document states as absent rather than guessing: a chassis crate's
+    /// build environment names whichever build filled the cargo cache, not
+    /// this application.
+    fn app_revision() -> Option<&'static str> {
+        None
+    }
 }
 
 /// The chassis with no app: probes, metrics, identity, and the verbs.
