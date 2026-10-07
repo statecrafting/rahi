@@ -151,7 +151,7 @@
       "contentHash": "b131a146b747341544ad809bd7c09841f7591e4ad811b20fae146085d0e7b571"
     },
     "deploy/k8s/ingress.yaml": {
-      "contentHash": "04a94b1664d7ffe87d79b850960eeea781bf4519aceef8338fe22fca501570f9"
+      "contentHash": "5409a9613d7d1e5abb82ea9488f463303af19dd2d7700835badd53a05b335f6b"
     },
     "deploy/k8s/kustomization.yaml": {
       "contentHash": "0474e7180e9b88b697d43a33c80a5504afc3384911521222307602855027eac4"
@@ -169,7 +169,7 @@
       "contentHash": "cc20676550ae328bf850a1e0c0db30d1f31ae00ea34d7544c921c4379bd0c54c"
     },
     "deploy/k8s/statefulset.yaml": {
-      "contentHash": "3a477877f5ec1bff36f9aec00e8f92de154a0a2fbcd66089c12629bf9f597088"
+      "contentHash": "685b64e901042baf490053adecea7ccab2564a3f53ee2a2ff2bfc497abacce9c"
     },
     "deploy/n3/kustomization.yaml": {
       "contentHash": "6d88e3c333ad5ee8949fc93153f49c7fe74fbc4d1e8e76f5669729d511efb7a1"
@@ -181,7 +181,7 @@
       "contentHash": "a4b4d73979c39bb36f20b8fb21d0827a8d088221dc26ad4d0cb5b42e772979f1"
     },
     "docker/Dockerfile": {
-      "contentHash": "32c81faed37fb3caaadd5fcdffd585bdc77d903dd0fa1b4f2febf1adbc2e3773"
+      "contentHash": "31e20d8619bb47a30a19f8fe5f2084b6140e4a2a188badebd10192cc2b086a61"
     },
     "docker/compose.yml": {
       "contentHash": "9d852e142a464b6df1376fb9ce7da13e8ff5b957edc32b88cdfdf0cb531728a9"
@@ -190,7 +190,7 @@
       "contentHash": "b2d4dfb85897999b63a6e177a03b1b1f15a8cb28b74b2c138ed5acb5b54e5cfb"
     },
     "docker/runtime.Dockerfile": {
-      "contentHash": "bbd2a221c9f66c0874545fca256b05c5903b97a8bfca8477d83bfb2091d066c0"
+      "contentHash": "7be8d1769a09659f601ec7ef7065cc04f614e63f78e9c703e57d4d053165b5b0"
     },
     "docker/smoke.sh": {
       "contentHash": "6ffa5596201477ded845b25569e0862b3819facdffc451763ccaf2dac04619c3"
@@ -205,7 +205,7 @@
       "contentHash": "b1973b69dc9b53dce163a2da56e52b1ce119b7f8079cc6cc302140d1a5be94c5"
     },
     "docs/design/01-consumer-contract.md": {
-      "contentHash": "29aee8fdc2c62e5de91b2d0a3f4c9fe738e90d0a7b82e9ec20aa9b185bdc6bda"
+      "contentHash": "abbdcc170cedb2ea0f65747d57b48a0bf09e6f0f188483c879c1de914f286390"
     },
     "docs/design/02-operational-prerequisites.md": {
       "contentHash": "3bfb1aafaf48390a4187bf6c769d328206b51cdecfeb96ae2eb55911c1c3e449"
@@ -247,7 +247,7 @@
       "contentHash": "f29ecfab602778e37107e96e8e5dd9e5891529179d7f48669c41adea2954b89f"
     },
     "scripts/k8s-validate.sh": {
-      "contentHash": "4335499d67376e9860f2797935b504c7b7fbf07389303ef049179da306289c2c"
+      "contentHash": "33070c0b97ab5cf24dbbfe36d3de775ce3dd0cf9ec1d12b9d429ff4bf1637b2f"
     },
     "scripts/spec-dag.sh": {
       "contentHash": "84d4793c8a1a811ab25ce7d45b9a66d92364015883bd4a72c8741b9898ab1d05"

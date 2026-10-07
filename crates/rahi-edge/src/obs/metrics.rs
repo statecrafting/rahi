@@ -51,6 +51,9 @@ pub const WORK_ITEMS: &str = "rahi_work_items";
 pub const PREVIOUS_STOP: &str = "rahi_previous_stop";
 /// Revocation rows held, by kind (spec 043 B-6 (i), D-10).
 pub const REVOCATION_ROWS: &str = "rahi_revocation_rows";
+/// The build this process runs, value `1`, labelled by versions only
+/// (spec 040 B-11).
+pub const BUILD_INFO: &str = "rahi_build_info";
 /// Entries found on the legacy path's fence (spec 043 B-5, D-17 (e)).
 pub const LEGACY_PATH_DEBRIS: &str = "rahi_legacy_path_debris";
 
@@ -85,6 +88,7 @@ pub struct Metrics {
     previous_stop: IntGaugeVec,
     revocation_rows: IntGaugeVec,
     legacy_path_debris: IntGauge,
+    build_info: IntGaugeVec,
 }
 
 impl Metrics {
@@ -233,8 +237,16 @@ impl Metrics {
             "Entries beside the fence on the legacy store path",
         ))
         .map_err(config)?;
+        // Spec 040 B-11: versions only. A digest, an instance id, a pod, a
+        // revision or a deployment id is never a label here.
+        let build_info = IntGaugeVec::new(
+            Opts::new(BUILD_INFO, "The build this process runs: 1 on its versions"),
+            &["rahi_version", "contract_version"],
+        )
+        .map_err(config)?;
         for collector in [
-            Box::new(previous_stop.clone()) as Box<dyn prometheus::core::Collector>,
+            Box::new(build_info.clone()) as Box<dyn prometheus::core::Collector>,
+            Box::new(previous_stop.clone()),
             Box::new(revocation_rows.clone()),
             Box::new(legacy_path_debris.clone()),
         ] {
@@ -260,6 +272,7 @@ impl Metrics {
             previous_stop,
             revocation_rows,
             legacy_path_debris,
+            build_info,
         })
     }
 
@@ -273,6 +286,15 @@ impl Metrics {
         TextEncoder::new()
             .encode_to_string(&self.registry.gather())
             .map_err(|err| Error::Io(format!("the metrics exposition cannot be encoded: {err}")))
+    }
+
+    /// Set `rahi_build_info` (spec 040 B-11): one series, value `1`. A
+    /// second call replaces the first, so a process never emits two.
+    pub fn set_build_info(&self, rahi_version: &str, contract_version: &str) {
+        self.build_info.reset();
+        self.build_info
+            .with_label_values(&[rahi_version, contract_version])
+            .set(1);
     }
 
     /// The registry, for a caller that has its own collector to register.

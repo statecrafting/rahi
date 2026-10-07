@@ -415,7 +415,36 @@ pub async fn compose_parts<C: Cell>(
     .await?;
     let obs = rahi_edge::ObsOptions::from_env(&booted.config, env)?
         .with_service_name(booted.manifest.app.name.as_str());
-    rahi_edge::obs::init(obs)?;
+    // Spec 040 B-2, B-6: the binding document, once, after the ledger opened
+    // and before anything listens. Its absences' detail goes to the boot log
+    // and never into the document; its present values go on the resource.
+    let binding = rahi_ops::binding::assemble(&rahi_ops::binding::Inputs {
+        env,
+        // B-12's `app_revision` parameter reaches the composer with the
+        // `Cell` declaration (D-5); until then the document states it absent.
+        app_revision: None,
+        cell: Some(rahi_ops::binding::CellFacts {
+            node: booted.store.config().node_id,
+            manifest_hash: booted.hash.to_string(),
+            app_name: booted.manifest.app.name.as_str().to_owned(),
+            app_org: booted.manifest.app.org.as_str().to_owned(),
+            contract_version: booted.manifest.contract.version.clone(),
+            store: rahi_ops::binding::store_facts(&booted.store.handle()).await?,
+        }),
+        observation: rahi_ops::binding::Observation {
+            export: Some(obs.otlp_endpoint.is_some()),
+            ring_capacity: obs.ring_capacity,
+            queue_capacity: rahi_kernel::DEFAULT_QUEUE_CAPACITY,
+            loss_counters: loss_counters(),
+        },
+    })?;
+    for line in binding.log() {
+        eprintln!("{line}");
+    }
+    let resource = rahi_edge::binding::resource_attributes(binding.document());
+    rahi_edge::obs::init_with(obs, &resource)?
+        .metrics()
+        .set_build_info(binding.rahi_version(), &booted.manifest.contract.version);
 
     let mut state = AppState::new(
         kernel.clone(),
@@ -538,6 +567,7 @@ pub async fn compose_parts<C: Cell>(
     }
 
     let mut edge = Edge::builder(state.clone())
+        .binding(binding.bytes().to_vec())
         .stream_identity(stream_identity())
         .mount("/", app_routes)
         .mount_operator(OPERATOR_PREFIX, operator_routes);
@@ -589,6 +619,18 @@ pub async fn compose_parts<C: Cell>(
         None => router,
     };
     Ok(Composed { router, kernel })
+}
+
+/// The counters that count lost denials, as the binding document names
+/// them (spec 040 B-9).
+fn loss_counters() -> Vec<String> {
+    [
+        rahi_edge::obs::metrics::KERNEL_DECISIONS_DROPPED,
+        rahi_edge::obs::metrics::KERNEL_DECISIONS_ABANDONED,
+        rahi_edge::obs::metrics::KERNEL_LEDGER_FAILURES,
+    ]
+    .map(str::to_owned)
+    .to_vec()
 }
 
 /// How long readiness waits for Rauthy's health route (spec 043 B-8).

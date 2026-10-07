@@ -61,6 +61,7 @@ pub struct EdgeBuilder {
     clock: Option<Clock>,
     stream_identity: Option<StreamIdentityResolver>,
     csrf_exemption: Option<csrf::Exemption>,
+    binding: Option<axum::body::Bytes>,
 }
 
 impl std::fmt::Debug for EdgeBuilder {
@@ -96,6 +97,7 @@ impl EdgeBuilder {
             clock: None,
             stream_identity: None,
             csrf_exemption: None,
+            binding: None,
         }
     }
 
@@ -188,6 +190,16 @@ impl EdgeBuilder {
         self
     }
 
+    /// Serve `document` at [`crate::BINDING_PATH`] (spec 040 B-6): beside
+    /// the probes and `/metrics`, outside every guard, and not observed. The
+    /// bytes are the composer's, assembled once at boot; the edge answers
+    /// them unchanged and never parses them.
+    #[must_use]
+    pub fn binding(mut self, document: impl Into<axum::body::Bytes>) -> Self {
+        self.binding = Some(document.into());
+        self
+    }
+
     /// Declare the per-route-group ceilings (B-5).
     #[must_use]
     pub fn rate_limits(mut self, limits: RateLimits) -> Self {
@@ -240,6 +252,9 @@ impl EdgeBuilder {
             crate::obs::METRICS_PATH,
         ] {
             table.record(Route::new(path, RouteClass::Probe));
+        }
+        if self.binding.is_some() {
+            table.record(Route::new(crate::BINDING_PATH, RouteClass::Probe));
         }
         for mount in &self.mounts {
             let class = mount
@@ -360,9 +375,14 @@ impl EdgeBuilder {
         }
         let guarded = guarded.layer(from_fn_with_state(check, csrf::enforce));
 
-        Router::new()
+        let unguarded = Router::new()
             .merge(probes::router().with_state(self.state.clone()))
-            .merge(crate::obs::metrics_router())
+            .merge(crate::obs::metrics_router());
+        let unguarded = match self.binding {
+            Some(document) => unguarded.merge(crate::binding::router(document)),
+            None => unguarded,
+        };
+        unguarded
             .merge(guarded)
             .layer(from_fn_with_state(
                 SecurityHeaders::from_config(self.state.config()),

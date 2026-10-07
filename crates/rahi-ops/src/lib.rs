@@ -32,6 +32,7 @@
 
 pub mod archive;
 pub mod backup;
+pub mod binding;
 pub mod cell_lock;
 pub mod first_boot;
 pub mod keys;

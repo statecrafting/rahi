@@ -219,7 +219,9 @@ where
 /// down (spec 023 D-3).
 #[must_use]
 pub fn is_instrumented(path: &str, route: Option<&str>) -> bool {
-    if path == METRICS_PATH {
+    // Spec 040 B-6: `/binding` is a scrape target like `/metrics`, and a
+    // collector polling it must not fill the ring or the request counters.
+    if path == METRICS_PATH || path == crate::binding::BINDING_PATH {
         return false;
     }
     route.is_some()
@@ -302,6 +304,7 @@ mod tests {
     #[test]
     fn the_metrics_path_and_the_static_slot_are_not_observed() {
         assert!(!is_instrumented(METRICS_PATH, Some("/metrics")));
+        assert!(!is_instrumented(crate::BINDING_PATH, Some("/binding")));
         assert!(!is_instrumented("/assets/app.4f3a2b1c.js", None));
         assert!(!is_instrumented("/anything-unrouted", None));
         assert!(is_instrumented("/api/notes/7", Some("/api/notes/{id}")));

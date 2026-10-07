@@ -27,11 +27,14 @@ extends:
   - { spec: "023-observability", unit: "crates/rahi-edge/src/obs/metrics.rs", nature: additive }
   - { spec: "023-observability", unit: "crates/rahi-edge/src/obs/mod.rs", nature: additive }
   - { spec: "023-observability", unit: "crates/rahi-edge/tests/obs.rs", nature: additive }
+  - { spec: "023-observability", unit: "crates/rahi-edge/src/obs/layer.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/lib.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/lib.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/serve.rs", nature: additive }
   - { spec: "031-single-container-packaging", unit: "docker/Dockerfile", nature: additive }
   - { spec: "031-single-container-packaging", unit: ".github/workflows/image.yml", nature: additive }
+  - { spec: "039-release-and-out-of-tree-packaging", unit: "docker/runtime.Dockerfile", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-cli/Cargo.toml", nature: additive }
   - { spec: "032-cluster-topology", unit: "deploy/k8s/statefulset.yaml", nature: additive }
   - { spec: "032-cluster-topology", unit: "deploy/k8s/ingress.yaml", nature: additive }
   - { spec: "032-cluster-topology", unit: "scripts/k8s-validate.sh", nature: additive }
@@ -884,6 +887,52 @@ itself.
   AC-1's binding test names FR-006 and its obs test FR-007, which no
   step named; example 2's migration sets equal example 1's, the same
   cell's. No other behavior changed.
+
+- **D-5 (2026-10-05, build decisions; the first implementing change).**
+  (a) **The hiqlite set and the lock.** B-5 names three packages as "the
+  exact locked package map", but `Cargo.lock` holds two:
+  `hiqlite-derive-patched` belongs to the `0.15.0-patched.3` release set
+  and no feature this workspace enables compiles it. The document reports
+  the three-member map B-5 and every example fix, declared, and
+  `rahi_ops::binding`'s unit test holds the two locked members to the lock
+  and admits only the derive crate as unlocked. Surfaced for the owner:
+  whether the map should name only compiled packages is a change to B-5
+  and the examples, which this build does not make. (b) **How the
+  packaged build declares Rauthy.** Both image recipes set
+  `RAHI_RAUTHY_IMAGE` from the `RAUTHY_IMAGE` argument they copy Rauthy
+  from; the composer reports it declared when set (a malformed value is
+  `Error::Config`, as for `RAHI_ARTIFACT_IMAGE`) and `absent` with reason
+  `not_applicable` when unset, which is every composition that did not
+  package Rauthy. Nothing reads the child, its labels or a registry.
+  (c) **`app_revision`.** The defaulted parameter is
+  `Cell::app_revision() -> Option<&'static str>`, `None` by default, so
+  an in-tree and an out-of-tree cell supply it the same way. `cell.rs` and
+  `lib.rs` are also claimed by draft spec 049, and the governance gate
+  refuses a change to a path a draft owns, so this change ships the
+  document, the route, the resource, the metric and the deployment checks
+  with `build.revision` stated `absent`/`not_declared`, and a second change
+  adds `Cell::app_revision` and `rahi version --binding` (B-13, FR-008,
+  AC-5) once 049 is ratified. (d) **Platforms.** The closed table maps
+  `linux` and `macos` (`darwin`) by `x86_64` (`amd64`) and `aarch64`
+  (`arm64`); anything else is `unmapped`. (e) **Unobserved.** Keeping
+  `/binding` out of the ring and the request counters (B-6, FR-006) is a
+  change to 023's `is_instrumented`, under an `extends` edge; the exposure
+  table lists `/binding` as a probe-class route. (f) **The resource.**
+  `obs::init_with` and `tracer::install_with` carry the identity
+  attributes, so `ObsOptions` gains no field and no consumer's struct
+  literal breaks; the edge reads the attributes off the document's JSON
+  (`rahi_edge::binding::resource_attributes`) and names no ops type.
+  (g) **Every shipped path.** Besides the Kubernetes render, the
+  repository ships `docker/compose.yml`, a developer path that publishes
+  on `127.0.0.1` only; `scripts/k8s-validate.sh` refuses a published port
+  beyond the loopback there. `deploy/README.md` states the rule for a path
+  the repository does not ship. (h) **The image workflow.** FR-010's
+  labels are written by `docker/Dockerfile` from build arguments; passing
+  the commit and verifying the labels in `image.yml` (AC-6) is a workflow
+  change, which needs the owner's exception, and lands as its own change.
+  (i) **The unreadable executable.** FR-004's test runs a copy of the
+  binary at mode `0111`, which a non-root user can execute and not read;
+  it refuses to run as a user file modes do not bind.
 
 ### Owner choices at ratification (resolved by D-3)
 

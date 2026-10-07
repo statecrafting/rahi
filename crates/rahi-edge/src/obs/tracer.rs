@@ -44,9 +44,25 @@ pub fn install(
     otlp_endpoint: Option<&str>,
     service_name: &str,
 ) -> Result<Option<SdkTracerProvider>> {
+    install_with(ring, metrics, otlp_endpoint, service_name, &[])
+}
+
+/// [`install`], with the identity attributes spec 040 B-10 adds to the
+/// resource beside `service.name`.
+///
+/// # Errors
+///
+/// As [`install`].
+pub fn install_with(
+    ring: Arc<Ring>,
+    metrics: Metrics,
+    otlp_endpoint: Option<&str>,
+    service_name: &str,
+    attributes: &[(String, String)],
+) -> Result<Option<SdkTracerProvider>> {
     let provider = match otlp_endpoint {
         None => None,
-        Some(endpoint) => Some(exporter(endpoint, service_name)?),
+        Some(endpoint) => Some(exporter(endpoint, resource(service_name, attributes))?),
     };
 
     let otel = provider
@@ -64,7 +80,7 @@ pub fn install(
 }
 
 /// Build the OTLP exporter and the provider that batches into it.
-fn exporter(endpoint: &str, service_name: &str) -> Result<SdkTracerProvider> {
+fn exporter(endpoint: &str, resource: Resource) -> Result<SdkTracerProvider> {
     let exporter = SpanExporter::builder()
         .with_tonic()
         .with_endpoint(endpoint)
@@ -76,10 +92,22 @@ fn exporter(endpoint: &str, service_name: &str) -> Result<SdkTracerProvider> {
         })?;
     Ok(SdkTracerProvider::builder()
         .with_batch_exporter(exporter)
-        .with_resource(
-            Resource::builder()
-                .with_attributes([KeyValue::new("service.name", service_name.to_owned())])
-                .build(),
-        )
+        .with_resource(resource)
         .build())
+}
+
+/// The resource exported spans carry: `service.name`, then each identity
+/// attribute the composer read off the binding document (spec 040 B-10).
+/// Per process, so bounded; none is copied onto a span or a metric label.
+#[must_use]
+pub fn resource(service_name: &str, attributes: &[(String, String)]) -> Resource {
+    Resource::builder()
+        .with_attributes(
+            std::iter::once(KeyValue::new("service.name", service_name.to_owned())).chain(
+                attributes
+                    .iter()
+                    .map(|(key, value)| KeyValue::new(key.clone(), value.clone())),
+            ),
+        )
+        .build()
 }

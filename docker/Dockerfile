@@ -78,7 +78,21 @@ USER rahi
 WORKDIR /data
 VOLUME ["/data"]
 EXPOSE 8443
+# Spec 040 B-12, FR-010: what the image builder knew, as OCI labels. The
+# revision is the commit image.yml built; nothing reads it back into the
+# binding document, and it is builder metadata, not provenance.
+ARG RAHI_BUILD_REVISION=unknown
+ARG RAHI_BUILD_VERSION=0.0.0-dev
+ARG RAHI_BUILD_SOURCE=https://github.com/statecrafting/rahi
+LABEL org.opencontainers.image.revision="${RAHI_BUILD_REVISION}" \
+      org.opencontainers.image.source="${RAHI_BUILD_SOURCE}" \
+      org.opencontainers.image.version="${RAHI_BUILD_VERSION}"
+# Spec 040 B-5, B-12: the Rauthy source image this build packaged, for the
+# binding document's `components.rauthy.image`. Declared by the build from
+# the same argument it copied Rauthy from; the runtime never checks it.
+ARG RAUTHY_IMAGE
 ENV RAHI_DATA_DIR=/data \
     RAHI_RAUTHY_BIN=/usr/local/bin/rauthy \
+    RAHI_RAUTHY_IMAGE=${RAUTHY_IMAGE} \
     RAHI_STATIC_DIR=/usr/local/share/rahi/static
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
