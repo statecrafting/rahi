@@ -66,7 +66,7 @@
       "wave": 3
     },
     "id": "049-cell-preflight-checks",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "kind": "kernel",
     "risk": "medium",
     "sectionDigests": {
@@ -96,6 +96,6 @@
     "summary": "`rahi preflight` answers whether serve would start here, but only for the chassis: an application cannot report its own readiness facts or refuse a deployment whose application configuration the manifest ceiling does not cover. This spec adds a default-empty `Cell::preflight_checks` declaration of named checks that preflight runs after its own twelve, against a read-only view of the opened app store, the parsed manifest, and the same environment reader, each under a time bound. Results are reported as `app.<name>` lines with optional bounded report lines; any failing app check fails preflight with exit 1, and no app check can mask, reorder, or replace a chassis check.\n",
     "title": "Let a cell contribute named, bounded, read-only checks to preflight"
   },
-  "shardHash": "0b8ae0e14fa4ef08ecae409bd97f8ca2ac1d235f453c754f0206f0be65d45d6e",
+  "shardHash": "0bf2ae120d6c40cb22b2774345084030edc6e7b253280aba5c810f7e4a0758a6",
   "specVersion": "1.9.0"
 }
