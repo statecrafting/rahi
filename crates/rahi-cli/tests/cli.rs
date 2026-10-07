@@ -652,6 +652,13 @@ fn stub_rauthy() -> StubRauthy {
     let login_code = code.clone();
     let app = axum::Router::new()
         .route("/auth/v1/health", get(|| async { "ok" }))
+        // The login reads its redirect URI from the issuer (037 D-11).
+        .route(
+            "/auth/v1/.well-known/openid-configuration",
+            get(|| async {
+                serde_json::json!({"issuer": "http://127.0.0.1/auth/v1/"}).to_string()
+            }),
+        )
         .route(
             "/auth/v1/oidc/session",
             post(|| async {
