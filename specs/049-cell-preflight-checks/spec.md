@@ -6,7 +6,7 @@ kind: kernel
 domain: ops
 created: "2026-10-05"
 authors: ["Bartek Kus"]
-implementation: in-progress
+implementation: complete
 risk: medium
 wave: 3
 depends_on:
