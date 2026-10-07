@@ -25,8 +25,12 @@ pub const VERBS: [&str; 11] = [
 pub enum Verb {
     /// Print the usage and exit 0.
     Help,
-    /// Print the version and exit 0.
-    Version,
+    /// Print the version and exit 0; with `binding`, the binding document
+    /// instead (spec 040 B-13).
+    Version {
+        /// `--binding`.
+        binding: bool,
+    },
     /// B-2.
     Serve,
     /// B-3.
@@ -181,7 +185,11 @@ where
     let rest: Vec<&str> = it.collect();
     match verb {
         "--help" | "-h" | "help" => Ok(Verb::Help),
-        "--version" | "-V" | "version" => Ok(Verb::Version),
+        // Spec 040 B-13: `--binding` is the one flag; anything else is
+        // ignored, as it was before, so today's invocations print today's line.
+        "--version" | "-V" | "version" => Ok(Verb::Version {
+            binding: rest.as_slice() == ["--binding"],
+        }),
         "serve" => no_options(verb, &rest, Verb::Serve),
         "preflight" => no_options(verb, &rest, Verb::Preflight),
         "supervise" => no_options(verb, &rest, Verb::Supervise),
