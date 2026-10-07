@@ -111,8 +111,8 @@
       }
     ],
     "specId": "049-cell-preflight-checks",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "3bdfb47f4acfb095871b56073f03c292c21deaee1755d0c8a14902e86102f79e"
+  "shardHash": "1df249d56102f30c622def7c1a720cd7f133aa24b3739d8c450d9c2fe6f3dffb"
 }
