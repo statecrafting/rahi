@@ -1,10 +1,11 @@
 # The consumer contract, as built
 
-**Current release candidate, 2026-09-26:** 0.4.0 under approved spec 039.
-It carries spec **043** at its owner-approved `in-progress` release boundary
-on top of 0.3.0. Section 2.0 is the current consumer guidance; the
-dated readings below remain historical evidence. The release identity is
-the annotated `v0.4.0` tag once created: it names the tested squash merge
+**Current release candidate, 2026-10-06:** 0.5.0 under approved spec 039.
+It carries spec **048**, spec 043's crash-safe fresh-volume fencing and
+spec 037 D-11's backup-admin login fix on top of 0.4.0, with 043 still at
+its owner-approved `in-progress` release boundary. Section 2.0 is the
+current consumer guidance; the dated readings below remain historical
+evidence. The release identity is the annotated `v0.5.0` tag once created: it names the tested squash merge
 on `main` (039 B-2, D-18), and
 this document is updated to that commit. A version declaration is not
 publication or downstream adoption: registry availability is proven only by
@@ -76,7 +77,41 @@ nothing in the chassis distributes jobs to workers.
 
 ## 2. Consuming today
 
-### 2.0 The 0.4.0 release and its compatibility boundary
+### 2.0 The 0.5.0 release and its compatibility boundary
+
+All nine inherited chassis versions and internal requirements are 0.5.0.
+It is a minor bump under 039 B-1: `rahi-ops`'s fencing functions changed
+(`create_fences` replaces `create_legacy_fence` and
+`create_supervisor_fence`; `build_supervisor_fence` returns a `FenceTemp`),
+and `serve` and the verbs arm SIGTERM and SIGINT and stop the node in order
+(spec 048). A cell that calls only `rahi_cli::run` needs no code change. A
+program that opens the node itself should use `rahi_store::Store::run` in
+place of `Store::open` ... `shutdown`. The full list and declared limits are
+[CHANGELOG.md](../../CHANGELOG.md#050-release-candidate-2026-10-06).
+
+Once `consumer-registry` passes for the tag, the registry stanza is:
+
+```toml
+[dependencies]
+rahi-cli    = "=0.5.0"
+rahi-edge   = "=0.5.0"
+rahi-idp    = "=0.5.0"
+rahi-kernel = "=0.5.0"
+rahi-ledger = "=0.5.0"
+rahi-ops    = "=0.5.0"
+rahi-store  = "=0.5.0"
+rahi-types  = "=0.5.0"
+
+[dev-dependencies]
+rahi-harness = "=0.5.0"
+```
+
+The hiqlite pin and the guidance of section 2.0-0.4.0 below are unchanged;
+its limits stand except that 048 removes every unclean-marker exit but a
+SIGKILL or a shutdown timeout before the app store's shutdown returns, and
+a v0.1.0 volume has no supported crossing (043 D-30).
+
+### 2.0-0.4.0 The 0.4.0 release and its compatibility boundary (historical)
 
 All nine inherited chassis versions and internal requirements are 0.4.0.
 It is a minor bump under 039 B-1. Spec 043 moves the app store from
