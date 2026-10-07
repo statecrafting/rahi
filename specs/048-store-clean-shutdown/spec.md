@@ -269,6 +269,10 @@ hiqlite is not changed (D-7).
   `state_machine/` with no marker and no database may be treated as absent is
   a judgment about pre-043 volumes this spec does not make. It is reported to
   the owner.
+- **D-6a (2026-10-05, owner decision).** D-6's question is answered:
+  an empty `state_machine/` with no marker, no database and nothing beside
+  it is read as absent and fenced at the next start. Spec 043 D-32 records
+  the decision and its mechanism.
 - **D-7 (2026-09-27, build session).** The marker's behavior should change
   upstream: hiqlite 0.14.0 and 0.15.0 both `panic!` inside `start_node*` on a
   stale marker without `auto-heal`, choose the rebuild only at compile time,

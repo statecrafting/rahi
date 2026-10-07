@@ -274,8 +274,9 @@ release resolves them through the registry stanza alone and must **drop**
 its copy of the patch below; `cargo tree -i hiqlite-patched` shows
 `0.15.0-patched.3` from crates.io, and no `hiqlite 0.14.0` appears. The
 app store moves from `<data>/hiqlite` to `<data>/app-store` and a volume
-from 0.3.x or earlier crosses once with `rahi upgrade-cache --backup
-<archive>` (`deploy/README.md`, "Upgrading from 0.3.x or earlier").
+from 0.2.0 or 0.3.x crosses once with `rahi upgrade-cache --backup
+<archive>` (`deploy/README.md`, "Upgrading from 0.3.x or earlier"); a
+v0.1.0 volume is unsupported for the crossing (043 D-32).
 `Config::hiqlite_dir()` answers the new path; `<data>/hiqlite` is a
 permanent fence. The rest of this section is the 0.3.0 reading.
 

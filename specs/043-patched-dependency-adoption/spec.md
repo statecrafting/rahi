@@ -374,7 +374,8 @@ Terms.
   under a path a pre-043 process may be refusing on right now is its own
   race, and debris holds nothing this version reads. It reports each
   entry at start and exports `rahi_legacy_path_debris{entries}`. It
-  refuses, naming B-4's verb and the path, when the marker is absent or
+  refuses, naming B-4's verb and the path, when the marker is absent (except
+  the empty abandoned fence D-32 reads as absent) or
   its content is not one of the fence contents, or when
   `<legacy>/state_machine/db/` holds any file (a store was placed at the
   legacy path, for instance by a pre-043 `restore` after an operator
@@ -1517,6 +1518,30 @@ None remains open: D-7 to D-13 record the owner's approval and choices.
   or the old node run after T1 passed. The legs print their counts and
   fail on either. Not changed: no requirement text; AC-4 (g) stays
   unexecuted.
+- **D-32 (2026-10-05, owner decisions on D-30 and on 048 D-6).** The
+  owner disposed of the items the previous builds surfaced, verbatim:
+  "Approve all; proceed with increased velocity development." Taken under
+  it: (a) **v0.1.0 is unsupported for the crossing.** D-30's question is
+  answered by stating it, not by supplying one: `deploy/README.md`'s
+  upgrade section, the changelog and the consumer contract say so, and a
+  v0.1.0 deployment moves by a fresh cell. AC-9's v0.1.0 leg keeps running
+  AC-3a's exclusion; its AC-3 and AC-4 (d) are reported `NOT REQUIRED`
+  with this decision, no longer as unexecuted gaps. (b) **An empty
+  abandoned fence reads as absent.** 048 D-6 and D-28's "Not changed"
+  left a volume a pre-D-28 build had killed mid-fencing, with
+  `<legacy>/` holding only an empty `state_machine/`, refused for good.
+  The owner chose the reading D-28 rejected as a build session's
+  judgment: such a directory holds no marker, so no node claimed it, and
+  no file, so no store was in it. An entry point that creates fences
+  (B-4a step (4)), with no transition record, removes it by two `rmdir`s,
+  which a concurrent writer's first file makes fail, and then fences the
+  volume as fresh; anything in or beside the directory is refused exactly
+  as before, and the verb and `--abort`, which create no fence, remove
+  nothing. B-3's refusal of an absent marker carries the exception.
+  `tests/cell_lock.rs` covers the empty case and three non-empty ones.
+  Not changed: AC-4 (g), the rest of D-20 (c) (a stale hiqlite marker
+  after a kill of an open store), and the backward-clock and stale-restore
+  limitations; 043 stays `in-progress` on them.
 
 ### 7.1 Proposals (2026-09-23)
 

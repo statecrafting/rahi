@@ -397,6 +397,59 @@ pub fn create_fences(config: &Config, sweep: bool, faults: &dyn upgrade::Faults)
     create_legacy_fence(config, faults)
 }
 
+/// Remove the legacy path when it is exactly an abandoned fence: a
+/// `state_machine/` directory with nothing in it and nothing beside it, which
+/// a build before spec 043 D-28 left when it was killed between creating the
+/// directory and publishing the marker. The owner chose to read it as absent
+/// (spec 043 D-32, spec 048 D-6): no marker means no node claimed it and no
+/// file means no store was in it. Each `rmdir` refuses a non-empty directory,
+/// so a process writing into it meanwhile keeps what it wrote and the volume
+/// is refused as before. Returns whether the path was removed.
+///
+/// # Errors
+///
+/// [`Error::Io`] when the path cannot be inspected or a removal fails for a
+/// reason other than a concurrent writer.
+fn remove_abandoned_fence(config: &Config) -> Result<bool> {
+    let legacy = config.legacy_hiqlite_dir();
+    let state_machine = legacy.join("state_machine");
+    let is_real_dir =
+        |path: &Path| std::fs::symlink_metadata(path).is_ok_and(|meta| meta.file_type().is_dir());
+    if !is_real_dir(&legacy)
+        || list(&legacy)? != [PathBuf::from("state_machine")]
+        || !is_real_dir(&state_machine)
+        || !list(&state_machine)?.is_empty()
+    {
+        return Ok(false);
+    }
+    for dir in [&state_machine, &legacy] {
+        match std::fs::remove_dir(dir) {
+            Ok(()) => {}
+            Err(err)
+                if matches!(
+                    err.kind(),
+                    std::io::ErrorKind::NotFound | std::io::ErrorKind::DirectoryNotEmpty
+                ) =>
+            {
+                return Ok(false);
+            }
+            Err(err) => {
+                return Err(Error::Io(format!(
+                    "{} cannot be removed: {err}",
+                    dir.display()
+                )));
+            }
+        }
+    }
+    crate::fsync_dir(&config.data_dir)?;
+    eprintln!(
+        "{}: an empty abandoned fence directory was removed and the volume is fenced as fresh \
+         (spec 043 D-32)",
+        legacy.display()
+    );
+    Ok(true)
+}
+
 /// Build the legacy fence beside its path and rename it into place.
 fn create_legacy_fence(config: &Config, faults: &dyn upgrade::Faults) -> Result<()> {
     let legacy = config.legacy_hiqlite_dir();
@@ -752,6 +805,13 @@ pub fn gate_with_env(
     // (4) A fresh volume gets both fences before anything creates or opens
     // the app store.
     let mut fenced = false;
+    if entry.creates_fences()
+        && record.is_none()
+        && matches!(legacy, Legacy::Other { .. })
+        && remove_abandoned_fence(config)?
+    {
+        legacy = inspect_legacy(config)?;
+    }
     if entry.creates_fences() && record.is_none() && legacy == Legacy::Absent {
         create_fences(config, cell.is_some(), &upgrade::NoFaults)?;
         legacy = inspect_legacy(config)?;
