@@ -11,7 +11,8 @@
 #
 # Every leg prints PASS or FAIL with what it checked; legs this script cannot
 # execute are printed as UNEXECUTED with the reason, so a reader sees what
-# was and was not run. Exit 1 when any executed leg failed. Needs docker,
+# was and was not run; legs an owner decision removed print NOT REQUIRED
+# with the decision. Exit 1 when any executed leg failed. Needs docker,
 # curl and jq.
 set -eu
 
@@ -139,6 +140,24 @@ old_volume() {
   # The ledger verbs of v0.2.0 open the node themselves, so they run on the
   # stopped volume.
   verb "$old" "$volume" ledger export /data/pre-upgrade-chain.jsonl >&2
+  # v0.2.0's ledger verbs exit without closing every SQLite connection, so
+  # about one export in ten leaves `-wal` and `-shm` beside the database,
+  # which T1 (c) rightly refuses as a node that stopped uncleanly (spec 043
+  # D-33; spec 048 fixed it for this version's verbs). The old cell started
+  # and stopped cleanly once more closes the database and checkpoints it.
+  if docker run --rm -v "${volume}:/data" --entrypoint sh "$old" -c \
+      'ls /data/hiqlite/state_machine/db/*-wal /data/hiqlite/state_machine/db/*-shm' >/dev/null 2>&1; then
+    say "the $old_name ledger export left SQLite open on $volume; one clean start and stop closes it"
+    start "$name" "$old" "$volume" "$p"
+    if ! ready_within "$p" 180 "$name"; then
+      docker logs "$name" >&2 2>&1 || true
+      docker rm -f "$name" >/dev/null 2>&1 || true
+      say "the $old_name image did not become ready again on $volume"
+      return 1
+    fi
+    docker stop -t 50 "$name" >/dev/null
+    docker rm "$name" >/dev/null
+  fi
   echo "$archive"
 }
 
@@ -523,13 +542,13 @@ ac5_races
 unexecuted "AC-4 (g): no seam in the pinned Rauthy build injects a crash between its two cache renames (hiqlite F-130); the outcome of that interruption is not recorded by this run"
 
 # AC-9's v0.1.0 leg: a volume the new chassis fenced, which v0.1.0 must
-# not serve. The transition legs need an archive of a v0.1.0 volume, and
-# none can be taken (spec 043 D-30).
+# not serve. v0.1.0 is unsupported for the crossing (spec 043 D-32), so its
+# transition legs are not required.
 if [ -n "$v010_new" ]; then
   main_new="$new"; main_old="$old"
   new="$v010_new"; old="$v010_old"; old_name=v0.1.0; leg="[v0.1.0] "; vs="-v010"
   ac3a
-  unexecuted "AC-3 and AC-4 (d) need a verifying archive of a v0.1.0 volume, and none can be taken: v0.1.0's backup authenticates to Rauthy with the admin API key, which Rauthy refuses (401), and 0.2.0's refuses on a pre-037 key set (spec 043 D-30)"
+  record "NOT REQUIRED" "AC-3 and AC-4 (d) for v0.1.0: v0.1.0 is unsupported for the crossing (spec 043 D-32); no verifying archive of a v0.1.0 volume can be taken (D-30)"
   new="$main_new"; old="$main_old"; old_name=v0.2.0; leg=""; vs=""
 else
   unexecuted "v0.1.0: RAHI_UPGRADE_V010_NEW names no bare chassis image built from this change; v0.1.0's exclusion stays source-established (AC-9)"

@@ -45,17 +45,39 @@ pub const DEFAULT_RAUTHY_ADDR: &str = "127.0.0.1:8080";
 pub trait EnvReader {
     /// The value of `key`, if set.
     fn get(&self, key: &str) -> Option<String>;
+
+    /// Every variable this reader holds, as an owned copy, when it can list
+    /// them (spec 049 D-9).
+    ///
+    /// A verb that hands the same environment to code that outlives the
+    /// borrow (a cell's preflight checks) takes this copy. `None`, the
+    /// default, is a reader that can only answer lookups.
+    fn snapshot(&self) -> Option<BTreeMap<String, String>> {
+        None
+    }
 }
 
 impl EnvReader for BTreeMap<String, String> {
     fn get(&self, key: &str) -> Option<String> {
         BTreeMap::get(self, key).cloned()
     }
+
+    fn snapshot(&self) -> Option<BTreeMap<String, String>> {
+        Some(self.clone())
+    }
 }
 
 impl EnvReader for BTreeMap<&str, &str> {
     fn get(&self, key: &str) -> Option<String> {
         BTreeMap::get(self, key).map(|v| (*v).to_owned())
+    }
+
+    fn snapshot(&self) -> Option<BTreeMap<String, String>> {
+        Some(
+            self.iter()
+                .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+                .collect(),
+        )
     }
 }
 

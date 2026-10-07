@@ -15,6 +15,7 @@ use rahi_store::Store;
 use rahi_types::{Config, EnvReader, Error, Result};
 
 use crate::KeySet;
+use crate::preflight_app::{self, AppCheck, AppLine, Ground, Ready};
 use crate::rauthy_api::RauthyApi;
 
 /// The least free space the volume may have, in bytes (512 MiB).
@@ -41,10 +42,26 @@ pub const CHECKS: [&str; 12] = [
 pub enum Verdict {
     /// The check passed; the detail says what was observed.
     Pass(String),
+    /// The check passed with something the operator should see. No chassis
+    /// check emits it; a cell's checks may (spec 049 B-4, D-6).
+    Warn(String),
     /// The check failed; the detail says why.
     Fail(String),
     /// The check could not run because an earlier one failed.
     Skipped(String),
+}
+
+impl Verdict {
+    /// The printed line for a check named `name`.
+    pub(crate) fn line(&self, name: &str) -> String {
+        let (word, detail) = match self {
+            Self::Pass(d) => ("PASS", d),
+            Self::Warn(d) => ("WARN", d),
+            Self::Fail(d) => ("FAIL", d),
+            Self::Skipped(d) => ("SKIP", d),
+        };
+        format!("{word} {name}: {detail}")
+    }
 }
 
 /// One named check.
@@ -95,12 +112,7 @@ impl Check {
 
 impl fmt::Display for Check {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (word, detail) = match &self.verdict {
-            Verdict::Pass(d) => ("PASS", d),
-            Verdict::Fail(d) => ("FAIL", d),
-            Verdict::Skipped(d) => ("SKIP", d),
-        };
-        write!(f, "{word} {}: {detail}", self.name)
+        f.write_str(&self.verdict.line(self.name))
     }
 }
 
@@ -109,13 +121,16 @@ impl fmt::Display for Check {
 pub struct Report {
     /// Every check, in [`CHECKS`] order.
     pub checks: Vec<Check>,
+    /// The cell's own checks, after the chassis's, in declaration order
+    /// (spec 049 B-5). Empty for a cell that declares none.
+    pub app: Vec<AppLine>,
 }
 
 impl Report {
     /// No check failed.
     #[must_use]
     pub fn passed(&self) -> bool {
-        self.checks.iter().all(Check::ok)
+        self.checks.iter().all(Check::ok) && self.app.iter().all(AppLine::ok)
     }
 
     /// The check named `name`.
@@ -130,6 +145,9 @@ impl fmt::Display for Report {
         for check in &self.checks {
             writeln!(f, "{check}")?;
         }
+        for line in &self.app {
+            writeln!(f, "{line}")?;
+        }
         write!(
             f,
             "preflight: {}",
@@ -141,10 +159,19 @@ impl fmt::Display for Report {
 /// Run every check against `env` for the cell whose manifest is
 /// `manifest_text`.
 pub async fn run(env: &dyn EnvReader, manifest_text: &str) -> Report {
-    run_inner(env, manifest_text).await
+    run_inner(env, manifest_text, Vec::new()).await
 }
 
-async fn run_inner(env: &dyn EnvReader, manifest_text: &str) -> Report {
+/// [`run`], then the cell's own `checks` after the chassis's (spec 049).
+pub async fn run_with_checks(
+    env: &dyn EnvReader,
+    manifest_text: &str,
+    checks: Vec<AppCheck>,
+) -> Report {
+    run_inner(env, manifest_text, checks).await
+}
+
+async fn run_inner(env: &dyn EnvReader, manifest_text: &str, apps: Vec<AppCheck>) -> Report {
     let mut checks = Vec::with_capacity(CHECKS.len());
 
     let config = match Config::from_env(env) {
@@ -160,7 +187,9 @@ async fn run_inner(env: &dyn EnvReader, manifest_text: &str) -> Report {
             for name in CHECKS.iter().skip(1) {
                 checks.push(Check::skipped(name, "config did not parse"));
             }
-            return Report { checks };
+            let app =
+                preflight_app::run(apps, Ground::Skip("the store did not open".to_owned())).await;
+            return Report { checks, app };
         }
     };
 
@@ -298,11 +327,30 @@ async fn run_inner(env: &dyn EnvReader, manifest_text: &str) -> Report {
 
     checks.push(Check::of("disk", free_disk(&config)));
 
+    // Spec 049 B-5, B-6: the cell's checks, after every chassis check and
+    // only on a store this verb opened; every task they spawn is joined
+    // before the store is shut down below (048 I-2).
+    let ground = match (&store, Manifest::parse(manifest_text), env.snapshot()) {
+        (None, _, _) => Ground::Skip("the store did not open".to_owned()),
+        (Some(_), Err(err), _) => {
+            Ground::Skip(format!("the manifest did not parse: {}", err.message()))
+        }
+        (Some(_), Ok(_), None) => Ground::Refuse(
+            "the environment reader given to preflight cannot be shared with app checks".to_owned(),
+        ),
+        (Some(store), Ok(manifest), Some(env)) => Ground::Ready(Box::new(Ready {
+            store: store.handle(),
+            manifest,
+            env,
+        })),
+    };
+    let app = preflight_app::run(apps, ground).await;
+
     if let Some(store) = store {
         let _ = store.shutdown().await;
     }
     drop(gate);
-    Report { checks }
+    Report { checks, app }
 }
 
 /// The token lifetimes rauthy is applying, and the deny-list's memory

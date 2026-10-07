@@ -221,6 +221,13 @@ from `<data>/hiqlite` to `<data>/app-store`; `<data>/hiqlite` becomes a
 permanent fence. A fresh volume gets the new layout and both fences at its
 first boot and needs none of this.
 
+**v0.1.0 is not supported for this crossing (spec 043 D-32).** The verb
+needs a verifying archive, and a v0.1.0 cell cannot take one: Rauthy
+refuses its backup call (401), and a newer `backup` refuses its pre-037 key
+set. Move a v0.1.0 deployment by starting a fresh 0.4.0 or later cell and
+recreating its data, not by `upgrade-cache`. The crossing is supported from
+0.2.0 and 0.3.x.
+
 **Preconditions the verb cannot establish.** Establish them before you run
 it; the verb prints them before it starts:
 

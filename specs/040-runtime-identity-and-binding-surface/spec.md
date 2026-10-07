@@ -934,6 +934,15 @@ itself.
   binary at mode `0111`, which a non-root user can execute and not read;
   it refuses to run as a user file modes do not bind.
 
+- **D-6 (2026-10-07, build decision; the image workflow change).** D-5 (h)'s
+  workflow change lands here: `image.yml` passes the commit, version and
+  source to the recipe's OCI label arguments on the smoke build and every
+  pushed image, and fails when the smoke image's three labels or its
+  declared Rauthy image differ from the workflow's inputs (FR-010, AC-6).
+  The step runs only on pushes to `main` and on tags, so AC-6 is first
+  evidenced by the push build after this change merges; 040 flips to
+  `complete` only after that run passes.
+
 ### Owner choices at ratification (resolved by D-3)
 
 Every row was a bounded choice Bart resolved by ratifying this draft or asking

@@ -1,19 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '049-cell-preflight-checks' file unit 'crates/rahi-ops/src/preflight_app.rs' does not exist",
-        "path": "crates/rahi-ops/src/preflight_app.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '049-cell-preflight-checks' file unit 'crates/rahi-cli/tests/preflight_app.rs' does not exist",
-        "path": "crates/rahi-cli/tests/preflight_app.rs"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "015-kernel-manifest-and-adjudication",
@@ -30,17 +15,33 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-cli/tests/preflight_app.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-ops/src/lib.rs",
         "source": "spec-edge"
       },
       {
         "path": "crates/rahi-ops/src/preflight.rs",
         "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/preflight_app.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-types/src/config.rs",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-cli/tests/preflight_app.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -49,7 +50,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/preflight_app.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -108,11 +113,24 @@
           "kind": "file",
           "path": "crates/rahi-ops/src/preflight.rs"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-types/src/config.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-types/src/config.rs"
+        }
       }
     ],
     "specId": "049-cell-preflight-checks",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "3bdfb47f4acfb095871b56073f03c292c21deaee1755d0c8a14902e86102f79e"
+  "shardHash": "0b8ae0e14fa4ef08ecae409bd97f8ca2ac1d235f453c754f0206f0be65d45d6e"
 }

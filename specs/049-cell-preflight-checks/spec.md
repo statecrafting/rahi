@@ -1,12 +1,12 @@
 ---
 id: "049-cell-preflight-checks"
 title: "Let a cell contribute named, bounded, read-only checks to preflight"
-status: draft
+status: approved
 kind: kernel
 domain: ops
 created: "2026-10-05"
 authors: ["Bartek Kus"]
-implementation: pending
+implementation: in-progress
 risk: medium
 wave: 3
 depends_on:
@@ -21,6 +21,7 @@ extends:
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/lib.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/cell.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/lib.rs", nature: additive }
+  - { spec: "010-workspace-and-core-types", unit: "crates/rahi-types/src/config.rs", nature: additive }
 summary: >
   `rahi preflight` answers whether serve would start here, but only for the
   chassis: an application cannot report its own readiness facts or refuse a
@@ -208,6 +209,40 @@ including which remote providers an app uses, stays the application's.
   governance gate admits a co-claimed additive edit before touching it, or
   passes the declaration through the existing `Verb::Preflight` arm with
   the smallest diff the gate accepts.
+
+- **D-8 (2026-10-07, owner decision; approval).** The owner directed,
+  verbatim: "Approve 049; proceed". The contract is approved as written,
+  with D-1 through D-7 as its resolved choices. No B-n, FR or AC text
+  changed.
+- **D-9 (2026-10-07, build session).** B-1 asks for an owned context and a
+  `Send + 'static` future, and B-3 for "the same `EnvReader` the verb was
+  given"; the verb holds only a borrowed `&dyn EnvReader`, which no
+  `'static` future may keep. Honoring both takes an owned copy, and
+  `EnvReader` could not list its variables, so spec 010's trait gains a
+  provided method, `snapshot() -> Option<BTreeMap<String, String>>`,
+  defaulting to `None` and answered by both of its map implementations (an
+  additive `extends` on 010's unit; every reader a consumer wrote still
+  compiles). The context carries the copy as `AppEnv`, which implements
+  `EnvReader`. A reader that cannot list itself runs no app check and
+  fails the phase with one `FAIL app:` line naming why; the binary's
+  reader is a map, so this is reachable only through `run_with` with a
+  custom reader. Rejected: a borrowed context with a higher-ranked check
+  signature (contradicts B-1's text) and a process-environment snapshot
+  (not the reader the verb was given, which tests replace).
+- **D-10 (2026-10-07, build session).** Four points B-5 and B-6 leave open.
+  (a) A manifest that does not parse while the store opened reports every
+  app check `SKIP app.<name>: skipped: the manifest did not parse: ...`,
+  since the context carries a parsed `Manifest` and the chassis's `tokens`
+  line already names the failure. (b) A check cut short because the phase
+  bound, not its own five seconds, ran out reads `FAIL app.<name>: timed
+  out: the app check budget is spent`. (c) A check task that ends cancelled
+  without a panic, which only the runtime can cause, reads `FAIL
+  app.<name>: cancelled`. (d) `preflight::run` keeps its signature and runs
+  no app check; `preflight::run_with_checks` is the amended entry the
+  composer calls, so a caller of the 0.5.0 function is unaffected. The
+  `Report` gains an `app` field and `Verdict` a `Warn` variant, both public
+  and both breaking for code that builds a `Report` or matches `Verdict`
+  exhaustively, which spec 039 admits at a minor bump.
 
 ## Verification
 

@@ -374,7 +374,8 @@ Terms.
   under a path a pre-043 process may be refusing on right now is its own
   race, and debris holds nothing this version reads. It reports each
   entry at start and exports `rahi_legacy_path_debris{entries}`. It
-  refuses, naming B-4's verb and the path, when the marker is absent or
+  refuses, naming B-4's verb and the path, when the marker is absent (except
+  the empty abandoned fence D-32 reads as absent) or
   its content is not one of the fence contents, or when
   `<legacy>/state_machine/db/` holds any file (a store was placed at the
   legacy path, for instance by a pre-043 `restore` after an operator
@@ -1517,6 +1518,84 @@ None remains open: D-7 to D-13 record the owner's approval and choices.
   or the old node run after T1 passed. The legs print their counts and
   fail on either. Not changed: no requirement text; AC-4 (g) stays
   unexecuted.
+- **D-32 (2026-10-05, owner decisions on D-30 and on 048 D-6).** The
+  owner disposed of the items the previous builds surfaced, verbatim:
+  "Approve all; proceed with increased velocity development." Taken under
+  it: (a) **v0.1.0 is unsupported for the crossing.** D-30's question is
+  answered by stating it, not by supplying one: `deploy/README.md`'s
+  upgrade section, the changelog and the consumer contract say so, and a
+  v0.1.0 deployment moves by a fresh cell. AC-9's v0.1.0 leg keeps running
+  AC-3a's exclusion; its AC-3 and AC-4 (d) are reported `NOT REQUIRED`
+  with this decision, no longer as unexecuted gaps. (b) **An empty
+  abandoned fence reads as absent.** 048 D-6 and D-28's "Not changed"
+  left a volume a pre-D-28 build had killed mid-fencing, with
+  `<legacy>/` holding only an empty `state_machine/`, refused for good.
+  The owner chose the reading D-28 rejected as a build session's
+  judgment: such a directory holds no marker, so no node claimed it, and
+  no file, so no store was in it. An entry point that creates fences
+  (B-4a step (4)), with no transition record, removes it by two `rmdir`s,
+  which a concurrent writer's first file makes fail, and then fences the
+  volume as fresh. An empty `<legacy>/`, which a stop between the two
+  `rmdir`s leaves, is read the same way, so that interruption is not
+  itself a stuck volume; anything in or beside the directory is refused exactly
+  as before, and the verb and `--abort`, which create no fence, remove
+  nothing. B-3's refusal of an absent marker carries the exception.
+  `tests/cell_lock.rs` covers both empty cases and three non-empty ones.
+  Not changed: AC-4 (g), the rest of D-20 (c) (a stale hiqlite marker
+  after a kill of an open store), and the backward-clock and stale-restore
+  limitations; 043 stays `in-progress` on them.
+- **D-33 (2026-10-07, build decision; a refused pre-043 start cuts the
+  legacy WAL metadata short).** The scheduled live runs of 2026-10-05 and
+  2026-10-06, and #107's, failed AC-5's start race once each (node-first
+  at 1 ms: the verb exited `3` at T3 with
+  `WAL: FileCorrupted: invalid metadata file length`) and AC-4 (d) at
+  `floored`, `t2.move.0` or `relocated` ("the verb did not stop there").
+  Two causes. (a) **The start race.** Reproduced with the v0.2.0 image
+  alone, no verb: a legacy volume stopped cleanly, a guard marker written,
+  then `rahi serve`, 30 runs. hiqlite 0.14 opens its WAL before it reads
+  the marker (D-P11) and, when the marker panic unwinds, its WAL writer
+  rewrites `logs/meta.hql` by `remove_file`, `create_new` and four
+  `write`s while the process exits; 20 runs left the refused node's empty
+  `logs/lock.hql`, and one left `meta.hql` at 7 bytes (the magic alone),
+  which both hiqlite versions refuse to start. So a start the guard
+  refuses can damage the legacy store whenever it lands between T1 and T2,
+  in the race and equally when the v0.2.0 image is started on a volume
+  left at `guarded` to `relocating` (AC-4 (d)), after which no rerun could
+  pass T3 and `--abort` returned a store the old image cannot start. The
+  bytes the rewrite carries are the ones it read, since the guard stops it
+  before raft runs, so what it leaves is `meta.hql` absent or a prefix of
+  T1's bytes. The chosen mechanism: T1 reads both legacy metadata files
+  before (b), when no start the guard refuses can yet have run, refuses
+  before writing the guard when one is not whole (at least 14 bytes, the
+  magic, version 1, which every cut-short state fails), and records them
+  in the state file (`wal_meta`, an additive field; the record version is
+  unchanged). T3, before it opens the app store, and `--abort`, after it
+  returns the planned entries, put back a file that is absent or not
+  whole and is a prefix of the recorded bytes (temporary, fsync, rename,
+  directory fsync), and refuse a cut-short file that is not such a prefix;
+  a whole file is left as it is, so a rerun after a T3 the new hiqlite
+  already wrote keeps that write. New fault points `t3.wal-meta` and
+  `abort.wal-meta` follow a restore. `tests/upgrade.rs` cuts the file to
+  each shape (absent, 0, 7, 8, 12 bytes) at `guarded` and `verified` in a
+  running verb, between two runs, and before `--abort`; with the restore
+  disabled the first case fails with the live error. The refused node's
+  `lock.hql` moves with `logs` and is left (B-5a names the locks as left).
+  Rejected: holding the legacy WAL locks from T1 to T2 (a clean stop
+  leaves no `lock.hql`, so it means creating one, which T1 (c)'s probe
+  text excludes, and it protects nothing between runs); a mode-0 lock file
+  (the same, and root bypasses it); repairing a metadata file by
+  recreating it empty (hiqlite would start silently without its vote).
+  (b) **AC-4 (d)'s preparation.** v0.2.0's `ledger export`, run by the
+  live script on the stopped prepared volume, leaves `-wal` and `-shm`
+  beside the database in about one run in ten (1 of 10 locally), the
+  pre-048 exit this version fixed; T1 (c) then rightly refuses as an
+  unclean stop and the leg sees exit `1`. The script now starts and stops
+  the old cell once more when the export left them, which closes SQLite.
+  An operator who ran a v0.2.0 ledger verb last meets the same refusal;
+  its message names the unclean stop, and starting and stopping the old
+  cell cleanly before the verb (or `--abort` if the guard is already
+  written) clears it. Not changed: no requirement text; AC-5's start race
+  still counts the verb's exit as it did.
 
 ### 7.1 Proposals (2026-09-23)
 

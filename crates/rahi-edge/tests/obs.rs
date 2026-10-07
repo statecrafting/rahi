@@ -420,7 +420,6 @@ async fn build_info_has_two_labels_and_binding_is_served_unobserved() {
         .binding(document.clone())
         .build();
 
-    let before = send(&router, get_request("/metrics")).await.body;
     for _ in 0..3 {
         let answer = send(&router, get_request(rahi_edge::BINDING_PATH)).await;
         assert_eq!(answer.status, StatusCode::OK);
@@ -437,17 +436,9 @@ async fn build_info_has_two_labels_and_binding_is_served_unobserved() {
         lines(&after),
         vec!["rahi_build_info{contract_version=\"1.0.0\",rahi_version=\"0.4.0\"} 1".to_owned()]
     );
-    let counts = |text: &str| -> Vec<String> {
-        text.lines()
-            .filter(|line| line.starts_with("http_requests_total"))
-            .map(str::to_owned)
-            .collect()
-    };
-    assert_eq!(
-        counts(&before),
-        counts(&after),
-        "a /binding scrape is not counted"
-    );
+    // The registry is shared with every test in this binary, which count
+    // their own requests concurrently, so the claim is about `/binding`'s
+    // own series: three scrapes leave it none.
     assert!(!after.contains("route=\"/binding\""));
     assert!(
         !obs::list_traces()
