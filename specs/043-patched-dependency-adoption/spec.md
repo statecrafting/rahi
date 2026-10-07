@@ -43,6 +43,7 @@ extends:
   - { spec: "010-workspace-and-core-types", unit: "crates/rahi-types/src/config.rs", nature: amending }
   - { spec: "010-workspace-and-core-types", unit: "crates/rahi-types/tests/config.rs", nature: amending }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/Cargo.toml", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-cli/Cargo.toml", nature: additive }
   - { spec: "011-store-hiqlite", unit: "crates/rahi-store/src/store.rs", nature: amending }
   - { spec: "011-store-hiqlite", unit: "crates/rahi-store/src/error.rs", nature: amending }
   - { spec: "011-store-hiqlite", unit: "crates/rahi-store/src/lib.rs", nature: additive }
@@ -1596,6 +1597,42 @@ None remains open: D-7 to D-13 record the owner's approval and choices.
   cell cleanly before the verb (or `--abort` if the guard is already
   written) clears it. Not changed: no requirement text; AC-5's start race
   still counts the verb's exit as it did.
+- **D-34 (2026-10-07, build decision; two binary tests that assumed more
+  than the code guarantees).** Both failed intermittently in CI on #117,
+  whose change reaches neither path; neither reproduced locally (0 of 80
+  `migrate` runs on macOS, idle and under load, and 0 of 100 in the 0.5.0
+  image on linux/arm64 with two CPUs under load). (a) **`-wal` after a
+  clean verb.** `cli.rs`'s AC-3 test makes its pre-043 volume from this
+  build's store after `rahi migrate` exits `0`, and asserted no `-wal`
+  beside the database; twice the `-wal` alone remained, with no `-shm`.
+  hiqlite's SQLite writer (`writer.rs`, `hiqlite-patched`
+  0.15.0-patched.3 and .4) is a detached thread that sends its shutdown
+  acknowledgement before its connection drops, so `Client::shutdown`
+  returns while the last close is still to run on that thread; the verb
+  then returns, the runtime drops and the process exits. SQLite's last
+  close deletes the `-shm` and only then the `-wal`, so a `-wal` without
+  a `-shm` is that close cut off by the exit, after its checkpoint. On
+  this layout it is harmless: the checkpoint has run, the next open reads
+  the WAL, and no rahi check refuses it (T1 (c) inspects only the legacy
+  path, which only a pre-043 binary writes). The test now finishes the
+  close the old node would have finished, as D-19 (c)'s library tests do,
+  and still asserts the fixture is a clean stop. The same ordering is the
+  likelier cause of D-33 (b)'s `-wal` and `-shm` after v0.2.0's
+  `ledger export` than the pre-048 exit named there; D-33's text is left
+  as written. The upstream fix is to send the acknowledgement after the
+  connection drops; it is the producer's to make, and rahi does not wrap
+  it. (b) **`/readyz` before a terminal stop.** `terminal.rs` watches
+  readiness every 50 ms and once saw no failure before `serve` exited.
+  `/readyz` and the terminal watch read the same store health, and the
+  stop closes the listener as soon as the watch, polling every
+  `TERMINAL_POLL` (1 s), sees the fault, so the span in which a new
+  connection can see the 503 runs from the fault to that poll and can be
+  a few milliseconds. The watcher now asks every 2 ms, which narrows the
+  span it can miss to that interval plus one request; it does not close
+  it. Making the 503 observable for a fixed time before the listener
+  closes would add a phase to B-9's stop, which is a requirement change
+  and not this build's; it is reported. Not changed: no requirement text,
+  no assertion's strength, B-9's bound.
 
 ### 7.1 Proposals (2026-09-23)
 

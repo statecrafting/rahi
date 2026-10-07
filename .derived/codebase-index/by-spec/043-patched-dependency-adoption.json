@@ -34,6 +34,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-cli/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-cli/src/lib.rs",
         "source": "spec-edge"
       },
@@ -429,6 +433,19 @@
         "unit": {
           "kind": "file",
           "path": "Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/Cargo.toml"
         }
       },
       {
@@ -982,5 +999,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "bbf45631ddb10b6611f4981926cf2cfa350c777e4d5b13a6ee749db8343a2eeb"
+  "shardHash": "5de3ec78382c8bb12160eed276cc43fa07b3b385c1363211bf18517b0d92be99"
 }

@@ -27,13 +27,21 @@ fixture_entry!();
 /// fault being noticed, plus the terminal watch's poll.
 const TERMINAL_BOUND: Duration = Duration::from_secs(45);
 
+/// How long the readiness watcher waits between two asks.
+const READINESS_ASK: Duration = Duration::from_millis(2);
+
 #[test]
 fn a_terminal_store_failure_fails_readiness_records_storage_terminal_and_exits_three() {
     let node = Node::new();
     let mut serve = node.spawn("serve");
     node.wait_ready(&mut serve, READY_BUDGET);
 
-    // Readiness, watched from its own thread for the whole run.
+    // Readiness, watched from its own thread for the whole run. `/readyz`
+    // and the terminal watch read the same store health, so the span in
+    // which a new connection can see the 503 runs from the fault to the
+    // watch's next poll (`TERMINAL_POLL`, 1 s) and can be a few
+    // milliseconds; the listener refuses after that. The watcher asks
+    // often enough that the span is not lost between two asks (043 D-34).
     let listen = node.listen.clone();
     let watching = Arc::new(AtomicBool::new(true));
     let readiness = {
@@ -47,7 +55,7 @@ fn a_terminal_store_failure_fails_readiness_records_storage_terminal_and_exits_t
                 {
                     first_failure = Some((status, body, Instant::now()));
                 }
-                std::thread::sleep(Duration::from_millis(50));
+                std::thread::sleep(READINESS_ASK);
             }
             first_failure
         })
