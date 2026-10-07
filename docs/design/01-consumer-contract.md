@@ -109,7 +109,7 @@ rahi-harness = "=0.5.0"
 The hiqlite pin and the guidance of section 2.0-0.4.0 below are unchanged;
 its limits stand except that 048 removes every unclean-marker exit but a
 SIGKILL or a shutdown timeout before the app store's shutdown returns, and
-a v0.1.0 volume has no supported crossing (043 D-30).
+a v0.1.0 volume has no supported crossing (043 D-32).
 
 ### 2.0-0.4.0 The 0.4.0 release and its compatibility boundary (historical)
 
