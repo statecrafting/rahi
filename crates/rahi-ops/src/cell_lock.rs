@@ -400,7 +400,8 @@ pub fn create_fences(config: &Config, sweep: bool, faults: &dyn upgrade::Faults)
 /// Remove the legacy path when it is exactly an abandoned fence: a
 /// `state_machine/` directory with nothing in it and nothing beside it, which
 /// a build before spec 043 D-28 left when it was killed between creating the
-/// directory and publishing the marker. The owner chose to read it as absent
+/// directory and publishing the marker, or the empty legacy directory this
+/// function leaves when it is itself stopped between its two removals. The owner chose to read it as absent
 /// (spec 043 D-32, spec 048 D-6): no marker means no node claimed it and no
 /// file means no store was in it. Each `rmdir` refuses a non-empty directory,
 /// so a process writing into it meanwhile keeps what it wrote and the volume
@@ -415,14 +416,21 @@ fn remove_abandoned_fence(config: &Config) -> Result<bool> {
     let state_machine = legacy.join("state_machine");
     let is_real_dir =
         |path: &Path| std::fs::symlink_metadata(path).is_ok_and(|meta| meta.file_type().is_dir());
-    if !is_real_dir(&legacy)
-        || list(&legacy)? != [PathBuf::from("state_machine")]
-        || !is_real_dir(&state_machine)
-        || !list(&state_machine)?.is_empty()
-    {
+    if !is_real_dir(&legacy) {
         return Ok(false);
     }
-    for dir in [&state_machine, &legacy] {
+    let entries = list(&legacy)?;
+    let dirs: &[&Path] = if entries.is_empty() {
+        &[&legacy]
+    } else if entries == [PathBuf::from("state_machine")]
+        && is_real_dir(&state_machine)
+        && list(&state_machine)?.is_empty()
+    {
+        &[&state_machine, &legacy]
+    } else {
+        return Ok(false);
+    };
+    for dir in dirs {
         match std::fs::remove_dir(dir) {
             Ok(()) => {}
             Err(err)

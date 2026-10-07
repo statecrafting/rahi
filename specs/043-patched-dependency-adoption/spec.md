@@ -1535,10 +1535,12 @@ None remains open: D-7 to D-13 record the owner's approval and choices.
   no file, so no store was in it. An entry point that creates fences
   (B-4a step (4)), with no transition record, removes it by two `rmdir`s,
   which a concurrent writer's first file makes fail, and then fences the
-  volume as fresh; anything in or beside the directory is refused exactly
+  volume as fresh. An empty `<legacy>/`, which a stop between the two
+  `rmdir`s leaves, is read the same way, so that interruption is not
+  itself a stuck volume; anything in or beside the directory is refused exactly
   as before, and the verb and `--abort`, which create no fence, remove
   nothing. B-3's refusal of an absent marker carries the exception.
-  `tests/cell_lock.rs` covers the empty case and three non-empty ones.
+  `tests/cell_lock.rs` covers both empty cases and three non-empty ones.
   Not changed: AC-4 (g), the rest of D-20 (c) (a stale hiqlite marker
   after a kill of an open store), and the backward-clock and stale-restore
   limitations; 043 stays `in-progress` on them.

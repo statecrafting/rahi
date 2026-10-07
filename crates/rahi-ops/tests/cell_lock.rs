@@ -455,6 +455,13 @@ fn an_empty_abandoned_fence_is_fenced_as_fresh_and_nothing_more() {
         assert_eq!(tree(&cfg.legacy_hiqlite_dir()), before, "{extra}");
     }
 
+    // An empty legacy directory, as a stop between the two removals leaves
+    // it, is fenced too, so that interruption is not a stuck volume.
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = config(dir.path());
+    std::fs::create_dir_all(cfg.legacy_hiqlite_dir()).unwrap();
+    assert!(gate(&cfg, Entry::Serve).unwrap().fenced());
+
     // The verb does not fence, so it does not remove the directory either.
     let dir = tempfile::tempdir().unwrap();
     let cfg = config(dir.path());
