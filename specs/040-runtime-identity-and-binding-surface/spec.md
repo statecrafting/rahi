@@ -68,6 +68,14 @@ summary: >
 
 # 040: Runtime identity and the binding surface
 
+> **Status (2026-10-07).** Implementation stays `in-progress`. #109 and
+> #111 carry the binding document, route, resource, metric, deployment
+> checks, `Cell::app_revision` and `rahi version --binding`; `make verify
+> SPEC=040` passes on `main` at `7123d62`. What remains is AC-6 (FR-010):
+> the image workflow change in PR #110, which needs the owner's workflow
+> exception, and the first push build after it merges, which is the only
+> run its label check executes on.
+
 ## 1. Purpose
 
 The family evidence chain proposed on 2026-09-11 (handoff 02-rahi, the
