@@ -169,6 +169,23 @@ pub struct Record {
     /// Every move to an evidence name, in order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub evidence: Vec<EvidenceMove>,
+    /// The legacy WAL metadata files as T1 found them before the guard
+    /// (spec 043 D-33).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub wal_meta: Vec<WalMeta>,
+}
+
+/// One legacy WAL directory's `meta.hql`, read at T1 before the guard
+/// (spec 043 D-33). A pre-043 start refused by the guard has already opened
+/// its WAL, and hiqlite 0.14 rewrites this file at the WAL writer's exit by
+/// removing it, creating it and writing it in four calls, which the
+/// refused process's own exit can cut short.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WalMeta {
+    /// The WAL directory's name under the store: `logs` or `logs_cache`.
+    pub log: String,
+    /// The file's bytes, lowercase hex.
+    pub bytes: String,
 }
 
 impl Record {
@@ -186,6 +203,7 @@ impl Record {
             plan: Vec::new(),
             seq: 0,
             evidence: Vec::new(),
+            wal_meta: Vec::new(),
         }
     }
 }
@@ -582,6 +600,12 @@ fn t1(config: &Config, record: &mut Record, faults: &dyn Faults) -> Result<()> {
     // a pre-043 node against the whole of T1 (spec 043 D-31).
     faults.hit("t1.start")?;
 
+    // D-33: the WAL metadata as it is before the guard exists, which no
+    // start the guard refuses can have touched yet.
+    if record.wal_meta.is_empty() {
+        record.wal_meta = capture_wal_meta(&legacy)?;
+    }
+
     // (b) The guard, whole or not at all.
     match read_marker(&marker)? {
         Some(content) if content == guard => {}
@@ -829,6 +853,123 @@ fn device(path: &Path) -> Result<Option<u64>> {
 
 /// T2's intent: refuse, before recording anything, what B-4 names; then
 /// record the plan.
+/// The legacy store's two WAL directories (spec 043 D-33).
+const WAL_LOGS: [&str; 2] = ["logs", "logs_cache"];
+
+/// The WAL metadata file in each of them.
+const WAL_META: &str = "meta.hql";
+
+/// Whether `bytes` is a whole hiqlite WAL metadata file: its magic, format
+/// version 1 and at least the fourteen bytes hiqlite requires. Every state a
+/// cut-short rewrite leaves (absent, empty, the magic alone, the magic and
+/// version, those and the checksum) fails it.
+fn wal_meta_whole(bytes: &[u8]) -> bool {
+    bytes.len() >= 14 && bytes.starts_with(b"HQLMETA") && bytes.get(7) == Some(&1)
+}
+
+/// D-33: each legacy WAL metadata file, which must be whole.
+fn capture_wal_meta(legacy: &Path) -> Result<Vec<WalMeta>> {
+    let mut found = Vec::new();
+    for log in WAL_LOGS {
+        let path = legacy.join(log).join(WAL_META);
+        let bytes = match std::fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(err) => {
+                return Err(Error::Io(format!(
+                    "{} cannot be read: {err}",
+                    path.display()
+                )));
+            }
+        };
+        if !wal_meta_whole(&bytes) {
+            return Err(Error::Conflict(format!(
+                "{} is not a whole WAL metadata file ({} bytes): a pre-043 process was \
+                 stopped while rewriting it, and this verb cannot know its content; restore \
+                 the pre-upgrade archive into a fresh volume (spec 043 D-33)",
+                path.display(),
+                bytes.len()
+            )));
+        }
+        found.push(WalMeta {
+            log: log.to_owned(),
+            bytes: bytes.iter().map(|b| format!("{b:02x}")).collect(),
+        });
+    }
+    Ok(found)
+}
+
+/// D-33: under `store`, put back each of `logs`' metadata files that T1
+/// recorded and that is now absent or not whole, when what is there is a
+/// prefix of what T1 read: exactly what a refused pre-043 start's cut-short
+/// rewrite leaves, since the guard stops it before any raft activity and its
+/// rewrite carries the bytes it read. A whole file is left as it is; a
+/// cut-short file that is not such a prefix refuses. `true` when one was put
+/// back.
+fn restore_wal_meta(store: &Path, recorded: &[WalMeta], logs: &[&str]) -> Result<bool> {
+    let mut restored = false;
+    for meta in recorded.iter().filter(|m| logs.contains(&m.log.as_str())) {
+        let dir = store.join(&meta.log);
+        if !dir.is_dir() {
+            continue;
+        }
+        let want = unhex(&meta.bytes).ok_or_else(|| {
+            Error::Integrity(format!(
+                "the transition record's {} metadata is not hex",
+                meta.log
+            ))
+        })?;
+        let path = dir.join(WAL_META);
+        let now = match std::fs::read(&path) {
+            Ok(bytes) => Some(bytes),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => None,
+            Err(err) => {
+                return Err(Error::Io(format!(
+                    "{} cannot be read: {err}",
+                    path.display()
+                )));
+            }
+        };
+        match now {
+            // Whole: T1's bytes, or what this build's hiqlite wrote at a T3
+            // a crash interrupted, which a rerun keeps.
+            Some(now) if wal_meta_whole(&now) => {}
+            Some(now) if !want.starts_with(&now) => {
+                return Err(Error::Conflict(format!(
+                    "{} is a cut-short WAL metadata file that is not a prefix of what T1 \
+                     recorded: the volume was modified outside this verb, which changes \
+                     nothing more",
+                    path.display()
+                )));
+            }
+            _ => {
+                crate::write_replacing(&path, &want)?;
+                eprintln!(
+                    "upgrade-cache: {} restored as T1 recorded it; a refused pre-043 start had \
+                     cut it short (spec 043 D-33)",
+                    path.display()
+                );
+                restored = true;
+            }
+        }
+    }
+    Ok(restored)
+}
+
+/// Lowercase hex back to bytes; `None` when it is not hex.
+fn unhex(hex: &str) -> Option<Vec<u8>> {
+    if !hex.len().is_multiple_of(2) {
+        return None;
+    }
+    (0..hex.len())
+        .step_by(2)
+        .map(|i| {
+            hex.get(i..i + 2)
+                .and_then(|b| u8::from_str_radix(b, 16).ok())
+        })
+        .collect()
+}
+
 fn plan_t2(config: &Config, record: &mut Record, faults: &dyn Faults) -> Result<()> {
     let legacy = config.legacy_hiqlite_dir();
     let state_machine = legacy.join("state_machine");
@@ -1012,6 +1153,11 @@ async fn t3(
             faults,
         )?;
     }
+    // D-33: a WAL metadata file a refused pre-043 start cut short is put
+    // back before the store opens; the old caches are aside and not opened.
+    if restore_wal_meta(&config.hiqlite_dir(), &record.wal_meta, &["logs"])? {
+        faults.hit("t3.wal-meta")?;
+    }
     let instant = record
         .instant
         .ok_or_else(|| Error::Integrity("the transition record names no instant".to_owned()))?;
@@ -1116,6 +1262,10 @@ pub fn abort(config: &Config, faults: &dyn Faults) -> Result<Outcome> {
             crate::fsync_dir(dir)?;
         }
         faults.hit("abort.return")?;
+    }
+    // D-33: the WAL metadata as T1 found it, where a refused start cut it short.
+    if restore_wal_meta(&legacy, &record.wal_meta, &WAL_LOGS)? {
+        faults.hit("abort.wal-meta")?;
     }
     // The supervisor fence replaced by the original file.
     if let Some(original) = record
