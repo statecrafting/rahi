@@ -1,7 +1,7 @@
 ---
 id: "049-cell-preflight-checks"
 title: "Let a cell contribute named, bounded, read-only checks to preflight"
-status: draft
+status: approved
 kind: kernel
 domain: ops
 created: "2026-10-05"
@@ -208,6 +208,11 @@ including which remote providers an app uses, stays the application's.
   governance gate admits a co-claimed additive edit before touching it, or
   passes the declaration through the existing `Verb::Preflight` arm with
   the smallest diff the gate accepts.
+
+- **D-8 (2026-10-07, owner decision; approval).** The owner directed,
+  verbatim: "Approve 049; proceed". The contract is approved as written,
+  with D-1 through D-7 as its resolved choices. No B-n, FR or AC text
+  changed.
 
 ## Verification
 
