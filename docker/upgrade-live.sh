@@ -140,6 +140,24 @@ old_volume() {
   # The ledger verbs of v0.2.0 open the node themselves, so they run on the
   # stopped volume.
   verb "$old" "$volume" ledger export /data/pre-upgrade-chain.jsonl >&2
+  # v0.2.0's ledger verbs exit without closing every SQLite connection, so
+  # about one export in ten leaves `-wal` and `-shm` beside the database,
+  # which T1 (c) rightly refuses as a node that stopped uncleanly (spec 043
+  # D-33; spec 048 fixed it for this version's verbs). The old cell started
+  # and stopped cleanly once more closes the database and checkpoints it.
+  if docker run --rm -v "${volume}:/data" --entrypoint sh "$old" -c \
+      'ls /data/hiqlite/state_machine/db/*-wal /data/hiqlite/state_machine/db/*-shm' >/dev/null 2>&1; then
+    say "the $old_name ledger export left SQLite open on $volume; one clean start and stop closes it"
+    start "$name" "$old" "$volume" "$p"
+    if ! ready_within "$p" 180 "$name"; then
+      docker logs "$name" >&2 2>&1 || true
+      docker rm -f "$name" >/dev/null 2>&1 || true
+      say "the $old_name image did not become ready again on $volume"
+      return 1
+    fi
+    docker stop -t 50 "$name" >/dev/null
+    docker rm "$name" >/dev/null
+  fi
   echo "$archive"
 }
 

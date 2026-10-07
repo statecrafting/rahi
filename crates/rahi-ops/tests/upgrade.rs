@@ -427,6 +427,141 @@ async fn every_pre043_t1_interleaving_refuses_and_never_reaches_guarded() {
     }
 }
 
+/// What a pre-043 start the guard refuses leaves in a legacy WAL directory
+/// when its exit cuts hiqlite 0.14's metadata rewrite short (spec 043 D-33):
+/// its own `lock.hql`, and `meta.hql` absent or holding a prefix of its bytes
+/// (the rewrite is `remove_file`, `create_new`, then the magic, the version,
+/// the checksum and the body, each its own `write`).
+fn cut_wal_meta(logs: &Path, keep: Option<usize>) {
+    drop(File::create(logs.join("lock.hql")).unwrap());
+    let meta = logs.join("meta.hql");
+    let bytes = std::fs::read(&meta).unwrap();
+    std::fs::remove_file(&meta).unwrap();
+    if let Some(keep) = keep {
+        std::fs::write(&meta, &bytes[..keep]).unwrap();
+    }
+}
+
+/// The cut-short shapes: absent, empty, the magic, the magic and version,
+/// and those with the checksum.
+const CUTS: [Option<usize>; 5] = [None, Some(0), Some(7), Some(8), Some(12)];
+
+/// A refused pre-043 start at fault point `point` of a run that continues,
+/// as the real start race of AC-5 interleaves it (D-33).
+struct RefusedStartAt {
+    config: Config,
+    point: &'static str,
+    keep: Option<usize>,
+    ran: AtomicBool,
+}
+
+impl Faults for RefusedStartAt {
+    fn hit(&self, point: &str) -> Result<()> {
+        if point == self.point && !self.ran.swap(true, Ordering::SeqCst) {
+            cut_wal_meta(&self.config.legacy_hiqlite_dir().join("logs"), self.keep);
+        }
+        Ok(())
+    }
+}
+
+/// D-33, AC-4 (a) and AC-5: a pre-043 start the guard refuses can cut the
+/// legacy WAL metadata short. Whether it lands while the verb runs or between
+/// two runs, the verb puts T1's bytes back before T3 opens the store and
+/// reaches the same end state.
+#[tokio::test]
+async fn a_refused_pre043_start_that_cuts_the_wal_metadata_short_is_repaired() {
+    for keep in CUTS {
+        for point in ["guarded", "verified"] {
+            let volume = pre043().await;
+            let faults = RefusedStartAt {
+                config: volume.config(),
+                point,
+                keep,
+                ran: AtomicBool::new(false),
+            };
+            let outcome = run(&volume, &faults).await;
+            assert!(
+                matches!(outcome, Ok(Outcome::Floored { .. })),
+                "cut {keep:?} at {point}: {outcome:?}"
+            );
+            assert_floored(&volume).await;
+        }
+        // Between runs: the verb stopped at `guarded`, the old image started.
+        let volume = pre043().await;
+        assert!(run(&volume, &FailOn::new("guarded")).await.is_err());
+        cut_wal_meta(&volume.config().legacy_hiqlite_dir().join("logs"), keep);
+        let outcome = run(&volume, &NoFaults).await;
+        assert!(
+            matches!(outcome, Ok(Outcome::Floored { .. })),
+            "cut {keep:?} between runs: {outcome:?}"
+        );
+        assert_floored(&volume).await;
+    }
+}
+
+/// D-33: a cut-short file that is not a prefix of T1's bytes refuses T3,
+/// and a legacy metadata file that is already cut short when T1 starts
+/// refuses before the guard, changing nothing.
+#[tokio::test]
+async fn wal_metadata_the_verb_cannot_account_for_refuses() {
+    let volume = pre043().await;
+    let config = volume.config();
+    assert!(run(&volume, &FailOn::new("guarded")).await.is_err());
+    let meta = config.legacy_hiqlite_dir().join("logs").join("meta.hql");
+    std::fs::write(&meta, b"NOTMETA").unwrap();
+    let err = run(&volume, &NoFaults).await.unwrap_err();
+    assert!(err.message().contains("not a prefix"), "{err}");
+    // T2 moved the log; T3 refused and left the file as it found it.
+    let moved = config.hiqlite_dir().join("logs").join("meta.hql");
+    assert_eq!(std::fs::read(moved).unwrap(), b"NOTMETA");
+
+    let volume = pre043().await;
+    let config = volume.config();
+    let meta = config.legacy_hiqlite_dir().join("logs").join("meta.hql");
+    let whole = std::fs::read(&meta).unwrap();
+    std::fs::write(&meta, &whole[..7]).unwrap();
+    let err = run(&volume, &NoFaults).await.unwrap_err();
+    assert!(
+        err.message().contains("not a whole WAL metadata file"),
+        "{err}"
+    );
+    assert!(
+        !rahi_ops::legacy_marker(&config).exists(),
+        "no guard was written"
+    );
+}
+
+/// D-33 and AC-4 (e): `--abort` after a refused start cut the metadata
+/// short returns the legacy store with T1's bytes, and the old layout opens.
+#[tokio::test]
+async fn abort_restores_wal_metadata_a_refused_start_cut_short() {
+    for keep in CUTS {
+        let volume = pre043().await;
+        let config = volume.config();
+        assert!(run(&volume, &FailOn::new("guarded")).await.is_err());
+        let logs = config.legacy_hiqlite_dir().join("logs");
+        let whole = std::fs::read(logs.join("meta.hql")).unwrap();
+        cut_wal_meta(&logs, keep);
+        assert!(matches!(
+            upgrade::abort(&config, &NoFaults).unwrap(),
+            Outcome::Aborted { .. }
+        ));
+        assert_eq!(std::fs::read(logs.join("meta.hql")).unwrap(), whole);
+        let keys = KeySet::of(&config);
+        let mut cfg =
+            rahi_ops::store_config(&config, &volume.env, keys.store_secrets().unwrap()).unwrap();
+        cfg.data_dir = config.legacy_hiqlite_dir();
+        let store = Store::open(&cfg).await.unwrap();
+        let rows: Vec<serde_json::Value> = store
+            .handle()
+            .query_consistent("SELECT v FROM app_rows", vec![])
+            .await
+            .unwrap();
+        assert_eq!(rows.len(), 1, "cut {keep:?}");
+        store.shutdown().await.unwrap();
+    }
+}
+
 fn recreate_directory(path: &Path, bytes: &[u8]) {
     std::fs::create_dir_all(path).unwrap();
     std::fs::write(path.join("occurrence"), bytes).unwrap();

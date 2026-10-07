@@ -10,6 +10,18 @@ Every chassis crate carries one version, and a release is an annotated tag
 `vX.Y.Z` on a `main` commit whose `make ci` passed. Pre-1.0, a minor bump may
 change the consumer contract and a patch bump may not.
 
+## Unreleased
+
+- **A refused v0.2.0 start no longer strands the cache transition (spec
+  043 D-33).** A v0.2.0 node started on a volume the verb had guarded but
+  not yet relocated could leave the legacy `logs/meta.hql` absent or cut
+  short as it died on the guard, after which `upgrade-cache` failed at T3
+  with `WAL: FileCorrupted: invalid metadata file length` on every rerun
+  and `--abort` returned a store v0.2.0 could not start. The verb now
+  records both WAL metadata files before it writes the guard and puts
+  either back before T3 and at `--abort` when a refused start cut it
+  short. The state file gains an optional `wal_meta` field.
+
 ## 0.5.0, release candidate 2026-10-06
 
 Every change since `v0.4.0`. All nine chassis crates move together. It is a
