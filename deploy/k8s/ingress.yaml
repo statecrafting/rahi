@@ -2,6 +2,8 @@
 # /metrics is not routed: the ServiceMonitor scrapes it in-cluster. The
 # ingress-nginx snippet below closes it at the edge, because a `/` prefix
 # would otherwise carry it; another ingress class needs its equivalent.
+# /binding (spec 040 B-6) is closed the same way and for the same reason:
+# it is an in-cluster document, unguarded by design.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -12,6 +14,7 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/server-snippet: |
       location = /metrics { return 404; }
+      location = /binding { return 404; }
 spec:
   ingressClassName: nginx
   tls:

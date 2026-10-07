@@ -60,6 +60,17 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.labels['apps.kubernetes.io/pod-index']
+            # Spec 040 B-4: the pod's name, reported as `instance.pod` in
+            # the binding document. Declared by the deployment.
+            - name: RAHI_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            # Spec 040 B-5: a deployment that pins the image by digest may
+            # declare that same reference as RAHI_ARTIFACT_IMAGE
+            # (`<repository>@sha256:<64 hex>`), reported as `artifact.image`.
+            # It is the deployer's claim; scripts/k8s-validate.sh refuses one
+            # that differs from a container image pinned by digest.
           envFrom:
             - configMapRef:
                 name: rahi-config

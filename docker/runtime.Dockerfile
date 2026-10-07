@@ -61,7 +61,12 @@ USER rahi
 WORKDIR /data
 VOLUME ["/data"]
 EXPOSE 8443
+# Spec 040 B-5, B-12: the Rauthy source image this build packaged, for the
+# binding document's `components.rauthy.image`. Declared by the build from
+# the same argument it copied Rauthy from; the runtime never checks it.
+ARG RAUTHY_IMAGE
 ENV RAHI_DATA_DIR=/data \
     RAHI_RAUTHY_BIN=/usr/local/bin/rauthy \
+    RAHI_RAUTHY_IMAGE=${RAUTHY_IMAGE} \
     RAHI_STATIC_DIR=/usr/local/share/rahi/static
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

@@ -21,11 +21,6 @@
         "code": "W-001",
         "message": "spec '041-deployment-epochs' file unit 'crates/rahi-cli/testdata/binding/' does not exist",
         "path": "crates/rahi-cli/testdata/binding/"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '041-deployment-epochs' file unit 'crates/rahi-ops/src/binding.rs' does not exist",
-        "path": "crates/rahi-ops/src/binding.rs"
       }
     ]
   },
@@ -70,6 +65,10 @@
       },
       {
         "path": "crates/rahi-ops/src/archive.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/binding.rs",
         "source": "spec-edge"
       },
       {
@@ -227,7 +226,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/binding.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {

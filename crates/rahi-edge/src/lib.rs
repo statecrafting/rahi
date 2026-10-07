@@ -48,6 +48,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod binding;
 pub mod client_identity;
 pub mod error;
 pub mod exposure;
@@ -60,6 +61,7 @@ pub mod state;
 pub mod static_files;
 pub mod stream;
 
+pub use binding::BINDING_PATH;
 pub use client_identity::ClientIdentity;
 pub use error::{EdgeError, EdgeResult, status_of};
 pub use exposure::{Exposure, Route, RouteClass};

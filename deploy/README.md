@@ -33,7 +33,7 @@ refuses a render that names `:latest` or a cell image outside
 | `k8s/configmap.yaml` | the cell's environment: `RAHI_PUBLIC_URL`, the trusted hop, the listeners, the peer lists |
 | `k8s/statefulset.yaml` | one container per pod, `volumeClaimTemplates` for `/data`, the keys mounted read-only at `/data/keys`, the probes |
 | `k8s/service.yaml` | the headless Service that names the pods (`rahi-<n>.rahi-hl`) and the ClusterIP Service the Ingress reaches |
-| `k8s/ingress.yaml` | TLS termination, `/metrics` closed at the edge |
+| `k8s/ingress.yaml` | TLS termination, `/metrics` and `/binding` closed at the edge |
 | `k8s/migrate-job.yaml` | the Job that runs a new image's `migrate --adopt-manifest` before a rollout (spec 036 B-3) |
 | `k8s/backup-cronjob.yaml` | the nightly `rahi backup --to s3://` against the leader, with the RBAC it needs |
 | `k8s/servicemonitor.yaml` | the in-cluster scrape of `/metrics` |
@@ -460,6 +460,13 @@ during Rauthy's stop) leaves no marker, and the next boot needs no step.
 - **`/metrics` is per pod.** The ServiceMonitor scrapes every pod through
   the ClusterIP Service; aggregate in Prometheus, never at the Ingress,
   where the path is closed.
+- **`/binding` is per pod, and in-cluster only** (spec 040 B-6). Each
+  replica serves its own boot-bound identity document beside `/metrics`:
+  unguarded, unobserved, and never routed publicly. The Ingress closes it
+  as it closes `/metrics`; the StatefulSet sets `RAHI_POD_NAME` from the
+  pod's name, and a deployment that pins the image by digest may declare
+  the same reference as `RAHI_ARTIFACT_IMAGE`, which the validation script
+  holds to the pinned image.
 - **A volume is per pod.** `ReadWriteOnce`, from the claim template. Two
   Raft members on one volume is corruption by construction, and the
   validation script refuses any `ReadWriteMany` claim in the render.
@@ -477,6 +484,21 @@ both probe paths present, the peer list sized to the replicas and carrying
 the app's ports (8400, 8300) and none of rauthy's (8100, 8200), and
 `kubeconform` when installed. It ends with the fixture of spec 032 FR-001:
 a kustomization that adds a `ReadWriteMany` claim must be refused.
+
+Spec 040 FR-009 adds: `/binding` is neither routed by the Ingress nor
+carried by a `/` prefix the edge does not close, a declared
+`RAHI_ARTIFACT_IMAGE` names the same repository and digest as any
+container image pinned by digest, and `docker/compose.yml` publishes its
+port on the loopback only. Two more fixtures must be refused: a render
+that routes `/binding`, and one whose artifact image disagrees.
+
+**Every other path.** `/binding` and `/metrics` carry no secret, but they
+are unguarded by design, so the deployment boundary is their only
+protection. On any path this repository does not ship (a container port
+published with `docker run -p`, another ingress class, a load balancer in
+front of the Service), publish neither: bind a published port to the
+loopback or an internal network, or close both paths at the edge, and
+check it with `curl -sI <public origin>/binding`, which must be `404`.
 
 ## The rollout check (AC-2)
 
@@ -521,6 +543,7 @@ its bucket.
    One `rahi-backup-<utc>.tar.age` object, newer than the job.
 
 5. Confirm the origin end to end: `curl -sI https://cell.example.com/healthz`
-   is `200`, and `curl -sI https://cell.example.com/metrics` is `404`.
+   is `200`, and `curl -sI https://cell.example.com/metrics` and
+   `curl -sI https://cell.example.com/binding` are both `404`.
 
 A failure at any step is a defect report against spec 032.

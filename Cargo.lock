@@ -3159,6 +3159,7 @@ dependencies = [
  "rahi-ops",
  "rahi-store",
  "rahi-types",
+ "ring",
  "serde_json",
  "tempfile",
  "tokio",

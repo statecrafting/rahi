@@ -1152,6 +1152,38 @@ serves under. Evaluating any of it is the consumer's.
 | metrics | every label a closed vocabulary (023) | no build or identity family |
 | traces | batch exporter, default sampler keeps every span, ring of 1,000 | export loss is not counted |
 
+### 11.1a The binding document (spec 040, built)
+
+From the release that carries spec 040, a replica states what it is in
+one document, `rahi.binding/v0`, at `GET /binding` and, outside a cell,
+from `rahi version --binding`. Spec 040 section 3.1 is its normative
+shape: every identity value is a wrapper carrying its basis, `measured`
+(the executable's sha256 read by path, the manifest hash, the store's
+schema and named-set versions, the boot's wall time), `declared` (the
+chassis version, the application revision the composer supplies, the
+deployer's `RAHI_ARTIFACT_IMAGE`, the pod name, the packaged hiqlite and
+Rauthy identities), `minted` (the per-boot `instance.id`), or `absent`
+with a reason from a closed set. The OTel resource carries the present
+values; `rahi_build_info{rahi_version, contract_version}` is the one
+metric, labelled by versions only.
+
+What a consumer must hold to:
+
+- **Boot-bound.** The document is assembled once, before the listener
+  binds, and is byte-identical for the life of the process. It names what
+  the process booted under, not the newest deployment, so it is never a
+  freshness source and polling it authorizes nothing (040 B-8).
+- **An observation, not an attestation.** The executable digest is a file
+  read by pathname; a compromised process can falsify it. It catches a
+  wrong image or a stale node, not an adversary inside the process.
+- **Absent is not passed.** A replica whose `build.binary.sha256` is
+  absent is unidentified; do not record it as running the image the
+  deployment believes it pinned.
+- **Off the ingress.** `/binding` is unguarded, like `/metrics`, and the
+  deployment keeps it off every public path (`deploy/README.md`).
+- **Nothing is written to the chain.** `epoch.ref` and `epoch.match` are
+  reserved and absent until spec 041.
+
 ### 11.2 A record order with no cycle
 
 **Recommendation** (drafts 040 and 041). Each record names only records

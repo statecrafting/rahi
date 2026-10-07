@@ -328,6 +328,128 @@ async fn the_scrape_and_the_static_slot_are_not_observed() {
     cell.stop().await;
 }
 
+// ------------------------------------------------------------------ spec 040
+
+/// Spec 040 FR-007: the resource carries every B-10 key whose document
+/// value is present, omits the ones that are absent, and carries no epoch
+/// or comparison attribute.
+#[test]
+fn the_resource_carries_the_present_identity_values_and_nothing_else() {
+    let document = serde_json::json!({
+        "schema": "rahi.binding/v0",
+        "instance": {
+            "id": { "value": "2-9f1c04e2a7b3d8151d6c0b47ea395f82", "basis": "minted" },
+            "node": { "value": 2, "basis": "declared" },
+            "pod": { "value": "rahi-1", "basis": "declared" }
+        },
+        "build": {
+            "binary": {
+                "sha256": { "basis": "absent", "reason": "unreadable" },
+                "platform": { "value": "linux/arm64", "basis": "declared" }
+            },
+            "rahi_version": { "value": "0.4.0", "basis": "declared" },
+            "revision": { "basis": "absent", "reason": "not_declared", "source": "app_revision" }
+        },
+        "manifest": {
+            "hash": { "value": "sha256:1b9d", "basis": "measured" },
+            "contract_version": { "value": "1.0.0", "basis": "declared" }
+        },
+        "artifact": { "image": { "value": "ghcr.io/a@sha256:00", "basis": "declared" } },
+        "epoch": {
+            "ref": { "value": { "number": 3 }, "basis": "measured" },
+            "match": { "value": "agrees", "basis": "measured" }
+        }
+    });
+    let attributes = rahi_edge::binding::resource_attributes(&document);
+    let resource = rahi_edge::obs::tracer::resource("rahi-test", &attributes);
+    // The SDK adds its own `telemetry.sdk.*` description of itself.
+    let mut keys: Vec<String> = resource
+        .iter()
+        .map(|(key, _)| key.to_string())
+        .filter(|key| !key.starts_with("telemetry.sdk."))
+        .collect();
+    keys.sort();
+    assert_eq!(
+        keys,
+        [
+            "rahi.artifact.image",
+            "rahi.binary.platform",
+            "rahi.manifest.hash",
+            "rahi.node",
+            "rahi.version",
+            "service.instance.id",
+            "service.name",
+            "service.version",
+        ]
+    );
+    let value = |key: &str| {
+        resource
+            .get(&opentelemetry::Key::new(key.to_owned()))
+            .map(|value| value.to_string())
+    };
+    assert_eq!(value("service.version").as_deref(), Some("1.0.0"));
+    assert_eq!(value("rahi.node").as_deref(), Some("2"));
+    assert_eq!(
+        value("rahi.binary.sha256"),
+        None,
+        "an absent value is not emitted"
+    );
+    assert_eq!(
+        value("rahi.revision"),
+        None,
+        "an absent value is not emitted"
+    );
+    assert!(
+        resource
+            .iter()
+            .all(|(key, _)| !key.as_str().contains("epoch") && !key.as_str().contains("match")),
+        "no epoch and no comparison reaches the resource"
+    );
+}
+
+/// Spec 040 FR-007 and FR-006: `/metrics` renders `rahi_build_info` with
+/// exactly its two labels, and `/binding` answers unguarded, unchanged and
+/// unobserved.
+#[tokio::test]
+async fn build_info_has_two_labels_and_binding_is_served_unobserved() {
+    let obs = observability();
+    obs.metrics().set_build_info("0.4.0", "1.0.0");
+    let cell = boot("https://cell.example.com").await;
+    let document = br#"{"schema":"rahi.binding/v0"}"#.to_vec();
+    let router = Edge::builder(cell.state.clone())
+        .binding(document.clone())
+        .build();
+
+    for _ in 0..3 {
+        let answer = send(&router, get_request(rahi_edge::BINDING_PATH)).await;
+        assert_eq!(answer.status, StatusCode::OK);
+        assert_eq!(answer.body.as_bytes(), document.as_slice());
+    }
+    let after = send(&router, get_request("/metrics")).await.body;
+    let lines = |text: &str| -> Vec<String> {
+        text.lines()
+            .filter(|line| line.starts_with("rahi_build_info"))
+            .map(str::to_owned)
+            .collect()
+    };
+    assert_eq!(
+        lines(&after),
+        vec!["rahi_build_info{contract_version=\"1.0.0\",rahi_version=\"0.4.0\"} 1".to_owned()]
+    );
+    // The registry is shared with every test in this binary, which count
+    // their own requests concurrently, so the claim is about `/binding`'s
+    // own series: three scrapes leave it none.
+    assert!(!after.contains("route=\"/binding\""));
+    assert!(
+        !obs::list_traces()
+            .iter()
+            .any(|trace| trace.root.field("route") == Some(rahi_edge::BINDING_PATH)),
+        "a /binding scrape left no trace"
+    );
+
+    cell.stop().await;
+}
+
 // ------------------------------------------------------------------ spec 045
 
 /// spec 045 FR-011: `/metrics` renders `rahi_work_items` with the labels

@@ -154,6 +154,16 @@ impl Obs {
 /// [`Error::Config`] when the registry refuses a collector, or when an OTLP
 /// endpoint is configured and its exporter cannot be built.
 pub fn init(options: ObsOptions) -> Result<&'static Obs> {
+    init_with(options, &[])
+}
+
+/// [`init`], with the identity attributes spec 040 B-10 puts on the
+/// exported resource. The first call in a process wins, as for [`init`].
+///
+/// # Errors
+///
+/// As [`init`].
+pub fn init_with(options: ObsOptions, resource: &[(String, String)]) -> Result<&'static Obs> {
     if let Some(obs) = OBS.get() {
         return Ok(obs);
     }
@@ -165,11 +175,12 @@ pub fn init(options: ObsOptions) -> Result<&'static Obs> {
 
     let metrics = Metrics::new()?;
     let ring = Arc::new(Ring::with_capacity(options.ring_capacity));
-    let provider = tracer::install(
+    let provider = tracer::install_with(
         Arc::clone(&ring),
         metrics.clone(),
         options.otlp_endpoint.as_deref(),
         &options.service_name,
+        resource,
     )?;
     hook_kernel(metrics.clone());
 

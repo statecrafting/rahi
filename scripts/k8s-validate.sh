@@ -130,6 +130,34 @@ check_render() {
     fail "the Ingress routes /metrics; it is scraped in-cluster only"
   fi
 
+  # Spec 040 B-12: /binding is off the Ingress like /metrics. A route that
+  # names it is refused, and so is a `/` prefix the edge does not close it on.
+  if grep -q "path: /binding" "$tmp/ingress.yaml"; then
+    fail "the Ingress routes /binding; it is an in-cluster document only"
+  fi
+  if grep -q "path: /$" "$tmp/ingress.yaml" \
+    && ! grep -q "location = /binding { return 404; }" "$tmp/ingress.yaml"; then
+    fail "the Ingress routes / and does not close /binding at the edge"
+  fi
+
+  # Spec 040 B-12: a declared RAHI_ARTIFACT_IMAGE names the image the pods
+  # run. Where a container image is pinned by digest, the declaration must
+  # name the same repository and digest (a tag is informative).
+  artifact=$(awk '
+    /^  RAHI_ARTIFACT_IMAGE: / { print $2; exit }
+    /- name: RAHI_ARTIFACT_IMAGE$/ { getline; if ($1 == "value:") { print $2; exit } }
+  ' "$out" | tr -d '"')
+  if [ -n "$artifact" ]; then
+    while read -r image; do
+      case "$image" in
+        *@sha256:*)
+          pinned="$(echo "${image%@*}" | sed 's/:[^/:]*$//')@${image#*@}"
+          [ "$pinned" = "$artifact" ] \
+            || fail "RAHI_ARTIFACT_IMAGE is $artifact but a container runs $image" ;;
+      esac
+    done < "$tmp/images"
+  fi
+
   # Both probe paths (B-4).
   grep -q "path: /healthz" "$tmp/sts.yaml" || fail "no probe on /healthz"
   grep -q "path: /readyz" "$tmp/sts.yaml" || fail "no probe on /readyz"
@@ -166,6 +194,19 @@ else
   check_render deploy/n3
 fi
 
+# Spec 040 B-12: the other deployment path the repository ships, the
+# developer Compose file, publishes the port on the loopback only, so
+# neither /binding nor /metrics is reachable from outside the machine.
+if [ "$#" -eq 0 ]; then
+  echo "k8s-validate: docker/compose.yml"
+  awk '/^ *ports:/ { on = 1; next } on && /^ *- / { print; next } on { on = 0 }' docker/compose.yml \
+    > "$tmp/compose-ports"
+  [ -s "$tmp/compose-ports" ] || fail "docker/compose.yml publishes no port"
+  if grep -v '"127\.0\.0\.1:' "$tmp/compose-ports" | grep -q .; then
+    fail "docker/compose.yml publishes a port beyond the loopback"
+  fi
+fi
+
 if [ "$failures" -ne 0 ]; then
   echo "k8s-validate: $failures failure(s)"
   exit 1
@@ -199,6 +240,64 @@ YAML
   fi
   grep -q "ReadWriteMany" "$tmp/fixture.out" || { echo "  FAIL: the fixture failed for another reason"; cat "$tmp/fixture.out"; exit 1; }
   echo "  refused, as required"
+
+  # Spec 040 FR-009: a render that routes /binding through the Ingress, and
+  # one whose RAHI_ARTIFACT_IMAGE disagrees with a digest-pinned image.
+  refused() {
+    want=$1
+    if "$0" deploy/.k8s-validate-fixture > "$tmp/fixture.out" 2>&1; then
+      echo "  FAIL: the fixture passed"
+      exit 1
+    fi
+    grep -q "$want" "$tmp/fixture.out" \
+      || { echo "  FAIL: the fixture failed for another reason"; cat "$tmp/fixture.out"; exit 1; }
+    echo "  refused, as required"
+  }
+  # Each child run's own exit trap removes the fixture directory.
+  mkdir -p "$fixture"
+  cat > "$fixture/kustomization.yaml" <<'YAML'
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../k8s
+patches:
+  - target:
+      kind: Ingress
+      name: rahi
+    patch: |-
+      - op: add
+        path: /spec/rules/0/http/paths/-
+        value:
+          path: /binding
+          pathType: Exact
+          backend:
+            service:
+              name: rahi
+              port:
+                name: http
+YAML
+  echo "k8s-validate: FR-009 fixture (/binding routed publicly must be refused)"
+  refused "routes /binding"
+
+  mkdir -p "$fixture"
+  digest=0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9
+  cat > "$fixture/kustomization.yaml" <<YAML
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../k8s
+images:
+  - name: ghcr.io/statecrafting/rahi
+    newTag: 0.4.0
+    digest: sha256:$digest
+configMapGenerator:
+  - name: rahi-config
+    behavior: merge
+    literals:
+      - RAHI_ARTIFACT_IMAGE=ghcr.io/statecrafting/rahi@sha256:$(echo "$digest" | tr '0' 'f')
+YAML
+  echo "k8s-validate: FR-009 fixture (an artifact image that disagrees must be refused)"
+  refused "RAHI_ARTIFACT_IMAGE is"
 fi
 
 echo "k8s-validate: ok"
