@@ -29,6 +29,9 @@ use rahi_ops::restore::{KeySource, Outcome};
 use rahi_types::{EnvReader, Error, Result};
 
 pub use cell::{Cell, EmptyCell, OPERATOR_PREFIX};
+pub use rahi_ops::preflight_app::{
+    AppCheck, AppEnv, AppOutcome, AppVerdict, PreflightContext, StoreView,
+};
 pub use serve::{Booted, RauthyMode};
 pub use verbs::{VERBS, Verb, usage};
 
@@ -344,7 +347,9 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
             // checks, so a stop is held until it has shut the node down and
             // the process ends right after, rather than ending it mid-check.
             let _held = rahi_store::stop_on_signal()?;
-            let report = rahi_ops::preflight::run(env, C::manifest()).await;
+            let report =
+                rahi_ops::preflight::run_with_checks(env, C::manifest(), C::preflight_checks())
+                    .await;
             println!("{report}");
             if report.passed() {
                 Ok(())

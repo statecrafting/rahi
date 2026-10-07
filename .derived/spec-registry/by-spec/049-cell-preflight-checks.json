@@ -52,6 +52,14 @@
           "kind": "file",
           "path": "crates/rahi-cli/src/lib.rs"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "010-workspace-and-core-types",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-types/src/config.rs"
+        }
       }
     ],
     "extraFrontmatter": {
@@ -62,14 +70,14 @@
     "kind": "kernel",
     "risk": "medium",
     "sectionDigests": {
-      "049-cell-preflight-checks": "cacce27f2e1bb1d0b480d1baf3fbf7fb9e9e210d9a9b2a8dd77f584ae90f3c2e",
+      "049-cell-preflight-checks": "1cc9d4a0222473124059efc11139fd42bf2f3215c42fe2997e1f78a3f1b1c51c",
       "1-purpose": "bdd4e4aa0a03592c18cbfc0febd6431aa17d953772d9e6b3a47cf7773ef746dc",
       "2-territory": "1f7ec5c9da7b57ed091c975a8f4b309944ae960f33db69cc2b8689328a311147",
       "3-behavior": "d32a95be5cec3a23c71d2b104fbc0c776d2041b5cc8d3d2294719ba9859727f1",
       "4-functional-requirements": "1e75be415dd820f0a0dcd8141e46f14adf5399c65cba4033d18c5035ecdea79d",
       "5-acceptance-criteria": "55487f2e20c5cdf04f811ff0f037649133cff85852a4a1a4dc2287bf9231622a",
       "6-out-of-scope": "ff1e064a4a7940549112a5238988124c8c822829d5730539dc3ef170e343c629",
-      "7-resolved-decisions": "c240ff3a4fff0199b361a3959a84117861a0ec75b30b714b1a991dbfddc0092c",
+      "7-resolved-decisions": "b6d0060bb8290a92473a2a67ad07ae7f834092b0c6501bda41ffb537f2ac1ac1",
       "verification": "664504a9f11b9168d27111e649af63babc91eacda1ad98de30414d1808e2107b"
     },
     "sectionHeadings": [
@@ -88,6 +96,6 @@
     "summary": "`rahi preflight` answers whether serve would start here, but only for the chassis: an application cannot report its own readiness facts or refuse a deployment whose application configuration the manifest ceiling does not cover. This spec adds a default-empty `Cell::preflight_checks` declaration of named checks that preflight runs after its own twelve, against a read-only view of the opened app store, the parsed manifest, and the same environment reader, each under a time bound. Results are reported as `app.<name>` lines with optional bounded report lines; any failing app check fails preflight with exit 1, and no app check can mask, reorder, or replace a chassis check.\n",
     "title": "Let a cell contribute named, bounded, read-only checks to preflight"
   },
-  "shardHash": "eee215261e4bb74d57f7c4a552e1f1056d5167cfc3ade2614c426c9d6667dd8e",
+  "shardHash": "0b8ae0e14fa4ef08ecae409bd97f8ca2ac1d235f453c754f0206f0be65d45d6e",
   "specVersion": "1.9.0"
 }
