@@ -30,6 +30,8 @@ extends:
   - { spec: "023-observability", unit: "crates/rahi-edge/src/obs/layer.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/lib.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/lib.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/cell.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/verbs.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/serve.rs", nature: additive }
   - { spec: "031-single-container-packaging", unit: "docker/Dockerfile", nature: additive }
   - { spec: "031-single-container-packaging", unit: ".github/workflows/image.yml", nature: additive }
@@ -933,6 +935,12 @@ itself.
   (i) **The unreadable executable.** FR-004's test runs a copy of the
   binary at mode `0111`, which a non-root user can execute and not read;
   it refuses to run as a user file modes do not bind.
+
+- **D-6 (2026-10-05, build decision; the second implementing change).**
+  `Cell::app_revision` and `rahi version --binding` land as D-5 (c) said.
+  `rahi version` keeps its old parse: `--binding` is the one flag, and
+  any other trailing argument is still ignored, so every invocation that
+  printed `rahi <version>` before prints it unchanged (AC-5).
 
 ### Owner choices at ratification (resolved by D-3)
 

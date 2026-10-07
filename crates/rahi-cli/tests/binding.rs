@@ -310,6 +310,28 @@ fn the_three_examples_of_section_3_1_validate() {
     for (n, example) in examples.iter().enumerate() {
         validate(example).unwrap_or_else(|err| panic!("example {}: {err}", n + 1));
     }
+    // Example 3 is the version output outside a cell: what this binary
+    // prints has the same members at the same bases.
+    let printed: Value = serde_json::from_slice(
+        &Command::new(env!("CARGO_BIN_EXE_rahi"))
+            .args(["version", "--binding"])
+            .env_remove(binding::ENV_ARTIFACT_IMAGE)
+            .env_remove(binding::ENV_POD_NAME)
+            .output()
+            .unwrap()
+            .stdout,
+    )
+    .unwrap();
+    for path in binding::WRAPPER_PATHS {
+        if path == "observation" || path.starts_with("build.") || path == "instance.id" {
+            continue;
+        }
+        assert_eq!(
+            at(&printed, path)["basis"],
+            at(&examples[2], path)["basis"],
+            "{path}"
+        );
+    }
 }
 
 /// FR-001 to FR-004, FR-006, FR-007a: the document a booted cell serves,
@@ -528,5 +550,57 @@ fn an_unreadable_executable_is_absent_and_leaks_nothing() {
         log.contains("binding: the executable could not be read")
             && log.contains("rahi-unreadable"),
         "{log}"
+    );
+}
+
+/// FR-008, AC-5: `rahi version` is byte for byte what it was, and
+/// `--binding` is the document a binary can state outside a cell.
+#[test]
+fn the_version_verb_is_unchanged_and_binding_is_explicit() {
+    let out = Command::new(env!("CARGO_BIN_EXE_rahi"))
+        .arg("version")
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(
+        out.stdout,
+        format!("rahi {}\n", env!("CARGO_PKG_VERSION")).into_bytes()
+    );
+
+    let out = Command::new(env!("CARGO_BIN_EXE_rahi"))
+        .args(["version", "--binding"])
+        .env_remove(binding::ENV_ARTIFACT_IMAGE)
+        .env_remove(binding::ENV_RAUTHY_IMAGE)
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    let document: Value = serde_json::from_slice(&out.stdout).unwrap();
+    validate(&document).unwrap();
+    assert_eq!(document["schema"], binding::SCHEMA);
+    for path in [
+        "manifest.hash",
+        "manifest.app.name",
+        "manifest.app.org",
+        "manifest.contract_version",
+        "store.layout",
+        "store.schema_version",
+        "store.migration_sets",
+        "instance.node",
+        "components.rauthy.image",
+    ] {
+        assert_eq!(at(&document, path)["reason"], "not_applicable", "{path}");
+    }
+    for path in ["epoch.ref", "epoch.match"] {
+        assert_eq!(at(&document, path)["reason"], "not_implemented", "{path}");
+    }
+    assert!(
+        at(&document, "instance.id")["value"]
+            .as_str()
+            .unwrap()
+            .starts_with("0-")
+    );
+    assert_eq!(
+        at(&document, "build.binary.sha256")["value"],
+        sha256_of(Path::new(env!("CARGO_BIN_EXE_rahi")))
     );
 }

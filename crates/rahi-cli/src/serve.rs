@@ -420,9 +420,7 @@ pub async fn compose_parts<C: Cell>(
     // and never into the document; its present values go on the resource.
     let binding = rahi_ops::binding::assemble(&rahi_ops::binding::Inputs {
         env,
-        // B-12's `app_revision` parameter reaches the composer with the
-        // `Cell` declaration (D-5); until then the document states it absent.
-        app_revision: None,
+        app_revision: C::app_revision(),
         cell: Some(rahi_ops::binding::CellFacts {
             node: booted.store.config().node_id,
             manifest_hash: booted.hash.to_string(),
@@ -631,6 +629,31 @@ fn loss_counters() -> Vec<String> {
     ]
     .map(str::to_owned)
     .to_vec()
+}
+
+/// `rahi version --binding` (spec 040 B-13): the document a binary can
+/// state outside a booted cell, with no store, no manifest and no epoch.
+///
+/// # Errors
+///
+/// [`Error::Config`] when a declared image is malformed or the entropy
+/// source fails.
+pub fn version_binding<C: Cell>(env: &dyn EnvReader) -> Result<String> {
+    let binding = rahi_ops::binding::assemble(&rahi_ops::binding::Inputs {
+        env,
+        app_revision: C::app_revision(),
+        cell: None,
+        observation: rahi_ops::binding::Observation {
+            export: None,
+            ring_capacity: 0,
+            queue_capacity: 0,
+            loss_counters: loss_counters(),
+        },
+    })?;
+    for line in binding.log() {
+        eprintln!("{line}");
+    }
+    Ok(String::from_utf8_lossy(binding.bytes()).into_owned())
 }
 
 /// How long readiness waits for Rauthy's health route (spec 043 B-8).
