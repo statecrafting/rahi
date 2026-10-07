@@ -38,6 +38,7 @@ pub mod first_boot;
 pub mod keys;
 pub mod migrate;
 pub mod preflight;
+pub mod preflight_app;
 pub mod rauthy_api;
 pub mod rauthy_env;
 pub mod rauthy_session;

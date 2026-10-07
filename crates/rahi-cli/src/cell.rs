@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use axum::Router;
 use rahi_edge::{AppState, Route};
 use rahi_idp::BearerRoutes;
+use rahi_ops::preflight_app::AppCheck;
 use rahi_store::{Migration, MigrationSet};
 
 /// The prefix a cell's operator routes are mounted under (spec 024 B-2).
@@ -68,6 +69,13 @@ pub trait Cell: Send + Sync + 'static {
     /// The directory the static slot serves (spec 020 B-7), if any.
     fn static_dir() -> Option<PathBuf> {
         None
+    }
+
+    /// The cell's own preflight checks (spec 049 B-1), run after the
+    /// chassis's and reported as `app.<name>`. Empty by default, which is a
+    /// cell whose preflight prints exactly what it printed before (B-9).
+    fn preflight_checks() -> Vec<AppCheck> {
+        Vec::new()
     }
 }
 
