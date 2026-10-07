@@ -235,7 +235,17 @@ pub struct StubLog {
     /// The epoch second of each accepted trigger, which is what the
     /// snapshot it produced is named for (spec 037 B-2).
     pub taken: Vec<i64>,
+    /// The `redirect_uri` of each login, accepted or refused.
+    pub redirects: Vec<String>,
 }
+
+/// The issuer the stub publishes: a public URL on the default port, as a
+/// production cell's is.
+pub const STUB_ISSUER: &str = "https://cell.example/auth/v1/";
+
+/// The one redirect URI the stub's own client accepts, built as rauthy's
+/// anti-lockout builds it: `{issuer}oidc/callback` (037 D-11).
+pub const STUB_CALLBACK: &str = "https://cell.example/auth/v1/oidc/callback";
 
 #[derive(Clone)]
 struct StubState {
@@ -306,6 +316,10 @@ pub async fn delayed_stub(
     };
     let app = Router::new()
         .route("/auth/v1/health", get(|| async { StatusCode::OK }))
+        .route(
+            "/auth/v1/.well-known/openid-configuration",
+            get(|| async { serde_json::json!({ "issuer": STUB_ISSUER }).to_string() }),
+        )
         .route("/auth/v1/oidc/session", post(session))
         // Difficulty zero: the verb's own solver returns at once.
         .route("/auth/v1/pow", post(|| async { "1:0:0:salt:hash:" }))
@@ -366,7 +380,24 @@ async fn session(State(state): State<StubState>) -> impl IntoResponse {
     )
 }
 
-async fn authorize() -> impl IntoResponse {
+async fn authorize(
+    State(state): State<StubState>,
+    axum::Json(login): axum::Json<serde_json::Value>,
+) -> impl IntoResponse {
+    let redirect = login["redirect_uri"]
+        .as_str()
+        .unwrap_or_default()
+        .to_owned();
+    let accepted = redirect == STUB_CALLBACK;
+    state.log.lock().unwrap().redirects.push(redirect);
+    if !accepted {
+        // rauthy's own answer to a redirect URI its client does not hold.
+        return (
+            StatusCode::BAD_REQUEST,
+            serde_json::json!({ "error": "BadRequest", "message": "Invalid redirect uri" })
+                .to_string(),
+        );
+    }
     (
         StatusCode::OK,
         serde_json::json!({ "code": "a".repeat(48), "exp": 60 }).to_string(),

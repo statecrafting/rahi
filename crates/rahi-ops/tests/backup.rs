@@ -343,3 +343,31 @@ async fn queued_backup_expires_without_logging_in_or_triggering() {
             .is_ok()
     );
 }
+
+/// 037 D-11: a public URL on the default port gives the passkey an
+/// `RP_ORIGIN` that names the port (`https://cell.example:443`), while
+/// rauthy registers its client's callback under its issuer, which does not.
+/// The login sends the registered callback, and the backup takes rauthy's
+/// half; before D-11 it sent the passkey's origin and rauthy refused it as
+/// "Invalid redirect uri".
+#[tokio::test]
+async fn a_default_port_public_url_logs_in_with_the_registered_callback() {
+    let passkey_config = rahi_types::Config::from_env(&BTreeMap::from([(
+        "RAHI_PUBLIC_URL",
+        "https://cell.example",
+    )]))
+    .unwrap();
+    let passkey = rahi_ops::rauthy_session::Passkey::generate(&passkey_config).unwrap();
+    assert_eq!(passkey.origin(), "https://cell.example:443");
+
+    let stub = common::stub(b"rauthy-snapshot-bytes", false).await;
+    let (name, bytes) = stub
+        .api_with(Some(passkey))
+        .backup()
+        .await
+        .expect("the backup admin logs in with the callback rauthy registered");
+    assert!(!name.is_empty());
+    assert_eq!(bytes, b"rauthy-snapshot-bytes");
+    let redirects = stub.log.lock().unwrap().redirects.clone();
+    assert_eq!(redirects, vec![common::STUB_CALLBACK.to_owned()]);
+}
