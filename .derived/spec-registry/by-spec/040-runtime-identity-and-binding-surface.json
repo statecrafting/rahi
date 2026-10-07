@@ -213,7 +213,7 @@
     ],
     "risk": "medium",
     "sectionDigests": {
-      "040-runtime-identity-and-the-binding-surface": "61378639f2745b38c9698631cdba2473721e3e722a0265aa9d619741e039b7f3",
+      "040-runtime-identity-and-the-binding-surface": "9148cd9862971abbfb7cd4e418651efd202326977818294aa2f9b8d12c51ece0",
       "1-purpose": "1699fa65255a6ba2ba5e8825c131e5fa230622a10d5b29e7ad4ff9dfc2efe0da",
       "2-territory": "5dbcf80404b95a3fd62e6d9e2f3d69493c07d37946422966c196000aa48fdaaf",
       "3-1-the-document-normatively": "9e5fd46f1385e934457f14da9291162e92de374ca935c300c34aeb2127a0a30c",
@@ -243,6 +243,6 @@
     "summary": "A consumer that correlates an immutable artifact, an authority snapshot, a deployment, and a running replica needs the replica to say what it is. Today it says almost nothing: rahi version prints the crate version, the manifest hash is visible only inside a ledger export or a backup, the OTel resource carries service.name alone, the image has no labels, and the deploy manifests pin no digest. This spec makes a replica report its measured executable digest, its booted manifest hash, its declared image and application revision, and a per-boot minted instance id, each with its basis (measured, declared, minted, or absent with a reason from a closed set), on one unguarded document at /binding kept off the ingress like /metrics, on the OTel resource, and in one build-info metric whose labels are versions only. Section 3.1 fixes the document normatively: one schema name, one path for every value, one wrapper shape, and an additive evolution rule. The document is boot-bound and immutable for the life of the process, so it is never a freshness proof and never an authorization. It states what the telemetry does not observe or count. It writes nothing to the chain; deployment epochs are spec 041. This contract, ratified on 2026-10-05 (D-3), is reconciled to released Rahi 0.4.0, including named migration sets and the exact patched component identities and limits carried by spec 043.\n",
     "title": "Runtime identity: a replica states which bits it runs, which ceiling it enforces, and which instance it is, with every value's basis named, on bounded surfaces"
   },
-  "shardHash": "ecebcedffe684683f3b5727fe8f7c638b758ae697cfcd7751fd899ca0c811bb3",
+  "shardHash": "736e54d19816bd6f39f8a1bc1129c0f01d72c9d4929783f47f9297744974a169",
   "specVersion": "1.9.0"
 }
