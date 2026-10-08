@@ -6,7 +6,7 @@ kind: feature
 domain: edge
 created: "2026-09-11"
 authors: ["Bartek Kus"]
-implementation: in-progress
+implementation: complete
 risk: medium
 wave: 3
 depends_on:
@@ -70,13 +70,12 @@ summary: >
 
 # 040: Runtime identity and the binding surface
 
-> **Status (2026-10-07).** Implementation stays `in-progress`. #109 and
-> #111 carry the binding document, route, resource, metric, deployment
-> checks, `Cell::app_revision` and `rahi version --binding`; `make verify
-> SPEC=040` passes on `main` at `7123d62`. What remains is AC-6 (FR-010):
-> the image workflow change in PR #110, which needs the owner's workflow
-> exception, and the first push build after it merges, which is the only
-> run its label check executes on.
+> **Status (2026-10-08).** Implementation is `complete`. #109, #119 and
+> #120 carry the binding document, route, resource, metric, deployment
+> checks, `Cell::app_revision`, `rahi version --binding` and the image
+> labels. AC-6 (FR-010) held on the first push build after #120 merged
+> (image workflow run 37749359462 at `82ce04d`, arm64 and amd64), and
+> `make verify SPEC=040` passes on `main` at `82ce04d`.
 
 ## 1. Purpose
 
