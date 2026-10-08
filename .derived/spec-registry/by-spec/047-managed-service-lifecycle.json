@@ -66,7 +66,7 @@
       "wave": 3
     },
     "id": "047-managed-service-lifecycle",
-    "implementation": "pending",
+    "implementation": "in-progress",
     "kind": "kernel",
     "risk": "critical",
     "sectionDigests": {
@@ -96,6 +96,6 @@
     "summary": "A Cell can declare routes and migrations, but it cannot give the chassis an application worker whose lifetime is tied to serve. Applications therefore either omit durable background work or detach tasks that Rahi cannot cancel, observe, or join before the application store shuts down. This spec adds a named managed-service declaration to Cell, starts each service once after successful composition, treats an unexpected return, error, or panic as a process failure, broadcasts cancellation for every stop cause, and joins or aborts every service before draining its final denials and shutting down the store. The service bound overlaps the existing HTTP drains so the published stop grace does not grow.\n",
     "title": "Manage application background services through the cell lifecycle"
   },
-  "shardHash": "d81dfc827aadf44c43ce28153ece8323cfa6b49c442e14bab150189dc9a0de26",
+  "shardHash": "4a3d9eaf4e11e1e4719ceb1de3f2f38278219dc93b17bf739da5b307d3668b48",
   "specVersion": "1.9.0"
 }
