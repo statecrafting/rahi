@@ -18,11 +18,19 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-cli/src/cell.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-cli/src/lib.rs",
         "source": "spec-edge"
       },
       {
         "path": "crates/rahi-cli/src/serve.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/src/verbs.rs",
         "source": "spec-edge"
       },
       {
@@ -163,6 +171,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-cli/src/cell.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/cell.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-cli/src/lib.rs"
           }
         ],
@@ -184,6 +205,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/verbs.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/verbs.rs"
         }
       },
       {
@@ -399,5 +433,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "d50d7733a33409f87c81cf0daef21b00b0df4877ca25d07e8d2b2acf7b4d1f46"
+  "shardHash": "736e54d19816bd6f39f8a1bc1129c0f01d72c9d4929783f47f9297744974a169"
 }

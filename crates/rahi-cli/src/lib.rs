@@ -69,9 +69,21 @@ pub fn run_with<C: Cell>(args: &[String], env: &dyn EnvReader) -> i32 {
             print!("{}", usage());
             return 0;
         }
-        Verb::Version => {
+        Verb::Version { binding: false } => {
             println!("rahi {}", env!("CARGO_PKG_VERSION"));
             return 0;
+        }
+        Verb::Version { binding: true } => {
+            return match serve::version_binding::<C>(env) {
+                Ok(text) => {
+                    println!("{text}");
+                    0
+                }
+                Err(err) => {
+                    eprintln!("error: {err}");
+                    err.exit_code()
+                }
+            };
         }
         _ => {}
     }
@@ -337,7 +349,7 @@ async fn stop_after(booted: &Booted, result: Result<()>) -> Result<()> {
 async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
     match verb {
         Verb::Help
-        | Verb::Version
+        | Verb::Version { .. }
         | Verb::Supervise
         | Verb::FirstBoot { .. }
         | Verb::UpgradeCache { .. } => Ok(()),
