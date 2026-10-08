@@ -213,7 +213,7 @@
     ],
     "risk": "medium",
     "sectionDigests": {
-      "040-runtime-identity-and-the-binding-surface": "9148cd9862971abbfb7cd4e418651efd202326977818294aa2f9b8d12c51ece0",
+      "040-runtime-identity-and-the-binding-surface": "3ae3ffac7854d7c9be43bbcd99425531ea7299d853d8eb6bac551a65248e991a",
       "1-purpose": "1699fa65255a6ba2ba5e8825c131e5fa230622a10d5b29e7ad4ff9dfc2efe0da",
       "2-territory": "5dbcf80404b95a3fd62e6d9e2f3d69493c07d37946422966c196000aa48fdaaf",
       "3-1-the-document-normatively": "9e5fd46f1385e934457f14da9291162e92de374ca935c300c34aeb2127a0a30c",
@@ -221,7 +221,7 @@
       "4-functional-requirements": "15e29116754042803c65e069cfa0b521028a11d7ccfb6902649efbbc5c0cb6d9",
       "5-acceptance-criteria": "471d16fb66fbd3e09955aff5948f7baa392a56b15d1aff29ffdeaae3c269645d",
       "6-out-of-scope": "436804320b14f447df4481133d764fecfe54da7c5a1eb7ab12974cc19f61abeb",
-      "7-resolved-decisions": "3f849411b27b31733a24793ce24f6a5bb4b7f6569304ed51417e0451ff053ac9",
+      "7-resolved-decisions": "50240aae743f3303e04cb6ea407f16a17fb12001ba927741648b9b1c8782854f",
       "owner-choices-at-ratification-resolved-by-d-3": "e6e4f6604e92f5168c1fea4ceef74d5929d129a8afd7108ca4441a6914917b08",
       "verification": "3dfa13beac6fd70bf1d0c8f885c23b4beda70986691029c28d2f1bd7cf90b5d9"
     },
@@ -243,6 +243,6 @@
     "summary": "A consumer that correlates an immutable artifact, an authority snapshot, a deployment, and a running replica needs the replica to say what it is. Today it says almost nothing: rahi version prints the crate version, the manifest hash is visible only inside a ledger export or a backup, the OTel resource carries service.name alone, the image has no labels, and the deploy manifests pin no digest. This spec makes a replica report its measured executable digest, its booted manifest hash, its declared image and application revision, and a per-boot minted instance id, each with its basis (measured, declared, minted, or absent with a reason from a closed set), on one unguarded document at /binding kept off the ingress like /metrics, on the OTel resource, and in one build-info metric whose labels are versions only. Section 3.1 fixes the document normatively: one schema name, one path for every value, one wrapper shape, and an additive evolution rule. The document is boot-bound and immutable for the life of the process, so it is never a freshness proof and never an authorization. It states what the telemetry does not observe or count. It writes nothing to the chain; deployment epochs are spec 041. This contract, ratified on 2026-10-05 (D-3), is reconciled to released Rahi 0.4.0, including named migration sets and the exact patched component identities and limits carried by spec 043.\n",
     "title": "Runtime identity: a replica states which bits it runs, which ceiling it enforces, and which instance it is, with every value's basis named, on bounded surfaces"
   },
-  "shardHash": "736e54d19816bd6f39f8a1bc1129c0f01d72c9d4929783f47f9297744974a169",
+  "shardHash": "fdeb6a2e48eff3400ab74e83b79c8ea467ff3919baca5710029ebe0914bf35ad",
   "specVersion": "1.9.0"
 }

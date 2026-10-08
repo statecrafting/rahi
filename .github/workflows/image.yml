@@ -79,6 +79,18 @@ jobs:
           echo "rauthy --version: $got"
           [ "$got" = "$want" ] || { echo "expected '$want'" >&2; exit 1; }
 
+      # Spec 040 B-12, FR-010: what the builder knew, as OCI labels. The
+      # version is the tag's on a release and the workspace's otherwise.
+      - name: The build's identity
+        id: identity
+        run: |
+          set -euo pipefail
+          case "${GITHUB_REF}" in
+            refs/tags/v*) version="${GITHUB_REF#refs/tags/v}" ;;
+            *) version="$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)" ;;
+          esac
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
       - name: Build the image
         uses: docker/build-push-action@v7
         with:
@@ -87,8 +99,25 @@ jobs:
           platforms: linux/${{ matrix.arch }}
           load: true
           tags: rahi:smoke
+          build-args: |
+            RAHI_BUILD_REVISION=${{ github.sha }}
+            RAHI_BUILD_VERSION=${{ steps.identity.outputs.version }}
+            RAHI_BUILD_SOURCE=${{ github.server_url }}/${{ github.repository }}
           cache-from: type=gha,scope=${{ matrix.arch }}
           cache-to: type=gha,scope=${{ matrix.arch }},mode=max
+
+      # Spec 040 AC-6: the three labels equal the workflow's inputs. They
+      # are declared builder metadata, not provenance or attestation.
+      - name: The image's OCI labels
+        run: |
+          set -euo pipefail
+          label() { docker inspect rahi:smoke --format "{{ index .Config.Labels \"org.opencontainers.image.$1\" }}"; }
+          [ "$(label revision)" = "${{ github.sha }}" ] || { echo "revision is '$(label revision)'" >&2; exit 1; }
+          [ "$(label source)" = "${{ github.server_url }}/${{ github.repository }}" ] || { echo "source is '$(label source)'" >&2; exit 1; }
+          [ "$(label version)" = "${{ steps.identity.outputs.version }}" ] || { echo "version is '$(label version)'" >&2; exit 1; }
+          rauthy="$(docker inspect rahi:smoke --format '{{ range .Config.Env }}{{ println . }}{{ end }}' | sed -n 's/^RAHI_RAUTHY_IMAGE=//p')"
+          want="$(grep -m1 '^ARG RAUTHY_IMAGE=' docker/Dockerfile | cut -d= -f2-)"
+          [ "$rauthy" = "$want" ] || { echo "RAHI_RAUTHY_IMAGE is '$rauthy', the recipe copies '$want'" >&2; exit 1; }
 
       # B-6 and FR-005: a temp volume, /readyz within the budget, discovery
       # fetched through the proxy, the issuer asserted to be the public URL,
@@ -134,6 +163,10 @@ jobs:
           file: docker/Dockerfile
           platforms: linux/${{ matrix.arch }}
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          build-args: |
+            RAHI_BUILD_REVISION=${{ github.sha }}
+            RAHI_BUILD_VERSION=${{ steps.identity.outputs.version }}
+            RAHI_BUILD_SOURCE=${{ github.server_url }}/${{ github.repository }}
           cache-from: type=gha,scope=${{ matrix.arch }}
 
       - name: Push the runtime by digest
@@ -163,6 +196,9 @@ jobs:
             RAHI_PACKAGE=hello-cell
             RAHI_BIN=hello-cell
             RAHI_STATIC_SRC=apps/hello-cell/web
+            RAHI_BUILD_REVISION=${{ github.sha }}
+            RAHI_BUILD_VERSION=${{ steps.identity.outputs.version }}
+            RAHI_BUILD_SOURCE=${{ github.server_url }}/${{ github.repository }}
           cache-from: type=gha,scope=${{ matrix.arch }}
 
       # Spec 039 AC-2, AC-3 and D-15. Everything above this point smokes a
