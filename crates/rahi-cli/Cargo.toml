@@ -29,6 +29,7 @@ tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "sig
 
 [dev-dependencies]
 tempfile = { workspace = true }
+rusqlite = { workspace = true }
 ring = { workspace = true }
 base64 = { workspace = true }
 serde_json = { workspace = true }

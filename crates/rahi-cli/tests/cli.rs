@@ -1451,6 +1451,27 @@ fn every_verb_locks_before_it_reads_opens_or_spawns() {
     drop((cell, layout));
 }
 
+/// What a pre-043 node's clean stop leaves (043 D-P12): SQLite closed, so
+/// no `-wal` and no `-shm` beside the database. hiqlite's SQLite writer is
+/// a detached thread that acknowledges its shutdown before its connection
+/// closes, so a verb's process can exit while that last close is still
+/// running and leave the `-wal` behind (043 D-34). The fixture finishes the
+/// close the old node would have finished: the WAL is checkpointed into the
+/// database and the two files are removed, as in the library tests (D-19
+/// (c)).
+fn clean_stop(db: &Path) {
+    let conn = rusqlite::Connection::open(db).unwrap();
+    conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(()))
+        .unwrap();
+    drop(conn);
+    for suffix in ["-wal", "-shm"] {
+        let path = PathBuf::from(format!("{}{suffix}", db.display()));
+        if path.exists() {
+            std::fs::remove_file(path).unwrap();
+        }
+    }
+}
+
 /// Spec 043 AC-3's shape through the binary: a volume in the pre-043 layout
 /// is refused by `serve` before anything opens; `upgrade-cache` with a
 /// verifying archive reaches `floored`; `serve` then answers ready and
@@ -1468,6 +1489,7 @@ fn a_pre043_volume_is_refused_then_transitioned_then_served_to_done() {
     std::fs::rename(data.join("app-store"), data.join("hiqlite")).unwrap();
     std::fs::write(data.join("rauthy").join("rauthy.env"), b"OLD=1\n").unwrap();
     let db = data.join("hiqlite").join("state_machine").join("db");
+    clean_stop(&db.join("hiqlite.db"));
     let leftovers: Vec<String> = std::fs::read_dir(&db)
         .unwrap()
         .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
@@ -1475,7 +1497,7 @@ fn a_pre043_volume_is_refused_then_transitioned_then_served_to_done() {
         .collect();
     assert!(
         leftovers.is_empty(),
-        "a stopped process closed SQLite: {leftovers:?}"
+        "the fixture is a pre-043 clean stop: {leftovers:?}"
     );
 
     let refused = volume.run(&["serve"]);
