@@ -12,10 +12,11 @@
 
 mod stop_fixture;
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use rahi_ops::stop::{Outcome, Reason};
-use stop_fixture::{Node, OpenStream, READY_BUDGET, slow_in_flight};
+use rahi_edge::READYZ_PATH;
+use rahi_ops::stop::{Outcome, READINESS_WINDOW, Reason};
+use stop_fixture::{Node, OpenStream, READY_BUDGET, http_get, slow_in_flight};
 
 fixture_entry!();
 
@@ -46,6 +47,7 @@ fn a_graceful_stop_is_confirmed_recorded_whole_and_read_by_the_next_boot() {
     assert_eq!(record.exit_code, Some(0));
     let phases = stop_fixture::phases(&record);
     for phase in [
+        "readiness_window",
         "stream_drain",
         "connection_drain",
         "denial_drain",
@@ -54,9 +56,34 @@ fn a_graceful_stop_is_confirmed_recorded_whole_and_read_by_the_next_boot() {
         assert!(phases.contains_key(phase), "{phase} in {record:?}");
     }
 
+    // B-9's readiness window: from SIGTERM `/readyz` answers 503
+    // `stopping`, and the listener keeps answering it for at least W even
+    // with nothing to drain.
     let mut next = node.spawn("serve");
     node.wait_ready(&mut next, READY_BUDGET);
     next.sigterm();
+    let signalled = Instant::now();
+    let mut stopping = Vec::new();
+    while signalled.elapsed() < STOP_BUDGET {
+        match http_get(&node.listen, READYZ_PATH) {
+            Ok((status, body)) if status == 503 && body.contains("\"stopping\"") => {
+                stopping.push(Instant::now());
+            }
+            Ok((status, body)) => {
+                assert!(stopping.is_empty(), "{status} after `stopping`: {body}");
+            }
+            Err(_) => break,
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let (Some(first), Some(last)) = (stopping.first(), stopping.last()) else {
+        panic!("`/readyz` never answered `stopping` after SIGTERM");
+    };
+    assert!(
+        last.duration_since(*first) + Duration::from_millis(200) >= READINESS_WINDOW,
+        "`stopping` was answered for {:?}, below the window {READINESS_WINDOW:?}",
+        last.duration_since(*first)
+    );
     let again = next.wait(STOP_BUDGET);
     assert_eq!(again.code, Some(0), "{}", again.logs());
     assert!(

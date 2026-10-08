@@ -1,7 +1,7 @@
 //! Spec 043 B-9: the stop budget, composed (FR-007) and measured (AC-7).
 //!
 //! The composition check is a test over the configured values and the
-//! shipped manifests: `SERVE_GRACE >= S + C + D + H`, and the pod's
+//! shipped manifests: `SERVE_GRACE >= max(W, S) + C + D + H`, and the pod's
 //! `terminationGracePeriodSeconds` and the documented `docker stop -t` are
 //! each `>= SERVE_GRACE + R`. It reads the values the code runs with, not
 //! copies of them.
@@ -69,6 +69,10 @@ fn fr007_the_configured_bounds_and_the_shipped_graces_compose() {
         "the stop module's names for the bounds are the bounds"
     );
     assert_eq!(h, Duration::from_secs(15), "hiqlite's own SHUTDOWN_WAIT");
+    // The readiness window runs beside the stream drain: the first phase is
+    // the longer of the two, which with the defaults is S.
+    assert_eq!(stop::first_phase(s), s, "W is within S with the defaults");
+    let s = stop::first_phase(s);
     stop::check_composition([s, c, d, h], serve_grace, r, stop::CONTAINER_GRACE).unwrap();
     assert_eq!(
         serve_grace,

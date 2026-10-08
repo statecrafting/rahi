@@ -6,7 +6,7 @@ kind: feature
 domain: ops
 created: "2026-09-23"
 authors: ["Bartek Kus"]
-implementation: in-progress
+implementation: complete
 risk: critical
 wave: 3
 depends_on:
@@ -318,7 +318,7 @@ Terms.
   | step | intent recorded | action | completion recorded | recovery if interrupted after the intent |
   |---|---|---|---|---|
   | T0 locks | none | B-4a's gate: take `<data>/cell.lock` and `<data>/transition.lock` exclusively, non-blocking, and hold both until exit; only then read the state file and inspect the layout | none | a held lock: refuse, change nothing |
-  | T1 guard | `begin{id}`, `id` 128 random bits | (a) refuse if `upgrade-cache.json` names another unfinished transition. (b) Write `rahi-upgrade-cache <id>` to `<legacy>/state_machine/.rahi-guard-<id>`, fsync it, and `link(2)` it to `<legacy>/state_machine/lock`, then fsync the directory and unlink the temporary: the marker appears whole or not at all. `EEXIST` refuses: a pre-043 node is live or stopped uncleanly (the message says which from (c)'s probe); the existing marker is never modified. (c) **Quiescence**, after the marker is durable: `<legacy>/logs/lock.hql` and `<legacy>/logs_cache/lock.hql` are not held (a non-blocking probe that opens existing files only and creates none; an absent file reads as not held), and `<legacy>/state_machine/db/` holds no `-wal` and no `-shm` file (a pre-043 node closes SQLite after it releases both WAL locks and removes its marker, D-P12; SQLite removes them only when the last connection closes, the writer's and every connection of hiqlite's read pool, `state_machine.rs:117,317-330`, so their absence covers the whole pool). (d) The marker still has the identity `link` gave it and its content is this `id` (a pre-043 start truncates the marker path in place with `File::create`, and a pre-043 clean stop unlinks it, D-P11). A failure of (c) or (d) refuses and **leaves the marker where it is**: while it carries this `id` a pre-043 start panics on it, and a marker a pre-043 node has truncated is that node's own. (e) Install the supervisor fence (B-5); the old rendered file goes to a fresh evidence name (step `t1e`). (f) Read `instant` from the wall clock | `guarded{instant, marker identity}` | a marker with this `id`: resume at (c) (the content proves provenance; `link` never publishes a partial file); no marker: redo (b); a marker with other content, including empty: refuse as in (b), and name the state as interrupted by a pre-043 node |
+  | T1 guard | `begin{id}`, `id` 128 random bits | (a) refuse if `upgrade-cache.json` names another unfinished transition. (b) Write `rahi-upgrade-cache <id>` to `<legacy>/state_machine/.rahi-guard-<id>`, fsync it, and `link(2)` it to `<legacy>/state_machine/lock`, then fsync the directory and unlink the temporary: the marker appears whole or not at all. `EEXIST` refuses: a pre-043 node is live or stopped uncleanly (the message says which from (c)'s probe); the existing marker is never modified. (c) **Quiescence**, after the marker is durable: `<legacy>/logs/lock.hql` and `<legacy>/logs_cache/lock.hql` are not held (a non-blocking probe that opens existing files only and creates none; an absent file reads as not held), and `<legacy>/state_machine/db/` holds no `-wal` and no `-shm` file (a pre-043 node closes SQLite after it releases both WAL locks and removes its marker, D-P12; SQLite removes them only when the last connection closes, the writer's and every connection of hiqlite's read pool, `state_machine.rs:117,317-330`, so their absence covers the whole pool), except that a `-wal` with no `-shm` is accepted when no process holds a POSIX lock on `hiqlite.db` (a non-mutating `F_GETLK` probe for a write lock over the whole file; every WAL-mode connection holds such a lock from its first read until its close has finished, so a `-wal` alone with no lock held is a last close an exit cut short, which the new store's first open recovers; D-36). (d) The marker still has the identity `link` gave it and its content is this `id` (a pre-043 start truncates the marker path in place with `File::create`, and a pre-043 clean stop unlinks it, D-P11). A failure of (c) or (d) refuses and **leaves the marker where it is**: while it carries this `id` a pre-043 start panics on it, and a marker a pre-043 node has truncated is that node's own. (e) Install the supervisor fence (B-5); the old rendered file goes to a fresh evidence name (step `t1e`). (f) Read `instant` from the wall clock | `guarded{instant, marker identity}` | a marker with this `id`: resume at (c) (the content proves provenance; `link` never publishes a partial file); no marker: redo (b); a marker with other content, including empty: refuse as in (b), and name the state as interrupted by a pre-043 node |
   | T1a verify | `verifying` | verify the archive with 030's read-only verification | `verified{digest}` | rerun; nothing on disk changed |
   | T2 relocate | `relocating{target, plan}` with `target` = the aside directory `<data>/upgrade-cache/aside/<id>/` and `plan` = every entry to move with its source path, destination path and identity, listed once | refuse, before recording the intent, when: the app store exists and is not an empty directory (`first-boot`'s layout creates it empty); `target` exists; any planned entry, or `<legacy>`, `<legacy>/state_machine`, `<data>` or `<data>/upgrade-cache`, is a symbolic link; any planned entry's `st_dev` differs from `<legacy>`'s; or `<legacy>`, `<data>/upgrade-cache` and `<data>` are not all on one device. Then move every child of `<legacy>` except `state_machine`, and every child of `<legacy>/state_machine` except `lock`, into the app store at the same relative path, except `logs_cache` and `state_machine_cache`, which go into `target`. The deterministic plan order is `logs` first, the other durable entries in path order, then `state_machine_cache` before `logs_cache` (hiqlite F-130). Moving `logs` first matters because D-P11 establishes that a pre-043 start opens and may truncate the WAL log before it checks the state-machine guard; after the move such a start can create only a new debris occurrence at the source. Fsync both parents after each rename. Debris that appears under `<legacy>` after the plan was recorded is moved once every planned entry has moved, each entry to a fresh evidence name recorded, with its identity, in an intent before its rename | `relocated`; `<legacy>` is now the fence | per planned entry, by identity and never by existence: the planned identity at the source means not moved (move it); at the destination means moved; a source path holding another identity beside a moved destination is debris (to a fresh evidence name, never deleted, never merged); a destination holding an identity the plan does not name, or a planned identity found at neither path, refuses and changes nothing (the volume was modified outside this verb). Per evidence move, the same rule on its recorded intent: its identity at the evidence name means moved, at the source means move it, at neither, or another identity at the evidence name, refuses |
   | T3 floor | `flooring` | open the app store in-process with 0.15, which binds its configured loopback addresses since hiqlite has no start mode without listeners (the verb holds no hiqlite lock of its own; `transition.lock` keeps every attaching verb away, B-4a); in one `txn` upsert the transition row, raise the floor (B-6b) to `before = floor(instant)` in whole seconds, and, under B-6 (ii) only, raise the prune horizon; shut the store down and require `Ok` | `floored` | an empty `<app store>/state_machine/lock` is this step's own unclean stop, because only a process holding `cell.lock` and `transition.lock` while the state is `flooring` can have opened the app store (B-4a): the verb requires the app store's `hiqlite-owner.lock` to be free, moves the marker to a fresh evidence name (step `t3`) and reruns T3; a marker with any other content is refused as foreign (a defensive branch: hiqlite writes only empty markers and T2 never relocates the guard, so only AC-5's synthetic case reaches it) |
@@ -697,13 +697,19 @@ Terms.
 
 ### Stopping
 
-- **B-9 (the budget, composed and measured).** The stop phases and their
+- **B-9 (the budget, composed and measured).** A stop, on SIGTERM or on
+  B-7's terminal failure, begins with the **readiness window** W
+  (`READINESS_WINDOW`, 2 s): from its first moment `/readyz` answers 503
+  `{"status":"stopping"}` whatever its dependencies say, and the listener
+  keeps accepting for at least W, so a client watching readiness sees the
+  cell leave before its port closes. W runs beside the stream drain; the
+  first phase lasts `max(W, S)` (D-36). The stop phases and their
   configured bounds are: stream drain S (026 B-7, default 10 s),
   connection drain C (`DRAIN_BUDGET`, 10 s), denial drain D (035, 5 s),
   store shutdown H (hiqlite's caller-side wait, 15 s, after which
   `Client::shutdown` returns `Error::Timeout`), and Rauthy's stop R
   (`SHUTDOWN_TERM_GRACE`, 10 s). The **composition check** is a test over
-  the configured values: `SERVE_GRACE >= S + C + D + H`, and the pod's
+  the configured values: `SERVE_GRACE >= max(W, S) + C + D + H`, and the pod's
   `terminationGracePeriodSeconds` and the documented `docker stop -t` are
   each `>= SERVE_GRACE + R`. With today's defaults the sums are 40 s and
   50 s, so both graces rise to those values (from 15 s and 30 s). The
@@ -768,7 +774,8 @@ Terms.
   revocation row, and a test asserts the tables only grow across a
   simulated day of revocations, a restart and a backward clock step.
 - **FR-007.** The composition check of B-9 is a unit test over the
-  constants and the shipped manifests.
+  constants and the shipped manifests, with the first phase taken as
+  `max(W, S)`.
 - **FR-008.** B-4a's gate is one function in `rahi-ops`, called by every
   entry point in its table before anything else touches the volume, and it
   takes its locks before it reads the state file or inspects the layout; a
@@ -867,7 +874,8 @@ storage or identity. A required leg that did not execute fails its job.
   the aside directory. (g) With the
   pinned Rauthy build, a crash injected between Rauthy's two cache renames
   is run and its outcome recorded; the criterion passes only on a build
-  that meets B-4b.
+  that meets B-4b. *(g) is waived by the owner on 2026-10-08 (D-36); the
+  gap is a documented limitation.*
 - **AC-5 (exclusion and concurrency).** With a live v0.2.0 cell the verb
   refuses at T1 and changes nothing but the guard's temporary, naming a
   live node; with a v0.2.0 cell stopped uncleanly (its marker left), it
@@ -925,7 +933,9 @@ storage or identity. A required leg that did not execute fails its job.
   phase's duration, the outcome, time to exit, and time to both owner
   locks' release. **Every run of this series must be confirmed**; a series
   with any unconfirmed run, or one whose measured maximum times 1.5 exceeds
-  the configured grace, fails this criterion.
+  the configured grace, fails this criterion. A graceful stop records the
+  `readiness_window` phase, and `/readyz` asked after SIGTERM answers 503
+  `stopping` for at least W before the listener closes.
 - **AC-7a (stop, unconfirmed and unrecorded).** Separately, each exits `3`
   with its reason recorded: the store's shutdown made to overrun
   (`store_timeout`); a phase made to overrun (`stream_drain_overrun` or
@@ -935,14 +945,20 @@ storage or identity. A required leg that did not execute fails its job.
   SIGTERM** with cause `witnessed_kill`; the same state without the
   harness's witness classifies with cause `unknown`. Every next boot
   succeeds with no manual step. These runs never count toward AC-7.
-- **AC-8 (terminal).** FR-005's fault makes `serve` fail `/readyz`, record
-  `storage_terminal`, and exit `3` within B-9's bound; denials queued at the
+  *Waived by the owner on 2026-10-08 (D-36): "every next boot succeeds
+  with no manual step" for a kill or `store_timeout` before the app
+  store's shutdown returned (D-20 (c)); the rest of AC-7a stands.*
+- **AC-8 (terminal).** FR-005's fault makes `serve` fail `/readyz`
+  (answering 503 `stopping` for at least B-9's W before its listener
+  closes), record `storage_terminal`, and exit `3` within B-9's bound; denials queued at the
   fault are ledgered or counted abandoned; a boot after the fault is
   cleared is ready. A Rauthy held unready does not end the process.
 - **AC-9 (live).** The live workflow (037) passes with
   `RAHI_REQUIRE_RAUTHY=1` against the image built from this change on both
   architectures it builds, runs AC-3, AC-3a, AC-4 (d) and (g) and AC-5's
-  v0.2.0 legs, and reports zero skipped required legs. A v0.1.0 leg runs
+  v0.2.0 legs, and reports zero skipped required legs. *AC-4 (g)'s leg is
+  waived by the owner on 2026-10-08 (D-36) and is not a required leg; the
+  v0.1.0 transition legs are not required since D-32.* A v0.1.0 leg runs
   when a v0.1.0 image is still published; if it is not, the leg is
   reported unexecuted with the reason, and v0.1.0's exclusion stays
   source-established.
@@ -1664,6 +1680,70 @@ None remains open: D-7 to D-13 record the owner's approval and choices.
   says "holds no `-wal` and no `-shm` file", so accepting one changes
   requirement text and is the owner's. Not changed: no requirement text;
   every refusal T1 (c) made, it still makes; AC-5's legs count as before.
+
+- **D-36 (2026-10-08, owner decisions on the gaps that held this spec
+  in progress, on B-9's readiness window, and on D-35 (c)).** The owner
+  wrote, verbatim: "Spec 043's remaining gaps: waive these; uarantee a 503
+  window on /readyz before shutdown. That adds a phase to spec 043's stop
+  sequence (B-9) I believe that fine; ... New decision for you (043 D-35
+  (c), not built): thats ok, proceed with this too". (a) **Waived.** Each
+  is a known limitation in the changelog and `deploy/README.md`, with its
+  mitigation, and none is tested as closed: AC-4 (g) and AC-9's (g) leg
+  (no seam in the pinned Rauthy build injects a crash between its two
+  cache renames; hiqlite F-130); AC-7a's "every next boot succeeds with no
+  manual step" where a kill or a `store_timeout` lands before the app
+  store's shutdown returned (D-20 (c); hiqlite refuses its marker without
+  `auto-heal`, which section 6 keeps out of scope); the backward-clock
+  window of the floor (D-12 (a), RHI-007; AC-6 (b)'s retained-row and
+  watermark cases are tested and unchanged); and a stale Rauthy restore's
+  revived sessions and refresh credentials (B-6c, D-12 (b), RHI-008). The
+  criteria's text is kept and annotated as waived; no other criterion is
+  relaxed. (b) **B-9's readiness window.** Before, `/readyz` and the
+  terminal watch read the same store health and the listener closed when
+  the watch (1 s poll) saw the fault, so the 503 could last milliseconds
+  (D-34 (b)). Now the stop sets a flag first (`rahi_edge::probes::Stopping`,
+  an `AppState` extension the composer registers), `/readyz` answers 503
+  `{"status":"stopping"}` while it is set, and the graceful-shutdown future
+  joins the stream drain with a sleep of W, so the listener accepts for at
+  least W on every stop. W = 2 s: long enough for a probe or a load
+  balancer polling at 1 s, and below S's default, so the first phase is
+  `max(W, S)` = 10 s and `SERVE_GRACE` (40 s) and the container grace
+  (50 s) are unchanged. The stop record gains the phase
+  `readiness_window`, the time from the stop's start to the listener's
+  release. `tests/terminal.rs` returns to a 50 ms readiness ask and
+  asserts `stopping` was answered for at least W; `tests/stop_outcome.rs`
+  asserts the same after SIGTERM. Rejected: a fixed sleep after the
+  listener closes (the 503 must be answered, not refused), and a W added
+  to the sums (it would raise both graces for no requirement). (c) **D-35
+  (c), built.** T1 (c) accepts a `-wal` with no `-shm` when `F_GETLK` on
+  `hiqlite.db` reports no lock: SQLite's unix VFS takes a shared POSIX
+  lock on the database file at a connection's first read and, in WAL mode,
+  keeps it until the connection closes (`pager_unlock` ends only the read
+  transaction in WAL mode); its close takes an exclusive lock before it
+  checkpoints and deletes the `-shm` and then the `-wal`. So an open,
+  opening or closing connection is always seen, and a `-wal` alone with no
+  lock is a close an exit cut short, or a start killed before it mapped
+  its `-shm`; the new store's first open recovers the WAL. A `-shm`, or a
+  held lock (named by its pid), still refuses as before. The probe opens
+  the database read-only and locks, writes and creates nothing, so 000's
+  `store-separation` and B-4's "changes nothing" hold; it needs
+  `rustix`'s `process` feature. `F_GETLK` reports only another process's
+  locks, so `tests/upgrade.rs` holds the database in a helper process (the
+  test binary re-run as `sqlite_holder`) and covers both outcomes: a
+  `-wal` left by a process that exited without closing is accepted and the
+  transition reaches `floored`; the same shape with the connection still
+  open refuses naming its pid, and is accepted once it closes; a `-shm`
+  beside the `-wal` refuses and `--abort` leaves both. Not changed: AC-5's
+  exclusion and every refusal T1 (c) made for a `-shm`.
+
+- **D-37 (2026-10-08, build decision; the flip).** With D-36's waivers,
+  every criterion holds: `make verify SPEC=043` passed its ten commands on
+  this change (macOS arm64), and the live workflow passed twice on the
+  branch (runs 37758926628 and 37758930554: the upgrade legs against the
+  real v0.2.0 image and the whole suite against the pinned Rauthy), with
+  AC-4 (g) and the v0.1.0 transition legs reported as not required (D-32,
+  D-36). The spec is `implementation: complete`; 047's dependency on it
+  is met.
 
 ### 7.1 Proposals (2026-09-23)
 
