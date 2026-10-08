@@ -348,9 +348,9 @@ dependencies = [
 
 [[package]]
 name = "attest-ledger-types"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16b5cb6e21a7f0342be61b4cf42bfdad81360f2efdf4eeec4dc33c32734691d7"
+checksum = "977ebd000e8230ed0a13063848a45ab50815134d69440bd821db8ab192ea66e6"
 dependencies = [
  "serde",
  "serde_json",
