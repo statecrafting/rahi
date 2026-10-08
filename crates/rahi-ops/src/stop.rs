@@ -57,6 +57,34 @@ pub const STORE_SHUTDOWN: Duration = rahi_store::SHUTDOWN_WAIT;
 /// Rauthy's stop R: SIGTERM to SIGKILL on a propagated SIGTERM.
 pub const RAUTHY_STOP: Duration = Duration::from_secs(10);
 
+/// Managed-service join J (spec 047 B-6): measured from the cancellation
+/// broadcast, which is the stop's first instant, so it runs beside the
+/// readiness window, the stream drain and the connection drain rather than
+/// after them. [`check_service_overlap`] holds it within those phases, which
+/// is why it adds nothing to [`SERVE_GRACE`].
+pub const SERVICE_JOIN: Duration = Duration::from_secs(10);
+
+/// Spec 047 B-6, D-3: the service join bound fits inside the HTTP phases it
+/// overlaps, `max(W, S) + C`, so the serve grace needs no fifth allowance.
+///
+/// # Errors
+///
+/// [`Error::Config`] when the bound outlasts the phases it overlaps.
+pub fn check_service_overlap(
+    service_join: Duration,
+    first_phase: Duration,
+    connection_drain: Duration,
+) -> Result<()> {
+    let overlapped = first_phase.saturating_add(connection_drain);
+    if service_join > overlapped {
+        return Err(Error::Config(format!(
+            "the service join bound {service_join:?} outlasts max(W, S) + C = {overlapped:?}, \
+             the HTTP phases it runs beside (spec 047 B-6)"
+        )));
+    }
+    Ok(())
+}
+
 /// How long `serve` has to finish its own stop under `supervise`:
 /// `max(W, S) + C + D + H` (B-9's composition, forty seconds with the
 /// defaults, where W is below S).
@@ -138,6 +166,31 @@ pub enum Reason {
         /// The error.
         error: String,
     },
+    /// A managed service returned `Ok(())` before the stop (spec 047 B-7).
+    ServiceExited {
+        /// The service's name.
+        service: String,
+    },
+    /// A managed service returned an error (spec 047 B-7, B-8).
+    ServiceError {
+        /// The service's name.
+        service: String,
+        /// What it returned.
+        error: String,
+    },
+    /// A managed service panicked (spec 047 B-7, B-8).
+    ServicePanicked {
+        /// The service's name.
+        service: String,
+        /// The panic's message.
+        panic: String,
+    },
+    /// A managed service was still running at the join bound and was
+    /// aborted (spec 047 B-6).
+    ServiceJoinTimeout {
+        /// The service's name.
+        service: String,
+    },
 }
 
 impl Reason {
@@ -155,6 +208,10 @@ impl Reason {
             Self::RauthyKilled => "rauthy_killed".to_owned(),
             Self::StorageTerminal => "storage_terminal".to_owned(),
             Self::ServeError { .. } => "serve_error".to_owned(),
+            Self::ServiceExited { service } => format!("service_unexpected_exit{{{service}}}"),
+            Self::ServiceError { service, .. } => format!("service_error{{{service}}}"),
+            Self::ServicePanicked { service, .. } => format!("service_panic{{{service}}}"),
+            Self::ServiceJoinTimeout { service } => format!("service_join_timeout{{{service}}}"),
         }
     }
 }
@@ -630,6 +687,18 @@ mod tests {
         .unwrap();
         assert_eq!(SERVE_GRACE, Duration::from_secs(40));
         assert_eq!(CONTAINER_GRACE, Duration::from_secs(50));
+        check_service_overlap(SERVICE_JOIN, first_phase(STREAM_DRAIN), CONNECTION_DRAIN).unwrap();
+    }
+
+    #[test]
+    fn a_service_bound_beyond_the_http_phases_is_refused() {
+        let err = check_service_overlap(
+            Duration::from_secs(21),
+            first_phase(STREAM_DRAIN),
+            CONNECTION_DRAIN,
+        )
+        .unwrap_err();
+        assert!(err.message().contains("max(W, S) + C"), "{err}");
     }
 
     #[test]
@@ -737,6 +806,26 @@ mod tests {
         assert_eq!(
             observed.render(),
             "unconfirmed: denials_abandoned{3}, rauthy_nonzero{137}, store_timeout"
+        );
+        let mut services = Observed::default();
+        services.reason(Reason::ServiceExited {
+            service: "a".to_owned(),
+        });
+        services.reason(Reason::ServiceError {
+            service: "b".to_owned(),
+            error: "e".to_owned(),
+        });
+        services.reason(Reason::ServicePanicked {
+            service: "c".to_owned(),
+            panic: "p".to_owned(),
+        });
+        services.reason(Reason::ServiceJoinTimeout {
+            service: "d".to_owned(),
+        });
+        assert_eq!(
+            services.render(),
+            "unconfirmed: service_unexpected_exit{a}, service_error{b}, service_panic{c}, \
+             service_join_timeout{d}"
         );
         assert_eq!(observed.exit_code(), 3);
     }

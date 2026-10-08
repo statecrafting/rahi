@@ -19,6 +19,7 @@
 
 pub mod cell;
 pub mod serve;
+pub mod service;
 pub mod verbs;
 
 use std::collections::BTreeMap;
@@ -33,6 +34,7 @@ pub use rahi_ops::preflight_app::{
     AppCheck, AppEnv, AppOutcome, AppVerdict, PreflightContext, StoreView,
 };
 pub use serve::{Booted, RauthyMode};
+pub use service::{ManagedService, ServiceShutdown};
 pub use verbs::{VERBS, Verb, usage};
 
 /// The process environment, as the config reader sees it.

@@ -12,6 +12,9 @@ use rahi_edge::{AppState, Route};
 use rahi_idp::BearerRoutes;
 use rahi_ops::preflight_app::AppCheck;
 use rahi_store::{Migration, MigrationSet};
+use rahi_types::Result;
+
+use crate::service::{ManagedService, ServiceShutdown};
 
 /// The prefix a cell's operator routes are mounted under (spec 024 B-2).
 pub const OPERATOR_PREFIX: &str = "/operator";
@@ -76,6 +79,21 @@ pub trait Cell: Send + Sync + 'static {
     /// cell whose preflight prints exactly what it printed before (B-9).
     fn preflight_checks() -> Vec<AppCheck> {
         Vec::new()
+    }
+
+    /// The cell's managed background services (spec 047 B-1), declared once
+    /// per `serve` composition, after the store, ledger, kernel,
+    /// observability and `state` exist, and run for the life of `serve`.
+    /// Application collectors register on `Metrics::registry()` here (D-5).
+    /// Empty by default, which is a cell whose lifecycle is exactly what it
+    /// was before managed services existed (B-9). No other verb calls it.
+    ///
+    /// # Errors
+    ///
+    /// Any error fails the composition before a request is accepted (B-2).
+    fn services(state: AppState, shutdown: ServiceShutdown) -> Result<Vec<ManagedService>> {
+        let _ = (state, shutdown);
+        Ok(Vec::new())
     }
 
     /// The application's source revision, reported as `build.revision` in

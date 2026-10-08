@@ -1,19 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '047-managed-service-lifecycle' file unit 'crates/rahi-cli/src/service.rs' does not exist",
-        "path": "crates/rahi-cli/src/service.rs"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '047-managed-service-lifecycle' file unit 'crates/rahi-cli/tests/services.rs' does not exist",
-        "path": "crates/rahi-cli/tests/services.rs"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "030-operational-verbs",
@@ -34,6 +19,18 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-cli/src/service.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/tests/service_fixture/mod.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/tests/services.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-cli/tests/stop_budget.rs",
         "source": "spec-edge"
       },
@@ -44,7 +41,11 @@
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/service.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -53,7 +54,24 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-cli/tests/service_fixture/mod.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/service_fixture/mod.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/tests/services.rs"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -131,5 +149,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "4a3d9eaf4e11e1e4719ceb1de3f2f38278219dc93b17bf739da5b307d3668b48"
+  "shardHash": "57f2823c1e3aedc928836b114ef4c9c9ca63d54d33268bd15dce4ee9ec32455a"
 }

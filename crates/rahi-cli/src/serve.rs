@@ -30,6 +30,7 @@ use rahi_store::Store;
 use rahi_types::{Config, EnvReader, Error, Result};
 
 use crate::cell::{Cell, OPERATOR_PREFIX};
+use crate::service::{self, Cancel, Ended};
 
 /// The address `serve` listens on.
 pub const ENV_LISTEN_ADDR: &str = "RAHI_LISTEN_ADDR";
@@ -369,6 +370,9 @@ pub struct Composed {
     /// The flag the stop sets first, which turns `/readyz` to 503
     /// `stopping` for spec 043 B-9's readiness window.
     pub stopping: rahi_edge::probes::Stopping,
+    /// The state every route received, which `serve` hands to the cell's
+    /// managed services (spec 047 B-3).
+    pub state: AppState,
 }
 
 /// Compose the cell's router over a booted cell (B-2, without the listener).
@@ -625,6 +629,7 @@ pub async fn compose_parts<C: Cell>(
         router,
         kernel,
         stopping,
+        state,
     })
 }
 
@@ -944,6 +949,7 @@ pub async fn serve_observed<C: Cell>(
         router,
         kernel,
         stopping,
+        state,
     } = match compose_parts::<C>(&booted, env, &streams).await {
         Ok(composed) => composed,
         Err(err) => {
@@ -955,6 +961,24 @@ pub async fn serve_observed<C: Cell>(
     };
     println!("{}", boot_line(&kernel));
     export_boot_gauges(&booted, gate).await;
+    // Spec 047 B-2, B-3: the cell declares its services once, with the
+    // state its routes got and the one-way half of the stop broadcast. A
+    // declaration that fails, or names a service empty or twice, ends the
+    // composition before anything listens.
+    let cancel = std::sync::Arc::new(Cancel::new());
+    let declared = C::services(state, cancel.subscribe())
+        .and_then(|declared| service::validate(&declared).map(|()| declared));
+    let declared = match declared {
+        Ok(declared) => declared,
+        Err(err) => {
+            eprintln!("serve: the cell's managed services cannot be declared: {err}");
+            drain_denials(&kernel, denial_bound, &mut observed).await;
+            shut_store(&booted, &mut observed).await;
+            let mut served = failed(err);
+            served.observed.absorb(observed);
+            return served;
+        }
+    };
     let listener = match tokio::net::TcpListener::bind(addr).await {
         Ok(listener) => listener,
         Err(err) => {
@@ -980,6 +1004,10 @@ pub async fn serve_observed<C: Cell>(
         booted.manifest.app.name.as_str(),
         booted.config.public_url.origin()
     );
+    // Spec 047 B-3: every service is spawned once, after the listener bound
+    // and before the server accepts its first request.
+    let mut services = service::Running::start(declared, &cancel);
+    let service_stop = std::sync::Arc::new(tokio::sync::Notify::new());
     let completion =
         completes.then(|| tokio::spawn(complete_after_ready(booted.config.clone(), bound)));
     // Spec 043 B-7: the first terminal store failure ends the process through
@@ -989,13 +1017,19 @@ pub async fn serve_observed<C: Cell>(
     let watch = tokio::spawn(watch_terminal(booted.store.handle(), terminal_tx));
     let stream_drain =
         std::sync::Arc::new(std::sync::Mutex::new(None::<(Duration, usize, Duration)>));
+    // When the streams' drain ended: where C starts (spec 047 keeps C off the
+    // service join, which can outlast the server).
+    let streams_drained = std::sync::Arc::new(std::sync::OnceLock::<Instant>::new());
     let stopped = std::sync::Arc::new(tokio::sync::Notify::new());
     let terminal = std::sync::Arc::new(std::sync::Mutex::new(None::<Error>));
     let until = {
         let stopped = stopped.clone();
         let streams = streams.clone();
         let stream_drain = stream_drain.clone();
+        let streams_drained = streams_drained.clone();
         let terminal = terminal.clone();
+        let cancel = cancel.clone();
+        let service_stop = service_stop.clone();
         async move {
             tokio::select! {
                 () = stop => {}
@@ -1006,7 +1040,11 @@ pub async fn serve_observed<C: Cell>(
                             Some(err);
                     }
                 }
+                () = service_stop.notified() => {}
             }
+            // Spec 047 B-4, B-5: one broadcast, at the first stop cause, so
+            // the services wind down beside the drains below.
+            cancel.broadcast();
             // Spec 043 B-9: readiness says the cell is leaving, and the
             // listener keeps accepting for the readiness window, beside the
             // stream drain: the first phase lasts the longer of the two.
@@ -1029,31 +1067,92 @@ pub async fn serve_observed<C: Cell>(
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner) =
                 Some((took, remaining, started.elapsed()));
+            let _ = streams_drained.set(Instant::now());
             stopped.notify_one();
         }
     };
-    let mut server = Box::pin(
+    let mut server = Some(Box::pin(
         axum::serve(listener, router)
             .with_graceful_shutdown(until)
             .into_future(),
-    );
-    let mut connections_from = None;
-    let served = tokio::select! {
-        result = &mut server => {
-            result.map_err(|err| Error::Io(format!("the listener failed: {err}")))
-        }
-        () = async {
-            stopped.notified().await;
-            tokio::time::sleep(DRAIN_BUDGET).await;
-        } => {
-            eprintln!("serve: connections still open after the drain budget; closing them");
-            observed.reason(Reason::ConnectionDrainOverrun);
-            connections_from = Some(DRAIN_BUDGET);
-            Ok(())
-        }
+    ));
+    let budget = async {
+        stopped.notified().await;
+        tokio::time::sleep(DRAIN_BUDGET).await;
     };
-    let drained_at = Instant::now();
-    drop(server);
+    tokio::pin!(budget);
+    let mut connections_from = None;
+    let mut served = None;
+    let mut connection_took = None;
+    let mut service_failed = false;
+    let mut services_joined_at = None;
+    // Spec 047 B-5, B-6: request handling and the services end
+    // independently. The loop ends when both have: the server has returned
+    // (or been cut at the drain budget) and every service is joined, the
+    // stragglers aborted at the bound measured from the broadcast.
+    while served.is_none() || !services.is_empty() {
+        let deadline = async {
+            cancel.broadcast_done().await;
+            match cancel.deadline() {
+                Some(at) => tokio::time::sleep_until(at.into()).await,
+                None => std::future::pending().await,
+            }
+        };
+        tokio::select! {
+            result = async {
+                match server.as_mut() {
+                    Some(server) => server.await,
+                    None => std::future::pending().await,
+                }
+            }, if served.is_none() => {
+                let result = result.map_err(|err| Error::Io(format!("the listener failed: {err}")));
+                if result.is_err() {
+                    cancel.broadcast();
+                }
+                served = Some(result);
+                connection_took = streams_drained.get().map(Instant::elapsed);
+                server = None;
+            }
+            () = &mut budget, if served.is_none() => {
+                eprintln!("serve: connections still open after the drain budget; closing them");
+                observed.reason(Reason::ConnectionDrainOverrun);
+                connections_from = Some(DRAIN_BUDGET);
+                served = Some(Ok(()));
+                server = None;
+            }
+            joined = services.join_next(), if !services.is_empty() => {
+                if services.is_empty() {
+                    services_joined_at = Some(Instant::now());
+                }
+                if let Some((name, ended)) = joined {
+                    match ended {
+                        Ended::Completed | Ended::Aborted => {}
+                        Ended::Failed(reason) => {
+                            eprintln!("serve: managed service {name:?} failed: {}", reason.name());
+                            observed.reason(reason);
+                            // B-4, B-7: the first failure stops the process;
+                            // a service that fails during the stop is named
+                            // and changes nothing else.
+                            if cancel.broadcast() {
+                                service_failed = true;
+                                service_stop.notify_one();
+                            }
+                        }
+                    }
+                }
+            }
+            () = deadline, if !services.is_empty() && !services.timed_out() => {
+                for name in services.abort_remaining() {
+                    eprintln!(
+                        "serve: managed service {name:?} still running {:?} after the stop; aborting it",
+                        rahi_ops::stop::SERVICE_JOIN
+                    );
+                    observed.reason(Reason::ServiceJoinTimeout { service: name });
+                }
+            }
+        }
+    }
+    let served = served.unwrap_or(Ok(()));
     watch.abort();
     if let Some(task) = completion {
         task.abort();
@@ -1074,8 +1173,19 @@ pub async fn serve_observed<C: Cell>(
             observed.reason(Reason::StreamDrainOverrun { open: remaining });
         }
         // C runs from the streams' drain to the server's exit.
-        let connection_took = connections_from.unwrap_or_else(|| drained_at.elapsed());
+        let connection_took = connections_from
+            .or(connection_took)
+            .unwrap_or(Duration::ZERO);
         observed.phase("connection_drain", connection_took, DRAIN_BUDGET);
+    }
+    // Spec 047 B-10: the join, timed from the broadcast, before the denials
+    // drain (D-4).
+    if services.started() {
+        let took = match (cancel.at(), services_joined_at) {
+            (Some(at), Some(joined)) => joined.saturating_duration_since(at),
+            _ => Duration::ZERO,
+        };
+        observed.phase("service_join", took, rahi_ops::stop::SERVICE_JOIN);
     }
     // Spec 035 B-1: the requests are done; the records of their denials get
     // their bound before the store they are written through goes away.
@@ -1086,6 +1196,17 @@ pub async fn serve_observed<C: Cell>(
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .take();
     let result = match (served, fault) {
+        // B-4: a service failure was the first cause; a later listener
+        // failure is an observation and does not replace it.
+        (Err(err), fault) if service_failed => {
+            if fault.is_some() {
+                observed.reason(Reason::StorageTerminal);
+            }
+            observed.reason(Reason::ServeError {
+                error: err.to_string(),
+            });
+            Ok(())
+        }
         (Err(err), _) => Err(err),
         (Ok(()), Some(err)) => {
             observed.reason(Reason::StorageTerminal);
