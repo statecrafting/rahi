@@ -72,6 +72,33 @@ impl std::fmt::Debug for ReadinessCheck {
     }
 }
 
+/// The stop's readiness window (spec 043 B-9), registered by the composer as
+/// an [`AppState`] extension: once the stop begins, `/readyz` answers 503
+/// `stopping` whatever its dependencies say, while the listener still
+/// accepts, so a client watching readiness sees the cell leave before its
+/// port closes.
+#[derive(Clone, Debug, Default)]
+pub struct Stopping(std::sync::Arc<std::sync::atomic::AtomicBool>);
+
+impl Stopping {
+    /// A flag not yet set.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The stop has begun: every later `/readyz` answers 503 `stopping`.
+    pub fn begin(&self) {
+        self.0.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// Whether the stop has begun.
+    #[must_use]
+    pub fn is_stopping(&self) -> bool {
+        self.0.load(std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
 /// The liveness path.
 pub const HEALTHZ_PATH: &str = "/healthz";
 /// The readiness path.
@@ -98,6 +125,17 @@ async fn healthz() -> Response {
 /// already failed closed (constitution XI); what readiness re-asks is whether
 /// the verified chain is still reachable.
 async fn readyz(State(state): State<AppState>) -> Response {
+    // Spec 043 B-9: a cell that has begun its stop is leaving, and says so
+    // before anything else is asked.
+    if state
+        .extension::<Stopping>()
+        .is_some_and(|stopping| stopping.is_stopping())
+    {
+        return json_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            &json!({ "status": "stopping" }),
+        );
+    }
     if let Err(err) = state.store().health().await {
         // Spec 043 D-15: while hiqlite is still applying the log it held at
         // start it answers `Recovering`; the cell reports that as its own

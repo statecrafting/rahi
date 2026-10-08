@@ -579,6 +579,30 @@ fn lock_held(path: &Path) -> Result<bool> {
     }
 }
 
+/// T1 (c)'s SQLite probe: the process holding a POSIX (`fcntl`) lock on
+/// `database`, the lock every SQLite connection in WAL mode keeps on the
+/// database file from its first read until it closes. It asks with
+/// `F_GETLK` for a write lock over the whole file: nothing is locked,
+/// written or created, and an absent file reads as not held.
+fn sqlite_lock_holder(database: &Path) -> Result<Option<i32>> {
+    use rustix::process::{Flock, FlockType, fcntl_getlk};
+    let file = match std::fs::OpenOptions::new().read(true).open(database) {
+        Ok(file) => file,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(err) => {
+            return Err(Error::Io(format!(
+                "{} cannot be probed: {err}",
+                database.display()
+            )));
+        }
+    };
+    let held = fcntl_getlk(&file, &Flock::from(FlockType::WriteLock))
+        .map_err(|err| Error::Io(format!("{} cannot be probed: {err}", database.display())))?;
+    Ok(held
+        .filter(|lock| lock.typ != FlockType::Unlocked)
+        .map(|lock| rustix::process::Pid::as_raw(lock.pid)))
+}
+
 /// Which pre-043 state a foreign marker means, from (c)'s probe.
 fn pre043_state(legacy: &Path) -> Result<&'static str> {
     for log in ["logs", "logs_cache"] {
@@ -682,23 +706,41 @@ fn t1(config: &Config, record: &mut Record, faults: &dyn Faults) -> Result<()> {
         .map(|name| name.to_string_lossy().into_owned())
         .filter(|name| name.ends_with("-wal") || name.ends_with("-shm"))
         .collect();
+    let database = state_machine.join("db").join("hiqlite.db");
+    let shm = open.iter().any(|name| name.ends_with("-shm"));
     if !open.is_empty() {
-        // D-35: SQLite's last close deletes the `-shm` before the `-wal`, so
-        // a `-wal` alone is a close cut short after its checkpoint; the
-        // refusal stands either way, and the message names which it is.
-        let state = if open.iter().any(|name| name.ends_with("-shm")) {
-            "a pre-043 node still has its database open, or stopped uncleanly"
-        } else {
-            "a pre-043 process stopped uncleanly: its exit cut its last SQLite close short \
-             (v0.2.0's ledger verbs can), or it was killed while opening the database"
-        };
-        return Err(Error::Conflict(format!(
-            "{} holds {}: {state}; the guard stays in place. Run `rahi upgrade-cache --abort`, \
-             start the old cell and stop it cleanly (its stop closes the database), then run \
-             the verb again",
+        // D-36: SQLite's last close deletes the `-shm` before the `-wal`, so
+        // a `-wal` alone is a close cut short after its checkpoint, or a
+        // start killed before it mapped its `-shm`. Every SQLite connection
+        // in WAL mode holds a POSIX lock on the database file from its first
+        // read until it closes, so a `-wal` alone with no such lock held has
+        // no connection behind it, and the next open recovers it. A `-shm`,
+        // or a held lock, still refuses.
+        let held = sqlite_lock_holder(&database)?;
+        if shm || held.is_some() {
+            let state = match held {
+                Some(pid) => format!(
+                    "process {pid} holds a SQLite lock on {}: a pre-043 node still has                      its database open",
+                    database.display()
+                ),
+                None => {
+                    "a pre-043 node still has its database open, or stopped uncleanly".to_owned()
+                }
+            };
+            return Err(Error::Conflict(format!(
+                "{} holds {}: {state}; the guard stays in place. Run `rahi upgrade-cache \
+                 --abort`, start the old cell and stop it cleanly (its stop closes the \
+                 database), then run the verb again",
+                state_machine.join("db").display(),
+                open.join(" and ")
+            )));
+        }
+        eprintln!(
+            "upgrade-cache: {} holds {} with no SQLite lock held on the database: a last \
+             close cut short; the next open recovers it (spec 043 D-36)",
             state_machine.join("db").display(),
             open.join(" and ")
-        )));
+        );
     }
 
     // (d) The marker is still the one `link` gave.

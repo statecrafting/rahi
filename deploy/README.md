@@ -253,7 +253,10 @@ which a hiqlite 0.14 process can destroy.
 3. Run the new image's verb on the volume:
    `rahi upgrade-cache --backup <archive>`. It verifies the archive,
    places a guard where the old store's lock marker lives, checks that no
-   old node is live or stopped uncleanly, fences the old supervisor's
+   old node is live or stopped uncleanly (a `-wal` with no `-shm` beside
+   the old database is accepted only when no process holds a SQLite lock
+   on it: a last close an exit cut short, which the next open recovers;
+   spec 043 D-36), fences the old supervisor's
    configuration path, moves the store into `<data>/app-store` (its two
    0.14 caches go aside, under `<data>/upgrade-cache/`), raises the
    revocation floor, and stops at `floored`. Every step is recorded in
@@ -404,13 +407,18 @@ in a `403` promises. As built:
 
 ## Stopping: the budget and the recorded outcome
 
-Spec 043 B-9 and B-10. A stop runs five bounded phases, in order: the
-stream drain S (`RAHI_STREAM_DRAIN_TIMEOUT_SECS`, default 10 s), the
+Spec 043 B-9 and B-10. A stop first turns `/readyz` to 503
+`{"status":"stopping"}` and keeps the listener accepting for the readiness
+window W (2 s), so a load balancer or probe watching readiness sees the
+cell leave before its port closes; W runs beside the stream drain, so it
+adds nothing while it is below S. This holds for a SIGTERM and for a
+terminal store failure alike. The stop then runs five bounded phases, in
+order: the stream drain S (`RAHI_STREAM_DRAIN_TIMEOUT_SECS`, default 10 s), the
 connection drain C (10 s), the denial drain D
 (`RAHI_DENIAL_DRAIN_TIMEOUT_SECS`, default 5 s), the store's shutdown H
 (hiqlite's own 15 s wait, never shortened) and, under `supervise`, Rauthy's
 stop R (10 s, then SIGKILL). `supervise` gives `serve` `SERVE_GRACE` =
-S + C + D + H = 40 s, and the orchestrator must give the container
+max(W, S) + C + D + H = 40 s, and the orchestrator must give the container
 SERVE_GRACE + R = **50 s**: the StatefulSet sets
 `terminationGracePeriodSeconds: 50`, and a hand-run container is stopped
 with `docker stop -t 50`. Raising a drain above its default raises both
