@@ -37,7 +37,7 @@ attest-ledger-types = "0.1"
 attest-ledger-core = "0.1"
 canonical-keysort-json = "0.1"
 ed25519-dalek = "3"
-base64 = "0.22"
+base64 = "0.23"
 # The segment archive (spec 014): a dyn-compatible async trait needs boxed
 # futures, and the object store is the S3 client hiqlite already carries,
 # reached through a parsed endpoint.
@@ -58,12 +58,12 @@ action-gate-core = { version = "=0.2.0", features = ["checks-common"] }
 serde_bytes = "0.11"
 
 # The edge (spec 020): axum is the one listener, tower-http serves the static
-# slot, and the CSRF token draws its bytes from the operating system. axum and
-# tower-http are already in the tree under hiqlite, and the versions here are
-# the ones already locked, so the edge adds no second copy of the HTTP stack.
+# slot, and the CSRF token draws its bytes from the operating system. axum is
+# already in the tree under hiqlite at the version locked here. tower-http is
+# a minor ahead of the copy reqwest carries; only its `fs` feature is built.
 axum = { version = "0.8" }
 tower = { version = "0.5" }
-tower-http = { version = "0.6", default-features = false, features = ["fs"] }
+tower-http = { version = "0.7", default-features = false, features = ["fs"] }
 getrandom = "0.4"
 
 # Identity (specs 021 and 022): rauthy is reached over loopback only, so the
@@ -89,10 +89,10 @@ ring = "0.17"
 prometheus = { version = "0.14", default-features = false }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["registry", "std"] }
-tracing-opentelemetry = { version = "0.33", default-features = false }
-opentelemetry = "0.32"
-opentelemetry_sdk = { version = "0.32", default-features = false, features = ["trace", "rt-tokio"] }
-opentelemetry-otlp = { version = "0.32", default-features = false, features = ["grpc-tonic", "trace"] }
+tracing-opentelemetry = { version = "0.34", default-features = false }
+opentelemetry = "0.33"
+opentelemetry_sdk = { version = "0.33", default-features = false, features = ["trace", "rt-tokio"] }
+opentelemetry-otlp = { version = "0.33", default-features = false, features = ["grpc-tonic", "trace"] }
 
 # The verbs (spec 030): one backup is one tar stream sealed with age to the
 # deployment's backup recipient, so the stores never travel without the key
