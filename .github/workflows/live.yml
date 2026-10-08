@@ -57,7 +57,7 @@ jobs:
     name: the whole suite, against the pinned rauthy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       # rustup installs the toolchain pinned in rust-toolchain.toml (spec 010).
       - run: rustup show
       - uses: Swatinem/rust-cache@v2
@@ -204,7 +204,7 @@ jobs:
     name: the upgrade legs, v0.2.0 against this change
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       - uses: docker/setup-buildx-action@v4
       - name: Build hello-cell from this change
         uses: docker/build-push-action@v7
