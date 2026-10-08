@@ -45,7 +45,7 @@ refuse() {
 # which is the property that lets a hook call it at all.
 code=0
 out=$("$sc" --repo "$root" check 2>&1) || code=$?
-# The exact 0.28.0 pin uses the Statecraft exit family.
+# The exact 0.29.0 pin uses the Statecraft exit family.
 case "$code" in
   0) ;;
   1) echo "$out"

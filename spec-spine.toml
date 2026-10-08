@@ -9,7 +9,7 @@
 # and CI derive the version here (D-21). Any other binary,
 # older or newer, must refuse the corpus instead of judging shards it did
 # not write. A pin mismatch is exit 2 under the current exit family.
-required_version = "=0.28.0"
+required_version = "=0.29.0"
 
 [manifest]
 # Cargo `[package.metadata.spec-spine].spec` names each crate's founding spec.

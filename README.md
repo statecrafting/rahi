@@ -105,7 +105,7 @@ binary in the same container and never forked.
 ## Governance
 
 The corpus is governed by [spec-spine](https://github.com/statecrafting/spec-spine)
-0.28.0. `make gate` runs the gate, read-only throughout (freshness, lint,
+0.29.0. `make gate` runs the gate, read-only throughout (freshness, lint,
 ownership coverage, coupling, DAG check); `make refresh` is the writing half,
 for a session that can commit the regenerated shards; `make ci` adds the
 cargo gates once a workspace exists. Derived artifacts under `.derived/` are committed
