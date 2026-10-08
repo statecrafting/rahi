@@ -79,7 +79,7 @@
       "contentHash": "db2adc9daa741b04b6ab1e75bcc1eeacfec078f1e4a0134d299103f1c9304b81"
     },
     ".githooks/pre-commit": {
-      "contentHash": "907bf25e2d2915ffb08049cc8f6150084a7e4eee9f620fdfd73936511f90aa33"
+      "contentHash": "f807ee071f835d6a25bbf6fa4f9e7761e2984e10962982b6e23be728deeec5f6"
     },
     ".github/consumer-cell/Cargo.registry.toml.in": {
       "contentHash": "e3d51f9bb3d19865fa3552f07b9cf8b1e285616fb9c099c1dcd79b1246909f02"
@@ -127,10 +127,10 @@
       "contentHash": "267962ad307e5707f2a025ce1fa40b80d52cd0cf3f8c8bdb25d03a6459366a1a"
     },
     "AGENTS.md": {
-      "contentHash": "b8be3b3b36397f4d093a2a3575103494da453f4d400e525a85da2d82decf4c23"
+      "contentHash": "9f55100ca35cbdd293ab0f1abebd2158117a44b4046f98bc63c055ac1a217628"
     },
     "CLAUDE.md": {
-      "contentHash": "41d5620394e0e9ad7fa3867d699d04a57b17f2fad53306c15119d22051f0f033"
+      "contentHash": "853ec30a549aef783214cc9029519455d67e398fc69bcc4859a5ae2913f31897"
     },
     "CODEOWNERS": {
       "contentHash": "be9b4a2ce0c6f28cfbcce6e455c79929f85229a3751d3b1634d4230d41aae3b0"
@@ -253,7 +253,7 @@
       "contentHash": "84d4793c8a1a811ab25ce7d45b9a66d92364015883bd4a72c8741b9898ab1d05"
     },
     "spec-spine.toml": {
-      "contentHash": "8a7f00269e56b9fee9548cf74cb307d2e9b249bfc18454b14aa12a5f545a7d08"
+      "contentHash": "238e0d84847c7569d61cc7a7b1c9d1ed25f7642ee51aec4c4d33e97e6502605f"
     },
     "standards/spec/constitution.md": {
       "contentHash": "4d61a25ddc4a913cc7a12da8b3ec0d8adb34e96794ec334c814981d0564fde0a"

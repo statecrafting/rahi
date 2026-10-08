@@ -17,7 +17,7 @@ design, every ordinary spec is `approved` and `implementation: pending`, and
 spec ordinals are the build order. Code arrives one spec per session under
 `crates/`, `apps/`, `docker/`, and `deploy/`.
 
-Governance is `spec-spine` **0.28.0** on your `PATH` (CI pins the same
+Governance is `spec-spine` **0.29.0** on your `PATH` (CI pins the same
 version, read out of `spec-spine.toml`). All governed reads of `.derived/` go
 through its CLI.
 
@@ -72,7 +72,7 @@ to derive its plan; anything added here is picked up on the next prime.
 `spec-spine` subcommands.
 
 **Freshness:** `spec-spine check` reads both committed trees without
-writing and reports each separately. Under the pinned 0.28.0 exit family,
+writing and reports each separately. Under the pinned 0.29.0 exit family,
 `0` means pass, `1` means a finding (including stale artifacts or validation
 violations), `2` means a refused read, `3` means an invocation error, and
 `4` means an operational error.
