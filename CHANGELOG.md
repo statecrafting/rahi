@@ -12,6 +12,32 @@ change the consumer contract and a patch bump may not.
 
 ## Unreleased
 
+- **A stop holds `/readyz` at 503 for a readiness window before the
+  listener closes (spec 043 B-9, D-36).** On SIGTERM and on a terminal
+  store failure, `/readyz` answers 503 `{"status":"stopping"}` from the
+  first moment of the stop and the listener keeps accepting for at least
+  `READINESS_WINDOW` (2 s), alongside the stream drain. The probe body's
+  `status` gains the value `stopping`; the stop record gains the phase
+  `readiness_window`. The graces are unchanged (40 s and 50 s).
+- **The verb accepts a `-wal` left by a cut-short close (spec 043 D-36).**
+  At T1, a `-wal` with no `-shm` beside the legacy database, and no
+  process holding a SQLite lock on it (an `F_GETLK` probe that locks,
+  writes and creates nothing), is a last close an exit cut short: the
+  verb proceeds and the next open recovers the WAL. A `-shm`, or a held
+  lock, still refuses, now naming the holding process.
+- **Known limitations, waived by the owner for spec 043 (D-36).** These
+  remain and are not tested as closed: a crash between Rauthy's two cache
+  renames can leave a 0.14 cache snapshot its next start restores
+  (AC-4 (g), hiqlite F-130; do not interrupt the first start after the
+  verb); a SIGKILL or a `store_timeout` before the app store's shutdown
+  returns leaves hiqlite's unclean-stop marker, and the next start refuses
+  it until an operator clears it (AC-7a's "every next boot succeeds with
+  no manual step", D-20 (c)); a wall clock stepped backwards across the
+  transition can admit a token whose revocation lived only in the old
+  cache (RHI-007, D-12 (a)); and a stale Rauthy restore revives sessions,
+  refresh credentials and other state removed after its archive
+  (RHI-008, D-12 (b)). `deploy/README.md` gives each one's mitigation.
+
 - **A refused v0.2.0 start no longer strands the cache transition (spec
   043 D-33).** A v0.2.0 node started on a volume the verb had guarded but
   not yet relocated could leave the legacy `logs/meta.hql` absent or cut

@@ -366,6 +366,9 @@ pub struct Composed {
     pub router: Router,
     /// The kernel every route of the router adjudicates through.
     pub kernel: Kernel,
+    /// The flag the stop sets first, which turns `/readyz` to 503
+    /// `stopping` for spec 043 B-9's readiness window.
+    pub stopping: rahi_edge::probes::Stopping,
 }
 
 /// Compose the cell's router over a booted cell (B-2, without the listener).
@@ -451,6 +454,8 @@ pub async fn compose_parts<C: Cell>(
         booted.config.clone(),
     )
     .with_extension(streams.clone());
+    let stopping = rahi_edge::probes::Stopping::new();
+    state = state.with_extension(stopping.clone());
     if RauthyMode::from_env(env)? == RauthyMode::Required {
         // Spec 043 B-8: a Rauthy that is up and unready fails readiness, on
         // every call, and never ends the process.
@@ -616,7 +621,11 @@ pub async fn compose_parts<C: Cell>(
         Some(gate) => rahi_idp::with_bearer(gate, router),
         None => router,
     };
-    Ok(Composed { router, kernel })
+    Ok(Composed {
+        router,
+        kernel,
+        stopping,
+    })
 }
 
 /// The counters that count lost denials, as the binding document names
@@ -931,7 +940,11 @@ pub async fn serve_observed<C: Cell>(
         )
     });
     let mut observed = Observed::default();
-    let Composed { router, kernel } = match compose_parts::<C>(&booted, env, &streams).await {
+    let Composed {
+        router,
+        kernel,
+        stopping,
+    } = match compose_parts::<C>(&booted, env, &streams).await {
         Ok(composed) => composed,
         Err(err) => {
             shut_store(&booted, &mut observed).await;
@@ -974,7 +987,8 @@ pub async fn serve_observed<C: Cell>(
     // is what turns it into a stop.
     let (terminal_tx, terminal_rx) = tokio::sync::oneshot::channel::<Error>();
     let watch = tokio::spawn(watch_terminal(booted.store.handle(), terminal_tx));
-    let stream_drain = std::sync::Arc::new(std::sync::Mutex::new(None::<(Duration, usize)>));
+    let stream_drain =
+        std::sync::Arc::new(std::sync::Mutex::new(None::<(Duration, usize, Duration)>));
     let stopped = std::sync::Arc::new(tokio::sync::Notify::new());
     let terminal = std::sync::Arc::new(std::sync::Mutex::new(None::<Error>));
     let until = {
@@ -993,10 +1007,19 @@ pub async fn serve_observed<C: Cell>(
                     }
                 }
             }
+            // Spec 043 B-9: readiness says the cell is leaving, and the
+            // listener keeps accepting for the readiness window, beside the
+            // stream drain: the first phase lasts the longer of the two.
+            stopping.begin();
+            let window = tokio::time::sleep(rahi_ops::stop::READINESS_WINDOW);
             // Spec 026 B-7: every open stream hears the shutdown and has the
             // drain timeout to close before the listener stops.
             let started = Instant::now();
-            let remaining = streams.drain().await;
+            let drain = async {
+                let remaining = streams.drain().await;
+                (started.elapsed(), remaining)
+            };
+            let ((took, remaining), ()) = tokio::join!(drain, window);
             if remaining > 0 {
                 eprintln!(
                     "serve: {remaining} stream(s) still open after the drain timeout; closing them"
@@ -1005,7 +1028,7 @@ pub async fn serve_observed<C: Cell>(
             *stream_drain
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner) =
-                Some((started.elapsed(), remaining));
+                Some((took, remaining, started.elapsed()));
             stopped.notify_one();
         }
     };
@@ -1040,7 +1063,12 @@ pub async fn serve_observed<C: Cell>(
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     let stream_bound =
         stream_options(env).map_or(rahi_ops::stop::STREAM_DRAIN, |o| o.drain_timeout);
-    if let Some((took, remaining)) = stream_phase {
+    if let Some((took, remaining, window)) = stream_phase {
+        observed.phase(
+            "readiness_window",
+            window,
+            rahi_ops::stop::first_phase(stream_bound),
+        );
         observed.phase("stream_drain", took, stream_bound);
         if remaining > 0 {
             observed.reason(Reason::StreamDrainOverrun { open: remaining });

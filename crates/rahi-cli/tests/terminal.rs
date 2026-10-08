@@ -15,7 +15,7 @@ use std::os::unix::fs::PermissionsExt as _;
 use std::time::{Duration, Instant};
 
 use rahi_edge::READYZ_PATH;
-use rahi_ops::stop::{Outcome, Reason};
+use rahi_ops::stop::{Outcome, READINESS_WINDOW, Reason};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -27,8 +27,9 @@ fixture_entry!();
 /// fault being noticed, plus the terminal watch's poll.
 const TERMINAL_BOUND: Duration = Duration::from_secs(45);
 
-/// How long the readiness watcher waits between two asks.
-const READINESS_ASK: Duration = Duration::from_millis(2);
+/// How long the readiness watcher waits between two asks: far below B-9's
+/// readiness window, so the window cannot fall between two asks.
+const READINESS_ASK: Duration = Duration::from_millis(50);
 
 #[test]
 fn a_terminal_store_failure_fails_readiness_records_storage_terminal_and_exits_three() {
@@ -36,28 +37,31 @@ fn a_terminal_store_failure_fails_readiness_records_storage_terminal_and_exits_t
     let mut serve = node.spawn("serve");
     node.wait_ready(&mut serve, READY_BUDGET);
 
-    // Readiness, watched from its own thread for the whole run. `/readyz`
-    // and the terminal watch read the same store health, so the span in
-    // which a new connection can see the 503 runs from the fault to the
-    // watch's next poll (`TERMINAL_POLL`, 1 s) and can be a few
-    // milliseconds; the listener refuses after that. The watcher asks
-    // often enough that the span is not lost between two asks (043 D-34).
+    // Readiness, watched from its own thread for the whole run. B-9's
+    // readiness window holds the listener open, answering 503 `stopping`,
+    // for at least `READINESS_WINDOW` after the stop begins, so the 503 is
+    // seen at an ordinary polling rate (043 D-36).
     let listen = node.listen.clone();
     let watching = Arc::new(AtomicBool::new(true));
     let readiness = {
         let watching = watching.clone();
         std::thread::spawn(move || {
             let mut first_failure = None;
+            let mut stopping: Vec<Instant> = Vec::new();
             while watching.load(Ordering::SeqCst) {
                 if let Ok((status, body)) = http_get(&listen, READYZ_PATH)
                     && status != 200
-                    && first_failure.is_none()
                 {
-                    first_failure = Some((status, body, Instant::now()));
+                    if body.contains("\"stopping\"") {
+                        stopping.push(Instant::now());
+                    }
+                    if first_failure.is_none() {
+                        first_failure = Some((status, body, Instant::now()));
+                    }
                 }
                 std::thread::sleep(READINESS_ASK);
             }
-            first_failure
+            (first_failure, stopping)
         })
     };
 
@@ -90,7 +94,7 @@ fn a_terminal_store_failure_fails_readiness_records_storage_terminal_and_exits_t
     };
     std::fs::set_permissions(&logs, std::fs::Permissions::from_mode(0o700)).unwrap();
     watching.store(false, Ordering::SeqCst);
-    let first_failure = readiness.join().unwrap();
+    let (first_failure, stopping) = readiness.join().unwrap();
     let stopped = serve.wait(Duration::from_secs(5));
 
     assert_eq!(exited.0.code(), Some(3), "{}", stopped.logs());
@@ -102,6 +106,14 @@ fn a_terminal_store_failure_fails_readiness_records_storage_terminal_and_exits_t
     assert!(fault.contains("NodeFailed"), "{fault}");
     let (status, body, failed_at) = first_failure.expect("/readyz failed while serve was stopping");
     assert_eq!(status, 503, "{body}");
+    let (Some(first), Some(last)) = (stopping.first(), stopping.last()) else {
+        panic!("`/readyz` never answered `stopping`\n{}", stopped.logs());
+    };
+    assert!(
+        last.duration_since(*first) + READINESS_ASK * 4 >= READINESS_WINDOW,
+        "`stopping` was answered for {:?}, below B-9's window {READINESS_WINDOW:?}",
+        last.duration_since(*first)
+    );
     assert!(
         exited.1.duration_since(failed_at) < TERMINAL_BOUND,
         "serve exited within B-9's bound of failing readiness"

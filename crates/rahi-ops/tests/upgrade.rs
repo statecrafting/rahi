@@ -399,53 +399,139 @@ async fn a_live_or_uncleanly_stopped_pre043_node_is_refused() {
         .join("db");
     std::fs::create_dir_all(&db).unwrap();
     std::fs::write(db.join("hiqlite.db-wal"), b"").unwrap();
+    std::fs::write(db.join("hiqlite.db-shm"), b"").unwrap();
     let err = run(&open_db, &NoFaults).await.unwrap_err();
     assert!(err.message().contains("-wal"), "{err}");
 }
 
-/// Spec 043 D-35: a `-wal` without its `-shm` (a last close the exit cut
-/// short) is still refused at T1 (c), and the refusal names that case and
-/// the remedy apart from an open database; `--abort` then removes the guard
-/// and leaves the database files as they were.
-#[tokio::test]
-async fn a_wal_without_its_shm_is_refused_naming_the_cut_close_and_the_remedy() {
-    let shapes: [(&[&str], &str); 2] = [
-        (&["hiqlite.db-wal"], "cut its last SQLite close short"),
-        (
-            &["hiqlite.db-shm", "hiqlite.db-wal"],
-            "still has its database open",
-        ),
-    ];
-    for (files, says) in shapes {
-        let volume = pre043().await;
-        let config = volume.config();
-        let db = config.legacy_hiqlite_dir().join("state_machine").join("db");
-        std::fs::create_dir_all(&db).unwrap();
-        for file in files {
-            std::fs::write(db.join(file), b"frames").unwrap();
-        }
-        let err = run(&volume, &NoFaults).await.unwrap_err();
-        let message = err.message();
-        assert!(message.contains(says), "{files:?}: {err}");
-        assert!(message.contains(&files.join(" and ")), "{files:?}: {err}");
-        assert!(
-            message.contains("upgrade-cache --abort"),
-            "{files:?}: {err}"
-        );
-        let record = upgrade::read(&config).unwrap().unwrap();
-        assert_eq!(record.phase, Phase::Begin, "T1 was not accepted");
-        let marker = rahi_ops::legacy_marker(&config);
-        assert!(marker.exists(), "the guard stays");
+/// The environment variable that turns [`sqlite_holder`] from a no-op into
+/// the helper process D-36's tests hold a SQLite connection in. A POSIX
+/// lock is reported by `F_GETLK` only to another process, so the holder
+/// must be one.
+const HOLD_SQLITE: &str = "RAHI_TEST_HOLD_SQLITE";
+/// With [`HOLD_SQLITE`]: exit right after the read, without closing the
+/// connection, as an exit that cuts the last close short does.
+const HOLD_EXIT_UNCLOSED: &str = "RAHI_TEST_HOLD_EXIT_UNCLOSED";
 
-        upgrade::abort(&config, &NoFaults).unwrap();
-        assert!(!marker.exists(), "--abort removes the guard");
-        for file in files {
-            assert_eq!(
-                std::fs::read(db.join(file)).unwrap(),
-                b"frames",
-                "{file} is left as it was"
-            );
-        }
+/// Not a test of its own: the helper process D-36's tests spawn. Opens the
+/// database named by [`HOLD_SQLITE`] in WAL mode, reads it (which takes the
+/// lock and creates the `-wal` and `-shm`), says `held`, and keeps the
+/// connection open until its stdin closes.
+#[test]
+fn sqlite_holder() {
+    use std::io::{Read as _, Write as _};
+    let Ok(path) = std::env::var(HOLD_SQLITE) else {
+        return;
+    };
+    let conn = rusqlite::Connection::open(&path).unwrap();
+    let _: i64 = conn
+        .query_row("SELECT count(*) FROM sqlite_master", [], |row| row.get(0))
+        .unwrap();
+    println!("held");
+    std::io::stdout().flush().unwrap();
+    if std::env::var_os(HOLD_EXIT_UNCLOSED).is_some() {
+        std::process::exit(0);
+    }
+    let mut rest = Vec::new();
+    let _ = std::io::stdin().read_to_end(&mut rest);
+    drop(conn);
+}
+
+/// Spawn [`sqlite_holder`] on `database` and wait until it holds it.
+fn hold_sqlite(database: &Path, exit_unclosed: bool) -> std::process::Child {
+    use std::io::BufRead as _;
+    let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+    command
+        .args([
+            "--exact",
+            "sqlite_holder",
+            "--nocapture",
+            "--test-threads=1",
+        ])
+        .env(HOLD_SQLITE, database)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped());
+    if exit_unclosed {
+        command.env(HOLD_EXIT_UNCLOSED, "1");
+    }
+    let mut child = command.spawn().unwrap();
+    let mut lines = std::io::BufReader::new(child.stdout.take().unwrap()).lines();
+    // libtest prints `test sqlite_holder ... ` before the test's own
+    // output, on the same line.
+    let held = lines
+        .by_ref()
+        .map_while(std::result::Result::ok)
+        .any(|line| line.ends_with("held"));
+    assert!(held, "the holder opened {}", database.display());
+    // The rest of its output is drained, so its own last lines never meet a
+    // closed pipe.
+    std::thread::spawn(move || lines.for_each(drop));
+    child
+}
+
+/// Spec 043 D-36 (the owner's decision on D-35 (c)): T1 (c) accepts a
+/// `-wal` without its `-shm` when no process holds a SQLite lock on the
+/// database, and the transition completes with the database's rows; with
+/// a `-shm` beside it, or with a lock held, it refuses naming the case and
+/// the remedy, and `--abort` leaves the database files as they were.
+#[tokio::test]
+async fn a_wal_without_its_shm_is_accepted_only_with_no_sqlite_lock_held() {
+    // A last close the exit cut short: a real connection, its process gone
+    // without closing, then the `-shm` deleted as SQLite's own close does
+    // first.
+    let volume = pre043().await;
+    let config = volume.config();
+    let db = config.legacy_hiqlite_dir().join("state_machine").join("db");
+    let database = db.join("hiqlite.db");
+    let mut gone = hold_sqlite(&database, true);
+    assert!(gone.wait().unwrap().success());
+    std::fs::remove_file(db.join("hiqlite.db-shm")).unwrap();
+    assert!(db.join("hiqlite.db-wal").exists(), "the -wal stays");
+    let outcome = run(&volume, &NoFaults).await.unwrap();
+    assert!(matches!(outcome, Outcome::Floored { .. }), "{outcome:?}");
+    let record = upgrade::read(&config).unwrap().unwrap();
+    assert_eq!(record.phase, Phase::Floored);
+
+    // The same shape with the connection still open: refused by the lock,
+    // naming the holder; accepted once it closes.
+    let volume = pre043().await;
+    let config = volume.config();
+    let db = config.legacy_hiqlite_dir().join("state_machine").join("db");
+    let database = db.join("hiqlite.db");
+    let mut open = hold_sqlite(&database, false);
+    std::fs::remove_file(db.join("hiqlite.db-shm")).unwrap();
+    let err = run(&volume, &NoFaults).await.unwrap_err();
+    let message = err.message();
+    assert!(message.contains("holds a SQLite lock"), "{err}");
+    assert!(message.contains(&open.id().to_string()), "{err}");
+    assert!(message.contains("upgrade-cache --abort"), "{err}");
+    let record = upgrade::read(&config).unwrap().unwrap();
+    assert_eq!(record.phase, Phase::Begin, "T1 was not accepted");
+    assert!(rahi_ops::legacy_marker(&config).exists(), "the guard stays");
+    drop(open.stdin.take());
+    assert!(open.wait().unwrap().success());
+    let outcome = run(&volume, &NoFaults).await.unwrap();
+    assert!(matches!(outcome, Outcome::Floored { .. }), "{outcome:?}");
+
+    // A `-shm` beside the `-wal` still refuses, and `--abort` leaves both.
+    let files = ["hiqlite.db-shm", "hiqlite.db-wal"];
+    let volume = pre043().await;
+    let config = volume.config();
+    let db = config.legacy_hiqlite_dir().join("state_machine").join("db");
+    for file in files {
+        std::fs::write(db.join(file), b"frames").unwrap();
+    }
+    let err = run(&volume, &NoFaults).await.unwrap_err();
+    let message = err.message();
+    assert!(message.contains("still has its database open"), "{err}");
+    assert!(message.contains(&files.join(" and ")), "{err}");
+    let record = upgrade::read(&config).unwrap().unwrap();
+    assert_eq!(record.phase, Phase::Begin, "T1 was not accepted");
+    let marker = rahi_ops::legacy_marker(&config);
+    upgrade::abort(&config, &NoFaults).unwrap();
+    assert!(!marker.exists(), "--abort removes the guard");
+    for file in files {
+        assert_eq!(std::fs::read(db.join(file)).unwrap(), b"frames", "{file}");
     }
 }
 
