@@ -32,6 +32,19 @@ pub const BOOT_SEQ_FILE: &str = "boot.seq";
 /// process that sent the SIGKILL, naming the boot it killed.
 pub const WITNESS_FILE: &str = "stop-witness.json";
 
+/// The readiness window W (B-9): from the moment the stop begins `/readyz`
+/// answers 503 `stopping` while the listener still accepts, for at least
+/// this long. It runs beside the stream drain, so the first phase lasts
+/// [`first_phase`] and W adds nothing to the sums while it is at most S.
+pub const READINESS_WINDOW: Duration = Duration::from_secs(2);
+
+/// The first stop phase's bound: the readiness window and the stream drain
+/// run together, so the listener closes after the longer of the two.
+#[must_use]
+pub fn first_phase(stream_drain: Duration) -> Duration {
+    stream_drain.max(READINESS_WINDOW)
+}
+
 /// Stream drain S (spec 026 B-7), its default.
 pub const STREAM_DRAIN: Duration = Duration::from_secs(10);
 /// Connection drain C (`DRAIN_BUDGET` of `serve`).
@@ -45,7 +58,8 @@ pub const STORE_SHUTDOWN: Duration = rahi_store::SHUTDOWN_WAIT;
 pub const RAUTHY_STOP: Duration = Duration::from_secs(10);
 
 /// How long `serve` has to finish its own stop under `supervise`:
-/// `S + C + D + H` (B-9's composition, forty seconds with the defaults).
+/// `max(W, S) + C + D + H` (B-9's composition, forty seconds with the
+/// defaults, where W is below S).
 pub const SERVE_GRACE: Duration = Duration::from_secs(40);
 
 /// The orchestrator's grace, `SERVE_GRACE + R`: the pod's
@@ -598,8 +612,17 @@ mod tests {
 
     #[test]
     fn the_defaults_compose() {
+        assert!(
+            READINESS_WINDOW <= STREAM_DRAIN,
+            "W adds nothing to the sums"
+        );
         check_composition(
-            [STREAM_DRAIN, CONNECTION_DRAIN, DENIAL_DRAIN, STORE_SHUTDOWN],
+            [
+                first_phase(STREAM_DRAIN),
+                CONNECTION_DRAIN,
+                DENIAL_DRAIN,
+                STORE_SHUTDOWN,
+            ],
             SERVE_GRACE,
             RAUTHY_STOP,
             CONTAINER_GRACE,
