@@ -677,15 +677,28 @@ fn t1(config: &Config, record: &mut Record, faults: &dyn Faults) -> Result<()> {
             )));
         }
     }
-    for name in crate::cell_lock::list(&state_machine.join("db"))? {
-        let name = name.to_string_lossy();
-        if name.ends_with("-wal") || name.ends_with("-shm") {
-            return Err(Error::Conflict(format!(
-                "{} holds {name}: a pre-043 node still has its database open, or stopped \
-                 uncleanly; the guard stays in place",
-                state_machine.join("db").display()
-            )));
-        }
+    let open: Vec<String> = crate::cell_lock::list(&state_machine.join("db"))?
+        .iter()
+        .map(|name| name.to_string_lossy().into_owned())
+        .filter(|name| name.ends_with("-wal") || name.ends_with("-shm"))
+        .collect();
+    if !open.is_empty() {
+        // D-35: SQLite's last close deletes the `-shm` before the `-wal`, so
+        // a `-wal` alone is a close cut short after its checkpoint; the
+        // refusal stands either way, and the message names which it is.
+        let state = if open.iter().any(|name| name.ends_with("-shm")) {
+            "a pre-043 node still has its database open, or stopped uncleanly"
+        } else {
+            "a pre-043 process stopped uncleanly: its exit cut its last SQLite close short \
+             (v0.2.0's ledger verbs can), or it was killed while opening the database"
+        };
+        return Err(Error::Conflict(format!(
+            "{} holds {}: {state}; the guard stays in place. Run `rahi upgrade-cache --abort`, \
+             start the old cell and stop it cleanly (its stop closes the database), then run \
+             the verb again",
+            state_machine.join("db").display(),
+            open.join(" and ")
+        )));
     }
 
     // (d) The marker is still the one `link` gave.
