@@ -403,6 +403,52 @@ async fn a_live_or_uncleanly_stopped_pre043_node_is_refused() {
     assert!(err.message().contains("-wal"), "{err}");
 }
 
+/// Spec 043 D-35: a `-wal` without its `-shm` (a last close the exit cut
+/// short) is still refused at T1 (c), and the refusal names that case and
+/// the remedy apart from an open database; `--abort` then removes the guard
+/// and leaves the database files as they were.
+#[tokio::test]
+async fn a_wal_without_its_shm_is_refused_naming_the_cut_close_and_the_remedy() {
+    let shapes: [(&[&str], &str); 2] = [
+        (&["hiqlite.db-wal"], "cut its last SQLite close short"),
+        (
+            &["hiqlite.db-shm", "hiqlite.db-wal"],
+            "still has its database open",
+        ),
+    ];
+    for (files, says) in shapes {
+        let volume = pre043().await;
+        let config = volume.config();
+        let db = config.legacy_hiqlite_dir().join("state_machine").join("db");
+        std::fs::create_dir_all(&db).unwrap();
+        for file in files {
+            std::fs::write(db.join(file), b"frames").unwrap();
+        }
+        let err = run(&volume, &NoFaults).await.unwrap_err();
+        let message = err.message();
+        assert!(message.contains(says), "{files:?}: {err}");
+        assert!(message.contains(&files.join(" and ")), "{files:?}: {err}");
+        assert!(
+            message.contains("upgrade-cache --abort"),
+            "{files:?}: {err}"
+        );
+        let record = upgrade::read(&config).unwrap().unwrap();
+        assert_eq!(record.phase, Phase::Begin, "T1 was not accepted");
+        let marker = rahi_ops::legacy_marker(&config);
+        assert!(marker.exists(), "the guard stays");
+
+        upgrade::abort(&config, &NoFaults).unwrap();
+        assert!(!marker.exists(), "--abort removes the guard");
+        for file in files {
+            assert_eq!(
+                std::fs::read(db.join(file)).unwrap(),
+                b"frames",
+                "{file} is left as it was"
+            );
+        }
+    }
+}
+
 /// FR-012 and AC-5: reproduce each pre-043 operation at a deterministic
 /// point after the guard is durable and before T1 accepts it.
 #[tokio::test]

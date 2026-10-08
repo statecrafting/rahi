@@ -121,6 +121,14 @@ tree() {
       -exec sha256sum {} + | sort -k2"
 }
 
+# The SQLite `-wal` and `-shm` files beside the legacy database, by name;
+# empty when there are none.
+sqlite_leftovers() {
+  docker run --rm -v "${1}:/data" --entrypoint sh "$old" -c \
+    'cd /data/hiqlite/state_machine/db 2>/dev/null && for f in *-wal *-shm; do [ -e "$f" ] && printf "%s " "$f"; done' \
+    2>/dev/null || true
+}
+
 # A v0.2.0 volume that served, with an archive taken while it ran; echoes
 # the archive's path inside the volume.
 old_volume() {
@@ -145,9 +153,16 @@ old_volume() {
   # which T1 (c) rightly refuses as a node that stopped uncleanly (spec 043
   # D-33; spec 048 fixed it for this version's verbs). The old cell started
   # and stopped cleanly once more closes the database and checkpoints it.
-  if docker run --rm -v "${volume}:/data" --entrypoint sh "$old" -c \
-      'ls /data/hiqlite/state_machine/db/*-wal /data/hiqlite/state_machine/db/*-shm' >/dev/null 2>&1; then
-    say "the $old_name ledger export left SQLite open on $volume; one clean start and stop closes it"
+  # Either file alone counts: a close the exit cut short leaves the `-wal`
+  # without the `-shm` (D-34, D-35).
+  tries=0
+  while [ -n "$(sqlite_leftovers "$volume")" ]; do
+    if [ "$tries" -ge 3 ]; then
+      say "SQLite's $(sqlite_leftovers "$volume") stayed on $volume after $tries clean starts and stops"
+      return 1
+    fi
+    tries=$((tries + 1))
+    say "the $old_name ledger export left $(sqlite_leftovers "$volume") on $volume; one clean start and stop closes it"
     start "$name" "$old" "$volume" "$p"
     if ! ready_within "$p" 180 "$name"; then
       docker logs "$name" >&2 2>&1 || true
@@ -157,7 +172,7 @@ old_volume() {
     fi
     docker stop -t 50 "$name" >/dev/null
     docker rm "$name" >/dev/null
-  fi
+  done
   echo "$archive"
 }
 

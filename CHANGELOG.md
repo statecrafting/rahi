@@ -21,6 +21,12 @@ change the consumer contract and a patch bump may not.
   records both WAL metadata files before it writes the guard and puts
   either back before T3 and at `--abort` when a refused start cut it
   short. The state file gains an optional `wal_meta` field.
+- **The verb's unclean-stop refusal names a cut-short close and its remedy
+  (spec 043 D-35).** When the legacy database holds a `-wal` with no
+  `-shm` (a v0.2.0 process whose exit cut its last SQLite close short),
+  `upgrade-cache` still refuses at T1, now saying so and naming the
+  remedy: `rahi upgrade-cache --abort`, one clean start and stop of the
+  old cell, then the verb again. No refusal was removed.
 
 ## 0.5.0, release candidate 2026-10-06
 

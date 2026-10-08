@@ -1633,6 +1633,37 @@ None remains open: D-7 to D-13 record the owner's approval and choices.
   closes would add a phase to B-9's stop, which is a requirement change
   and not this build's; it is reported. Not changed: no requirement text,
   no assertion's strength, B-9's bound.
+- **D-35 (2026-10-08, build decision and one proposal for the owner; a
+  `-wal` without its `-shm` at T1 (c)).** AC-4 (d)'s `relocated` leg
+  failed in live run 37709856423 (PR #119) and in main's scheduled runs of
+  2026-10-05 and 2026-10-06 with `.../state_machine/db holds
+  hiqlite.db-wal`; the verb lists the directory sorted, so a `-shm` would
+  have been named first, and the prepared volume held the `-wal` alone.
+  (a) **The harness.** D-33 (b)'s re-preparation tested `ls *-wal *-shm`,
+  which succeeds only when both globs match, so the `-wal`-only leftover
+  D-34 (a) explains (SQLite's last close deletes the `-shm` and then the
+  `-wal`, and the exit cut it between them) was never re-prepared, and the
+  verb rightly refused. `docker/upgrade-live.sh` now treats either file as
+  a leftover, re-prepares up to three times, and fails the preparation, not
+  the leg, if one stays. (b) **The message.** T1 (c) still refuses any
+  `-wal` or `-shm`, as B-4 requires; its message now tells the two apart
+  (a `-shm` present: a database still open or killed while open; a `-wal`
+  alone: a last close cut short, or a process killed while opening), and
+  names the remedy D-33 (b) gives in prose: `rahi upgrade-cache --abort`
+  (which removes the guard and leaves both files as they are), one clean
+  start and stop of the old cell (whose stop closes and checkpoints the
+  database, D-P12), then the verb again. (c) **Proposal, for the owner, not
+  built.** An operator whose last v0.2.0 action was a ledger verb can meet
+  this refusal after a stop that was in fact clean. A mechanism would let
+  T1 (c) accept a `-wal` with no `-shm` when no process holds a SQLite
+  lock on the database file (a non-mutating POSIX `F_GETLK` probe on the
+  lock bytes SQLite holds for the whole of a WAL-mode connection,
+  including while it opens and while it closes), and leave the file for
+  the new store's first open to read. It would keep AC-5's exclusion, since
+  an open, opening or closing connection holds that lock, but B-4's (c)
+  says "holds no `-wal` and no `-shm` file", so accepting one changes
+  requirement text and is the owner's. Not changed: no requirement text;
+  every refusal T1 (c) made, it still makes; AC-5's legs count as before.
 
 ### 7.1 Proposals (2026-09-23)
 
