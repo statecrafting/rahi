@@ -10,8 +10,52 @@ Every chassis crate carries one version, and a release is an annotated tag
 `vX.Y.Z` on a `main` commit whose `make ci` passed. Pre-1.0, a minor bump may
 change the consumer contract and a patch bump may not.
 
-## Unreleased
+## 0.6.0, release candidate 2026-10-08
 
+Every change since `v0.5.0`. All nine chassis crates move together. It is a
+minor bump under 039 B-1: the `Cell` trait gains three default methods,
+`rahi_cli::serve::Composed` gains a public field, and
+`rahi_ops::stop::Reason` gains variants. A cell that calls only
+`rahi_cli::run` and overrides none of the new methods needs no code change
+and keeps its lifecycle. Spec 043 is now `implementation: complete` with
+the owner's waivers below. The hiqlite pin is unchanged,
+`0.15.0-patched.3`.
+
+- **Managed services (spec 047).** `Cell::services(state, shutdown)`
+  declares named background services (`rahi_cli::ManagedService`) whose
+  lifetime is `serve`'s. Each is declared once after composition and
+  spawned once after the listener binds. All of them hear one
+  cancellation broadcast through the receive-only
+  `rahi_cli::ServiceShutdown` at the first stop cause. Any service still
+  running ten seconds after that broadcast is aborted, and every service
+  is joined before the denial drain and the store's shutdown. An early
+  `Ok(())`, an `Err` or a panic stops the process with exit `3` and is
+  named in the stop record: `service_unexpected_exit{name}`,
+  `service_error{name}`, `service_panic{name}` or
+  `service_join_timeout{name}`. Nothing is restarted in-process. The record
+  gains a `service_join` phase when a service ran. A name must be
+  `[A-Za-z0-9._-]`, non-empty and unique, or `serve` refuses to start. The
+  join overlaps the HTTP drains (`rahi_ops::stop::SERVICE_JOIN`), so the
+  graces stay at 40 s and 50 s. A service that blocks a runtime thread
+  cannot be aborted (047 D-13).
+- **Cell-contributed preflight checks (spec 049).**
+  `Cell::preflight_checks()` declares named `AppCheck`s that `rahi
+  preflight` runs after the chassis's own checks, against a read-only
+  store view, the manifest and the environment. Each check is bounded by
+  `CHECK_BOUND` (5 s) within `PHASE_BOUND` (30 s) and reported as
+  `app.<name>`. A failing check fails preflight with exit `1`, and no app
+  check can mask or replace a chassis check.
+- **The binding document (spec 040).** Each replica reports what it is on
+  `GET /binding`, kept off the ingress like `/metrics`, under schema
+  `rahi.binding/v0`: its measured executable digest, booted manifest hash,
+  declared image (`RAHI_ARTIFACT_IMAGE`, `RAHI_RAUTHY_IMAGE`), pod
+  (`RAHI_POD_NAME`), application revision (`Cell::app_revision()`), and a
+  per-boot instance id. Each value carries its basis: measured, declared,
+  minted, or absent with a reason. The same facts go on the OTel resource
+  and in `rahi_build_info`, whose labels are versions only. `rahi version
+  --binding` prints the document a binary can state without booting. The
+  image is labelled with the commit it built. The document is boot-bound:
+  it is never a freshness proof or an authorization.
 - **A stop holds `/readyz` at 503 for a readiness window before the
   listener closes (spec 043 B-9, D-36).** On SIGTERM and on a terminal
   store failure, `/readyz` answers 503 `{"status":"stopping"}` from the

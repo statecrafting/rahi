@@ -636,6 +636,18 @@ RH-05 and RH-06 of the revision-3 register), and approved the spec on
   record, README and consumer contract state 043's remaining gaps. No
   GitHub Release object is created.
 
+- **D-21 (2026-10-08, release coordination under B-1 and B-2; 0.6.0).**
+  The owner's work order of 2026-10-08 ("Build rahi spec 047, then cut
+  0.6.0 (040, 043, 047, 049) and notify the aicortex session") is taken as
+  the grant to prepare, merge, tag and publish 0.6.0, as D-20 did for
+  0.5.0. It carries specs 040, 047 and 049 and spec 043 complete with the
+  owner's D-36 waivers. The version is 0.6.0, a minor bump: the `Cell`
+  trait gains three defaulted methods, `rahi_cli::serve::Composed` gains a
+  public field and `rahi_ops::stop::Reason` gains variants, which B-1
+  allows only at a minor bump. The release lands as one pull request and
+  the tag names its squash merge (D-18). No GitHub Release object is
+  created.
+
 ## Verification
 
 ```verify:cli
