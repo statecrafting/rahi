@@ -456,7 +456,9 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
         }
         Verb::LedgerVerify { full } => {
             let stopping = rahi_store::stop_on_signal()?;
-            let booted = Booted::open::<C>(env).await?;
+            // Spec 041 B-14: beside a running replica, attached to its node or
+            // as a store client, as `migrate` and `backup` open it.
+            let booted = Booted::open_or_attach::<C>(env).await?;
             on_node(&booted, &stopping, ledger_verify(&booted, full, env)).await
         }
         Verb::LedgerReindex { archive } => {
@@ -466,7 +468,8 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
         }
         Verb::LedgerExport { path } => {
             let stopping = rahi_store::stop_on_signal()?;
-            let booted = Booted::open::<C>(env).await?;
+            // Spec 041 B-14, as `ledger verify`.
+            let booted = Booted::open_or_attach::<C>(env).await?;
             let work = async {
                 // Spec 042 B-10 and B-15: export works on an uncovered
                 // chain, because an operator diagnosing that state needs it
@@ -477,6 +480,7 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
                 let coverage = ledger.coverage().await?;
                 let jsonl = ledger.export_jsonl().await?;
                 let segments = ledger.segments().await?;
+                let document = export_coverage(&ledger, &jsonl, &segments).await?;
                 let mut out = jsonl;
                 for segment in &segments {
                     let line = serde_json::to_string(segment).map_err(|err| {
@@ -487,6 +491,15 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
                 }
                 std::fs::write(&path, out).map_err(|err| {
                     Error::Io(format!("{} cannot be written: {err}", path.display()))
+                })?;
+                // Spec 041 B-13: what the export covers, beside it. The JSONL
+                // bytes above are unchanged.
+                let coverage_path = coverage_path(&path);
+                std::fs::write(&coverage_path, document).map_err(|err| {
+                    Error::Io(format!(
+                        "{} cannot be written: {err}",
+                        coverage_path.display()
+                    ))
                 })?;
                 println!(
                     "ledger export: {} resident record(s) and {} segment reference(s) to {}",
@@ -589,6 +602,74 @@ async fn backup(booted: &Booted, to: &Destination, env: &dyn EnvReader) -> Resul
         outcome.location
     );
     Ok(())
+}
+
+/// `<path>.coverage.json` beside an export at `path` (spec 041 B-13).
+#[must_use]
+pub fn coverage_path(path: &std::path::Path) -> std::path::PathBuf {
+    let mut name = path.as_os_str().to_owned();
+    name.push(".coverage.json");
+    std::path::PathBuf::from(name)
+}
+
+/// The coverage document `ledger export` writes beside its JSONL (spec 041
+/// B-13): the depth exported, the resident range, the sealed segments it
+/// references and does not include, the verifying key, the current epoch,
+/// and the gaps that stand however complete the export is.
+async fn export_coverage(
+    ledger: &Ledger,
+    jsonl: &str,
+    segments: &[rahi_ledger::SegmentHeader],
+) -> Result<Vec<u8>> {
+    // Everything below is derived from what was exported, not re-read: a
+    // replica appending beside a live export must not make the document
+    // describe a different chain from the file it sits beside.
+    let records = jsonl
+        .lines()
+        .map(|line| rahi_ledger::SignedRecord::from_bytes(line.as_bytes()))
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    let root = match records.first() {
+        Some(first) => first.prev_hash()?,
+        None => ledger.resident_root().await?,
+    };
+    let chain = match records.first() {
+        Some(first) if first.record.id.starts_with("genesis:") => Ok(first.hash()?),
+        _ => ledger.genesis_record_hash().await,
+    };
+    let epoch = chain.and_then(|chain| {
+        let before = segments
+            .iter()
+            .rev()
+            .find_map(|header| header.current_epoch.clone())
+            .unwrap_or_else(|| rahi_ledger::EpochTail::genesis(chain.clone()));
+        rahi_ledger::EpochTail::after(&records, before).map(|tail| tail.reference(&chain))
+    });
+    let epoch = match epoch {
+        Ok(reference) => reference,
+        // An uncovered chain may not name its genesis yet (spec 042); the
+        // export still runs, and says the epoch is unread rather than 0.
+        Err(err) => serde_json::json!({ "unread": err.message() }),
+    };
+    let document = serde_json::json!({
+        "depth": "resident",
+        "resident": {
+            "count": records.len(),
+            "root": root.as_str(),
+            "first_id": records.first().map(|r| r.record.id.clone()),
+            "last_id": records.last().map(|r| r.record.id.clone()),
+        },
+        "sealed_not_included": segments.iter().map(rahi_ledger::SegmentHeader::key).collect::<Vec<_>>(),
+        "verifying_key": ledger.verifier().public_key(),
+        "current_epoch": epoch,
+        "gaps": [
+            "allows are never recorded (spec 015 D-5)",
+            "a denial is lost when the queue is full, the append fails, the drain bound expires, or \
+             the process is killed without a stop signal (spec 035 B-4); the first three are \
+             counted per process on /metrics and are not in this export",
+        ],
+    });
+    serde_json::to_vec_pretty(&document)
+        .map_err(|err| Error::Io(format!("the export coverage cannot be serialised: {err}")))
 }
 
 /// The chain, opened without spec 042 B-10's coverage gate and unable to

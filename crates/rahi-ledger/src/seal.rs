@@ -47,10 +47,11 @@ use crate::segment::{Segment, SegmentHeader, order_segments};
 const SEGMENTS_CENSUS_SQL: &str = "SELECT 0 AS witness, \
      (SELECT COUNT(*) FROM kernel_segments) AS total, \
      '' AS first_id, '' AS last_id, 0 AS count, '' AS segment_hash, \
-     '' AS prev_segment_hash, '' AS last_hash, NULL AS current_manifest \
+     '' AS prev_segment_hash, '' AS last_hash, NULL AS current_manifest, \
+     NULL AS current_epoch \
      UNION ALL \
      SELECT 1 AS witness, 0 AS total, first_id, last_id, count, segment_hash, \
-     prev_segment_hash, last_hash, current_manifest FROM kernel_segments";
+     prev_segment_hash, last_hash, current_manifest, current_epoch FROM kernel_segments";
 
 /// The last segment: the one no other segment claims as its predecessor,
 /// and the count of all of them, in one statement
@@ -224,6 +225,9 @@ pub(crate) struct SegmentRow {
     /// `NULL` on a segment sealed before spec 036 B-5 (segment.rs).
     #[serde(default)]
     pub(crate) current_manifest: Option<String>,
+    /// `NULL` on a segment sealed before spec 041 B-6.
+    #[serde(default)]
+    pub(crate) current_epoch: Option<String>,
 }
 
 impl SegmentRow {
@@ -239,6 +243,11 @@ impl SegmentRow {
                 .current_manifest
                 .filter(|text| !text.is_empty())
                 .map(Hash::parse)
+                .transpose()?,
+            current_epoch: self
+                .current_epoch
+                .filter(|text| !text.is_empty())
+                .map(|text| crate::epoch::EpochTail::from_column(&text))
                 .transpose()?,
         })
     }
@@ -403,7 +412,10 @@ impl Ledger {
             .and_then(|h| h.current_manifest.clone())
             .unwrap_or_else(|| self.genesis_parent().clone());
         let current_manifest = Some(Self::manifest_at_tail(&records, before)?);
-        let segment = Segment::seal(previous, records, current_manifest)?;
+        // Spec 041 B-6: the epoch current at this tail, likewise.
+        let current_epoch = self.epoch_at_tail(&sealed, &records).await?;
+        let segment =
+            Segment::seal(previous, records, current_manifest)?.with_current_epoch(current_epoch);
 
         archive
             .put(&segment.key(), segment.to_canonical_bytes()?)
@@ -423,7 +435,7 @@ impl Ledger {
             .map(Accounted::of)
             .collect::<Result<Vec<_>, Error>>()?;
         let mut statements = vec![
-            insert_segment(&segment.header),
+            insert_segment(&segment.header)?,
             delete_records(&segment.records),
         ];
         let accounting_at = statements.len();
@@ -556,12 +568,18 @@ impl Ledger {
 ///
 /// Kept beside the deletion it commits with so the column list and the rows
 /// it accounts for cannot drift apart.
-fn insert_segment(header: &SegmentHeader) -> Statement {
-    Statement::with_params(
+fn insert_segment(header: &SegmentHeader) -> Result<Statement, Error> {
+    // Spec 041: an epoch that will not serialize is an error, never a NULL
+    // that would read as a segment sealed before epochs existed.
+    let current_epoch = match &header.current_epoch {
+        Some(tail) => Value::from(tail.to_column()?),
+        None => Value::Null,
+    };
+    Ok(Statement::with_params(
         "INSERT INTO kernel_segments \
          (segment_hash, prev_segment_hash, last_hash, first_id, last_id, count, \
-          current_manifest) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7)",
+          current_manifest, current_epoch) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
         vec![
             Value::from(header.segment_hash.as_str()),
             Value::from(header.prev_segment_hash.as_str()),
@@ -573,8 +591,9 @@ fn insert_segment(header: &SegmentHeader) -> Statement {
                 .current_manifest
                 .as_ref()
                 .map_or(Value::Null, |h| Value::from(h.as_str())),
+            current_epoch,
         ],
-    )
+    ))
 }
 
 /// The deletion of exactly the records the segment archived.

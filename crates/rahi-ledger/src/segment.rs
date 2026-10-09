@@ -26,6 +26,7 @@ use std::collections::HashMap;
 use rahi_types::Error;
 use serde::{Deserialize, Serialize};
 
+use crate::epoch::EpochTail;
 use crate::record::{DecisionId, Hash, SignedRecord};
 
 /// The segment table (spec 014 B-2).
@@ -39,7 +40,8 @@ pub const SEGMENTS_TABLE_SQL: &str = "CREATE TABLE IF NOT EXISTS kernel_segments
     first_id TEXT NOT NULL, \
     last_id TEXT NOT NULL, \
     count INTEGER NOT NULL, \
-    current_manifest TEXT NULL)";
+    current_manifest TEXT NULL, \
+    current_epoch TEXT NULL)";
 
 /// The column spec 036 B-5 adds, for a volume whose table predates it.
 ///
@@ -56,6 +58,16 @@ pub const SEGMENTS_COLUMNS_SQL: &str = "SELECT name FROM pragma_table_info('kern
 /// Adding it.
 pub const SEGMENTS_ADD_MANIFEST_SQL: &str =
     "ALTER TABLE kernel_segments ADD COLUMN current_manifest TEXT NULL";
+
+/// The column spec 041 B-6 adds: the epoch current at a segment's tail, as
+/// [`crate::EpochTail`] JSON. Nullable for the same reason as
+/// [`SEGMENTS_MANIFEST_COLUMN`]: a segment sealed before spec 041 recorded
+/// none.
+pub const SEGMENTS_EPOCH_COLUMN: &str = "current_epoch";
+
+/// Adding it.
+pub const SEGMENTS_ADD_EPOCH_SQL: &str =
+    "ALTER TABLE kernel_segments ADD COLUMN current_epoch TEXT NULL";
 
 /// The unique parent index over the segment chain.
 ///
@@ -104,6 +116,13 @@ pub struct SegmentHeader {
     /// every segment written before it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_manifest: Option<Hash>,
+    /// The epoch current at this segment's tail (spec 041 B-6).
+    ///
+    /// `None` on a segment sealed by a binary older than spec 041, and absent
+    /// from the serialized form then, so every body archived before it
+    /// round-trips byte for byte (041 AC-2).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_epoch: Option<EpochTail>,
 }
 
 impl SegmentHeader {
@@ -166,8 +185,20 @@ impl Segment {
             prev_segment_hash,
             last_hash: last.hash()?,
             current_manifest,
+            current_epoch: None,
         };
         Ok(Self { header, records })
+    }
+
+    /// Name the epoch current at this segment's tail (spec 041 B-6).
+    ///
+    /// The caller computes it, as it computes the manifest, because it is a
+    /// fact about the chain up to this tail
+    /// ([`crate::EpochTail::after`]).
+    #[must_use]
+    pub fn with_current_epoch(mut self, current_epoch: EpochTail) -> Self {
+        self.header.current_epoch = Some(current_epoch);
+        self
     }
 
     /// The archive key of this segment's body.
