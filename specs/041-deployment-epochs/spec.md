@@ -24,7 +24,9 @@ establishes:
   - "crates/rahi-cli/testdata/binding/"
 extends:
   - { spec: "013-ledger-decision-chain", unit: "crates/rahi-ledger/src/lib.rs", nature: additive }
+  - { spec: "013-ledger-decision-chain", unit: "crates/rahi-ledger/src/chain.rs", nature: additive }
   - { spec: "014-ledger-sealing-and-archive", unit: "crates/rahi-ledger/src/segment.rs", nature: additive }
+  - { spec: "036-manifest-and-schema-evolution", unit: "crates/rahi-ledger/tests/transition.rs", nature: amending }
   - { spec: "014-ledger-sealing-and-archive", unit: "crates/rahi-ledger/src/seal.rs", nature: additive }
   - { spec: "015-kernel-manifest-and-adjudication", unit: "crates/rahi-kernel/src/lib.rs", nature: additive }
   - { spec: "023-observability", unit: "crates/rahi-edge/src/obs/metrics.rs", nature: additive }
@@ -413,6 +415,61 @@ is re-run.
   sealed-segment key reuse after a restore at N=3 is investigated, not
   assumed. The `match` value vocabulary (`bound`, `mismatch` with kinds,
   `unbound`, and `unknown` per kind) is B-8's.
+
+- **D-6 (2026-10-08, build; the open items D-5 hands the build).** Each
+  takes the text's proposed answer. Two record kinds: 036's
+  `manifest.transition` stays as built and the epoch is its own
+  `deployment.epoch`, naming the transition by hash (B-2). A mismatch stays
+  a signal and never refuses a boot (B-8). The ledger's `schema_version`
+  does not move: the envelope is unchanged and the payload keys are
+  additive. The type URIs and member names stay rahi's counterproposal
+  below, marked provisional in the fixture, because no producer has
+  answered.
+- **D-7 (2026-10-08, build; what B-5 compares).** The deploy step compares
+  a fingerprint: sha256 over the canonical JSON of the manifest, the
+  binary, the image and the references (`rahi_ledger::fingerprint`). The
+  epoch number, `previous`, the schema version and the wall time are not
+  part of it, because they are not what is deployed. The fingerprint is
+  carried in each segment header's `current_epoch`, so the comparison
+  survives the epoch record being sealed away without fetching an archived
+  body. Rejected: comparing whole payloads, which differ in every epoch by
+  number and time.
+- **D-8 (2026-10-08, build; which restore an epoch already records).**
+  The restore marker persists for the life of the volume (030 B-6), so B-5's
+  "a restore marker whose archive the current epoch does not name" is read
+  as "whose archive the newest restore epoch does not name". Each header's
+  `current_epoch` carries `last_restore`, the newest restore any epoch at
+  or before it followed. Otherwise every deploy epoch after a restore,
+  which carries `restore: null`, would force a second restore epoch on the
+  next deploy step. Rejected: deleting the marker at the restore epoch,
+  which would change 030's single-shot restore.
+- **D-9 (2026-10-08, build; reading epoch 0 and old headers).** The chain
+  identity of D-1 is the genesis record's hash. It is read from the
+  resident chain while the genesis is resident, and from spec 042's
+  lifetime identity index once it has been sealed, so it needs no archive.
+  A segment sealed before this spec names no epoch, and
+  `Ledger::current_epoch` walks back to the newest header that does. Such
+  a segment holds an epoch record only if an older replica sealed a run a
+  newer deploy step wrote into, and the newest epoch the headers name is
+  then the best evidence that remains. An epoch is an observation and
+  never a ceiling, so unlike 036 D-11 the walk admits nothing. The new
+  `kernel_segments.current_epoch` column is added at open exactly as 036
+  B-5's column is, which is why this spec extends 013's `chain.rs`.
+- **D-10 (2026-10-08, build; B-9's carrier and B-14's open).**
+  `KernelOptions` gains `binding: Option<DecisionBinding>`. `serve` sets it,
+  and a kernel booted without it (every test and every non-serve use)
+  emits decisions without the three keys, which is what records written
+  before this spec look like. `ledger verify` and `ledger export` open
+  through `Booted::open_or_attach`. Opening the chain there runs only the
+  idempotent schema statements every open runs, and appends nothing.
+  `ledger reindex` still opens its own node, because it writes.
+- **D-11 (2026-10-08, build; B-13's document).**
+  `<path>.coverage.json` holds `depth` (`resident`, since the export carries
+  segment references rather than bodies), `resident {count, root,
+  first_id, last_id}`, `sealed_not_included` (the archive keys of the
+  segments it references), `verifying_key`, `current_epoch` (the D-1
+  reference, or `{unread}` with the reason when an uncovered chain cannot
+  name its genesis), and `gaps`, the two standing statements B-13 names.
 
 Open at drafting (2026-09-12), carried to the build by D-5; the first
 item needs the other repositories:

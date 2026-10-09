@@ -26,8 +26,9 @@ use serde_json::json;
 use crate::record::{Decision, DecisionId, DecisionKind, Hash, Outcome, SignedRecord};
 use crate::seal::Depth;
 use crate::segment::{
-    SEGMENTS_ADD_MANIFEST_SQL, SEGMENTS_COLUMNS_SQL, SEGMENTS_INDEX_SQL, SEGMENTS_MANIFEST_COLUMN,
-    SEGMENTS_TABLE_SQL, SegmentHeader, order_segments,
+    SEGMENTS_ADD_EPOCH_SQL, SEGMENTS_ADD_MANIFEST_SQL, SEGMENTS_COLUMNS_SQL, SEGMENTS_EPOCH_COLUMN,
+    SEGMENTS_INDEX_SQL, SEGMENTS_MANIFEST_COLUMN, SEGMENTS_TABLE_SQL, SegmentHeader,
+    order_segments,
 };
 use crate::signer::{LedgerSigner, LedgerVerifier};
 use crate::verify::order_chain;
@@ -77,15 +78,16 @@ const HEAD_SQL: &str = "SELECT hash FROM kernel_decisions \
 const CHAIN_SNAPSHOT_SQL: &str = "SELECT 0 AS kind, \
      (SELECT COUNT(*) FROM kernel_decisions) AS total, X'' AS record, \
      '' AS first_id, '' AS last_id, 0 AS count, '' AS segment_hash, \
-     '' AS prev_segment_hash, '' AS last_hash, NULL AS current_manifest \
+     '' AS prev_segment_hash, '' AS last_hash, NULL AS current_manifest, \
+     NULL AS current_epoch \
      UNION ALL \
      SELECT 1, (SELECT COUNT(*) FROM kernel_segments), X'', \
-     '', '', 0, '', '', '', NULL \
+     '', '', 0, '', '', '', NULL, NULL \
      UNION ALL \
-     SELECT 2, 0, record, '', '', 0, '', '', '', NULL FROM kernel_decisions \
+     SELECT 2, 0, record, '', '', 0, '', '', '', NULL, NULL FROM kernel_decisions \
      UNION ALL \
      SELECT 3, 0, X'', first_id, last_id, count, segment_hash, \
-     prev_segment_hash, last_hash, current_manifest FROM kernel_segments";
+     prev_segment_hash, last_hash, current_manifest, current_epoch FROM kernel_segments";
 
 /// Which kind of row [`CHAIN_SNAPSHOT_SQL`] yielded.
 const RESIDENT_WITNESS: i64 = 0;
@@ -1094,15 +1096,19 @@ impl Ledger {
                     .to_owned(),
             ));
         }
-        if columns
-            .iter()
-            .any(|column| column.name == SEGMENTS_MANIFEST_COLUMN)
-        {
+        // Spec 041 B-6 adds a second column the same way.
+        let missing: Vec<Statement> = [
+            (SEGMENTS_MANIFEST_COLUMN, SEGMENTS_ADD_MANIFEST_SQL),
+            (SEGMENTS_EPOCH_COLUMN, SEGMENTS_ADD_EPOCH_SQL),
+        ]
+        .into_iter()
+        .filter(|(name, _)| !columns.iter().any(|column| column.name == *name))
+        .map(|(_, add)| Statement::new(add))
+        .collect();
+        if missing.is_empty() {
             return Ok(());
         }
-        self.store
-            .txn(vec![Statement::new(SEGMENTS_ADD_MANIFEST_SQL)])
-            .await?;
+        self.store.txn(missing).await?;
         Ok(())
     }
 

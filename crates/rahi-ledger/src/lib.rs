@@ -67,6 +67,7 @@
 pub mod append;
 pub mod archive;
 pub mod chain;
+pub mod epoch;
 pub mod identity;
 pub mod record;
 pub mod seal;
@@ -80,6 +81,11 @@ pub use archive::{Archive, FsArchive, S3Archive, S3Config};
 #[doc(hidden)]
 pub use chain::{AppendSeam, AppendStage, ReadCounts, ReadInterleave, SnapshotInterleave};
 pub use chain::{DECISIONS_INDEX_SQL, DECISIONS_TABLE_SQL, Ledger};
+pub use epoch::{
+    Artifact, Cause, Deployed, DeploymentEpoch, EPOCH_KIND, EPOCH_REF_TYPE, EpochTail,
+    MAX_REFERENCE_BYTES, REFERENCE_MEMBERS, Reference, References, RestoreRef, fingerprint,
+    is_sha256,
+};
 pub use identity::{
     COLLISIONS_INDEX_SQL, COLLISIONS_TABLE_SQL, COVERAGE_TABLE_SQL, Coverage, DecisionCopy,
     IDENTITY_INDEX_SQL, IDENTITY_SCHEMA_SQL, IDENTITY_TABLE_SQL, IdentityTotals, Presence,
@@ -91,9 +97,9 @@ pub use record::{
 };
 pub use seal::{Depth, SealPolicy};
 pub use segment::{
-    SEGMENT_PREFIX, SEGMENTS_ADD_MANIFEST_SQL, SEGMENTS_COLUMNS_SQL, SEGMENTS_INDEX_SQL,
-    SEGMENTS_MANIFEST_COLUMN, SEGMENTS_TABLE_SQL, Segment, SegmentHeader, fetch_segment,
-    order_segments, segment_hash,
+    SEGMENT_PREFIX, SEGMENTS_ADD_EPOCH_SQL, SEGMENTS_ADD_MANIFEST_SQL, SEGMENTS_COLUMNS_SQL,
+    SEGMENTS_EPOCH_COLUMN, SEGMENTS_INDEX_SQL, SEGMENTS_MANIFEST_COLUMN, SEGMENTS_TABLE_SQL,
+    Segment, SegmentHeader, fetch_segment, order_segments, segment_hash,
 };
 pub use signer::{DEFAULT_KEY_PATH, LedgerSigner, LedgerVerifier};
 pub use transition::{

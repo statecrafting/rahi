@@ -120,6 +120,32 @@ pub struct KernelOptions {
     /// replica of the same chain can mint it (spec 035 B-6). Zero means
     /// [`DEFAULT_NODE_ID`].
     pub node_id: u64,
+    /// The epoch and instance every decision names (spec 041 B-9), or
+    /// `None` for a kernel booted outside `serve`, whose decisions carry
+    /// neither key.
+    pub binding: Option<DecisionBinding>,
+}
+
+/// What every decision a replica emits names beside its manifest (spec 041
+/// B-9): the epoch it booted under and its instance.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DecisionBinding {
+    /// The record hash of the booted epoch; the genesis record's hash at
+    /// epoch 0. This identifies the epoch.
+    pub epoch: Hash,
+    /// That epoch's number, which orders it and never identifies it.
+    pub epoch_number: u64,
+    /// The replica's `instance.id` (spec 040 B-4).
+    pub instance: String,
+}
+
+impl DecisionBinding {
+    /// Add the three keys to a decision payload.
+    fn stamp(&self, payload: &mut serde_json::Map<String, serde_json::Value>) {
+        payload.insert("epoch".to_owned(), json!(self.epoch.as_str()));
+        payload.insert("epoch_number".to_owned(), json!(self.epoch_number));
+        payload.insert("instance".to_owned(), json!(self.instance));
+    }
 }
 
 impl fmt::Debug for KernelOptions {
@@ -128,6 +154,7 @@ impl fmt::Debug for KernelOptions {
             .field("queue_capacity", &self.queue_capacity)
             .field("clock", &self.clock.is_some())
             .field("node_id", &self.node_id)
+            .field("binding", &self.binding)
             .finish()
     }
 }
@@ -303,6 +330,7 @@ struct Inner {
     node_id: u64,
     seq: AtomicU64,
     clock: Option<WallClock>,
+    binding: Option<DecisionBinding>,
 }
 
 impl Drop for Inner {
@@ -430,6 +458,7 @@ impl Kernel {
                 node_id,
                 seq: AtomicU64::new(0),
                 clock: options.clock,
+                binding: options.binding,
             }),
         })
     }
@@ -526,6 +555,9 @@ impl Kernel {
         let id = self.next_id();
         let mut payload = payload;
         payload.insert("manifest".to_owned(), json!(self.inner.hash.as_str()));
+        if let Some(binding) = &self.inner.binding {
+            binding.stamp(&mut payload);
+        }
         if let Some(clock) = &self.inner.clock {
             payload.insert("wall_time".to_owned(), json!(clock()));
         }
@@ -566,6 +598,9 @@ impl Kernel {
         }
         if let Some(host) = &request.host {
             payload.insert("host".to_owned(), json!(host));
+        }
+        if let Some(binding) = &self.inner.binding {
+            binding.stamp(&mut payload);
         }
         if let Some(clock) = &self.inner.clock {
             payload.insert("wall_time".to_owned(), json!(clock()));
@@ -833,6 +868,14 @@ mod tests {
         /// node is what keeps one test's ids out of another's observations,
         /// which is spec 035 B-6 in miniature.
         async fn boot(queue_capacity: usize, node_id: u64) -> Self {
+            Self::boot_bound(queue_capacity, node_id, None).await
+        }
+
+        async fn boot_bound(
+            queue_capacity: usize,
+            node_id: u64,
+            binding: Option<DecisionBinding>,
+        ) -> Self {
             let _ = losses();
             let dir = tempfile::tempdir().expect("a temp dir");
             let node = Store::open(&store_config(&dir.path().join("hiqlite")))
@@ -858,6 +901,7 @@ mod tests {
                 KernelOptions {
                     queue_capacity,
                     node_id,
+                    binding,
                     ..KernelOptions::default()
                 },
                 move |decision| {
@@ -1010,5 +1054,68 @@ mod tests {
         assert_eq!(first.as_str(), format!("kernel:{nonce}:1:000000000000"));
         assert_eq!(second.as_str(), format!("kernel:{nonce}:1:000000000001"));
         held.gate.add_permits(8);
+    }
+
+    /// Spec 041 B-9: a bound kernel's decisions name the epoch, its number
+    /// and the instance beside the manifest; an unbound one's name none.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn a_bound_kernels_decisions_name_their_epoch_and_instance() {
+        let epoch = Hash::parse(format!("sha256:{}", "e7".repeat(32))).expect("a hash");
+        let held = Held::boot_bound(
+            8,
+            4,
+            Some(DecisionBinding {
+                epoch: epoch.clone(),
+                epoch_number: 7,
+                instance: "4-0123456789abcdef0123456789abcdef".to_owned(),
+            }),
+        )
+        .await;
+        let id = held.deny("b9-bound");
+        held.gate.add_permits(8);
+        held.kernel
+            .flush(Duration::from_secs(10))
+            .await
+            .expect("the denial lands");
+        let record = held
+            .ledger
+            .records()
+            .await
+            .expect("records")
+            .into_iter()
+            .find(|r| r.record.id == id.as_str())
+            .expect("the denial is in the chain");
+        let payload = record.decision().expect("reads").payload.as_value().clone();
+        assert_eq!(payload.get("epoch"), Some(&json!(epoch.as_str())));
+        assert_eq!(payload.get("epoch_number"), Some(&json!(7)));
+        assert_eq!(
+            payload.get("instance"),
+            Some(&json!("4-0123456789abcdef0123456789abcdef"))
+        );
+        assert!(payload.get("manifest").is_some(), "beside the manifest");
+
+        let unbound = Held::boot(8, 5).await;
+        let id = unbound.deny("b9-unbound");
+        unbound.gate.add_permits(8);
+        unbound
+            .kernel
+            .flush(Duration::from_secs(10))
+            .await
+            .expect("the denial lands");
+        let record = unbound
+            .ledger
+            .records()
+            .await
+            .expect("records")
+            .into_iter()
+            .find(|r| r.record.id == id.as_str())
+            .expect("the denial is in the chain");
+        let payload = record.decision().expect("reads").payload.as_value().clone();
+        for key in ["epoch", "epoch_number", "instance"] {
+            assert!(
+                payload.get(key).is_none(),
+                "an unbound kernel names no {key}"
+            );
+        }
     }
 }

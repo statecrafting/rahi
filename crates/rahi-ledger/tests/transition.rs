@@ -541,7 +541,10 @@ async fn a_sealed_read_that_does_not_answer_never_names_an_older_manifest() {
     reads_stop_answering(
         &f.handle(),
         "kernel_segments",
-        "first_id, last_id, count, segment_hash, prev_segment_hash, last_hash, current_manifest",
+        // Spec 041 B-6 added `current_epoch`; the stand-in names every
+        // column the table has, so the read reaches the guard under test.
+        "first_id, last_id, count, segment_hash, prev_segment_hash, last_hash, current_manifest, \
+         current_epoch",
     )
     .await;
 
