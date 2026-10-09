@@ -14,6 +14,13 @@
 # the old image keep serving and keep stamping the old hash on their
 # decisions; one that restarts on the old image after this Job has run
 # refuses to boot rather than serve a ceiling the chain no longer names.
+#
+# Then it records the deployment epoch (spec 041 B-5): the image it runs,
+# measured, and what the rollout declares. Set RAHI_ARTIFACT_IMAGE to the
+# digest-pinned image this Job runs, and RAHI_DEPLOYMENT_REFS to the
+# rollout's typed references ({"build": {...}, "deployment": {...},
+# "authority": {...}}, each {type, digest, id?}); both are optional, and
+# the step appends one epoch only when something it names changed.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -43,6 +50,12 @@ spec:
               value: "true"
             - name: RAHI_DATA_DIR
               value: /data
+            # Spec 041 B-2, B-3: what this rollout deploys, set per rollout.
+            # Unset, the epoch records no image and no references.
+            # - name: RAHI_ARTIFACT_IMAGE
+            #   value: ghcr.io/statecrafting/rahi@sha256:<64 hex>
+            # - name: RAHI_DEPLOYMENT_REFS
+            #   value: '{"deployment": {"type": "<uri>", "digest": "sha256:<64 hex>"}}'
           envFrom:
             - configMapRef:
                 name: rahi-config

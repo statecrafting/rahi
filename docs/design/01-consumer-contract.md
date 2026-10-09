@@ -1163,41 +1163,46 @@ The family's evidence chain (the September 11 realignment) wants a
 control plane to correlate an immutable artifact, the authority snapshot
 it was built under, a deployment and its epoch, and a running replica,
 without a hash cycle. rahi's share is identity and metadata a replica
-reports reliably, and a record in its own chain of each deployment it
-serves under. Evaluating any of it is the consumer's.
+reports reliably (spec 040), and a record in its own chain of each
+deployment it serves under (spec 041). Evaluating any of it is the
+consumer's. This section is the procedure as built; the readings it
+replaces are in git history.
 
-### 11.1 What a replica can say about itself today
+### 11.1 The binding document (spec 040, with 041's epoch members)
 
-**Verified** at `444bcf8` by reading the code:
+A replica states what it is in one document, `rahi.binding/v0`, at
+`GET /binding` and, outside a cell, from `rahi version --binding`. Spec 040
+section 3.1 is its normative shape: every identity value is a wrapper
+carrying its basis, `measured` (the executable's sha256 read by path, the
+manifest hash, the store's schema and named-set versions, the boot's wall
+time, and the epoch members below), `declared` (the chassis version, the
+application revision the composer supplies, the deployer's
+`RAHI_ARTIFACT_IMAGE`, the pod name, the packaged hiqlite and Rauthy
+identities), `minted` (the per-boot `instance.id`), or `absent` with a
+reason from a closed set. The OTel resource carries the present values;
+`rahi_build_info{rahi_version, contract_version}`,
+`rahi_binding_epoch` (the booted epoch's number) and
+`rahi_binding_mismatch{kind}` (0 or 1 for `binary`, `image`, `manifest`)
+are the metrics, labelled by versions and that closed set only.
 
-| Identifier | Where it exists | Readable by an operator or consumer |
-|---|---|---|
-| chassis version | `CARGO_PKG_VERSION` | `rahi version` prints `rahi 0.1.0`; a backup's `manifest.json` records it |
-| build revision | nowhere: no `build.rs`, no `option_env!` | no |
-| executable digest | nowhere | no |
-| image digest | `image.yml` logs it and names a one-day workflow artifact after it; no provenance, no SBOM; the Dockerfile has no `LABEL`; `deploy/k8s` pins no digest | no |
-| manifest hash | computed at boot (015 B-2) | only as the genesis record in `ledger export`, in a backup's `manifest.json`, and in every denial's payload; not on `/readyz`, `/metrics`, preflight, or a log line |
-| `contract.version`, `app.org` | parsed and validated | read by nothing |
-| chain identity | the genesis record; the ledger public key beside every record | `ledger export`, on a stopped volume only (11.4) |
-| replica | hiqlite node id, the pod ordinal plus one | not reported; OTel resource carries `service.name` only |
-| process incarnation | nothing names one | no |
-| metrics | every label a closed vocabulary (023) | no build or identity family |
-| traces | batch exporter, default sampler keeps every span, ring of 1,000 | export loss is not counted |
+From spec 041, a served document's two epoch members are present:
 
-### 11.1a The binding document (spec 040, built)
-
-From the release that carries spec 040, a replica states what it is in
-one document, `rahi.binding/v0`, at `GET /binding` and, outside a cell,
-from `rahi version --binding`. Spec 040 section 3.1 is its normative
-shape: every identity value is a wrapper carrying its basis, `measured`
-(the executable's sha256 read by path, the manifest hash, the store's
-schema and named-set versions, the boot's wall time), `declared` (the
-chassis version, the application revision the composer supplies, the
-deployer's `RAHI_ARTIFACT_IMAGE`, the pod name, the packaged hiqlite and
-Rauthy identities), `minted` (the per-boot `instance.id`), or `absent`
-with a reason from a closed set. The OTel resource carries the present
-values; `rahi_build_info{rahi_version, contract_version}` is the one
-metric, labelled by versions only.
+- `epoch.ref` is `{type: "rahi.epoch-ref/v0", chain, epoch, number}`:
+  `chain` is the genesis record's hash, `epoch` the booted epoch's record
+  hash, and `number` orders it and never identifies it (a restore can
+  reuse a number). A chain no deploy step has written an epoch to is
+  present at `number: 0`, naming the genesis record; `absent` with reason
+  `not_implemented` now means only a process outside a cell
+  (`rahi version --binding`).
+- `epoch.match` is `{state, differs, kinds}`. `kinds` gives `binary`,
+  `image` and `manifest` each as `equal`, `differs`, `unknown` (an input
+  is absent, or the binary was built for another platform) or
+  `not_declared` (an image one side does not declare, which is not
+  compared). `state` is `bound` when the binary and the manifest are equal
+  and the image is equal or undeclared, `mismatch` (with `differs`) when
+  any kind differs, `unknown` otherwise, and `unbound` at epoch 0. A
+  mismatch never stops the boot; it is one warning line naming both
+  values of each differing kind (041 B-8, D-12).
 
 What a consumer must hold to:
 
@@ -1205,21 +1210,18 @@ What a consumer must hold to:
   binds, and is byte-identical for the life of the process. It names what
   the process booted under, not the newest deployment, so it is never a
   freshness source and polling it authorizes nothing (040 B-8).
-- **An observation, not an attestation.** The executable digest is a file
-  read by pathname; a compromised process can falsify it. It catches a
-  wrong image or a stale node, not an adversary inside the process.
+- **An observation, not an attestation, and not a permission.** The
+  executable digest is a file read by pathname; a compromised process can
+  falsify it. `bound` says the replica runs what its epoch names, not that
+  the epoch was permitted (041 B-10a).
 - **Absent is not passed.** A replica whose `build.binary.sha256` is
-  absent is unidentified; do not record it as running the image the
-  deployment believes it pinned.
+  absent is unidentified, and its `epoch.match` is never `bound`.
 - **Off the ingress.** `/binding` is unguarded, like `/metrics`, and the
   deployment keeps it off every public path (`deploy/README.md`).
-- **Nothing is written to the chain.** `epoch.ref` and `epoch.match` are
-  reserved and absent until spec 041.
 
 ### 11.2 A record order with no cycle
 
-**Recommendation** (drafts 040 and 041). Each record names only records
-that exist before it:
+Each record names only records that exist before it (041 B-4):
 
 ```
 authority snapshot   spec-spine                over source
@@ -1231,85 +1233,78 @@ epoch record         rahi chain (041)          names deployment, provenance, sna
                                                 measured binary, declared image, current manifest
 replica binding      rahi /binding (040, 041)  names the epoch it booted under, its binary,
                                                 manifest and instance; boot-bound, never newest
-decisions            rahi chain (041 B-9)      name their epoch, instance, and manifest
+decisions            rahi chain (041 B-9)      name their epoch, epoch_number, instance, manifest
 observations         the consumer's collector  name instance, epoch, interval, coverage
 ```
 
-The image contains none of these: it cannot contain its own digest, and
-the chassis writes no deployment id, epoch, or snapshot into a built
-file. The manifest stays the ceiling and the TOML it is written in; no
-extracted application model replaces it. The genesis and every record
+The image contains none of these, and the chassis writes no deployment id,
+epoch, or snapshot into a built file. The genesis and every record
 already in a chain stay byte for byte; epoch 0 is the genesis and needs
-no backfill. A deployment outcome the consumer writes after the rollout
-may name the epoch record's hash; that keeps the direction.
+no backfill. `crates/rahi-cli/testdata/binding/` holds the producers'
+templates and `tests/epochs.rs` composes and joins them in this order on
+every run. The reference type URIs there are rahi's provisional
+counterproposal until the producers answer (041 D-1, D-6).
 
-Every value a replica reports carries its basis: `measured` (computed by
-the process from bytes it read: its executable's digest, the manifest
-hash), `declared` (given to it and unchecked: the image digest, the build
-revision, the deployment references), or `absent` with a reason. A digest
-the process measures of itself catches the wrong image or a stale node;
-it does not stand against an adversary inside the process.
+### 11.3 The deploy step, as built
 
-### 11.3 Upgrade, changed manifest, rollback, restore
+`rahi migrate --adopt-manifest` is the deploy step: the entrypoint runs it
+at N=1 and the migration Job at N=3. After its migrations and any 036
+transition, it reads:
 
-**Recommendation** (041, whose worked example is the reference):
+- `RAHI_DEPLOYMENT_REFS`: one JSON object with optional members `build`,
+  `deployment` and `authority`, each `{type, digest, id?}`, `digest`
+  `sha256:<64 hex>` over the record's original bytes. An unknown member, a
+  malformed digest or a member over 4 KiB is a configuration error, and the
+  step exits non-zero having appended nothing; a missing or unknown reference never refuses the step, and nothing
+  it names is fetched.
+- `RAHI_ARTIFACT_IMAGE`: the digest-pinned image being deployed.
+- its own executable, measured, with the platform it was built for.
 
-- **Upgrade.** The deploy step (the Job at N=3, the entrypoint at N=1)
-  applies migrations, appends 036's transition when the manifest changed,
-  then appends one epoch naming the artifact it measured and the
-  references it was given. Replicas roll; until the rollout ends, old
-  replicas report the previous epoch and their decisions say so.
-- **Changed manifest.** Always through 036's transition, in the same
-  step; the epoch names the transition. A replica on the old image that
-  restarts after the transition is refused by 036, not by 041.
+When the manifest, binary, image and references equal the current
+epoch's, it appends nothing and prints `epoch: the chain is at epoch n
+(<hash>); nothing appended`. Otherwise it appends `epoch:<n+1>`, a
+`deployment.epoch` record with `cause: deploy`, and prints it.
+
+- **Upgrade.** One step, one transition when the manifest changed, one
+  epoch naming it. Until the rollout ends, old replicas report the
+  previous epoch and their decisions say so.
 - **Rollback.** Deploying an older image is a new epoch whose artifact
-  equals an earlier epoch's. An artifact never names an epoch; an epoch
-  names an artifact, and one artifact can appear in many epochs.
-- **Restore.** The archive names the epoch it was taken under. The next
-  deploy step appends an epoch with `cause: restore` whose predecessor is
-  that archived epoch. What the chain held after the backup is not in the
-  restored chain; an epoch is identified by its record hash because a
-  restore can reuse a number.
+  equals an earlier epoch's.
+- **Restore.** A backup's archive manifest names the epoch it was taken
+  under (`epoch {number, hash}`). After a restore, the next deploy step
+  reads the marker and appends `cause: restore`, naming the archive and its
+  sha256, whose `previous` is the archived epoch. Records appended after
+  the backup are not in the restored chain. At N=3 that ordering holds only
+  when the Job runs before the replicas start.
 - **N=3, multiple architectures.** The Job measures one platform's
   binary; a replica on another platform reports its binary as `unknown`,
   and the consumer resolves it against the provenance's subjects.
 
-### 11.4 What a consumer can do before 040 and 041
+### 11.4 Reading a live chain
 
-**Verified** as available today, with the limits named:
-
-- Correlate a decision to a ceiling: every denial's payload names the
-  manifest hash, and `ledger export` names the genesis.
-- Pin the image by digest in the pod spec and read the kubelet's
-  `imageID` from the pod status. That is the platform's observation of
-  the image, not the cell's.
-- Read a live cell's chain: **not possible** today, by reading the code.
-  `migrate` and `backup` attach to a running node or connect as a store
-  client (`Booted::open_or_attach`, `crates/rahi-cli/src/lib.rs`);
-  `ledger verify` and `ledger export` use `Booted::open`, which starts a
-  node on the data directory, so they run on a stopped volume only. A
-  consumer cannot mark a deployment by the chain head without stopping a
-  replica. 041 B-14 proposes the attach path for both.
-- Attribute a decision to a replica: **not possible** today. The id names
-  no replica and collides at N=3 (section 5).
+`ledger verify` and `ledger export` attach to a running replica's node, or
+run as a pure store client under `RAHI_STORE_CLIENT`, as `migrate` and
+`backup` do. An export taken while replicas append is a prefix of the
+chain ending at the head it read. Beside `<path>` it writes
+`<path>.coverage.json`: the depth exported, the resident range, the
+sealed segments referenced and not included, the verifying public key,
+the current epoch's reference, and the standing gaps (allows are never
+recorded; a denial can be lost under spec 035 B-4's causes, whose counters
+are per process and not in the export). Every denial written since 041
+names `epoch`, `epoch_number` and `instance`; records written before it
+do not.
 
 ### 11.5 Trust windows and audit bundles
 
-**Recommendation**. For a validity predicate revalidated at effect time,
-the chassis supplies the current epoch's record hash from the chain as a
-freshness input; the broker evaluates the predicate. `/binding` is not
-that input: 040 makes it boot-bound and byte-identical for the life
-of the process, so a replica that has not restarted since the newest
-deployment reports the older epoch correctly. Polling it is not an atomic
-authorization of an effect. Whether a current-epoch observation surface
-exists, and its consistency and race semantics, belongs to 041. The
-chassis evaluates no trust window (015 §6 leaves that to a later spec; the
-sibling `trust-window` crate is not a chassis dependency). For an
+For a validity predicate revalidated at effect time, the chassis supplies
+the current epoch's record hash from the chain as a freshness input,
+through a live `ledger export` or a store client's read; the broker
+evaluates the predicate. `/binding` is not that input: it is boot-bound,
+so a replica that has not restarted since the newest deployment reports
+the older epoch correctly. The chassis evaluates no trust window. For an
 independent audit bundle, the chassis supplies the `ledger export` lines
 as the original bytes, the verifying public key, the segment references,
-and, with 041 B-13, a coverage file that states what the export
-does not contain: allows, lost denials, and archived segments. The
-bundle's envelope is the consumer's.
+and the coverage file. The bundle's envelope is the consumer's.
 
 ## 12. Status reconciliation, 2026-09-17
 

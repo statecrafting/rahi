@@ -410,21 +410,19 @@ pub async fn compose_parts<C: Cell>(
     rahi_ops::migrate::check_current_sets(&booted.store, C::migrations(), &C::migration_sets())
         .await?;
     let ledger = booted.ledger().await?;
-    let kernel = Kernel::boot_with(
-        booted.manifest.clone(),
-        booted.store.handle(),
-        ledger.clone(),
-        KernelOptions {
-            node_id: booted.store.config().node_id,
-            ..KernelOptions::default()
-        },
-    )
-    .await?;
+    // Spec 041 B-8: the epoch this process boots under, read once after the
+    // chain opened and before anything listens.
+    let epoch = rahi_ops::binding::EpochFacts {
+        chain: ledger.genesis_record_hash().await?,
+        tail: ledger.current_epoch().await?,
+    };
     let obs = rahi_edge::ObsOptions::from_env(&booted.config, env)?
         .with_service_name(booted.manifest.app.name.as_str());
     // Spec 040 B-2, B-6: the binding document, once, after the ledger opened
     // and before anything listens. Its absences' detail goes to the boot log
     // and never into the document; its present values go on the resource.
+    // Spec 041 B-9 has it assembled before the kernel boots, because every
+    // decision names the instance it mints.
     let binding = rahi_ops::binding::assemble(&rahi_ops::binding::Inputs {
         env,
         app_revision: C::app_revision(),
@@ -435,6 +433,7 @@ pub async fn compose_parts<C: Cell>(
             app_org: booted.manifest.app.org.as_str().to_owned(),
             contract_version: booted.manifest.contract.version.clone(),
             store: rahi_ops::binding::store_facts(&booted.store.handle()).await?,
+            epoch: Some(epoch.clone()),
         }),
         observation: rahi_ops::binding::Observation {
             export: Some(obs.otlp_endpoint.is_some()),
@@ -446,10 +445,32 @@ pub async fn compose_parts<C: Cell>(
     for line in binding.log() {
         eprintln!("{line}");
     }
+    let kernel = Kernel::boot_with(
+        booted.manifest.clone(),
+        booted.store.handle(),
+        ledger.clone(),
+        KernelOptions {
+            node_id: booted.store.config().node_id,
+            binding: binding
+                .instance_id()
+                .map(|instance| rahi_kernel::DecisionBinding {
+                    epoch: epoch.tail.hash.clone(),
+                    epoch_number: epoch.tail.number,
+                    instance: instance.to_owned(),
+                }),
+            ..KernelOptions::default()
+        },
+    )
+    .await?;
     let resource = rahi_edge::binding::resource_attributes(binding.document());
-    rahi_edge::obs::init_with(obs, &resource)?
-        .metrics()
-        .set_build_info(binding.rahi_version(), &booted.manifest.contract.version);
+    let metrics = rahi_edge::obs::init_with(obs, &resource)?.metrics();
+    metrics.set_build_info(binding.rahi_version(), &booted.manifest.contract.version);
+    // Spec 041 B-10: the booted epoch's number and the kinds that differ.
+    let differs = binding
+        .epoch_match()
+        .map(rahi_ops::binding::EpochMatch::differs)
+        .unwrap_or_default();
+    metrics.set_binding(epoch.tail.number, &rahi_ops::binding::MATCH_KINDS, &differs);
 
     let mut state = AppState::new(
         kernel.clone(),

@@ -6,7 +6,7 @@ kind: kernel
 domain: ledger
 created: "2026-09-11"
 authors: ["Bartek Kus"]
-implementation: in-progress
+implementation: complete
 risk: critical
 wave: 3
 depends_on:
@@ -37,6 +37,8 @@ extends:
   - { spec: "032-cluster-topology", unit: "deploy/k8s/migrate-job.yaml", nature: additive }
   - { spec: "032-cluster-topology", unit: "deploy/README.md", nature: additive }
   - { spec: "040-runtime-identity-and-binding-surface", unit: "crates/rahi-ops/src/binding.rs", nature: additive }
+  - { spec: "040-runtime-identity-and-binding-surface", unit: "crates/rahi-cli/tests/binding.rs", nature: amending }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/backup.rs", nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/01-consumer-contract.md" }, role: context }
   - { unit: { kind: file, path: "docs/design/02-operational-prerequisites.md" }, role: context }
@@ -470,6 +472,44 @@ is re-run.
   segments it references), `verifying_key`, `current_epoch` (the D-1
   reference, or `{unread}` with the reason when an uncovered chain cannot
   name its genesis), and `gaps`, the two standing statements B-13 names.
+
+- **D-12 (2026-10-08, build; `epoch.match`'s vocabulary, which D-5 left to
+  B-8).** The value is `{state, differs, kinds}`. Each of `binary`, `image`
+  and `manifest` is `equal`, `differs`, `unknown` (an input is absent, or the
+  replica's platform is not the epoch's) or `not_declared` (an image one
+  side does not declare, which B-8 does not compare). `state` is `bound`
+  when the binary and the manifest are equal and the image is equal or
+  undeclared; `mismatch`, naming `differs`, when any kind differs; `unknown`
+  otherwise, because 040 B-7 forbids reporting missing evidence as
+  agreement; and `unbound` at epoch 0. The comparison is `measured`: this
+  process performed it. Rejected: `bound` with an unknown binary, which
+  would report agreement nobody checked.
+- **D-13 (2026-10-08, build; the fixture's composed records).**
+  `testdata/binding/` holds the three producers' templates and a README
+  naming the provisional type URIs. The epoch record, the `/binding`
+  document and the denial carry a minted instance id and fresh record
+  hashes, so `tests/epochs.rs` composes them and joins them on every run
+  rather than committing bytes no later run could reproduce. FR-004's
+  second binary is the test executable copied with one byte appended: the
+  same fixture under another digest.
+- **D-14 (2026-10-08, build; 040's served-cell assertion).** 040 B-7 states
+  that with 041 built, a cell's `epoch.ref` is present, and that `absent`
+  with `not_implemented` means only a binary without the feature. 040's
+  FR-002 test asserted the pre-041 state on a served cell. It now asserts
+  B-7's post-041 state: present, epoch 0, `unbound`. `rahi version
+  --binding`, which has no cell, still asserts `not_implemented`. 040's
+  text is unchanged and every statement in it still holds, so this is an
+  `extends` edge on its test, not a reconciliation. 036's segment-view
+  test gains the new column for the same reason (D-9).
+- **D-15 (2026-10-08, build; the deploy step's order and the archive).**
+  The deploy step refuses a malformed `RAHI_DEPLOYMENT_REFS` or
+  `RAHI_ARTIFACT_IMAGE` before its migrations, so a refusal leaves no
+  migration, transition or epoch behind it. `serve` now assembles the
+  binding document before it boots the kernel, because every decision names
+  the instance the document mints (B-9). `backup` records the epoch through
+  `rahi_ops::backup::run_at_epoch`, and `run` keeps its signature for its
+  existing callers. The archive's `epoch` member is absent from an archive
+  written before this spec, so `FORMAT` does not move.
 
 Open at drafting (2026-09-12), carried to the build by D-5; the first
 item needs the other repositories:

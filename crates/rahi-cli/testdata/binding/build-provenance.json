@@ -1,0 +1,18 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {"name": "{{IMAGE_NAME}}", "digest": {"sha256": "{{IMAGE_SHA256}}"}},
+    {"name": "cell-binary", "digest": {"sha256": "{{BINARY_SHA256}}"}}
+  ],
+  "predicateType": "https://slsa.dev/provenance/v1",
+  "predicate": {
+    "buildDefinition": {
+      "buildType": "https://statecraft.ing/rahi-fixture/build/v0",
+      "externalParameters": {"source": "rahi-fixture"},
+      "resolvedDependencies": [
+        {"name": "authority-snapshot", "digest": {"sha256": "{{AUTHORITY_SHA256}}"}}
+      ]
+    },
+    "runDetails": {"builder": {"id": "https://statecraft.ing/rahi-fixture/builder"}}
+  }
+}

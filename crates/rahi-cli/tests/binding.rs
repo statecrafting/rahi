@@ -383,9 +383,17 @@ fn a_booted_cell_serves_its_binding_and_a_restart_mints_a_new_instance() {
         at(&document, "artifact.image"),
         &serde_json::json!({ "value": ARTIFACT, "basis": "declared" })
     );
-    for path in ["epoch.ref", "epoch.match"] {
-        assert_eq!(at(&document, path)["reason"], "not_implemented", "{path}");
-    }
+    // Spec 041 B-8, as 040 B-7 reserves: with epochs built, a chain no
+    // deploy step has written an epoch to is present at epoch 0, unbound,
+    // never `not_implemented` (which now only `rahi version --binding`
+    // reports, below).
+    assert_eq!(at(&document, "epoch.ref")["basis"], "measured");
+    assert_eq!(at(&document, "epoch.ref")["value"]["number"], 0);
+    assert_eq!(
+        at(&document, "epoch.ref")["value"]["type"],
+        rahi_ledger::EPOCH_REF_TYPE
+    );
+    assert_eq!(at(&document, "epoch.match")["value"]["state"], "unbound");
     assert_eq!(at(&document, "instance.pod")["value"], "rahi-0");
     assert_eq!(
         at(&document, "build.rahi_version")["value"],
