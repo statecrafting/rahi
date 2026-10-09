@@ -435,7 +435,7 @@ impl Ledger {
             .map(Accounted::of)
             .collect::<Result<Vec<_>, Error>>()?;
         let mut statements = vec![
-            insert_segment(&segment.header),
+            insert_segment(&segment.header)?,
             delete_records(&segment.records),
         ];
         let accounting_at = statements.len();
@@ -568,8 +568,14 @@ impl Ledger {
 ///
 /// Kept beside the deletion it commits with so the column list and the rows
 /// it accounts for cannot drift apart.
-fn insert_segment(header: &SegmentHeader) -> Statement {
-    Statement::with_params(
+fn insert_segment(header: &SegmentHeader) -> Result<Statement, Error> {
+    // Spec 041: an epoch that will not serialize is an error, never a NULL
+    // that would read as a segment sealed before epochs existed.
+    let current_epoch = match &header.current_epoch {
+        Some(tail) => Value::from(tail.to_column()?),
+        None => Value::Null,
+    };
+    Ok(Statement::with_params(
         "INSERT INTO kernel_segments \
          (segment_hash, prev_segment_hash, last_hash, first_id, last_id, count, \
           current_manifest, current_epoch) \
@@ -585,13 +591,9 @@ fn insert_segment(header: &SegmentHeader) -> Statement {
                 .current_manifest
                 .as_ref()
                 .map_or(Value::Null, |h| Value::from(h.as_str())),
-            header
-                .current_epoch
-                .as_ref()
-                .and_then(|tail| tail.to_column().ok())
-                .map_or(Value::Null, Value::from),
+            current_epoch,
         ],
-    )
+    ))
 }
 
 /// The deletion of exactly the records the segment archived.

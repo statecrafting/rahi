@@ -480,6 +480,7 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
                 let coverage = ledger.coverage().await?;
                 let jsonl = ledger.export_jsonl().await?;
                 let segments = ledger.segments().await?;
+                let document = export_coverage(&ledger, &jsonl, &segments).await?;
                 let mut out = jsonl;
                 for segment in &segments {
                     let line = serde_json::to_string(segment).map_err(|err| {
@@ -494,7 +495,6 @@ async fn verbs_030<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<()> {
                 // Spec 041 B-13: what the export covers, beside it. The JSONL
                 // bytes above are unchanged.
                 let coverage_path = coverage_path(&path);
-                let document = export_coverage(&ledger, &segments).await?;
                 std::fs::write(&coverage_path, document).map_err(|err| {
                     Error::Io(format!(
                         "{} cannot be written: {err}",
@@ -618,23 +618,43 @@ pub fn coverage_path(path: &std::path::Path) -> std::path::PathBuf {
 /// and the gaps that stand however complete the export is.
 async fn export_coverage(
     ledger: &Ledger,
+    jsonl: &str,
     segments: &[rahi_ledger::SegmentHeader],
 ) -> Result<Vec<u8>> {
-    let records = ledger.records().await?;
-    let epoch = match (
-        ledger.current_epoch().await,
-        ledger.genesis_record_hash().await,
-    ) {
-        (Ok(tail), Ok(chain)) => tail.reference(&chain),
+    // Everything below is derived from what was exported, not re-read: a
+    // replica appending beside a live export must not make the document
+    // describe a different chain from the file it sits beside.
+    let records = jsonl
+        .lines()
+        .map(|line| rahi_ledger::SignedRecord::from_bytes(line.as_bytes()))
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    let root = match records.first() {
+        Some(first) => first.prev_hash()?,
+        None => ledger.resident_root().await?,
+    };
+    let chain = match records.first() {
+        Some(first) if first.record.id.starts_with("genesis:") => Ok(first.hash()?),
+        _ => ledger.genesis_record_hash().await,
+    };
+    let epoch = chain.and_then(|chain| {
+        let before = segments
+            .iter()
+            .rev()
+            .find_map(|header| header.current_epoch.clone())
+            .unwrap_or_else(|| rahi_ledger::EpochTail::genesis(chain.clone()));
+        rahi_ledger::EpochTail::after(&records, before).map(|tail| tail.reference(&chain))
+    });
+    let epoch = match epoch {
+        Ok(reference) => reference,
         // An uncovered chain may not name its genesis yet (spec 042); the
         // export still runs, and says the epoch is unread rather than 0.
-        (Err(err), _) | (_, Err(err)) => serde_json::json!({ "unread": err.message() }),
+        Err(err) => serde_json::json!({ "unread": err.message() }),
     };
     let document = serde_json::json!({
         "depth": "resident",
         "resident": {
             "count": records.len(),
-            "root": ledger.resident_root().await?.as_str(),
+            "root": root.as_str(),
             "first_id": records.first().map(|r| r.record.id.clone()),
             "last_id": records.last().map(|r| r.record.id.clone()),
         },
