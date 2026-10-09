@@ -1,11 +1,10 @@
 # The consumer contract, as built
 
-**Current release candidate, 2026-10-06:** 0.5.0 under approved spec 039.
-It carries spec **048**, spec 043's crash-safe fresh-volume fencing and
-spec 037 D-11's backup-admin login fix on top of 0.4.0, with 043 still at
-its owner-approved `in-progress` release boundary. Section 2.0 is the
-current consumer guidance; the dated readings below remain historical
-evidence. The release identity is the annotated `v0.5.0` tag once created: it names the tested squash merge
+**Current release candidate, 2026-10-08:** 0.6.0 under approved spec 039.
+It carries specs **040**, **047** and **049**, and spec 043 complete with
+the owner's waivers, on top of 0.5.0. Section 2.0 is the current consumer
+guidance; the dated readings below remain historical evidence. The release
+identity is the annotated `v0.6.0` tag once created: it names the tested squash merge
 on `main` (039 B-2, D-18), and
 this document is updated to that commit. A version declaration is not
 publication or downstream adoption: registry availability is proven only by
@@ -77,7 +76,40 @@ nothing in the chassis distributes jobs to workers.
 
 ## 2. Consuming today
 
-### 2.0 The 0.5.0 release and its compatibility boundary
+### 2.0 The 0.6.0 release and its compatibility boundary
+
+All nine inherited chassis versions and internal requirements are 0.6.0.
+It is a minor bump under 039 B-1. The `Cell` trait gains three methods,
+each with a default that keeps a cell's previous behavior:
+`services(state, shutdown)` (spec 047), `preflight_checks()` (spec 049)
+and `app_revision()` (spec 040). `rahi_cli::serve::Composed` gains a public
+`state` field, and `rahi_ops::stop::Reason` gains four service variants. A
+cell that calls only `rahi_cli::run` needs no code change. A worker the
+application used to detach from route construction now belongs in
+`Cell::services`: there `serve` cancels it on every stop and joins it
+before the store shuts down. The full list is in
+[CHANGELOG.md](../../CHANGELOG.md#060-release-candidate-2026-10-08).
+
+Once `consumer-registry` passes for the tag, the registry stanza is:
+
+```toml
+[dependencies]
+rahi-cli    = "=0.6.0"
+rahi-edge   = "=0.6.0"
+rahi-idp    = "=0.6.0"
+rahi-kernel = "=0.6.0"
+rahi-ledger = "=0.6.0"
+rahi-ops    = "=0.6.0"
+rahi-store  = "=0.6.0"
+rahi-types  = "=0.6.0"
+
+[dev-dependencies]
+rahi-harness = "=0.6.0"
+```
+
+The hiqlite pin and the limits of section 2.0-0.5.0 below are unchanged.
+
+### 2.0-0.5.0 The 0.5.0 release and its compatibility boundary (historical)
 
 All nine inherited chassis versions and internal requirements are 0.5.0.
 It is a minor bump under 039 B-1: `rahi-ops`'s fencing functions changed

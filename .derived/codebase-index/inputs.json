@@ -154,7 +154,7 @@
       "contentHash": "5409a9613d7d1e5abb82ea9488f463303af19dd2d7700835badd53a05b335f6b"
     },
     "deploy/k8s/kustomization.yaml": {
-      "contentHash": "54d7c7e22797ad0c8a6af710fa790b38bf3476060e56b82779a227a47d6cb6ef"
+      "contentHash": "defcb14e287bc023a9709fcbba2b415c1f9688add02a7be2e46cca42c8febef3"
     },
     "deploy/k8s/migrate-job.yaml": {
       "contentHash": "6744d244ac101a266b46539d44706aa789f86e87c8a5f11292e8fc199beb84b1"
@@ -205,7 +205,7 @@
       "contentHash": "b1973b69dc9b53dce163a2da56e52b1ce119b7f8079cc6cc302140d1a5be94c5"
     },
     "docs/design/01-consumer-contract.md": {
-      "contentHash": "e627ee04508eca7f223ede99c4eaf656d04ee45b01747500db97a0a20cbb92b8"
+      "contentHash": "815f0b466b41a0454d3886d73527b831bf59607f9a5725bf219fbc370eb84443"
     },
     "docs/design/02-operational-prerequisites.md": {
       "contentHash": "3bfb1aafaf48390a4187bf6c769d328206b51cdecfeb96ae2eb55911c1c3e449"
