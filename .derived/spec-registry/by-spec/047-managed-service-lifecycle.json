@@ -18,6 +18,10 @@
       {
         "kind": "file",
         "path": "crates/rahi-cli/tests/services.rs"
+      },
+      {
+        "kind": "file",
+        "path": "crates/rahi-cli/tests/service_fixture/mod.rs"
       }
     ],
     "extends": [
@@ -66,18 +70,18 @@
       "wave": 3
     },
     "id": "047-managed-service-lifecycle",
-    "implementation": "pending",
+    "implementation": "complete",
     "kind": "kernel",
     "risk": "critical",
     "sectionDigests": {
-      "047-managed-service-lifecycle": "36b615738de3c71ceca433d53b7096b48bde8ec1582265c536390635e6903d85",
+      "047-managed-service-lifecycle": "d579707819de04168f8ced1ade15213208c6b7c7fbb3d170dda9d154cdc2544d",
       "1-purpose": "602335d4675a9ee0f4b3d2d1c5407a63c748b0b84f299b55ac3e6fdcedf94750",
       "2-territory": "ca911d9dc794544e64aa4f6af234ba222a205445737fb338732812125c09c552",
       "3-behavior": "52505524f4871594ef1149d649b5b71cd45288b76e8c166ea2d08553a870ad54",
       "4-functional-requirements": "f6ff1e8e4743a6c3f6f156d02d74490f0f39c49b84b96276c571d1f9be52d875",
       "5-acceptance-criteria": "6344f6dc66f077f9117b2f923011f2d7ae3ab8fa2d9a21b1dfe4577e7ee5c8d2",
       "6-out-of-scope": "2f6856fcfc935927476c385e9979dfc7c63692cda53d94b321186942ae3eb387",
-      "7-resolved-decisions": "d5af44aee30e71bb47a2d1baa8244bd8caa5edb51185a646a9e92d7eb434ad31",
+      "7-resolved-decisions": "54e425e68a9dfd1913eb3894e63573ed974b94332b948bb3089a8e9561a631e6",
       "verification": "4015e47eaaaf9380141be68db3d1d8f5fe36c0fd91498e9ee9f6b19c13fd3e47"
     },
     "sectionHeadings": [
@@ -96,6 +100,6 @@
     "summary": "A Cell can declare routes and migrations, but it cannot give the chassis an application worker whose lifetime is tied to serve. Applications therefore either omit durable background work or detach tasks that Rahi cannot cancel, observe, or join before the application store shuts down. This spec adds a named managed-service declaration to Cell, starts each service once after successful composition, treats an unexpected return, error, or panic as a process failure, broadcasts cancellation for every stop cause, and joins or aborts every service before draining its final denials and shutting down the store. The service bound overlaps the existing HTTP drains so the published stop grace does not grow.\n",
     "title": "Manage application background services through the cell lifecycle"
   },
-  "shardHash": "d81dfc827aadf44c43ce28153ece8323cfa6b49c442e14bab150189dc9a0de26",
+  "shardHash": "57f2823c1e3aedc928836b114ef4c9c9ca63d54d33268bd15dce4ee9ec32455a",
   "specVersion": "1.9.0"
 }

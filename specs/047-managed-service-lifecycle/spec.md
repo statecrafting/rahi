@@ -6,7 +6,7 @@ kind: kernel
 domain: ops
 created: "2026-09-27"
 authors: ["Bartek Kus"]
-implementation: pending
+implementation: complete
 risk: critical
 wave: 3
 depends_on:
@@ -16,6 +16,7 @@ depends_on:
 establishes:
   - "crates/rahi-cli/src/service.rs"
   - "crates/rahi-cli/tests/services.rs"
+  - "crates/rahi-cli/tests/service_fixture/mod.rs"
 extends:
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/cell.rs", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/lib.rs", nature: additive }
@@ -234,6 +235,50 @@ acts after this draft is approved, implemented, verified, and merged.
   verbatim: "Approve all; proceed with increased velocity development."
   The spec moves to `approved` with D-6's defaults as the approved
   behavior. No requirement text changed.
+
+- **D-8 (2026-10-08, build).** The declaration is made in `serve`'s body
+  after `compose_parts` and never inside it, so `compose` and every other
+  verb that composes a router cannot reach `Cell::services` (B-3).
+  `Composed` gains the `AppState` its routes received, which is the clone
+  the declaration gets. Rejected: declaring inside `compose_parts`, which
+  `compose` callers share.
+- **D-9 (2026-10-08, build).** The broadcast is a `tokio::sync::watch`
+  channel whose sender `serve` keeps beside the instant it was first sent;
+  `ServiceShutdown` holds only a receiver. One `JoinSet` owns every handle.
+  A service's `Ok(())` is judged unexpected or normal against the broadcast
+  at the moment it is joined, since a service can only observe a broadcast
+  made before it returned. Rejected: `tokio_util::CancellationToken`, a new
+  dependency for what `watch` already gives.
+- **D-10 (2026-10-08, build).** B-10's structured reasons are four new
+  `rahi_ops::stop::Reason` variants rendered `service_unexpected_exit{n}`,
+  `service_error{n}`, `service_panic{n}` and `service_join_timeout{n}`, one
+  per service, following `denials_abandoned{n}`. The bound is
+  `rahi_ops::stop::SERVICE_JOIN`, held inside `max(W, S) + C` by
+  `check_service_overlap`, so `check_composition`'s four phases and both
+  graces are untouched. `service_join` is timed from the broadcast to the
+  last join. The process fixture shared by `services.rs` and
+  `stop_budget.rs` is `tests/service_fixture/mod.rs`, claimed here.
+- **D-11 (2026-10-08, build).** When a service failure is the first cause
+  and the listener later fails too, the listener's error is recorded as a
+  `serve_error` reason and does not replace the process result (B-4). The
+  exit code is the infrastructure code either way.
+- **D-12 (2026-10-08, build).** A service name is `[A-Za-z0-9._-]`, refused
+  at composition like an empty or repeated one (B-2). Stop reasons render
+  the name inside `{}` in a comma-separated line; a name holding `,`, `}`
+  or a space would make that line ambiguous. Rejected: escaping in
+  `Reason::name`, which every reader of the line would have to undo.
+- **D-13 (2026-10-08, build).** B-6's abort preempts a service at its next
+  await point. A service that blocks a runtime thread (a synchronous sleep,
+  a busy poll) cannot be aborted, and `serve` waits for it: B-5 forbids
+  starting store shutdown while it is alive, so no second, leaking bound is
+  added. That service is outside B-2's contract as a detached task is; the
+  orchestrator's grace and SIGKILL remain the backstop, and spec 043's
+  previous-stop classification records the result honestly. Each service's
+  `Ok(())` is judged against the broadcast at the instant it returned, not
+  when it is joined, so the order the loop polls in cannot hide an
+  unexpected exit (amends D-9's judging point). A terminal store fault
+  that follows a first service failure is still recorded as
+  `storage_terminal` beside it (amends D-11).
 
 ## Verification
 

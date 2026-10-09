@@ -15,9 +15,15 @@
 //! `RAHI_STOP_SERIES_OUT` when it names a file), so the series is recorded
 //! evidence. Without Rauthy the series runs `serve` alone and says the
 //! Rauthy leg did not execute; `RAHI_REQUIRE_RAUTHY=1` makes that a failure.
+//!
+//! Spec 047 FR-006 adds the managed-service join: its bound is read from the
+//! constant `serve` enforces, measured from the cancellation broadcast, and
+//! shown to overlap the HTTP drains both by composition and by a measured
+//! stop of a cell whose service ignores the stop.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 
+mod service_fixture;
 mod stop_fixture;
 
 use std::path::{Path, PathBuf};
@@ -26,7 +32,16 @@ use std::time::{Duration, Instant};
 use rahi_ops::stop::{self, Outcome};
 use stop_fixture::{Node, OpenStream, deny_in_flight, tally};
 
-fixture_entry!();
+/// The fixture entry: spec 047's services cell when a services mode is
+/// set, spec 043's stop cell otherwise.
+#[test]
+fn fixture_cell() {
+    if service_fixture::requested() {
+        service_fixture::fixture_main();
+    } else {
+        stop_fixture::fixture_main();
+    }
+}
 
 /// The repository root, where the shipped manifests are.
 fn repo() -> PathBuf {
@@ -272,5 +287,80 @@ fn ac7_graceful_stops_under_the_declared_workload_are_confirmed_within_the_grace
     assert!(
         max * 3 / 2 <= grace.as_millis(),
         "the measured maximum {max} ms times 1.5 exceeds the grace {grace:?}"
+    );
+}
+
+/// Spec 047 FR-006, AC-2: the service join bound is the constant `serve`
+/// enforces, its deadline is measured from the cancellation broadcast, it
+/// fits inside the HTTP drains it overlaps, and the graces are unchanged.
+/// A measured stop of a service that ignores the stop shows the overlap:
+/// SIGTERM to exit is shorter than the readiness window and the join run
+/// one after the other.
+#[test]
+fn fr006_the_service_join_overlaps_the_http_drains_and_raises_no_grace() {
+    let j = stop::SERVICE_JOIN;
+    assert_eq!(j, Duration::from_secs(10), "B-6: ten seconds");
+    let cancelled_at = Instant::now();
+    assert_eq!(
+        rahi_cli::service::service_deadline(cancelled_at),
+        cancelled_at + j,
+        "B-6: the bound runs from the broadcast"
+    );
+    let s = stop::first_phase(rahi_edge::StreamOptions::default().drain_timeout);
+    let c = rahi_cli::serve::DRAIN_BUDGET;
+    stop::check_service_overlap(j, s, c).unwrap();
+    let d = rahi_cli::serve::DEFAULT_DENIAL_DRAIN_TIMEOUT;
+    let h = rahi_store::SHUTDOWN_WAIT;
+    stop::check_composition(
+        [s, c, d, h],
+        stop::SERVE_GRACE,
+        stop::RAUTHY_STOP,
+        stop::CONTAINER_GRACE,
+    )
+    .unwrap();
+    assert_eq!(
+        stop::SERVE_GRACE,
+        Duration::from_secs(40),
+        "unchanged by 047"
+    );
+    assert_eq!(
+        stop::CONTAINER_GRACE,
+        Duration::from_secs(50),
+        "unchanged by 047"
+    );
+
+    let mut node = Node::new();
+    node.set_env(service_fixture::MODE_VAR, service_fixture::MODE_HANG);
+    let migrated = node.run("migrate");
+    assert_eq!(migrated.code, Some(0), "{}", migrated.logs());
+    let mut cell = node.spawn("serve");
+    node.wait_ready(&mut cell, stop_fixture::READY_BUDGET);
+    let signalled = Instant::now();
+    cell.sigterm();
+    let finished = cell.wait(Duration::from_secs(60));
+    let took = signalled.elapsed();
+    assert_ne!(finished.code, Some(0), "{}", finished.logs());
+    let record = node.stop_record().expect("a stop record");
+    let phase = |name: &str| {
+        record
+            .phases
+            .iter()
+            .find(|p| p.phase == name)
+            .unwrap_or_else(|| panic!("no {name} phase: {:?}", record.phases))
+            .clone()
+    };
+    let window = phase("readiness_window");
+    let join = phase("service_join");
+    assert_eq!(join.bound_millis, 10_000);
+    assert!(
+        join.millis >= j.as_millis() as u64,
+        "aborted at the bound: {join:?}"
+    );
+    let serial = u128::from(window.millis + join.millis);
+    assert!(
+        took.as_millis() < serial,
+        "the join overlaps the drains: SIGTERM to exit took {} ms, the readiness window and \
+         the join one after the other would take {serial} ms",
+        took.as_millis()
     );
 }
