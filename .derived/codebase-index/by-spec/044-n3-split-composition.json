@@ -1,14 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '044-n3-split-composition' file unit 'deploy/n3-split/' does not exist",
-        "path": "deploy/n3-split/"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "020-edge-server",
@@ -141,6 +131,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "deploy/n3-split/",
+        "source": "spec-edge"
+      },
+      {
         "path": "scripts/k8s-validate.sh",
         "source": "spec-edge"
       }
@@ -173,7 +167,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "deploy/n3-split/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
