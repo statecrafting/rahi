@@ -40,6 +40,7 @@ extends:
   - { spec: "022-session-and-principal", unit: "crates/rahi-idp/src/session.rs", nature: amending }
   - { spec: "038-native-clients-and-bearer-revocation", unit: "crates/rahi-idp/src/revoke.rs", nature: amending }
   - { spec: "038-native-clients-and-bearer-revocation", unit: "crates/rahi-idp/src/native.rs", nature: amending }
+  - { spec: "025-api-tokens-and-resource-server", unit: "crates/rahi-idp/tests/bearer.rs", nature: additive }
   - { spec: "037-identity-recovery-and-live-proof", unit: "crates/rahi-ops/src/rauthy_session.rs", nature: amending }
   - { spec: "031-single-container-packaging", unit: "crates/rahi-ops/src/supervise.rs", nature: amending }
   - { spec: "031-single-container-packaging", unit: "crates/rahi-ops/src/first_boot.rs", nature: additive }
