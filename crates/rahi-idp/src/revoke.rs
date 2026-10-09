@@ -251,7 +251,7 @@ impl Revoker {
     ///
     /// [`Error::Config`] when the loopback client cannot be built.
     pub fn ending_grants(mut self, config: &IdpConfig, admin_token: &str) -> Result<Self> {
-        let client = reqwest::Client::builder()
+        let client = crate::back_channel::builder()?
             .build()
             .map_err(|err| Error::Config(format!("the loopback client cannot be built: {err}")))?;
         self.admin = Some(Admin {

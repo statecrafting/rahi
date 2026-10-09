@@ -67,7 +67,7 @@ impl Proxy {
             Error::Config(format!("the public URL is not a legal header value: {err}"))
         })?;
         let proto = HeaderValue::from_static(config.forwarded_proto());
-        let client = reqwest::Client::builder()
+        let client = crate::back_channel::builder()?
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|err| Error::Config(format!("the loopback client cannot be built: {err}")))?;

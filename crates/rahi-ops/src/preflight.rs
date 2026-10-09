@@ -280,8 +280,8 @@ async fn run_inner(env: &dyn EnvReader, manifest_text: &str, apps: Vec<AppCheck>
     let mut rauthy_answers = false;
     match keys.admin_token() {
         Ok(token) => {
-            let rauthy =
-                RauthyApi::new(config.rauthy_base_url(), token).map_err(|err| err.to_string());
+            let rauthy = RauthyApi::new(rahi_idp::back_channel::base(&config), token)
+                .map_err(|err| err.to_string());
             let verdict = match rauthy {
                 Ok(api) => api
                     .health()

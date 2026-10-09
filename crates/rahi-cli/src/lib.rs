@@ -111,10 +111,29 @@ pub fn run_with<C: Cell>(args: &[String], env: &dyn EnvReader) -> i32 {
 /// Run `verb`; the code is the process exit code, which only `supervise`
 /// (spec 031 B-3, the child's code) makes anything but zero on `Ok`.
 async fn dispatch<C: Cell>(verb: Verb, env: &dyn EnvReader) -> Result<i32> {
+    // Spec 044 B-1, B-2: a remote Rauthy is reached only through the internal
+    // Service over TLS verified against the mounted CA, for every verb.
+    rahi_idp::back_channel::install_from_env(env)?;
     match verb {
         Verb::Supervise => supervise::<C>(env).await,
         Verb::FirstBoot { export: true } => {
-            print!("{}", rahi_ops::first_boot::export(env)?);
+            // Spec 044: a remote-identity cell also gets Rauthy's own
+            // environment, from the same key set.
+            let standalone = if RauthyMode::from_env(env)? == RauthyMode::Remote {
+                Some(
+                    rahi_kernel::Manifest::parse(C::manifest())?
+                        .app
+                        .name
+                        .as_str()
+                        .to_owned(),
+                )
+            } else {
+                None
+            };
+            print!(
+                "{}",
+                rahi_ops::first_boot::export_with(env, standalone.as_deref())?
+            );
             Ok(0)
         }
         Verb::FirstBoot { export: false } => first_boot::<C>(env).await.map(|()| 0),
@@ -234,7 +253,10 @@ async fn supervise<C: Cell>(env: &dyn EnvReader) -> Result<i32> {
     // number of hours in its own configuration rather than as a client
     // field, so the manifest's value is applied to the child at every start.
     sup::apply_device_grant_lifetime(&mut rauthy, &manifest);
-    let api = rahi_ops::rauthy_api::RauthyApi::new(config.rauthy_base_url(), keys.admin_token()?)?;
+    let api = rahi_ops::rauthy_api::RauthyApi::new(
+        rahi_idp::back_channel::base(&config),
+        keys.admin_token()?,
+    )?;
     let ready = async {
         sup::wait_healthy(&api, sup::HEALTH_BUDGET).await?;
         // Spec 037 B-3 and B-1, in that order: a restored rauthy has just
@@ -605,7 +627,7 @@ async fn backup(booted: &Booted, to: &Destination, env: &dyn EnvReader) -> Resul
     // passkey can (spec 037 B-1). A key set minted before spec 037 holds
     // none, and the verb says so by name rather than failing on a 401.
     let rauthy = rahi_ops::rauthy_api::RauthyApi::new(
-        booted.config.rauthy_base_url(),
+        rahi_idp::back_channel::base(&booted.config),
         booted.keys.admin_token()?,
     )?
     .with_passkey(booted.keys.backup_passkey()?);

@@ -20,6 +20,7 @@ depends_on:
 establishes:
   - "deploy/n3-split/"
   - "crates/rahi-cli/tests/split.rs"
+  - "crates/rahi-idp/src/back_channel.rs"
 extends:
   - { spec: "020-edge-server", unit: "crates/rahi-edge/src/probes.rs", nature: amending }
   - { spec: "021-idp-proxy-and-discovery", unit: "crates/rahi-idp/src/config.rs", nature: amending }
@@ -30,6 +31,26 @@ extends:
   - { spec: "031-single-container-packaging", unit: "crates/rahi-ops/src/rauthy_env.rs", nature: additive }
   - { spec: "032-cluster-topology", unit: "scripts/k8s-validate.sh", nature: amending }
   - { spec: "032-cluster-topology", unit: "deploy/README.md", nature: amending }
+  # The back channel's TLS, at every client that reaches Rauthy (B-1, B-2).
+  - { spec: "010-workspace-and-core-types", unit: "Cargo.toml", nature: additive }
+  - { spec: "021-idp-proxy-and-discovery", unit: "crates/rahi-idp/src/lib.rs", nature: additive }
+  - { spec: "021-idp-proxy-and-discovery", unit: "crates/rahi-idp/src/jwks.rs", nature: amending }
+  - { spec: "021-idp-proxy-and-discovery", unit: "crates/rahi-idp/src/proxy.rs", nature: amending }
+  - { spec: "021-idp-proxy-and-discovery", unit: "crates/rahi-idp/src/bootstrap.rs", nature: amending }
+  - { spec: "022-session-and-principal", unit: "crates/rahi-idp/src/session.rs", nature: amending }
+  - { spec: "038-native-clients-and-bearer-revocation", unit: "crates/rahi-idp/src/revoke.rs", nature: amending }
+  - { spec: "038-native-clients-and-bearer-revocation", unit: "crates/rahi-idp/src/native.rs", nature: amending }
+  - { spec: "037-identity-recovery-and-live-proof", unit: "crates/rahi-ops/src/rauthy_session.rs", nature: amending }
+  - { spec: "031-single-container-packaging", unit: "crates/rahi-ops/src/supervise.rs", nature: amending }
+  - { spec: "031-single-container-packaging", unit: "crates/rahi-ops/src/first_boot.rs", nature: additive }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/preflight.rs", nature: amending }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/lib.rs", nature: additive }
+  # The startup probe and the in-place router (B-5).
+  - { spec: "020-edge-server", unit: "crates/rahi-edge/src/router.rs", nature: additive }
+  - { spec: "020-edge-server", unit: "crates/rahi-edge/src/lib.rs", nature: additive }
+  - { spec: "020-edge-server", unit: "crates/rahi-edge/Cargo.toml", nature: additive }
+  - { spec: "024-hardening", unit: "crates/rahi-edge/src/exposure.rs", nature: additive }
+  - { spec: "023-observability", unit: "crates/rahi-edge/src/obs/layer.rs", nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/01-consumer-contract.md" }, role: context }
   - { unit: { kind: file, path: "docs/design/02-operational-prerequisites.md" }, role: context }
@@ -330,6 +351,92 @@ establishes N=3 support.
   B-n, FR or AC text. The approval does not establish N=3 support; AC-3
   and AC-4 still need operator evidence on a named release, and the
   obligations of 040, 041, 042 and 032 AC-2 named above remain owed.
+
+### Build decisions (2026-10-08)
+
+- **D-2 (the back channel, B-1, B-2).** `rahi_idp::back_channel` is one
+  process-wide setting, installed when a verb starts from `RAHI_RAUTHY_URL`
+  (which must be `https`) and `RAHI_RAUTHY_CA` (a PEM bundle holding at
+  least one certificate). With it installed, every client that reaches
+  Rauthy is built from it: discovery, JWKS, the session client, the proxy,
+  client bootstrap, native clients, revocation, the backup admin's session,
+  `RauthyApi` (health, readiness, backup), preflight, and the secret read.
+  It trusts only the mounted CA (`tls_certs_only`) and refuses plaintext
+  (`https_only`). Without it, every client is the loopback client of 031,
+  unchanged. Rejected: a field on `IdpConfig`, which would break the struct
+  literals other specs' tests build; and `SSL_CERT_FILE`, which would
+  replace the trust of every outbound call, S3 backups included.
+- **D-3 (no dependency changes).** The workspace's `reqwest` now declares
+  the `rustls` feature. hiqlite already enabled it through feature
+  unification, so `Cargo.lock` is unchanged. `tower`, which `rahi-edge`
+  already carried as a dev-dependency, is promoted to a normal dependency
+  for `router::switching`; the lock lists dev-dependencies too, so it does
+  not change either. No version moves, and the summary's "changes no
+  dependency" holds.
+- **D-4 (remote startup and readiness, B-4 to B-6).** `RAHI_RAUTHY_MODE=remote`
+  binds the listener with only the chassis's own routes (the probes,
+  `/metrics`, `/binding`). It then composes identity in the background:
+  discovery waits up to 10 s per attempt, with backoff from 1 s to 15 s.
+  When composition succeeds, the full router replaces the first one in place
+  through `rahi_edge::router::switching`, with no restart. `/readyz` adds the
+  check `identity`: an authenticated `GET /auth/v1/ready` through the
+  internal Service must answer `200`, and the composition must be done.
+  `/healthz` is unchanged and never consults Rauthy. A new startup probe,
+  `/startupz`, checks the store and the chain head and nothing a readiness
+  check names. A stop aborts a composition still retrying before the store
+  shuts.
+- **D-5 (the client bootstrap without a supervisor).** At N=1, `supervise`
+  registers the cell's OIDC client and custodies its secret (021 B-5,
+  038 B-3). A remote cell has no supervisor, so its background composition
+  runs the same idempotent `custody_client` first. The secret falls back to
+  the data volume when the key Secret is mounted read-only. `supervise`'s
+  other two N=1 steps are Rauthy-side settings at N=3, carried in Rauthy's
+  own StatefulSet: the API key's re-applied access (043 D-24) and the
+  refresh-token lifetime (038 D-11).
+- **D-6 (an https public URL).** Rauthy names its issuer with the scheme it
+  listens on. A remote Rauthy listens on its native TLS, so its issuer is
+  `https://<public host>/auth/v1/`. `serve` therefore refuses remote mode
+  with an `http` public URL, which could never match and would retry
+  forever.
+- **D-7 (AC-2's evidence).** `tests/split.rs` mints a CA and a server
+  certificate with `openssl`. It starts the Rauthy binary named by
+  `RAHI_TEST_RAUTHY` alone, with `rauthy_env::standalone_tls`, and drives
+  AC-2 against it. `live.yml` runs the whole suite with the pinned Rauthy
+  and refuses skips, so AC-2 is executed there on every change. Locally it
+  passed on 2026-10-08 against the patched Rauthy debug build.
+
+- **D-8 (the split overlay and its validation, FR-001).** `deploy/n3-split`
+  is its own kustomization rather than a patch of `deploy/k8s`, because
+  the supervised base's shape (one StatefulSet holding both clusters,
+  `Parallel` start) is what this layout replaces. `scripts/k8s-validate.sh`
+  checks it as the split layout whenever the render's rahi config names
+  `RAHI_RAUTHY_MODE: remote`. The run generates twelve fixtures, one per
+  FR-001 rule plus B-2's plaintext URL, and each is refused by name. In
+  remote mode, `rahi first-boot --export` also renders Rauthy's environment
+  as the `rauthy-env` Secret from the same key set
+  (`rauthy_env::standalone_secret`). The node id comes from the ordinal
+  (`HQL_NODE_ID_FROM=k8s`), the peers from `RAHI_RAUTHY_HQL_NODES`, the
+  trusted proxy from `RAHI_RAUTHY_TRUSTED_PROXIES`, and native TLS from
+  `/tls`.
+
+### Status (2026-10-08)
+
+Built and verified here: B-1, B-2 (D-2, D-6), B-3 and B-7 to B-9 in the
+overlay with FR-001's validation and negative fixtures (AC-1), B-4 to B-6
+(D-4, D-5), and AC-2 against a real patched Rauthy over native TLS (D-7).
+B-10's backup reaches Rauthy through `rauthy-internal`, and the README
+states the two-instant skew. This spec stays `in-progress` for what no
+session can close here:
+
+- **AC-3 and AC-4** are operator checks on a named release and a real
+  three-node cluster. Neither has run.
+- **B-8's grace** is a placeholder of 60 s on both StatefulSets until AC-4
+  measures a single-node stop at N=3.
+- **B-11** is held by D-1 until a hiqlite release carries the offline
+  export.
+- **B-12** is owed. The cell archive does not yet name both images and both
+  clusters' applied log ids. Rauthy's applied log id is not exposed to rahi
+  by any route its backup uses, so this needs a decision on its source.
 
 ## Verification
 

@@ -18,6 +18,9 @@ rahi-ledger = { workspace = true }
 rahi-kernel = { workspace = true }
 axum = { workspace = true }
 tower-http = { workspace = true }
+# `router::switching` calls a router as a service (spec 044 B-5). It was a
+# dev-dependency already, so the lockfile does not change.
+tower = { workspace = true, features = ["util"] }
 getrandom = { workspace = true }
 base64 = { workspace = true }
 serde_json = { workspace = true }
@@ -41,7 +44,6 @@ prometheus = { workspace = true, features = ["process"] }
 [dev-dependencies]
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
-tower = { workspace = true, features = ["util"] }
 
 [lints]
 workspace = true

@@ -94,7 +94,7 @@ impl Discovery {
     ///
     /// As [`Discovery::fetch`].
     pub async fn fetch_within(config: &IdpConfig, budget: Duration) -> Result<Self> {
-        let client = reqwest::Client::builder()
+        let client = crate::back_channel::builder()?
             .build()
             .map_err(|err| Error::Config(format!("the loopback client cannot be built: {err}")))?;
         let url = config.discovery_url();

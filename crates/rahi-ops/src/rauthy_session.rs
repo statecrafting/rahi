@@ -516,7 +516,7 @@ impl AdminSession {
     ///
     /// [`Error::Config`] when the HTTP client cannot be built.
     pub fn new(base: &str) -> Result<Self> {
-        let client = reqwest::Client::builder()
+        let client = rahi_idp::back_channel::builder()?
             .timeout(CALL_TIMEOUT)
             .user_agent(USER_AGENT)
             .redirect(reqwest::redirect::Policy::none())
@@ -905,7 +905,7 @@ pub async fn ensure_backup_admin(
     let api = AdminApiKey {
         base,
         token: admin_token,
-        client: reqwest::Client::builder()
+        client: rahi_idp::back_channel::builder()?
             .timeout(CALL_TIMEOUT)
             .user_agent(USER_AGENT)
             .build()

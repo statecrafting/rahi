@@ -74,7 +74,7 @@ impl IdpConfig {
         validate_client_id(client_id)?;
         let origin = config.public_url.as_str();
         Ok(Self {
-            loopback_base: config.rauthy_base_url(),
+            loopback_base: crate::back_channel::base(config),
             issuer: format!("{origin}{ISSUER_PATH}"),
             client_id: client_id.to_owned(),
             redirect_uri: format!("{origin}{CALLBACK_PATH}"),

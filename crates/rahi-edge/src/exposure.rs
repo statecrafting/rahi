@@ -21,7 +21,7 @@ use rahi_types::{Error, Result};
 
 use crate::middleware::csrf;
 use crate::obs::METRICS_PATH;
-use crate::probes::{HEALTHZ_PATH, READYZ_PATH};
+use crate::probes::{HEALTHZ_PATH, READYZ_PATH, STARTUPZ_PATH};
 
 /// The path the static slot's fallback is recorded under.
 ///
@@ -232,10 +232,11 @@ pub fn default_class(prefix: &str) -> RouteClass {
     }
 }
 
-/// Whether `path` is one of the three surfaces mounted outside the guards.
+/// Whether `path` is one of the surfaces mounted outside the guards: the
+/// probes (with spec 044's startup probe) and the metrics.
 #[must_use]
 pub fn is_probe(path: &str) -> bool {
-    [HEALTHZ_PATH, READYZ_PATH, METRICS_PATH].contains(&path)
+    [HEALTHZ_PATH, READYZ_PATH, STARTUPZ_PATH, METRICS_PATH].contains(&path)
 }
 
 /// The process-wide table, the union of every router built in this process.

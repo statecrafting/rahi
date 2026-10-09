@@ -233,7 +233,7 @@ pub async fn provision_native_clients(
     if clients.is_empty() {
         return Ok(Vec::new());
     }
-    let http = reqwest::Client::builder()
+    let http = crate::back_channel::builder()?
         .build()
         .map_err(|err| Error::Config(format!("the loopback client cannot be built: {err}")))?;
     let authorization = format!("{API_KEY_SCHEME} {admin_token}");
@@ -318,7 +318,7 @@ pub async fn apply_lifetime(
     client_id: &str,
     lifetime: u64,
 ) -> Result<bool> {
-    let http = reqwest::Client::builder()
+    let http = crate::back_channel::builder()?
         .build()
         .map_err(|err| Error::Config(format!("the loopback client cannot be built: {err}")))?;
     let authorization = format!("{API_KEY_SCHEME} {admin_token}");
@@ -359,7 +359,7 @@ pub async fn apply_lifetime(
 /// As [`provision_native_clients`]; [`Error::NotFound`] when rauthy holds no
 /// such client.
 pub async fn read_lifetime(config: &IdpConfig, admin_token: &str, client_id: &str) -> Result<u64> {
-    let http = reqwest::Client::builder()
+    let http = crate::back_channel::builder()?
         .build()
         .map_err(|err| Error::Config(format!("the loopback client cannot be built: {err}")))?;
     let authorization = format!("{API_KEY_SCHEME} {admin_token}");

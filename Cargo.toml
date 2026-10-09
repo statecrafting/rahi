@@ -72,7 +72,7 @@ getrandom = "0.4"
 # and revocation endpoints are addressed: OAuth 2 posts
 # `application/x-www-form-urlencoded` and nothing else. reqwest is already in
 # the tree under hiqlite at this version, so this adds no second HTTP client.
-reqwest = { version = "0.13", default-features = false, features = ["stream", "json", "form"] }
+reqwest = { version = "0.13", default-features = false, features = ["stream", "json", "form", "rustls"] }
 
 # Sessions (spec 022): one primitive library covers all three of this spec's
 # cryptographic needs. HMAC-SHA256 seals the session envelope, SHA-256 is the

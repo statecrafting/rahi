@@ -249,6 +249,7 @@ impl EdgeBuilder {
         for path in [
             probes::HEALTHZ_PATH,
             probes::READYZ_PATH,
+            probes::STARTUPZ_PATH,
             crate::obs::METRICS_PATH,
         ] {
             table.record(Route::new(path, RouteClass::Probe));
@@ -411,5 +412,25 @@ fn refusing(err: Error) -> Router {
     Router::new().fallback(move || {
         let err = err.clone();
         async move { error::response(&err) }
+    })
+}
+
+/// A router that serves whichever router `slot` holds when each request
+/// arrives, so a cell can replace its router in place (spec 044 B-5): a
+/// remote-identity cell answers its probes before Rauthy is reachable and
+/// gains its identity routes, without a restart, once they compose.
+pub fn switching(slot: std::sync::Arc<std::sync::RwLock<Router>>) -> Router {
+    use tower::ServiceExt as _;
+    Router::new().fallback(move |request: axum::extract::Request| {
+        let router = slot
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        async move {
+            match router.oneshot(request).await {
+                Ok(response) => response,
+                Err(never) => match never {},
+            }
+        }
     })
 }

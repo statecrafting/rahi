@@ -187,6 +187,17 @@ pub const EXPORT_SECRET_NAME: &str = "rahi-keys";
 /// party of the backup admin's passkey is derived from; [`Error::Io`] when
 /// entropy is refused or the temporary directory cannot be written.
 pub fn export(env: &dyn EnvReader) -> Result<String> {
+    export_with(env, None)
+}
+
+/// [`export`], and for a cell named `standalone_app` whose Rauthy is its own
+/// StatefulSet (spec 044), Rauthy's environment as a second Secret rendered
+/// from the same key set.
+///
+/// # Errors
+///
+/// As [`export`], and as [`rauthy_env::standalone_secret`].
+pub fn export_with(env: &dyn EnvReader, standalone_app: Option<&str>) -> Result<String> {
     use base64::Engine as _;
     let config = Config::from_env(env)?;
     let dir = tempfile::tempdir().map_err(|err| {
@@ -212,6 +223,15 @@ pub fn export(env: &dyn EnvReader) -> Result<String> {
             "  {name}: {}\n",
             base64::engine::general_purpose::STANDARD.encode(bytes)
         ));
+    }
+    if let Some(app_name) = standalone_app {
+        out.push_str("---\n");
+        out.push_str(&rauthy_env::standalone_secret(
+            &config,
+            &keys.rauthy_secrets()?,
+            app_name,
+            env,
+        )?);
     }
     Ok(out)
 }

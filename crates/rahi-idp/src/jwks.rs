@@ -141,7 +141,7 @@ impl Jwks {
     ///
     /// As [`Jwks::load`].
     pub async fn load_with(discovery: &Discovery, options: JwksOptions) -> Result<Self> {
-        let client = reqwest::Client::builder()
+        let client = crate::back_channel::builder()?
             .build()
             .map_err(|err| Error::Config(format!("the loopback client cannot be built: {err}")))?;
         let uri = discovery.jwks_uri.clone();
