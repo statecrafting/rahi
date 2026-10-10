@@ -103,12 +103,35 @@ impl Stopping {
 pub const HEALTHZ_PATH: &str = "/healthz";
 /// The readiness path.
 pub const READYZ_PATH: &str = "/readyz";
+/// The startup probe (spec 044 B-5): the store and the chain, never a
+/// [`ReadinessCheck`], so a cell whose identity is remote can start while
+/// Rauthy is away.
+pub const STARTUPZ_PATH: &str = "/startupz";
 
 /// The two probe routes, to be merged outside the CSRF and rate-limit layers.
 pub fn router() -> Router<AppState> {
     Router::new()
         .route(HEALTHZ_PATH, get(healthz))
         .route(READYZ_PATH, get(readyz))
+        .route(STARTUPZ_PATH, get(startupz))
+}
+
+/// Spec 044 B-5: started means the store answers and the chain head reads.
+/// Nothing a [`ReadinessCheck`] names is consulted.
+async fn startupz(State(state): State<AppState>) -> Response {
+    if let Err(err) = state.store().health().await {
+        if rahi_store::is_recovering(&err) {
+            return recovering(&err);
+        }
+        return not_ready("store", &err);
+    }
+    if let Err(err) = state.ledger().head().await {
+        return not_ready("ledger", &err);
+    }
+    json_response(
+        StatusCode::OK,
+        &json!({ "status": "started", "store": "up", "ledger": "verified" }),
+    )
 }
 
 /// Liveness: the process answers. Nothing else is asserted and nothing is

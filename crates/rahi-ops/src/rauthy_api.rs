@@ -39,6 +39,10 @@ use crate::rauthy_session::{AdminSession, Passkey};
 /// rauthy's health route, relative to the loopback base.
 pub const HEALTH_PATH: &str = "/auth/v1/health";
 
+/// rauthy's readiness route (spec 044 B-6): `503` while its storage layer is
+/// unreachable.
+pub const READY_PATH: &str = "/auth/v1/ready";
+
 /// rauthy's backup route: `POST` triggers one, `GET` lists them.
 pub const BACKUP_PATH: &str = "/auth/v1/backup";
 
@@ -109,7 +113,7 @@ impl RauthyApi {
     ///
     /// [`Error::Config`] when the HTTP client cannot be built.
     pub fn new(base: impl Into<String>, token: impl Into<String>) -> Result<Self> {
-        let client = reqwest::Client::builder()
+        let client = rahi_idp::back_channel::builder()?
             .timeout(CALL_TIMEOUT)
             .build()
             .map_err(|err| Error::Config(format!("the loopback client cannot be built: {err}")))?;
@@ -159,6 +163,36 @@ impl RauthyApi {
             .await
             .map_err(|err| Error::Upstream(format!("rauthy does not answer at {url}: {err}")))?;
         if response.status().is_server_error() {
+            return Err(Error::Upstream(format!(
+                "rauthy answers {} at {url}",
+                response.status()
+            )));
+        }
+        Ok(())
+    }
+
+    /// rauthy is ready: an authenticated `GET /auth/v1/ready` answers `200`
+    /// (spec 044 B-6). A transient failure and a terminal one look the same
+    /// here, and both are not-ready.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Upstream`] naming the address when nothing answers within
+    /// [`HEALTH_TIMEOUT`] or the answer is not a success.
+    pub async fn ready(&self) -> Result<()> {
+        let url = format!("{}{READY_PATH}", self.base);
+        let response = self
+            .client
+            .get(&url)
+            .header(
+                reqwest::header::AUTHORIZATION,
+                format!("{} {}", rahi_idp::config::API_KEY_SCHEME, self.token),
+            )
+            .timeout(HEALTH_TIMEOUT)
+            .send()
+            .await
+            .map_err(|err| Error::Upstream(format!("rauthy does not answer at {url}: {err}")))?;
+        if !response.status().is_success() {
             return Err(Error::Upstream(format!(
                 "rauthy answers {} at {url}",
                 response.status()

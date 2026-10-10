@@ -185,7 +185,7 @@ impl ClientSettings {
 /// admin token; [`Error::Upstream`] when rauthy cannot be reached or answers
 /// with a status the bootstrap does not expect.
 pub async fn bootstrap_client(config: &IdpConfig, admin_token: &str) -> Result<Bootstrap> {
-    let client = reqwest::Client::builder()
+    let client = crate::back_channel::builder()?
         .build()
         .map_err(|err| Error::Config(format!("the loopback client cannot be built: {err}")))?;
     let settings = ClientSettings::for_config(config);

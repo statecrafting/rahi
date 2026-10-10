@@ -382,6 +382,145 @@ pub fn render(
     Ok(out)
 }
 
+/// The networks a standalone Rauthy trusts `X-Forwarded-*` from (spec 044):
+/// the pod network rahi's pods are on. Only rahi's pods are admitted to its
+/// HTTP port (B-3), so the proxy it trusts is the cell itself.
+pub const ENV_RAUTHY_TRUSTED_PROXIES: &str = "RAHI_RAUTHY_TRUSTED_PROXIES";
+
+/// The Secret a standalone Rauthy StatefulSet reads its environment from.
+pub const STANDALONE_SECRET_NAME: &str = "rauthy-env";
+
+/// Where a standalone Rauthy's certificate and key are mounted.
+pub const STANDALONE_TLS_DIR: &str = "/tls";
+
+/// Where a standalone Rauthy keeps its hiqlite data, on its own claim.
+pub const STANDALONE_DATA_DIR: &str = "/app/data";
+
+/// The port a standalone Rauthy serves its native TLS on, which the
+/// `rauthy-internal` Service names.
+pub const STANDALONE_HTTPS_PORT: u16 = 8443;
+
+/// Rauthy's environment for its own StatefulSet (spec 044 A-031, B-2, B-8):
+/// the template rendered for this cell, with the per-pod and per-unit
+/// values replaced. The node id comes from the pod's ordinal
+/// (`HQL_NODE_ID_FROM=k8s`), the peers from [`ENV_RAUTHY_HQL_NODES`], the
+/// listeners bind the pod network, the proxy is trusted from
+/// [`ENV_RAUTHY_TRUSTED_PROXIES`], and the HTTP surface is native TLS.
+///
+/// # Errors
+///
+/// [`Error::Config`] when [`ENV_RAUTHY_HQL_NODES`] or
+/// [`ENV_RAUTHY_TRUSTED_PROXIES`] is unset, or as [`render`].
+pub fn standalone_env(
+    config: &Config,
+    secrets: &RauthySecrets,
+    app_name: &str,
+    env: &dyn rahi_types::EnvReader,
+) -> Result<Vec<(String, String)>> {
+    let nodes = env
+        .get(ENV_RAUTHY_HQL_NODES)
+        .ok_or_else(|| {
+            Error::Config(format!(
+                "a standalone Rauthy needs its peers in {ENV_RAUTHY_HQL_NODES} (spec 044 B-8)"
+            ))
+        })
+        .and_then(|raw| parse_nodes(&raw))?;
+    let trusted = env
+        .get(ENV_RAUTHY_TRUSTED_PROXIES)
+        .filter(|t| !t.trim().is_empty())
+        .ok_or_else(|| {
+            Error::Config(format!(
+                "a standalone Rauthy needs the pod network rahi proxies from in \
+                 {ENV_RAUTHY_TRUSTED_PROXIES}"
+            ))
+        })?;
+    let ports = HqlPorts {
+        raft: DEFAULT_HQL_RAFT_PORT,
+        api: DEFAULT_HQL_API_PORT,
+        node_id: 1,
+        nodes: Some(nodes),
+        listen_addr: "0.0.0.0".to_owned(),
+    };
+    let rendered = render(config, secrets, app_name, ports)?;
+    let replaced = [
+        "HQL_NODE_ID",
+        "LISTEN_ADDRESS",
+        "HQL_DATA_DIR",
+        "PROXY_MODE",
+        "TRUSTED_PROXIES",
+        "COOKIE_MODE",
+    ];
+    let mut pairs: Vec<(String, String)> = parse(&rendered)
+        .into_iter()
+        .filter(|(key, _)| !replaced.contains(&key.as_str()))
+        .collect();
+    let tls = std::path::Path::new(STANDALONE_TLS_DIR);
+    pairs.extend(
+        [
+            ("HQL_NODE_ID_FROM", "k8s".to_owned()),
+            ("LISTEN_ADDRESS", "0.0.0.0".to_owned()),
+            ("HQL_DATA_DIR", STANDALONE_DATA_DIR.to_owned()),
+            ("PROXY_MODE", "true".to_owned()),
+            ("TRUSTED_PROXIES", trusted.trim().to_owned()),
+        ]
+        .into_iter()
+        .chain(standalone_tls(
+            &tls.join("tls.crt"),
+            &tls.join("tls.key"),
+            STANDALONE_HTTPS_PORT,
+        ))
+        .map(|(k, v)| (k.to_owned(), v)),
+    );
+    Ok(pairs)
+}
+
+/// [`standalone_env`] as the Kubernetes Secret its StatefulSet mounts with
+/// `envFrom`. Every value is a double-quoted scalar, so a multi-line peer
+/// list survives.
+///
+/// # Errors
+///
+/// As [`standalone_env`].
+pub fn standalone_secret(
+    config: &Config,
+    secrets: &RauthySecrets,
+    app_name: &str,
+    env: &dyn rahi_types::EnvReader,
+) -> Result<String> {
+    let mut out = format!(
+        "# Rauthy's environment for its own StatefulSet (spec 044), rendered with the\n\
+         # key set above: it holds Rauthy's encryption key and bootstrap secrets.\n\
+         apiVersion: v1\nkind: Secret\nmetadata:\n  name: {STANDALONE_SECRET_NAME}\ntype: Opaque\n\
+         stringData:\n"
+    );
+    for (key, value) in standalone_env(config, secrets, app_name, env)? {
+        let quoted = serde_json::to_string(&value)
+            .map_err(|err| Error::Config(format!("{key} cannot be quoted: {err}")))?;
+        out.push_str(&format!("  {key}: {quoted}\n"));
+    }
+    Ok(out)
+}
+
+/// What a standalone Rauthy StatefulSet adds to the rendered environment
+/// (spec 044 B-2, D-1's P-1): Rauthy's native TLS on `https_port`, from the
+/// certificate and key mounted into its pod, and never a self-signed pair it
+/// generates itself. Rahi verifies that certificate against the CA it
+/// mounts (`rahi_idp::back_channel`).
+#[must_use]
+pub fn standalone_tls(
+    cert: &std::path::Path,
+    key: &std::path::Path,
+    https_port: u16,
+) -> Vec<(&'static str, String)> {
+    vec![
+        ("LISTEN_SCHEME", "https".to_owned()),
+        ("LISTEN_PORT_HTTPS", https_port.to_string()),
+        ("TLS_CERT", cert.display().to_string()),
+        ("TLS_KEY", key.display().to_string()),
+        ("TLS_GENERATE_SELF_SIGNED", "false".to_owned()),
+    ]
+}
+
 /// Parse a rendered environment back into pairs: `KEY=VALUE` lines, with
 /// comments and blank lines skipped. A line with no `=` continues the
 /// previous value on a new line, which is how a peer list (one node per

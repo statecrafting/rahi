@@ -66,6 +66,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod back_channel;
 pub mod bearer;
 pub mod bootstrap;
 pub mod config;

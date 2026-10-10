@@ -445,7 +445,7 @@ async fn read_client_secret(idp: &IdpConfig, token: &str) -> Result<String> {
         secret: Option<String>,
     }
     let url = format!("{}/secret", idp.client_url());
-    let client = reqwest::Client::builder()
+    let client = rahi_idp::back_channel::builder()?
         .build()
         .map_err(|err| Error::Config(format!("the loopback client cannot be built: {err}")))?;
     let response = client

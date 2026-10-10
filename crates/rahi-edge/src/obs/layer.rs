@@ -29,7 +29,7 @@ use tracing_subscriber::registry::LookupSpan;
 
 use crate::obs::metrics::Metrics;
 use crate::obs::ring::{Ring, SpanRecord, Trace};
-use crate::probes::{HEALTHZ_PATH, READYZ_PATH};
+use crate::probes::{HEALTHZ_PATH, READYZ_PATH, STARTUPZ_PATH};
 
 /// The name of the span one request opens.
 pub const REQUEST_SPAN: &str = "http.request";
@@ -293,8 +293,8 @@ pub fn trace_id() -> String {
 
 /// The probe paths, which an app may want to keep out of its dashboards.
 #[must_use]
-pub const fn probe_paths() -> [&'static str; 2] {
-    [HEALTHZ_PATH, READYZ_PATH]
+pub const fn probe_paths() -> [&'static str; 3] {
+    [HEALTHZ_PATH, READYZ_PATH, STARTUPZ_PATH]
 }
 
 #[cfg(test)]

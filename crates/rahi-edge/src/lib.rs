@@ -70,7 +70,7 @@ pub use middleware::rate_limit::{ClientResolver, Clock, RateLimiter, RateLimits}
 pub use middleware::security_headers::SecurityHeaders;
 pub use obs::{Metrics, Obs, ObsOptions, Ring, Trace, get_trace, list_traces, subscribe};
 pub use operator::RequireOperator;
-pub use probes::{HEALTHZ_PATH, READYZ_PATH};
+pub use probes::{HEALTHZ_PATH, READYZ_PATH, STARTUPZ_PATH};
 pub use router::{Edge, EdgeBuilder};
 pub use state::AppState;
 pub use stream::{

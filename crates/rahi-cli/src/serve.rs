@@ -162,6 +162,11 @@ pub enum RauthyMode {
     Required,
     /// No identity is mounted.
     None,
+    /// Rauthy is its own workload, reached only through the internal
+    /// Service over TLS (spec 044 B-1, B-2): `serve` starts without it,
+    /// composes identity in the background, and is unready, never dead,
+    /// while it is away (B-4 to B-6).
+    Remote,
 }
 
 impl RauthyMode {
@@ -174,8 +179,9 @@ impl RauthyMode {
         match env.get(ENV_RAUTHY_MODE).as_deref() {
             None | Some("") | Some("required") => Ok(Self::Required),
             Some("none") => Ok(Self::None),
+            Some("remote") => Ok(Self::Remote),
             Some(other) => Err(Error::Config(format!(
-                "{ENV_RAUTHY_MODE} must be required or none, not {other:?}"
+                "{ENV_RAUTHY_MODE} must be required, remote or none, not {other:?}"
             ))),
         }
     }
@@ -373,6 +379,9 @@ pub struct Composed {
     /// The state every route received, which `serve` hands to the cell's
     /// managed services (spec 047 B-3).
     pub state: AppState,
+    /// A remote cell's background identity composition (spec 044 B-5),
+    /// aborted when the cell stops before it finished.
+    pub identity_task: Option<tokio::task::AbortHandle>,
 }
 
 /// Compose the cell's router over a booted cell (B-2, without the listener).
@@ -481,28 +490,98 @@ pub async fn compose_parts<C: Cell>(
     .with_extension(streams.clone());
     let stopping = rahi_edge::probes::Stopping::new();
     state = state.with_extension(stopping.clone());
-    if RauthyMode::from_env(env)? == RauthyMode::Required {
-        // Spec 043 B-8: a Rauthy that is up and unready fails readiness, on
-        // every call, and never ends the process.
-        let api = rahi_ops::rauthy_api::RauthyApi::new(
-            booted.config.rauthy_base_url(),
-            booted.keys.admin_token().unwrap_or_default(),
-        )?;
-        state = state.with_extension(rahi_edge::probes::ReadinessCheck::new(
-            "rauthy",
-            move || {
-                let api = api.clone();
-                async move {
-                    tokio::time::timeout(RAUTHY_READY_WAIT, api.health())
-                    .await
-                    .map_err(|_| {
-                        Error::Upstream(format!(
-                            "rauthy did not answer its health route within {RAUTHY_READY_WAIT:?}"
-                        ))
-                    })?
-                }
-            },
-        ));
+    let mode = RauthyMode::from_env(env)?;
+    // Spec 044 B-6: whether a remote identity has been composed, which
+    // remote readiness waits for beside Rauthy's own answer.
+    let composed = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    match mode {
+        RauthyMode::Required => {
+            // Spec 043 B-8: a Rauthy that is up and unready fails readiness,
+            // on every call, and never ends the process.
+            let api = rahi_ops::rauthy_api::RauthyApi::new(
+                rahi_idp::back_channel::base(&booted.config),
+                booted.keys.admin_token().unwrap_or_default(),
+            )?;
+            state = state.with_extension(rahi_edge::probes::ReadinessCheck::new(
+                "rauthy",
+                move || {
+                    let api = api.clone();
+                    async move {
+                        tokio::time::timeout(RAUTHY_READY_WAIT, api.health())
+                            .await
+                            .map_err(|_| {
+                                Error::Upstream(format!(
+                                    "rauthy did not answer its health route within \
+                                     {RAUTHY_READY_WAIT:?}"
+                                ))
+                            })?
+                    }
+                },
+            ));
+        }
+        RauthyMode::Remote => {
+            // Spec 044 B-6: not ready while rahi cannot complete an
+            // authenticated request to Rauthy's `/auth/v1/ready` through the
+            // internal Service, or before identity is composed; never a
+            // liveness failure (B-4).
+            if rahi_idp::back_channel::remote().is_none() {
+                return Err(Error::Config(format!(
+                    "{ENV_RAUTHY_MODE}=remote needs {} and {} (spec 044 B-1, B-2)",
+                    rahi_idp::back_channel::ENV_RAUTHY_URL,
+                    rahi_idp::back_channel::ENV_RAUTHY_CA
+                )));
+            }
+            // Rauthy names its issuer with the scheme it listens on, and a
+            // remote Rauthy listens on its native TLS, so its issuer is
+            // `https`; an `http` public URL could never match it, and the
+            // composition would retry forever (spec 044 D-6).
+            if !booted.config.public_url.is_https() {
+                return Err(Error::Config(format!(
+                    "{ENV_RAUTHY_MODE}=remote needs an https public URL: a remote Rauthy \
+                     serves its native TLS and issues tokens for https://<public host>/auth/v1/"
+                )));
+            }
+            // `/auth/v1/ready` is authenticated, so a key set without the
+            // admin token would fail readiness forever; refuse at startup.
+            let admin_token = booted.keys.admin_token().map_err(|err| {
+                Error::Config(format!(
+                    "{ENV_RAUTHY_MODE}=remote reads Rauthy's ready route with the admin \
+                     token, and the key set has none: {err}"
+                ))
+            })?;
+            let api = rahi_ops::rauthy_api::RauthyApi::new(
+                rahi_idp::back_channel::base(&booted.config),
+                admin_token,
+            )?;
+            let composed = composed.clone();
+            state = state.with_extension(rahi_edge::probes::ReadinessCheck::new(
+                "identity",
+                move || {
+                    let api = api.clone();
+                    let composed = composed.clone();
+                    async move {
+                        tokio::time::timeout(RAUTHY_READY_WAIT, api.ready())
+                            .await
+                            .map_err(|_| {
+                                Error::Upstream(format!(
+                                    "rauthy did not answer its ready route within \
+                                     {RAUTHY_READY_WAIT:?}"
+                                ))
+                            })??;
+                        if composed.load(std::sync::atomic::Ordering::SeqCst) {
+                            Ok(())
+                        } else {
+                            Err(Error::Upstream(
+                                "rauthy answers and the identity routes are still being \
+                                 composed"
+                                    .to_owned(),
+                            ))
+                        }
+                    }
+                },
+            ));
+        }
+        RauthyMode::None => {}
     }
 
     // The app's routes are built first because building them is what
@@ -517,141 +596,310 @@ pub async fn compose_parts<C: Cell>(
         .manifest
         .validate_native_scopes(&rahi_idp::scope::supported().into_iter().collect())?;
 
-    let mut resolver: Option<Sessions> = None;
-    let mut bearer: Option<rahi_idp::RequireBearer> = None;
-    let mut operator_routes = operator_routes;
-    let mut identity: Option<Identity> = None;
-    if RauthyMode::from_env(env)? == RauthyMode::Required {
-        let idp = IdpConfig::derive(&booted.config, booted.manifest.app.name.as_str())?;
-        let discovery = Discovery::fetch(&idp).await?;
-        // rauthy publishes its endpoints on the public origin, which is not
-        // reachable from inside the container; the key set is fetched over
-        // the same loopback base every other back-channel call uses (spec
-        // 021 B-1, spec 031 D-3).
-        let mut on_loopback = discovery.clone();
-        on_loopback.jwks_uri = back_channel(&idp, &discovery.jwks_uri);
-        let jwks = Jwks::load(&on_loopback).await?;
-        let jwks_cache = jwks.clone();
-        let key = SessionKey::load(&booted.keys.path(rahi_ops::SESSION_KEY_FILE))?;
-        let secret_path = rahi_ops::supervise::client_secret_path(&booted.config);
-        let client_secret = std::fs::read_to_string(&secret_path)
-            .map(|text| text.trim().to_owned())
-            .map_err(|err| {
-                Error::Config(format!(
-                    "the OIDC client secret at {} is not custodied yet; run the client bootstrap (spec 021 B-5) first: {err}",
-                    secret_path.display()
-                ))
-            })?;
-        let sessions = Sessions::new(
-            &idp,
-            &booted.config,
-            discovery,
-            jwks,
-            booted.store.handle(),
-            key,
-            client_secret,
-        )?;
-        let resource = Resource::derive(&idp)?;
-
-        // Spec 025's resource server, with spec 038's two additions: the
-        // deny-list remembers a revocation for as long as a token of the
-        // manifest's lifetime can still validate (038 D-7), and the
-        // revocation routes are what write it (038 B-5).
-        let lifetime = Duration::from_secs(booted.manifest.access_token_lifetime_secs());
-        let server = rahi_idp::ResourceServer::new(
-            &booted.config,
-            resource.clone(),
-            jwks_cache.clone(),
-            booted.store.handle(),
-            kernel.clone(),
-        )
-        .with_lifetime(lifetime);
-        let mut revoker = rahi_idp::Revoker::new(server.clone());
-        if let Ok(admin_token) = booted.keys.admin_token() {
-            // Spec 038 D-8: revoking a subject ends the grant at rauthy as
-            // well as deny-listing the access tokens. A cell whose key set
-            // holds no admin token still revokes the tokens and says in its
-            // answer that the grant is untouched.
-            revoker = revoker.ending_grants(&idp, &admin_token)?;
-        }
-        operator_routes = operator_routes.merge(rahi_idp::operator_revoke_router(revoker.clone()));
-
-        // The route a bearer client revokes its own token on is itself a
-        // bearer route: it reads the credential the gate resolved, and
-        // nothing a caller writes decides what is revoked (038 B-5).
-        let declared = declared_bearer.clone().route(rahi_idp::SESSION_REVOKE_PATH);
-        bearer = Some(rahi_idp::RequireBearer::new(server, declared));
-
-        // The proxy and the resource metadata carry their full paths, so they
-        // merge at the root and are named in the exposure table by prefix;
-        // the session routes are relative and nest under their prefix.
-        identity = Some(Identity {
-            proxy: proxy_router(Proxy::new(&idp)?),
-            sessions: session_router(sessions.clone()),
-            resource: resource_router(resource),
-            revoke: rahi_idp::revoke_router(revoker),
-        });
-        resolver = Some(sessions);
-    }
-
-    let mut edge = Edge::builder(state.clone())
-        .binding(binding.bytes().to_vec())
-        .stream_identity(stream_identity())
-        .mount("/", app_routes)
-        .mount_operator(OPERATOR_PREFIX, operator_routes);
-    for route in C::exposed() {
-        edge = edge.expose(route);
-    }
-    if let Some(dir) = static_dir::<C>(env)? {
-        edge = edge.static_slot(dir);
-    }
-    if let Some(identity) = identity {
-        edge = edge
-            .mount("/", identity.proxy)
-            .expose(Route::new(AUTH_PREFIX, RouteClass::Proxy))
-            .mount_public(SESSION_PREFIX, identity.sessions)
-            .mount("/", identity.revoke)
-            .mount("/", identity.resource)
-            .expose(Route::new(rahi_idp::METADATA_PATH, RouteClass::Public));
-    }
-    // Spec 038 B-1: the CSRF check does not apply to a bearer write. The
-    // predicate is passed from here because the facts it reads are the
-    // composer's: which routes were declared bearer, and what this cell's
-    // session cookie is called. A request carrying both credentials is not
-    // exempt and never reaches the check anyway, because the bearer layer
-    // refuses it first (025 B-10).
-    let scheme = booted.config.cookie_scheme;
-    edge = edge.csrf_exemption(std::sync::Arc::new(
-        move |path: &str, headers: &HeaderMap| {
-            rahi_idp::is_bearer_route(path)
-                && headers.contains_key(axum::http::header::AUTHORIZATION)
-                && !rahi_idp::bearer::both_credentials(headers, scheme)
-        },
-    ));
-
-    let router = edge.try_build().map_err(|err| err.0)?;
-    // Spec 022's layer, outermost: it opens the session cookie, renews the
-    // assertion, and leaves the `Principal` in the request extensions that
-    // `Authenticated` and the operator gate read. Outside it every
-    // authenticated route answers 401 (022 D-3), which is what an app with
-    // a login would have met here before the first app existed (034 D-2).
-    let router = match resolver {
-        Some(sessions) => with_sessions(sessions, router),
-        None => router,
+    let assembly = Assembly {
+        state: state.clone(),
+        binding: binding.bytes().to_vec(),
+        app_routes,
+        operator_routes,
+        exposed: C::exposed(),
+        static_dir: static_dir::<C>(env)?,
+        scheme: booted.config.cookie_scheme,
     };
-    // Spec 025 B-11: outside the session layer, where the paths are whole.
-    // It resolves a token, refuses a request carrying two credentials, and
-    // strips any cookie a bearer-authenticated answer tried to set.
-    let router = match bearer {
-        Some(gate) => rahi_idp::with_bearer(gate, router),
-        None => router,
+    let inputs = || -> Result<IdentityInputs> {
+        Ok(IdentityInputs {
+            idp: IdpConfig::derive(&booted.config, booted.manifest.app.name.as_str())?,
+            config: booted.config.clone(),
+            keys: booted.keys.clone(),
+            store: booted.store.handle(),
+            kernel: kernel.clone(),
+            lifetime: Duration::from_secs(booted.manifest.access_token_lifetime_secs()),
+            declared_bearer: declared_bearer.clone(),
+            custody: (mode == RauthyMode::Remote).then(|| booted.manifest.clone()),
+        })
+    };
+    let mut identity_task = None;
+    let router = match mode {
+        RauthyMode::Required => assembly.build(Some(
+            identity(inputs()?, rahi_idp::discovery::BOOT_BUDGET).await?,
+        ))?,
+        RauthyMode::None => assembly.build(None)?,
+        RauthyMode::Remote => {
+            // Spec 044 B-5: serve starts and answers its probes without
+            // Rauthy. Until identity is composed only the chassis's own
+            // routes are mounted (the probes, `/metrics`, `/binding`), and
+            // readiness says so; the full router replaces them once the
+            // background composition succeeds, with no restart.
+            let probes_only = Assembly {
+                app_routes: Router::new(),
+                operator_routes: Router::new(),
+                exposed: Vec::new(),
+                static_dir: None,
+                ..assembly.clone()
+            }
+            .build(None)?;
+            let slot = std::sync::Arc::new(std::sync::RwLock::new(probes_only));
+            let inputs = inputs()?;
+            let task = {
+                let slot = slot.clone();
+                let composed = composed.clone();
+                tokio::spawn(async move {
+                    let mut pause = REMOTE_RETRY_FIRST;
+                    loop {
+                        let built = identity(inputs.clone(), REMOTE_DISCOVERY_WAIT)
+                            .await
+                            .and_then(|parts| assembly.build(Some(parts)));
+                        match built {
+                            Ok(router) => {
+                                *slot
+                                    .write()
+                                    .unwrap_or_else(std::sync::PoisonError::into_inner) = router;
+                                composed.store(true, std::sync::atomic::Ordering::SeqCst);
+                                eprintln!("serve: identity composed against the remote rauthy");
+                                return;
+                            }
+                            Err(err) => {
+                                eprintln!(
+                                    "serve: identity is not composed yet; retrying in {pause:?}: \
+                                     {err}"
+                                );
+                                tokio::time::sleep(pause).await;
+                                pause = (pause * 2).min(REMOTE_RETRY_MAX);
+                            }
+                        }
+                    }
+                })
+            };
+            identity_task = Some(task.abort_handle());
+            rahi_edge::router::switching(slot)
+        }
     };
     Ok(Composed {
         router,
         kernel,
         stopping,
         state,
+        identity_task,
     })
+}
+
+/// Aborts a task when dropped.
+struct AbortOnDrop(Option<tokio::task::AbortHandle>);
+
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        if let Some(task) = self.0.take() {
+            task.abort();
+        }
+    }
+}
+
+/// How long one remote discovery attempt waits for Rauthy (spec 044 B-5).
+const REMOTE_DISCOVERY_WAIT: Duration = Duration::from_secs(10);
+/// The first pause between remote composition attempts.
+const REMOTE_RETRY_FIRST: Duration = Duration::from_secs(1);
+/// The longest pause between remote composition attempts.
+const REMOTE_RETRY_MAX: Duration = Duration::from_secs(15);
+
+/// What the identity composition needs, owned, so a remote cell can retry it
+/// in the background (spec 044 B-5).
+#[derive(Clone)]
+struct IdentityInputs {
+    idp: IdpConfig,
+    config: Config,
+    keys: KeySet,
+    store: rahi_store::StoreHandle,
+    kernel: Kernel,
+    lifetime: Duration,
+    declared_bearer: rahi_idp::BearerRoutes,
+    /// A remote cell has no supervisor to register its OIDC client and
+    /// custody the secret (spec 021 B-5, 038 B-3), so its composition does it
+    /// first, idempotently (spec 044 D-5). `None` where `supervise` already
+    /// has.
+    custody: Option<rahi_kernel::Manifest>,
+}
+
+/// What identity adds to a cell: its routes, the session resolver, the
+/// bearer gate, and the operator's revocation surface.
+struct IdentityParts {
+    identity: Identity,
+    sessions: Sessions,
+    bearer: rahi_idp::RequireBearer,
+    operator_revoke: Router,
+}
+
+/// Compose identity against Rauthy: discovery within `budget`, the key set,
+/// the session resolver, the resource server and the revocation surface.
+async fn identity(inputs: IdentityInputs, budget: Duration) -> Result<IdentityParts> {
+    let IdentityInputs {
+        idp,
+        config,
+        keys,
+        store,
+        kernel,
+        lifetime,
+        declared_bearer,
+        custody,
+    } = inputs;
+    let discovery = Discovery::fetch_within(&idp, budget).await?;
+    if let Some(manifest) = &custody {
+        let custodied = rahi_ops::supervise::custody_client(&config, &keys, manifest).await?;
+        eprintln!(
+            "serve: the OIDC client is registered and its secret custodied{}",
+            match custodied.render() {
+                text if text.is_empty() => String::new(),
+                text => format!("; {text}"),
+            }
+        );
+    }
+    // rauthy publishes its endpoints on the public origin, which is not
+    // reachable from inside the cell; the key set is fetched over the same
+    // back channel every other call uses (spec 021 B-1, spec 031 D-3, spec
+    // 044 B-1).
+    let mut on_back_channel = discovery.clone();
+    on_back_channel.jwks_uri = back_channel(&idp, &discovery.jwks_uri);
+    let jwks = Jwks::load(&on_back_channel).await?;
+    let jwks_cache = jwks.clone();
+    let key = SessionKey::load(&keys.path(rahi_ops::SESSION_KEY_FILE))?;
+    let secret_path = rahi_ops::supervise::client_secret_path(&config);
+    let client_secret = std::fs::read_to_string(&secret_path)
+        .map(|text| text.trim().to_owned())
+        .map_err(|err| {
+            Error::Config(format!(
+                "the OIDC client secret at {} is not custodied yet; run the client bootstrap (spec 021 B-5) first: {err}",
+                secret_path.display()
+            ))
+        })?;
+    let sessions = Sessions::new(
+        &idp,
+        &config,
+        discovery,
+        jwks,
+        store.clone(),
+        key,
+        client_secret,
+    )?;
+    let resource = Resource::derive(&idp)?;
+
+    // Spec 025's resource server, with spec 038's two additions: the
+    // deny-list remembers a revocation for as long as a token of the
+    // manifest's lifetime can still validate (038 D-7), and the revocation
+    // routes are what write it (038 B-5).
+    let server =
+        rahi_idp::ResourceServer::new(&config, resource.clone(), jwks_cache, store, kernel)
+            .with_lifetime(lifetime);
+    let mut revoker = rahi_idp::Revoker::new(server.clone());
+    if let Ok(admin_token) = keys.admin_token() {
+        // Spec 038 D-8: revoking a subject ends the grant at rauthy as well
+        // as deny-listing the access tokens. A cell whose key set holds no
+        // admin token still revokes the tokens and says in its answer that
+        // the grant is untouched.
+        revoker = revoker.ending_grants(&idp, &admin_token)?;
+    }
+    let operator_revoke = rahi_idp::operator_revoke_router(revoker.clone());
+
+    // The route a bearer client revokes its own token on is itself a bearer
+    // route: it reads the credential the gate resolved, and nothing a caller
+    // writes decides what is revoked (038 B-5).
+    let declared = declared_bearer.route(rahi_idp::SESSION_REVOKE_PATH);
+    let bearer = rahi_idp::RequireBearer::new(server, declared);
+
+    // The proxy and the resource metadata carry their full paths, so they
+    // merge at the root and are named in the exposure table by prefix; the
+    // session routes are relative and nest under their prefix.
+    Ok(IdentityParts {
+        identity: Identity {
+            proxy: proxy_router(Proxy::new(&idp)?),
+            sessions: session_router(sessions.clone()),
+            resource: resource_router(resource),
+            revoke: rahi_idp::revoke_router(revoker),
+        },
+        sessions,
+        bearer,
+        operator_revoke,
+    })
+}
+
+/// Everything the edge is built from, so a remote cell can build it twice:
+/// once without identity, once with (spec 044 B-5).
+#[derive(Clone)]
+struct Assembly {
+    state: AppState,
+    binding: Vec<u8>,
+    app_routes: Router,
+    operator_routes: Router,
+    exposed: Vec<Route>,
+    static_dir: Option<PathBuf>,
+    scheme: rahi_types::CookieScheme,
+}
+
+impl Assembly {
+    /// The cell's router, with identity when `identity` carries it.
+    fn build(&self, identity: Option<IdentityParts>) -> Result<Router> {
+        let mut operator_routes = self.operator_routes.clone();
+        let (identity, resolver, bearer) = match identity {
+            Some(parts) => {
+                operator_routes = operator_routes.merge(parts.operator_revoke);
+                (
+                    Some(parts.identity),
+                    Some(parts.sessions),
+                    Some(parts.bearer),
+                )
+            }
+            None => (None, None, None),
+        };
+        let mut edge = Edge::builder(self.state.clone())
+            .binding(self.binding.clone())
+            .stream_identity(stream_identity())
+            .mount("/", self.app_routes.clone())
+            .mount_operator(OPERATOR_PREFIX, operator_routes);
+        for route in &self.exposed {
+            edge = edge.expose(route.clone());
+        }
+        if let Some(dir) = &self.static_dir {
+            edge = edge.static_slot(dir.clone());
+        }
+        if let Some(identity) = identity {
+            edge = edge
+                .mount("/", identity.proxy)
+                .expose(Route::new(AUTH_PREFIX, RouteClass::Proxy))
+                .mount_public(SESSION_PREFIX, identity.sessions)
+                .mount("/", identity.revoke)
+                .mount("/", identity.resource)
+                .expose(Route::new(rahi_idp::METADATA_PATH, RouteClass::Public));
+        }
+        // Spec 038 B-1: the CSRF check does not apply to a bearer write. The
+        // predicate is passed from here because the facts it reads are the
+        // composer's: which routes were declared bearer, and what this cell's
+        // session cookie is called. A request carrying both credentials is
+        // not exempt and never reaches the check anyway, because the bearer
+        // layer refuses it first (025 B-10).
+        let scheme = self.scheme;
+        edge = edge.csrf_exemption(std::sync::Arc::new(
+            move |path: &str, headers: &HeaderMap| {
+                rahi_idp::is_bearer_route(path)
+                    && headers.contains_key(axum::http::header::AUTHORIZATION)
+                    && !rahi_idp::bearer::both_credentials(headers, scheme)
+            },
+        ));
+
+        let router = edge.try_build().map_err(|err| err.0)?;
+        // Spec 022's layer, outermost: it opens the session cookie, renews
+        // the assertion, and leaves the `Principal` in the request extensions
+        // that `Authenticated` and the operator gate read. Outside it every
+        // authenticated route answers 401 (022 D-3).
+        let router = match resolver {
+            Some(sessions) => with_sessions(sessions, router),
+            None => router,
+        };
+        // Spec 025 B-11: outside the session layer, where the paths are
+        // whole. It resolves a token, refuses a request carrying two
+        // credentials, and strips any cookie a bearer-authenticated answer
+        // tried to set.
+        Ok(match bearer {
+            Some(gate) => rahi_idp::with_bearer(gate, router),
+            None => router,
+        })
+    }
 }
 
 /// The counters that count lost denials, as the binding document names
@@ -971,6 +1219,7 @@ pub async fn serve_observed<C: Cell>(
         kernel,
         stopping,
         state,
+        identity_task,
     } = match compose_parts::<C>(&booted, env, &streams).await {
         Ok(composed) => composed,
         Err(err) => {
@@ -980,6 +1229,9 @@ pub async fn serve_observed<C: Cell>(
             return served;
         }
     };
+    // Spec 044 B-5: a remote composition still retrying ends with the cell,
+    // on every exit from here.
+    let identity_task = AbortOnDrop(identity_task);
     println!("{}", boot_line(&kernel));
     export_boot_gauges(&booted, gate).await;
     // Spec 047 B-2, B-3: the cell declares its services once, with the
@@ -1175,6 +1427,8 @@ pub async fn serve_observed<C: Cell>(
     }
     let served = served.unwrap_or(Ok(()));
     watch.abort();
+    // Before the store goes away.
+    drop(identity_task);
     if let Some(task) = completion {
         task.abort();
     }

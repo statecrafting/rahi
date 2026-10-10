@@ -236,7 +236,7 @@ impl Sessions {
                 idp.redirect_uri
             )));
         }
-        let client = reqwest::Client::builder()
+        let client = crate::back_channel::builder()?
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|err| Error::Config(format!("the loopback client cannot be built: {err}")))?;

@@ -792,6 +792,11 @@ fn no_credential_is_minted_anywhere_in_this_workspace() {
              (spec 038 D-8)",
         ),
         (
+            "crates/rahi-ops/src/rauthy_api.rs",
+            "presents rauthy's admin key on the authenticated readiness call a \
+             remote cell makes through rauthy-internal (spec 044 B-6)",
+        ),
+        (
             "crates/rahi-ops/tests/first_boot.rs",
             "asserts the provisioned key and rauthy's floor on its length",
         ),
