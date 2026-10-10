@@ -64,6 +64,16 @@ spec:
             - name: tls
               mountPath: /tls
               readOnly: true
+          # Liveness waits for the first health answer: a pod still binding
+          # TLS and joining its hiqlite peers under OrderedReady is not dead,
+          # and killing it would hold the set at rauthy-0.
+          startupProbe:
+            httpGet:
+              path: /auth/v1/health
+              port: https
+              scheme: HTTPS
+            periodSeconds: 5
+            failureThreshold: 36
           readinessProbe:
             httpGet:
               path: /auth/v1/ready

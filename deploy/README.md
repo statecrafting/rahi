@@ -116,6 +116,12 @@ The certificate in `rauthy-tls` names
 `rauthy-internal.rahi.svc.cluster.local` and is signed by the CA in
 `rauthy-ca`.
 
+The namespace `rahi` appears in three places that kustomize does not keep
+in step: the kustomization's `namespace:`, `RAHI_RAUTHY_URL` in
+`configmap.yaml`, and that certificate's name. A cell in another namespace
+changes all three together; changing only the first leaves rahi unready,
+because its back channel names a Service that does not exist.
+
 **Backups (B-10 to B-12).** The scheduled backup is the same verb against
 the rahi leader. It reaches Rauthy's backup through `rauthy-internal`.
 Under the split it is two snapshots taken at two instants, one per cluster,
