@@ -442,35 +442,35 @@ pub fn standalone_env(
         listen_addr: "0.0.0.0".to_owned(),
     };
     let rendered = render(config, secrets, app_name, ports)?;
-    let replaced = [
-        "HQL_NODE_ID",
-        "LISTEN_ADDRESS",
-        "HQL_DATA_DIR",
-        "PROXY_MODE",
-        "TRUSTED_PROXIES",
-        "COOKIE_MODE",
-    ];
+    let tls = std::path::Path::new(STANDALONE_TLS_DIR);
+    let overrides: Vec<(String, String)> = [
+        ("HQL_NODE_ID_FROM", "k8s".to_owned()),
+        ("LISTEN_ADDRESS", "0.0.0.0".to_owned()),
+        ("HQL_DATA_DIR", STANDALONE_DATA_DIR.to_owned()),
+        ("PROXY_MODE", "true".to_owned()),
+        ("TRUSTED_PROXIES", trusted.trim().to_owned()),
+    ]
+    .into_iter()
+    .chain(standalone_tls(
+        &tls.join("tls.crt"),
+        &tls.join("tls.key"),
+        STANDALONE_HTTPS_PORT,
+    ))
+    .map(|(k, v)| (k.to_owned(), v))
+    .collect();
+    // Every key an override sets is dropped from the template first, so the
+    // Secret never carries one key twice (the template's `LISTEN_SCHEME=http`
+    // beside the override's `https`); the node id comes from the pod name
+    // and the cookie mode from Rauthy's default, so those two are dropped
+    // with no replacement.
+    let dropped = ["HQL_NODE_ID", "COOKIE_MODE"];
     let mut pairs: Vec<(String, String)> = parse(&rendered)
         .into_iter()
-        .filter(|(key, _)| !replaced.contains(&key.as_str()))
+        .filter(|(key, _)| {
+            !dropped.contains(&key.as_str()) && !overrides.iter().any(|(k, _)| k == key)
+        })
         .collect();
-    let tls = std::path::Path::new(STANDALONE_TLS_DIR);
-    pairs.extend(
-        [
-            ("HQL_NODE_ID_FROM", "k8s".to_owned()),
-            ("LISTEN_ADDRESS", "0.0.0.0".to_owned()),
-            ("HQL_DATA_DIR", STANDALONE_DATA_DIR.to_owned()),
-            ("PROXY_MODE", "true".to_owned()),
-            ("TRUSTED_PROXIES", trusted.trim().to_owned()),
-        ]
-        .into_iter()
-        .chain(standalone_tls(
-            &tls.join("tls.crt"),
-            &tls.join("tls.key"),
-            STANDALONE_HTTPS_PORT,
-        ))
-        .map(|(k, v)| (k.to_owned(), v)),
-    );
+    pairs.extend(overrides);
     Ok(pairs)
 }
 
