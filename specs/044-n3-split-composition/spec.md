@@ -430,7 +430,10 @@ establishes N=3 support.
   test now asserts every key appears once. A fixed list was rejected
   because it fails silently the next time an override is added.
 
-### Status (2026-10-08)
+### Status (2026-10-10)
+
+The remote identity landed first (#136, with D-9's fix in #137); the
+overlay and its validation land after it, in their own change.
 
 Built and verified here: B-1, B-2 (D-2, D-6), B-3 and B-7 to B-9 in the
 overlay with FR-001's validation and negative fixtures (AC-1), B-4 to B-6

@@ -1,0 +1,70 @@
+# B-3: access control, not encryption. Rauthy's HTTP port admits rahi's
+# pods only (P-2: users reach Rauthy through rahi's origin); each hiqlite
+# cluster admits only its own pods; no hiqlite port is reachable through
+# ingress. Rahi's HTTP port admits the ingress controller and the
+# in-cluster scrapers.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: rauthy-https-from-rahi
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: rauthy
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: rahi
+      ports:
+        - port: 8443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: rauthy-hiqlite-from-rauthy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: rauthy
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: rauthy
+      ports:
+        - port: 8100
+        - port: 8200
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: rahi-hiqlite-from-rahi
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: rahi
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: rahi
+      ports:
+        - port: 8300
+        - port: 8400
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: rahi-http
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: rahi
+  policyTypes: ["Ingress"]
+  ingress:
+    - ports:
+        - port: 8443

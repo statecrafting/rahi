@@ -1,0 +1,30 @@
+# The public origin is rahi's (P-2): users reach Rauthy only through rahi's
+# `/auth` proxy. /metrics and /binding stay in-cluster (040 B-12).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rahi
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-body-size: 16m
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/server-snippet: |
+      location = /metrics { return 404; }
+      location = /binding { return 404; }
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - cell.example.com
+      secretName: rahi-tls
+  rules:
+    - host: cell.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: rahi
+                port:
+                  name: http
