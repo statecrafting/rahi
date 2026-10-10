@@ -430,6 +430,19 @@ establishes N=3 support.
   test now asserts every key appears once. A fixed list was rejected
   because it fails silently the next time an override is added.
 
+- **D-10 (2026-10-10, the migration client's policy, B-3, B-9).** The
+  migrate Job is a rahi workload with the distinct `rahi-migrate` label.
+  As 032 D-3 defines, `RAHI_STORE_CLIENT=true` selects `Store::connect`
+  through `Booted::open_or_attach`; it contacts the peers' API addresses
+  on 8300 and starts no Raft node. The split policy admits that label to
+  rahi's API port only, keeping 8400 for rahi's replicas and both Rauthy
+  hiqlite ports for Rauthy's pods. Relabelling the Job as `rahi` was
+  rejected because it would also select it for replica Services and admit
+  it to the Raft port. FR-001's validator requires the client's API rule
+  and refuses fixtures removing it, opening its Raft access, or adding a
+  foreign client beside an allowed selector. It enumerates every selector
+  in a rule so a later allowed selector cannot hide an earlier foreign one.
+
 ### Status (2026-10-10)
 
 The remote identity landed first (#136, with D-9's fix in #137); the

@@ -187,7 +187,7 @@
       "contentHash": "e253a94ee3d21fe26580c388be92f0f928360d3742c83e0bf04c11b7abe8b9e0"
     },
     "deploy/n3-split/networkpolicies.yaml": {
-      "contentHash": "da3484425710709458eecfdca5ccdda8df2946aefde8177693f9831a8c96fc3c"
+      "contentHash": "fe26eb923861e44c9063803526eb1c76eaa9efbc1d499d958bfa9f9b48f78ce4"
     },
     "deploy/n3-split/rahi.yaml": {
       "contentHash": "3bc7882f095d5bf42225be3c7ecc86f1637f54c3e10398cb72dd828f811e81d3"
@@ -274,7 +274,7 @@
       "contentHash": "f29ecfab602778e37107e96e8e5dd9e5891529179d7f48669c41adea2954b89f"
     },
     "scripts/k8s-validate.sh": {
-      "contentHash": "f60f77ad67dd055a70868a0d09732478c30de06c80e06c80f35e2fdf34730f63"
+      "contentHash": "bb26160004ea8a9f4546d803e9762f701f718741eddc734ee99e7d054654b174"
     },
     "scripts/spec-dag.sh": {
       "contentHash": "84d4793c8a1a811ab25ce7d45b9a66d92364015883bd4a72c8741b9898ab1d05"

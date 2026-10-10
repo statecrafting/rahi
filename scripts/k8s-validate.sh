@@ -280,14 +280,18 @@ check_split() {
   done
 
   # NetworkPolicy (B-3): Rauthy's HTTP port admits rahi's pods only, each
-  # hiqlite cluster admits only its own pods, and no rule admits every port.
+  # hiqlite cluster admits only its own pods (including the migration client
+  # on rahi's API port only, 032 D-3 / 044 B-9), and no rule admits every port.
   awk '
-    function flush(   i, j, n) {
+    function flush(   i, j, k, n, m) {
       if (kind == "NetworkPolicy") {
         for (i = 1; i <= nrules; i++) {
           n = split(ports[i], ps, " ")
-          if (n == 0) print target, (from[i] == "" ? "*" : from[i]), "*"
-          for (j = 1; j <= n; j++) print target, (from[i] == "" ? "*" : from[i]), ps[j]
+          m = split((from[i] == "" ? "*" : from[i]), sources, " ")
+          for (k = 1; k <= m; k++) {
+            if (n == 0) print target, sources[k], "*"
+            for (j = 1; j <= n; j++) print target, sources[k], ps[j]
+          }
         }
       }
       kind = ""; target = ""; nrules = 0; delete from; delete ports; section = ""
@@ -298,13 +302,13 @@ check_split() {
     /^  podSelector:/ { section = "target"; next }
     /^  policyTypes:/ { section = ""; next }
     section == "ingress" && /^  - / { nrules++; from[nrules] = ""; ports[nrules] = "" }
-    section == "ingress" && /app.kubernetes.io\/name:/ { from[nrules] = $2 }
+    section == "ingress" && /app.kubernetes.io\/name:/ { from[nrules] = from[nrules] " " $2 }
     section == "ingress" && /- port:/ { ports[nrules] = ports[nrules] " " $3 }
     section == "target" && /app.kubernetes.io\/name:/ { target = $2 }
     END { flush() }
   ' "$out" > "$tmp/rules"
   for want in "rauthy rahi 8443" "rauthy rauthy 8100" "rauthy rauthy 8200" \
-              "rahi rahi 8300" "rahi rahi 8400"; do
+              "rahi rahi 8300" "rahi rahi 8400" "rahi rahi-migrate 8300"; do
     grep -qx "$want" "$tmp/rules" || fail "no NetworkPolicy admits ${want#* } to ${want%% *}"
   done
   while read -r target from port; do
@@ -314,7 +318,9 @@ check_split() {
               || fail "Rauthy's HTTP port admits $from; only rahi's pods" ;;
       8100 | 8200) { [ "$target" = rauthy ] && [ "$from" = rauthy ]; } \
               || fail "Rauthy's hiqlite port $port admits $from on $target" ;;
-      8300 | 8400) { [ "$target" = rahi ] && [ "$from" = rahi ]; } \
+      8300) { [ "$target" = rahi ] && { [ "$from" = rahi ] || [ "$from" = rahi-migrate ]; }; } \
+              || fail "rahi's hiqlite port $port admits $from on $target" ;;
+      8400) { [ "$target" = rahi ] && [ "$from" = rahi ]; } \
               || fail "rahi's hiqlite port $port admits $from on $target" ;;
     esac
   done < "$tmp/rules"
@@ -495,6 +501,20 @@ YAML
     patch: |-
       - op: remove
         path: /spec/ingress/0/from'
+  split_fixture "no NetworkPolicy admits rahi-migrate 8300" "a blocked migration client" '  - target: {kind: NetworkPolicy, name: rahi-hiqlite-from-rahi}
+    patch: |-
+      - op: remove
+        path: /spec/ingress/1'
+  split_fixture "hiqlite port 8400 admits rahi-migrate" "a migration client on the Raft port" '  - target: {kind: NetworkPolicy, name: rahi-hiqlite-from-rahi}
+    patch: |-
+      - op: add
+        path: /spec/ingress/1/ports/-
+        value: {port: 8400}'
+  split_fixture "hiqlite port 8300 admits rauthy" "a foreign client beside an allowed selector" '  - target: {kind: NetworkPolicy, name: rahi-hiqlite-from-rahi}
+    patch: |-
+      - op: add
+        path: /spec/ingress/1/from/0
+        value: {podSelector: {matchLabels: {app.kubernetes.io/name: rauthy}}}'
   split_fixture "maxUnavailable 1" "a PDB of two" '  - target: {kind: PodDisruptionBudget, name: rauthy}
     patch: |-
       - op: replace

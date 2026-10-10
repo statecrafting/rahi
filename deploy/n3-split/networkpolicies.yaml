@@ -1,8 +1,8 @@
 # B-3: access control, not encryption. Rauthy's HTTP port admits rahi's
 # pods only (P-2: users reach Rauthy through rahi's origin); each hiqlite
-# cluster admits only its own pods; no hiqlite port is reachable through
-# ingress. Rahi's HTTP port admits the ingress controller and the
-# in-cluster scrapers.
+# cluster admits only its own pods, including rahi's migration client on
+# its API port only; no hiqlite port is reachable through ingress. Rahi's
+# HTTP port admits the ingress controller and the in-cluster scrapers.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -55,6 +55,12 @@ spec:
       ports:
         - port: 8300
         - port: 8400
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: rahi-migrate
+      ports:
+        - port: 8300
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
