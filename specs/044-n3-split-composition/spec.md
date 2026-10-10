@@ -420,6 +420,15 @@ establishes N=3 support.
   (`HQL_NODE_ID_FROM=k8s`), the peers from `RAHI_RAUTHY_HQL_NODES`, the
   trusted proxy from `RAHI_RAUTHY_TRUSTED_PROXIES`, and native TLS from
   `/tls`.
+- **D-9 (2026-10-10, one key per `rauthy-env` entry).** `standalone_env`
+  drops from the N=1 template every key an override sets, derived from the
+  overrides themselves, plus `HQL_NODE_ID` and `COOKIE_MODE`, which are
+  dropped with no replacement. The first build filtered a fixed list that
+  missed the five keys `standalone_tls` sets, so the Secret carried the
+  template's `LISTEN_SCHEME=http` beside the override's `https`; a
+  duplicate mapping key leaves Rauthy's listener to the parser. The export
+  test now asserts every key appears once. A fixed list was rejected
+  because it fails silently the next time an override is added.
 
 ### Status (2026-10-08)
 

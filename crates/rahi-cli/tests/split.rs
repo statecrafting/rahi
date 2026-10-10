@@ -350,6 +350,23 @@ fn a_remote_export_renders_rauthys_standalone_environment() {
         !rauthy.contains("HQL_NODE_ID:"),
         "the ordinal names the node"
     );
+    // One key, one value: a template line an override replaces is dropped,
+    // never left beside it (`LISTEN_SCHEME` was once both http and https).
+    let mut keys: Vec<&str> = rauthy
+        .lines()
+        .map(str::trim_start)
+        .filter_map(|line| line.split_once(": ").map(|(key, _)| key))
+        .filter(|key| {
+            !key.is_empty()
+                && key
+                    .chars()
+                    .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
+        })
+        .collect();
+    let total = keys.len();
+    keys.sort_unstable();
+    keys.dedup();
+    assert_eq!(keys.len(), total, "a key appears twice in\n{rauthy}");
     assert!(
         rauthy.contains("rauthy-1.rauthy-hl:8100"),
         "the peers: {rauthy}"
