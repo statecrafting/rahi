@@ -268,6 +268,16 @@ and emits them); key generation (031).
   retrying on `AddrInUse`, which hiqlite reports as a panic rather than an
   error.
 
+- **D-11 (2026-10-10, owner-requested dependency adoption).** Upgrade the
+  workspace's `attest-ledger-core` and `attest-ledger-types` requirements
+  from `0.1` to `0.2`. The 0.2 primitives preserve the `LedgerRecord`
+  envelope, canonical record bytes, hash computation and presented-chain
+  verification used by Rahi. Existing signed fixtures and the ledger's
+  append and verification tests remain the compatibility checks. Rahi
+  continues to pin its expected signer through its own verifier; adopting
+  the dependency alone supplies no independently trusted latest head and
+  makes no new completeness or freshness claim.
+
 ## Verification
 
 ```verify:cli
