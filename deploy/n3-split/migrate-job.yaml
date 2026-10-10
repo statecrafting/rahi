@@ -48,6 +48,8 @@ spec:
         - name: keys
           secret:
             secretName: rahi-keys
+            defaultMode: 0400
         - name: rauthy-ca
           secret:
             secretName: rauthy-ca
+            defaultMode: 0444
