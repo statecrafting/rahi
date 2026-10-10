@@ -541,9 +541,17 @@ pub async fn compose_parts<C: Cell>(
                      serves its native TLS and issues tokens for https://<public host>/auth/v1/"
                 )));
             }
+            // `/auth/v1/ready` is authenticated, so a key set without the
+            // admin token would fail readiness forever; refuse at startup.
+            let admin_token = booted.keys.admin_token().map_err(|err| {
+                Error::Config(format!(
+                    "{ENV_RAUTHY_MODE}=remote reads Rauthy's ready route with the admin \
+                     token, and the key set has none: {err}"
+                ))
+            })?;
             let api = rahi_ops::rauthy_api::RauthyApi::new(
                 rahi_idp::back_channel::base(&booted.config),
-                booted.keys.admin_token().unwrap_or_default(),
+                admin_token,
             )?;
             let composed = composed.clone();
             state = state.with_extension(rahi_edge::probes::ReadinessCheck::new(
