@@ -144,13 +144,29 @@
           "kind": "file",
           "path": "crates/rahi-ops/src/binding.rs"
         }
+      },
+      {
+        "nature": "amending",
+        "spec": "040-runtime-identity-and-binding-surface",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/binding.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/backup.rs"
+        }
       }
     ],
     "extraFrontmatter": {
       "wave": 3
     },
     "id": "041-deployment-epochs",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "kind": "kernel",
     "references": [
       {
@@ -170,14 +186,14 @@
     ],
     "risk": "critical",
     "sectionDigests": {
-      "041-deployment-epochs": "d0ec716449b3f6d9e88d9bb13fa7b9b34677caf90805eb49882230a82310de32",
+      "041-deployment-epochs": "16154c864971c15becce3f658b991563de2adf429eb1bfca2bde7f90d7e2ea3d",
       "1-purpose": "bcee9c4f18b467301e9a043a3af111015ccf1198005c06ec87984b2fb1ce9893",
       "2-territory": "a7f2646b31bf501254abeefd3e61ba3a98a64305fcb79032c01800550f2fb6f4",
       "3-behavior": "388d0b2606a97ecea8ee9b26e7ebf97346bd50fb3ed31e4cf1e6129b53f9424e",
       "4-functional-requirements": "9d443525a83c72c943ac28b454dbe58095596ec6e9ef09c67c63b51b3487957a",
       "5-acceptance-criteria": "cf639794476e4e8c8258af35bd46607e079b16e4cf54a2c33d1a3184ca49180b",
       "6-out-of-scope": "c9edf06e701fd98835484f9d52a3dda572d73228df7c7827ea70abc07bbc604c",
-      "7-resolved-decisions": "1f608ecba63c0c1379eb34df0b432fc8dbe512132588625d5c3ceb5a70424d04",
+      "7-resolved-decisions": "0b3d9ad9def957752e5e53bf9bd71eccf30091b572416ebae59abbb16d4d5b6e",
       "backup-restore-and-export": "04a906ac21a2d8ee8ccd9d20ae9c3e77cc79ae8fb7012f887ef22cf1d8c4f983",
       "the-record": "168cdf0ffffc954b17dfc809fc2fdcda0c8041aad7f0a1578e17ec61fbbc61aa",
       "the-reference-contract-proposed-to-statecraft-2026-09-12": "2fb16ad06f7b70249df6b22612e913e3967073d8d2ccecf0211b158d839100af",
@@ -208,6 +224,6 @@
     "summary": "The chain commits to the first manifest (genesis) and, with spec 036, to every manifest adopted since. It records nothing about which build a replica runs or which deployment put it there, so a consumer cannot join a decision to an artifact, an authority snapshot, or a rollout, and an upgrade, a rollback, and a restore look the same in the chain. This spec appends one epoch record at each deploy step that changes what is deployed: the manifest current after the step, the artifact (the binary measured by the deploy step, the image digest the deployer declares), and typed opaque references to the external build provenance, the deployment record, and the authority snapshot. The genesis and every existing record stay byte for byte; no history is rehashed; nothing is embedded in a built artifact; every reference points from the later record to the earlier one, so no hash cycle is possible. Replicas bind to the current epoch at boot and report a mismatch without refusing, every decision names its epoch and instance, and the chain becomes readable from a running cell.\n",
     "title": "Deployment epochs: the chain records each deployment it serves under, appended at the deploy step, linked to external build and deployment records it never rewrites"
   },
-  "shardHash": "6124b689f422de6ef790ac0cbc08279441ce5ab7f7bf161661dec33370bc5976",
+  "shardHash": "0b9f93fb30e1e97fbc71d45dd2b2122bc996d892ba6c65fbbac008eff0e73e99",
   "specVersion": "1.9.0"
 }

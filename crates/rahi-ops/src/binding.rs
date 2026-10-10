@@ -242,6 +242,196 @@ pub struct CellFacts {
     pub contract_version: String,
     /// The store's own account of its schema.
     pub store: StoreFacts,
+    /// The epoch this process booted under (spec 041 B-8), or `None` from a
+    /// caller that has no chain to read, whose document keeps 040's
+    /// `not_implemented` absence.
+    pub epoch: Option<EpochFacts>,
+}
+
+/// The epoch a booting replica read from its chain (spec 041 B-8).
+#[derive(Clone, Debug)]
+pub struct EpochFacts {
+    /// The chain's identity: its genesis record's hash (041 D-1).
+    pub chain: rahi_ledger::Hash,
+    /// The epoch current at boot, with what it deployed.
+    pub tail: rahi_ledger::EpochTail,
+}
+
+/// The kinds a replica compares against its epoch (spec 041 B-8), in the
+/// order the document and `rahi_binding_mismatch{kind}` name them.
+pub const MATCH_KINDS: [&str; 3] = ["binary", "image", "manifest"];
+
+/// What one kind's comparison found (spec 041 B-8, D-12).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KindMatch {
+    /// Both sides present and equal.
+    Equal,
+    /// Both sides present and different.
+    Differs,
+    /// The comparison could not be made: an input is absent, or the binary
+    /// was built for another platform. Never reported as agreement.
+    Unknown,
+    /// An image that one side does not declare, which B-8 does not compare.
+    NotDeclared,
+}
+
+impl KindMatch {
+    /// The token the document carries.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Equal => "equal",
+            Self::Differs => "differs",
+            Self::Unknown => "unknown",
+            Self::NotDeclared => "not_declared",
+        }
+    }
+}
+
+/// A replica's comparison with the epoch it booted under (spec 041 B-8).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EpochMatch {
+    /// `bound`, `mismatch`, `unknown`, or `unbound` at epoch 0.
+    pub state: &'static str,
+    /// Each kind of [`MATCH_KINDS`], with what its comparison found and the
+    /// two values compared (the replica's, then the epoch's); empty at
+    /// epoch 0.
+    pub kinds: Vec<(&'static str, KindMatch, Option<String>, Option<String>)>,
+}
+
+impl EpochMatch {
+    /// The kinds that differ.
+    #[must_use]
+    pub fn differs(&self) -> Vec<&'static str> {
+        self.kinds
+            .iter()
+            .filter(|(_, found, _, _)| *found == KindMatch::Differs)
+            .map(|(kind, _, _, _)| *kind)
+            .collect()
+    }
+
+    /// The document's value.
+    #[must_use]
+    pub fn value(&self) -> Value {
+        let mut out = Map::new();
+        out.insert("state".to_owned(), Value::from(self.state));
+        if !self.kinds.is_empty() {
+            out.insert("differs".to_owned(), Value::from(self.differs()));
+            out.insert(
+                "kinds".to_owned(),
+                Value::Object(
+                    self.kinds
+                        .iter()
+                        .map(|(kind, found, _, _)| {
+                            ((*kind).to_owned(), Value::from(found.as_str()))
+                        })
+                        .collect(),
+                ),
+            );
+        }
+        Value::Object(out)
+    }
+}
+
+/// B-8's comparison of a replica with its epoch: the measured binary (only
+/// when both sides name the same platform), the declared image (only when
+/// both sides declare one), and the booted manifest. `bound` needs the
+/// binary and the manifest equal and the image equal or undeclared; any
+/// difference is `mismatch`; anything else is `unknown`, because missing
+/// evidence is never agreement (040 B-7). Epoch 0 is `unbound`.
+#[must_use]
+pub fn epoch_match(
+    tail: &rahi_ledger::EpochTail,
+    manifest: &str,
+    binary: Option<&str>,
+    platform: Option<&str>,
+    image: Option<&str>,
+) -> EpochMatch {
+    let Some(deployed) = (tail.number > 0)
+        .then_some(tail.deployed.as_ref())
+        .flatten()
+    else {
+        return EpochMatch {
+            state: "unbound",
+            kinds: Vec::new(),
+        };
+    };
+    let compare = |ours: Option<&str>, theirs: Option<&str>| match (ours, theirs) {
+        (Some(a), Some(b)) if a == b => KindMatch::Equal,
+        (Some(_), Some(_)) => KindMatch::Differs,
+        _ => KindMatch::Unknown,
+    };
+    let binary_found = if platform.is_some() && platform == deployed.platform.as_deref() {
+        compare(binary, deployed.binary.as_deref())
+    } else {
+        KindMatch::Unknown
+    };
+    let image_found = match (image, deployed.image.as_deref()) {
+        (Some(_), Some(_)) => compare(image, deployed.image.as_deref()),
+        _ => KindMatch::NotDeclared,
+    };
+    let manifest_found = compare(Some(manifest), Some(deployed.manifest.as_str()));
+    let kinds = vec![
+        (
+            "binary",
+            binary_found,
+            binary.map(str::to_owned),
+            deployed.binary.clone(),
+        ),
+        (
+            "image",
+            image_found,
+            image.map(str::to_owned),
+            deployed.image.clone(),
+        ),
+        (
+            "manifest",
+            manifest_found,
+            Some(manifest.to_owned()),
+            Some(deployed.manifest.to_string()),
+        ),
+    ];
+    let state = if kinds
+        .iter()
+        .any(|(_, found, _, _)| *found == KindMatch::Differs)
+    {
+        "mismatch"
+    } else if binary_found == KindMatch::Equal && manifest_found == KindMatch::Equal {
+        "bound"
+    } else {
+        "unknown"
+    };
+    EpochMatch { state, kinds }
+}
+
+/// The deploy step's and the replica's own measured binary digest, when the
+/// executable is readable (040 B-2).
+#[must_use]
+pub fn measured_binary() -> Option<String> {
+    wrapper_value(&measure_executable().0)
+}
+
+/// This build's OCI platform, when the table maps it (040 B-2).
+#[must_use]
+pub fn this_platform() -> Option<String> {
+    wrapper_value(&platform(std::env::consts::OS, std::env::consts::ARCH))
+}
+
+/// The declared [`ENV_ARTIFACT_IMAGE`], when set (040 B-5).
+///
+/// # Errors
+///
+/// [`Error::Config`] when it is set and malformed.
+pub fn artifact_image(env: &dyn EnvReader) -> Result<Option<String>> {
+    declared_image(env, ENV_ARTIFACT_IMAGE, false, Value::Null).map(|v| wrapper_value(&v))
+}
+
+/// A present wrapper's string value.
+fn wrapper_value(wrapper: &Value) -> Option<String> {
+    wrapper
+        .get("value")
+        .and_then(Value::as_str)
+        .map(str::to_owned)
 }
 
 /// The chassis's own telemetry configuration (B-9). Plain values, no basis.
@@ -286,6 +476,7 @@ pub struct Binding {
     document: Value,
     bytes: Vec<u8>,
     log: Vec<String>,
+    epoch_match: Option<EpochMatch>,
 }
 
 impl Binding {
@@ -305,6 +496,21 @@ impl Binding {
     #[must_use]
     pub fn log(&self) -> &[String] {
         &self.log
+    }
+
+    /// `instance.id` (B-4), which spec 041 B-9 has every decision name.
+    #[must_use]
+    pub fn instance_id(&self) -> Option<&str> {
+        self.document
+            .pointer("/instance/id/value")
+            .and_then(Value::as_str)
+    }
+
+    /// The comparison with the booted epoch (spec 041 B-8), when the
+    /// document has one.
+    #[must_use]
+    pub const fn epoch_match(&self) -> Option<&EpochMatch> {
+        self.epoch_match.as_ref()
     }
 
     /// `build.rahi_version`, for `rahi_build_info` (B-11).
@@ -365,7 +571,28 @@ pub fn assemble_with<E: std::fmt::Display>(
         .iter()
         .map(|(name, version)| ((*name).to_owned(), Value::from(*version)))
         .collect();
-    let epoch = || absent("not_implemented", Some(EPOCH_SOURCE));
+    let not_implemented = || absent("not_implemented", Some(EPOCH_SOURCE));
+    // Spec 041 B-8: the epoch this process booted under, and its comparison
+    // with what that epoch deployed, both read once and never refreshed.
+    let epoch_match = cell.and_then(|c| {
+        c.epoch.as_ref().map(|facts| {
+            epoch_match(
+                &facts.tail,
+                &c.manifest_hash,
+                wrapper_value(&binary_sha256).as_deref(),
+                wrapper_value(&platform(std::env::consts::OS, std::env::consts::ARCH)).as_deref(),
+                wrapper_value(&artifact).as_deref(),
+            )
+        })
+    });
+    let epoch_ref = cell
+        .and_then(|c| c.epoch.as_ref())
+        .map_or_else(not_implemented, |facts| {
+            present(facts.tail.reference(&facts.chain), "measured")
+        });
+    let epoch_compared = epoch_match
+        .as_ref()
+        .map_or_else(not_implemented, |found| present(found.value(), "measured"));
     let unless = |text: Option<&str>| match text {
         Some(text) => Value::from(text),
         None => Value::from("not_applicable"),
@@ -426,7 +653,7 @@ pub fn assemble_with<E: std::fmt::Display>(
                 )
             }),
         },
-        "epoch": { "ref": epoch(), "match": epoch() },
+        "epoch": { "ref": epoch_ref, "match": epoch_compared },
         "observation": {
             "traces": {
                 "export": unless(inputs.observation.export.map(|on| if on { "on" } else { "off" })),
@@ -445,10 +672,24 @@ pub fn assemble_with<E: std::fmt::Display>(
     let bytes = serde_json::to_vec(&document).map_err(|err| {
         Error::Integrity(format!("the binding document does not serialize: {err}"))
     })?;
+    let mut log = Vec::new();
+    if let Some(found) = &epoch_match {
+        for (kind, compared, ours, theirs) in &found.kinds {
+            if *compared == KindMatch::Differs {
+                log.push(format!(
+                    "WARN binding: this replica's {kind} is {} and its epoch's is {}; the epoch \
+                     names another deployment (spec 041 B-8)",
+                    ours.as_deref().unwrap_or("absent"),
+                    theirs.as_deref().unwrap_or("absent"),
+                ));
+            }
+        }
+    }
     Ok(Binding {
         document,
         bytes,
-        log: Vec::new(),
+        log,
+        epoch_match,
     })
 }
 
@@ -619,6 +860,7 @@ mod tests {
             app_org: "statecrafting".to_owned(),
             contract_version: "1.0.0".to_owned(),
             store: StoreFacts::default(),
+            epoch: None,
         }
     }
 
@@ -644,6 +886,124 @@ mod tests {
         assert!(matches!(failed, Err(Error::Config(m)) if m.contains("entropy")));
         let outside = mint_instance::<String>(None, |_| Ok(())).unwrap();
         assert!(outside.starts_with("0-"));
+    }
+
+    fn tail(number: u64, image: Option<&str>) -> rahi_ledger::EpochTail {
+        rahi_ledger::EpochTail {
+            number,
+            hash: rahi_ledger::Hash::parse(format!("sha256:{}", "e".repeat(64))).unwrap(),
+            fingerprint: Some("f".to_owned()),
+            last_restore: None,
+            deployed: (number > 0).then(|| rahi_ledger::Deployed {
+                manifest: rahi_ledger::Hash::parse(format!("sha256:{}", "a".repeat(64))).unwrap(),
+                binary: Some("sha256:bin".to_owned()),
+                platform: Some("linux/amd64".to_owned()),
+                image: image.map(str::to_owned),
+            }),
+        }
+    }
+
+    /// Spec 041 B-8, D-12: the comparison's vocabulary.
+    #[test]
+    fn a_replica_compares_itself_with_its_epoch_and_never_guesses() {
+        let manifest = format!("sha256:{}", "a".repeat(64));
+        let image = "ghcr.io/a@sha256:1";
+        let found = |t: &rahi_ledger::EpochTail, bin: &str, plat: &str, img: Option<&str>| {
+            epoch_match(t, &manifest, Some(bin), Some(plat), img)
+        };
+
+        assert_eq!(
+            found(&tail(0, None), "sha256:bin", "linux/amd64", None).state,
+            "unbound"
+        );
+        let bound = found(&tail(2, None), "sha256:bin", "linux/amd64", Some(image));
+        assert_eq!(
+            bound.state, "bound",
+            "an image one side does not declare is not compared"
+        );
+        assert_eq!(bound.value()["kinds"]["image"], "not_declared");
+
+        let other = found(
+            &tail(2, Some(image)),
+            "sha256:other",
+            "linux/amd64",
+            Some(image),
+        );
+        assert_eq!((other.state, other.differs()), ("mismatch", vec!["binary"]));
+        let other_image = found(
+            &tail(2, Some(image)),
+            "sha256:bin",
+            "linux/amd64",
+            Some("ghcr.io/b@sha256:2"),
+        );
+        assert_eq!(other_image.differs(), vec!["image"]);
+        let elsewhere = epoch_match(
+            &tail(2, None),
+            &format!("sha256:{}", "b".repeat(64)),
+            Some("sha256:bin"),
+            Some("linux/amd64"),
+            None,
+        );
+        assert_eq!(elsewhere.differs(), vec!["manifest"]);
+
+        let arm = found(&tail(2, None), "sha256:other", "linux/arm64", None);
+        assert_eq!(
+            arm.state, "unknown",
+            "another platform's binary is unknown, never a mismatch"
+        );
+        assert_eq!(arm.value()["kinds"]["binary"], "unknown");
+        let unread = epoch_match(&tail(2, None), &manifest, None, Some("linux/amd64"), None);
+        assert_eq!(
+            unread.state, "unknown",
+            "missing evidence is never agreement"
+        );
+    }
+
+    /// Spec 041 B-8: a populated document names the epoch and logs a
+    /// mismatch naming both values.
+    #[test]
+    fn a_booted_epoch_is_present_and_a_mismatch_is_logged() {
+        let env = BTreeMap::<String, String>::new();
+        let mut facts = cell();
+        facts.epoch = Some(EpochFacts {
+            chain: rahi_ledger::Hash::parse(format!("sha256:{}", "c".repeat(64))).unwrap(),
+            tail: {
+                let mut here = tail(2, None);
+                if let Some(deployed) = here.deployed.as_mut() {
+                    deployed.platform = this_platform();
+                }
+                here
+            },
+        });
+        let inputs = Inputs {
+            env: &env,
+            app_revision: None,
+            cell: Some(facts),
+            observation: observation(),
+        };
+        let binding = assemble_with(
+            &inputs,
+            present("sha256:other", "measured"),
+            |_: &mut [u8; 16]| Ok::<(), String>(()),
+        )
+        .unwrap();
+        let doc = binding.document();
+        assert_eq!(doc["epoch"]["ref"]["basis"], "measured");
+        assert_eq!(doc["epoch"]["ref"]["value"]["number"], 2);
+        assert_eq!(
+            doc["epoch"]["ref"]["value"]["type"],
+            rahi_ledger::EPOCH_REF_TYPE
+        );
+        assert_eq!(doc["epoch"]["match"]["value"]["state"], "mismatch");
+        assert!(
+            binding
+                .log()
+                .iter()
+                .any(|l| l.contains("sha256:other") && l.contains("sha256:bin")),
+            "{:?}",
+            binding.log()
+        );
+        assert!(binding.instance_id().is_some());
     }
 
     #[test]

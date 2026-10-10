@@ -1,14 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '041-deployment-epochs' file unit 'crates/rahi-cli/testdata/binding/' does not exist",
-        "path": "crates/rahi-cli/testdata/binding/"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "013-ledger-decision-chain",
@@ -26,6 +16,14 @@
       },
       {
         "path": "crates/rahi-cli/src/serve.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/testdata/binding/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-cli/tests/binding.rs",
         "source": "spec-edge"
       },
       {
@@ -73,6 +71,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-ops/src/backup.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rahi-ops/src/binding.rs",
         "source": "spec-edge"
       },
@@ -91,7 +93,11 @@
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rahi-cli/testdata/binding/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -162,6 +168,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/tests/binding.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/binding.rs"
         }
       },
       {
@@ -271,6 +290,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-ops/src/backup.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/backup.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-ops/src/binding.rs"
           }
         ],
@@ -351,5 +383,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "6124b689f422de6ef790ac0cbc08279441ce5ab7f7bf161661dec33370bc5976"
+  "shardHash": "0b9f93fb30e1e97fbc71d45dd2b2122bc996d892ba6c65fbbac008eff0e73e99"
 }

@@ -167,8 +167,27 @@ pub async fn run(
     to: &Destination,
     env: &dyn rahi_types::EnvReader,
 ) -> Result<Outcome> {
+    run_at_epoch(store, rauthy, keys, manifest_hash, None, to, env).await
+}
+
+/// [`run`], recording the epoch the backup is taken under in the archive
+/// manifest (spec 041 B-11).
+///
+/// # Errors
+///
+/// As [`run`].
+pub async fn run_at_epoch(
+    store: &Store,
+    rauthy: &RauthyApi,
+    keys: &KeySet,
+    manifest_hash: &str,
+    epoch: Option<crate::archive::ArchiveEpoch>,
+    to: &Destination,
+    env: &dyn rahi_types::EnvReader,
+) -> Result<Outcome> {
     let created = crate::unix_now();
-    let (manifest, parts) = gather(store, rauthy, keys, manifest_hash, created).await?;
+    let (mut manifest, parts) = gather(store, rauthy, keys, manifest_hash, created).await?;
+    manifest.epoch = epoch;
     let recipient = keys.backup_recipient()?;
     let sealed = archive::seal(&parts, &manifest, &recipient)?;
     let name = archive::archive_name(created);

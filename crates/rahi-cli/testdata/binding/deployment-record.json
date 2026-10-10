@@ -1,0 +1,8 @@
+{
+  "_type": "https://statecraft.ing/deployment-record/v0",
+  "provisional": true,
+  "rollout": "fixture-rollout-1",
+  "build": {"digest": "{{STATEMENT_DIGEST}}"},
+  "artifact": {"image": "{{IMAGE}}"},
+  "environment": "fixture"
+}

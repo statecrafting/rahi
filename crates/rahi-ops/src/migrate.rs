@@ -431,6 +431,140 @@ impl Adoption {
     }
 }
 
+/// The deployer's references for this rollout (spec 041 B-3): one JSON
+/// object with optional `build`, `deployment` and `authority` members.
+pub const ENV_DEPLOYMENT_REFS: &str = "RAHI_DEPLOYMENT_REFS";
+
+/// Spec 041 B-3: refuse malformed epoch inputs before the deploy step
+/// changes anything, so a refusal leaves no migration, transition or epoch
+/// behind it.
+///
+/// # Errors
+///
+/// [`Error::Config`] when [`ENV_DEPLOYMENT_REFS`] or the declared image is
+/// malformed.
+pub fn check_epoch_inputs(env: &dyn rahi_types::EnvReader) -> Result<()> {
+    if let Some(text) = env.get(ENV_DEPLOYMENT_REFS)
+        && !text.trim().is_empty()
+    {
+        rahi_ledger::References::parse(&text)?;
+    }
+    crate::binding::artifact_image(env).map(|_| ())
+}
+
+/// What the deploy step's epoch is built from (spec 041 B-2, B-5).
+pub struct EpochStep<'a> {
+    /// The process environment: [`ENV_DEPLOYMENT_REFS`] and the declared
+    /// image.
+    pub env: &'a dyn rahi_types::EnvReader,
+    /// The configuration, whose data directory may hold a restore marker.
+    pub config: &'a rahi_types::Config,
+    /// The application's declared revision (040 B-12).
+    pub app_revision: Option<&'a str>,
+    /// The record hash of the transition this step appended, if any.
+    pub transition: Option<Hash>,
+    /// The store's schema version after this step's migrations.
+    pub schema_version: u32,
+}
+
+/// What the deploy step did about the epoch (spec 041 B-5).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EpochOutcome {
+    /// The epoch current after the step.
+    pub current: rahi_ledger::EpochTail,
+    /// Why it was appended, or `None` when the step changed nothing that an
+    /// epoch names and nothing was appended.
+    pub appended: Option<rahi_ledger::Cause>,
+}
+
+/// Spec 041 B-5: after the migrations and any transition, append epoch
+/// n+1 when what is deployed differs from the current epoch, or when a
+/// restore marker names an archive the newest restore epoch does not (B-12,
+/// D-8); otherwise append nothing.
+///
+/// The references are recorded and never fetched or judged, and no
+/// reference, present or missing, refuses the step (B-10a).
+///
+/// # Errors
+///
+/// [`Error::Config`] when [`ENV_DEPLOYMENT_REFS`] or the declared image is
+/// malformed (B-3); the restore marker's or the chain's own error.
+pub async fn record_epoch(ledger: &Ledger, step: &EpochStep<'_>) -> Result<EpochOutcome> {
+    let refs = match step.env.get(ENV_DEPLOYMENT_REFS) {
+        Some(text) if !text.trim().is_empty() => rahi_ledger::References::parse(&text)?,
+        _ => rahi_ledger::References::default(),
+    };
+    let image = crate::binding::artifact_image(step.env)?;
+    let binary = crate::binding::measured_binary();
+    let manifest = ledger.current_manifest().await?;
+    let current = ledger.current_epoch().await?;
+    let restore = crate::restore::Marker::read(&crate::restore_marker(step.config))?.map(|m| {
+        rahi_ledger::RestoreRef {
+            archive: m.archive,
+            sha256: m.sha256,
+        }
+    });
+    let restored = restore
+        .as_ref()
+        .is_some_and(|r| current.last_restore.as_ref() != Some(r));
+    let fingerprint =
+        rahi_ledger::fingerprint(&manifest, binary.as_deref(), image.as_deref(), &refs);
+    if !restored && current.fingerprint.as_deref() == Some(fingerprint.as_str()) {
+        return Ok(EpochOutcome {
+            current,
+            appended: None,
+        });
+    }
+    let cause = if restored {
+        rahi_ledger::Cause::Restore
+    } else {
+        rahi_ledger::Cause::Deploy
+    };
+    let epoch = rahi_ledger::DeploymentEpoch {
+        epoch: current.number + 1,
+        previous: current.hash,
+        cause,
+        manifest,
+        transition: step.transition.clone(),
+        schema_version: step.schema_version,
+        artifact: rahi_ledger::Artifact {
+            binary,
+            platform: crate::binding::this_platform(),
+            image,
+            rahi_version: env!("CARGO_PKG_VERSION").to_owned(),
+            build_revision: step.app_revision.map(str::to_owned),
+        },
+        refs,
+        restore: restored.then_some(restore).flatten(),
+        wall_time: crate::unix_now(),
+    };
+    ledger.append_epoch(&epoch, Sub::new(SYSTEM_DEPLOY)).await?;
+    Ok(EpochOutcome {
+        current: ledger.current_epoch().await?,
+        appended: Some(cause),
+    })
+}
+
+/// One line for what [`record_epoch`] did.
+#[must_use]
+pub fn render_epoch(outcome: &EpochOutcome) -> String {
+    match outcome.appended {
+        Some(cause) => format!(
+            "epoch: appended epoch {} ({}) as {}",
+            outcome.current.number,
+            match cause {
+                rahi_ledger::Cause::Deploy => "deploy",
+                rahi_ledger::Cause::Restore => "restore",
+            },
+            outcome.current.hash
+        ),
+        None => format!(
+            "epoch: the chain is at epoch {} ({}); nothing appended",
+            outcome.current.number, outcome.current.hash
+        ),
+    }
+}
+
 /// Every grant a manifest declares, as `service:capability` (spec 036 B-3).
 #[must_use]
 pub fn grants(manifest: &Manifest) -> BTreeSet<String> {

@@ -544,6 +544,8 @@ async fn migrate<C: Cell>(
     // before the chain is opened, so a follower's deploy step writes nothing
     // at all rather than creating the chain's schema on its way to exit 2.
     rahi_ops::migrate::refuse_follower(&booted.store).await?;
+    // Spec 041 B-3: the epoch's inputs are refused before anything moves.
+    rahi_ops::migrate::check_epoch_inputs(env)?;
     // One deploy step moves the schema and the ceiling together. The chain is
     // opened here because the adoption reads the manifest it currently names
     // and appends to it; opening it verifies it first, as every other verb
@@ -560,12 +562,41 @@ async fn migrate<C: Cell>(
         .await?;
         println!("{}", rahi_ops::migrate::render_sets(&report));
         println!("{}", rahi_ops::migrate::render_adoption(&adoption));
-        return Ok(());
+        let schema_version = report
+            .current
+            .get(rahi_store::APP_SET)
+            .copied()
+            .unwrap_or(rahi_store::migrate::BASELINE_VERSION);
+        return record_epoch::<C>(booted, &ledger, &adoption, schema_version, env).await;
     }
     let (report, adoption) =
         rahi_ops::migrate::adopt(&booted.store, &ledger, &booted.manifest, C::migrations()).await?;
     println!("{}", rahi_ops::migrate::render(&report));
     println!("{}", rahi_ops::migrate::render_adoption(&adoption));
+    record_epoch::<C>(booted, &ledger, &adoption, report.current, env).await
+}
+
+/// Spec 041 B-5: the deploy step's epoch, after its migrations and any
+/// transition.
+async fn record_epoch<C: Cell>(
+    booted: &Booted,
+    ledger: &Ledger,
+    adoption: &rahi_ops::migrate::Adoption,
+    schema_version: u32,
+    env: &dyn EnvReader,
+) -> Result<()> {
+    let outcome = rahi_ops::migrate::record_epoch(
+        ledger,
+        &rahi_ops::migrate::EpochStep {
+            env,
+            config: &booted.config,
+            app_revision: C::app_revision(),
+            transition: adoption.appended.clone(),
+            schema_version,
+        },
+    )
+    .await?;
+    println!("{}", rahi_ops::migrate::render_epoch(&outcome));
     Ok(())
 }
 
@@ -585,11 +616,17 @@ async fn backup(booted: &Booted, to: &Destination, env: &dyn EnvReader) -> Resul
     // against a ceiling the chain never named.
     let ledger = booted.ledger().await?;
     let current = ledger.current_manifest().await?;
-    let outcome = rahi_ops::backup::run(
+    // Spec 041 B-11: and the epoch it is taken under.
+    let epoch = ledger.current_epoch().await?;
+    let outcome = rahi_ops::backup::run_at_epoch(
         &booted.store,
         &rauthy,
         &booted.keys,
         &current.to_string(),
+        Some(rahi_ops::archive::ArchiveEpoch {
+            number: epoch.number,
+            hash: epoch.hash.to_string(),
+        }),
         to,
         env,
     )

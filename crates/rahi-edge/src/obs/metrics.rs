@@ -54,6 +54,14 @@ pub const REVOCATION_ROWS: &str = "rahi_revocation_rows";
 /// The build this process runs, value `1`, labelled by versions only
 /// (spec 040 B-11).
 pub const BUILD_INFO: &str = "rahi_build_info";
+
+/// The booted epoch's number (spec 041 B-10): a gauge with no label. For a
+/// dashboard, never an epoch's identity (041 B-7).
+pub const BINDING_EPOCH: &str = "rahi_binding_epoch";
+
+/// Whether the replica differs from its epoch, by kind (spec 041 B-10): 0 or
+/// 1 for each of `binary`, `image`, `manifest`.
+pub const BINDING_MISMATCH: &str = "rahi_binding_mismatch";
 /// Entries found on the legacy path's fence (spec 043 B-5, D-17 (e)).
 pub const LEGACY_PATH_DEBRIS: &str = "rahi_legacy_path_debris";
 
@@ -89,6 +97,8 @@ pub struct Metrics {
     revocation_rows: IntGaugeVec,
     legacy_path_debris: IntGauge,
     build_info: IntGaugeVec,
+    binding_epoch: IntGauge,
+    binding_mismatch: IntGaugeVec,
 }
 
 impl Metrics {
@@ -244,8 +254,25 @@ impl Metrics {
             &["rahi_version", "contract_version"],
         )
         .map_err(config)?;
+        // Spec 041 B-10: a number and a closed set of kinds; no digest,
+        // reference or instance id is a label.
+        let binding_epoch = IntGauge::with_opts(Opts::new(
+            BINDING_EPOCH,
+            "The number of the epoch this process booted under",
+        ))
+        .map_err(config)?;
+        let binding_mismatch = IntGaugeVec::new(
+            Opts::new(
+                BINDING_MISMATCH,
+                "1 when this process differs from its epoch in this kind, else 0",
+            ),
+            &["kind"],
+        )
+        .map_err(config)?;
         for collector in [
             Box::new(build_info.clone()) as Box<dyn prometheus::core::Collector>,
+            Box::new(binding_epoch.clone()),
+            Box::new(binding_mismatch.clone()),
             Box::new(previous_stop.clone()),
             Box::new(revocation_rows.clone()),
             Box::new(legacy_path_debris.clone()),
@@ -273,6 +300,8 @@ impl Metrics {
             revocation_rows,
             legacy_path_debris,
             build_info,
+            binding_epoch,
+            binding_mismatch,
         })
     }
 
@@ -295,6 +324,19 @@ impl Metrics {
         self.build_info
             .with_label_values(&[rahi_version, contract_version])
             .set(1);
+    }
+
+    /// Set `rahi_binding_epoch` and `rahi_binding_mismatch{kind}` (spec 041
+    /// B-10) from the comparison made at boot: each kind in `kinds` is 1 when
+    /// it is in `differs`, else 0.
+    pub fn set_binding(&self, epoch_number: u64, kinds: &[&str], differs: &[&str]) {
+        self.binding_epoch
+            .set(i64::try_from(epoch_number).unwrap_or(i64::MAX));
+        for kind in kinds {
+            self.binding_mismatch
+                .with_label_values(&[kind])
+                .set(i64::from(differs.contains(kind)));
+        }
     }
 
     /// The registry, for a caller that has its own collector to register.

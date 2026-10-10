@@ -1,0 +1,9 @@
+{
+  "_type": "https://spec-spine.dev/authority-snapshot/v0",
+  "provisional": true,
+  "corpus": "rahi-fixture",
+  "specs": {
+    "041-deployment-epochs": {"status": "approved"}
+  },
+  "source": {"revision": "0000000000000000000000000000000000000000"}
+}

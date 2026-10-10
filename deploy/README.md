@@ -145,6 +145,39 @@ binary may serve a store ahead of it only across migrations the cell
 declared additive (036 B-8). None of this reaches a binary built before spec
 036, which carries no such check.
 
+### The deployment epoch (spec 041)
+
+After its migrations and any transition, the same step records which
+deployment the chain now serves under: a `deployment.epoch` record naming
+the current manifest, the binary it measured (its own executable, which is
+the image being deployed), the image it was told (`RAHI_ARTIFACT_IMAGE`),
+and the rollout's references (`RAHI_DEPLOYMENT_REFS`, one JSON object with
+optional `build`, `deployment` and `authority` members, each `{type,
+digest, id?}`). It appends one epoch only when one of those changed, and
+prints `epoch: appended epoch n (deploy)` or `epoch: the chain is at epoch
+n (...); nothing appended`. A malformed `RAHI_DEPLOYMENT_REFS` stops the
+step before it appends anything; a missing reference never does. Nothing
+the references name is fetched or judged: an epoch is an observation, not a
+permission.
+
+Each replica reads its epoch once at boot and reports it on `/binding`
+(`epoch.ref`, `epoch.match`), on `rahi_binding_epoch`, and on
+`rahi_binding_mismatch{kind}` for `binary`, `image` and `manifest`. A
+replica that differs from its epoch boots anyway and logs one warning line
+naming both values. Every denial it writes names `epoch`, `epoch_number`
+and `instance`.
+
+After a restore, the next deploy step appends an epoch with `cause:
+restore`, so the head moves before any replica mints an id. At N=1 the
+entrypoint guarantees that ordering. **At N=3 run the Job before starting
+the replicas on a restored volume**; a replica that starts first serves
+under the archived epoch and can re-mint ids the discarded timeline used.
+
+`rahi ledger verify` and `rahi ledger export <path>` run beside a serving
+replica (`kubectl exec`), or from a Job as store clients, without stopping
+anything. The export writes `<path>.coverage.json` stating what it does not
+contain.
+
 ## Backups go to S3 from the leader
 
 `k8s/backup-cronjob.yaml` runs nightly. The job's container carries

@@ -127,6 +127,21 @@ pub struct ArchiveManifest {
     pub schema: Option<ArchiveSchema>,
     /// Every part's path and its sha256, hex.
     pub parts: BTreeMap<String, String>,
+    /// The chain's current epoch at backup time (spec 041 B-11), so an
+    /// operator knows which deployment a backup was taken under before
+    /// restoring it. Absent from an archive written before spec 041, which
+    /// keeps the format unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub epoch: Option<ArchiveEpoch>,
+}
+
+/// The epoch an archive was taken under (spec 041 B-11).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ArchiveEpoch {
+    /// Its number, which orders it (041 B-7).
+    pub number: u64,
+    /// Its record hash, which identifies it.
+    pub hash: String,
 }
 
 impl ArchiveManifest {
@@ -157,6 +172,7 @@ impl ArchiveManifest {
                 .iter()
                 .map(|p| (p.path.clone(), sha256_hex(&p.bytes)))
                 .collect(),
+            epoch: None,
         }
     }
 
