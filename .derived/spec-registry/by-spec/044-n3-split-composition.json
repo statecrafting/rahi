@@ -252,6 +252,14 @@
           "kind": "file",
           "path": "crates/rahi-edge/src/obs/layer.rs"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "023-observability",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/obs/metrics.rs"
+        }
       }
     ],
     "extraFrontmatter": {
@@ -324,6 +332,6 @@
     "summary": "The owner decided on 2026-09-23 (hiqlite proposal D-14, recorded at bartekus/hiqlite@da4c910) that an N=3 cell is one namespace holding two StatefulSets, rahi and rauthy, three replicas each, one hiqlite node per pod, and that the single-container supervised composition of spec 031 stays the N=1 profile. This spec is rahi's share of that decision. It amends 031 and 032 for N=3 only: rahi starts without rauthy, reaches it only through the internal ClusterIP Service rauthy-internal.<namespace>.svc.cluster.local over Rauthy's TLS or a mesh's mTLS, fails readiness and never liveness while rauthy is unavailable, and keeps peer discovery independent of readiness. It carries the proposal's routing, NetworkPolicy, per-StatefulSet disruption and storage requirements, and backup obligations. It changes no dependency and claims no N=3 support: that follows only from recorded qualification on a named release.\n",
     "title": "N=3 split composition: two StatefulSets, rahi and rauthy, one hiqlite node per pod, rahi reaching rauthy only through an encrypted internal Service and losing readiness, never liveness, without it"
   },
-  "shardHash": "3df840e4cd2597419960a8c0a08512486527ef0641ed4493ae4efd1b0809386c",
+  "shardHash": "5ef31dec866a3e57ade29dc2510c3147847afb9b73e8205d64a14fb6152a90c9",
   "specVersion": "1.9.0"
 }

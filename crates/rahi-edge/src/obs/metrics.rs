@@ -62,6 +62,7 @@ pub const BINDING_EPOCH: &str = "rahi_binding_epoch";
 /// Whether the replica differs from its epoch, by kind (spec 041 B-10): 0 or
 /// 1 for each of `binary`, `image`, `manifest`.
 pub const BINDING_MISMATCH: &str = "rahi_binding_mismatch";
+
 /// Entries found on the legacy path's fence (spec 043 B-5, D-17 (e)).
 pub const LEGACY_PATH_DEBRIS: &str = "rahi_legacy_path_debris";
 

@@ -52,6 +52,7 @@ extends:
   - { spec: "020-edge-server", unit: "crates/rahi-edge/Cargo.toml", nature: additive }
   - { spec: "024-hardening", unit: "crates/rahi-edge/src/exposure.rs", nature: additive }
   - { spec: "023-observability", unit: "crates/rahi-edge/src/obs/layer.rs", nature: additive }
+  - { spec: "023-observability", unit: "crates/rahi-edge/src/obs/metrics.rs", nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/01-consumer-contract.md" }, role: context }
   - { unit: { kind: file, path: "docs/design/02-operational-prerequisites.md" }, role: context }
