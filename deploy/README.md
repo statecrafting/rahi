@@ -232,8 +232,8 @@ the image being deployed), the image it was told (`RAHI_ARTIFACT_IMAGE`),
 and the rollout's references (`RAHI_DEPLOYMENT_REFS`, one JSON object with
 optional `build`, `deployment` and `authority` members, each `{type,
 digest, id?}`). It appends one epoch only when one of those changed, and
-prints `epoch: appended epoch n (deploy)` or `epoch: the chain is at epoch
-n (...); nothing appended`. A malformed `RAHI_DEPLOYMENT_REFS` stops the
+prints `epoch: appended epoch n (deploy) as <hash>` or `epoch: the chain is
+at epoch n (<hash>); nothing appended`. A malformed `RAHI_DEPLOYMENT_REFS` stops the
 step before it appends anything; a missing reference never does. Nothing
 the references name is fetched or judged: an epoch is an observation, not a
 permission.
