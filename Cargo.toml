@@ -33,8 +33,8 @@ tokio = { version = "1", default-features = false }
 tempfile = "3"
 # The statecrafting ledger primitives (spec 013): the record envelope, the
 # hashing and verification engine, and the canonical bytes both hash over.
-attest-ledger-types = "0.1"
-attest-ledger-core = "0.1"
+attest-ledger-types = "0.2"
+attest-ledger-core = "0.2"
 canonical-keysort-json = "0.1"
 ed25519-dalek = "3"
 base64 = "0.23"
