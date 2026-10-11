@@ -1,0 +1,59 @@
+# B-7: each StatefulSet's headless Service publishes not-ready addresses,
+# so a pod unready because Rauthy is away stays addressable to its raft
+# peers. The client-facing Services are separate and honor readiness.
+apiVersion: v1
+kind: Service
+metadata:
+  name: rahi-hl
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/name: rahi
+  ports:
+    - name: hiqlite-api
+      port: 8300
+    - name: hiqlite-raft
+      port: 8400
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rahi
+spec:
+  selector:
+    app.kubernetes.io/name: rahi
+  ports:
+    - name: http
+      port: 8443
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rauthy-hl
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/name: rauthy
+  ports:
+    - name: hiqlite-api
+      port: 8200
+    - name: hiqlite-raft
+      port: 8100
+---
+# B-1: the one address rahi reaches Rauthy by. ClusterIP only: no ingress
+# path, no LoadBalancer, no NodePort.
+apiVersion: v1
+kind: Service
+metadata:
+  name: rauthy-internal
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: rauthy
+  ports:
+    - name: https
+      port: 8443
+      targetPort: https

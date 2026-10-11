@@ -1,0 +1,44 @@
+# The split N=3 cell (spec 044): one namespace, two StatefulSets of three
+# replicas each, rahi and rauthy, one hiqlite node per pod. Rahi reaches
+# Rauthy only through the internal ClusterIP Service `rauthy-internal`, over
+# Rauthy's native TLS, verified against a CA mounted into rahi's pods (B-1,
+# B-2). Rahi is unready, never dead, while Rauthy is away (B-4 to B-6).
+#
+# Not qualified: N=3 support follows only from recorded operator evidence on
+# a named release (044 AC-3, AC-4). `deploy/n3` stays as the co-located
+# overlay and is unqualified too. The N=1 profile is `deploy/k8s`.
+#
+# Before the first rollout, render the two Secrets this overlay reads:
+#
+#   RAHI_RAUTHY_MODE=remote RAHI_PUBLIC_URL=https://cell.example.com \
+#   RAHI_RAUTHY_HQL_NODES="$(cat rauthy-peers.txt)" \
+#   RAHI_RAUTHY_TRUSTED_PROXIES=<the pod network> \
+#   rahi first-boot --export > secrets.yaml      # rahi-keys and rauthy-env
+#
+# and the TLS pair: `rauthy-tls` (tls.crt, tls.key for
+# rauthy-internal.rahi.svc.cluster.local) and `rauthy-ca` (ca.pem) for rahi.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: rahi
+
+labels:
+  - includeSelectors: true
+    pairs:
+      app.kubernetes.io/part-of: rahi
+
+resources:
+  - configmap.yaml
+  - rahi.yaml
+  - rauthy.yaml
+  - services.yaml
+  - networkpolicies.yaml
+  - disruption.yaml
+  - ingress.yaml
+  - migrate-job.yaml
+
+images:
+  # Spec 039 B-3: by version, never latest. Remote identity (spec 044) is
+  # first carried by 0.7.0.
+  - name: ghcr.io/statecrafting/rahi
+    newTag: 0.7.0

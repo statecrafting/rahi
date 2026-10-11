@@ -1,0 +1,133 @@
+# Rahi's StatefulSet (spec 044 A-031, A-032): `rahi serve` alone, no
+# supervisor and no Rauthy in the pod. One hiqlite node per pod, node id
+# the ordinal plus one, peers fixed before first start (B-8).
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rahi
+spec:
+  serviceName: rahi-hl
+  replicas: 3
+  # P-3: ordered first bootstrap until hiqlite F-118 (node-1 replacement) is
+  # repaired; Parallel afterwards.
+  podManagementPolicy: OrderedReady
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rahi
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rahi
+    spec:
+      # B-8: from a measured single-node stop at N=3 plus margin, never below
+      # it. Not measured yet (AC-4): this is the N=1 serve grace plus the
+      # hiqlite pre-shutdown delay at N>1 (9.5 s), with margin, until AC-4
+      # records the measurement.
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: rahi
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: rahi
+      containers:
+        - name: rahi
+          image: ghcr.io/statecrafting/rahi
+          # A fresh cluster's first start applies the migrations on the
+          # leader (a follower's exit 2 is tolerated); every later rollout
+          # runs the migration Job first (B-9). Then `serve`, with identity
+          # remote (B-5).
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              rahi first-boot
+              rahi migrate --adopt-manifest || [ "$?" -eq 2 ]
+              exec rahi serve
+          ports:
+            - name: http
+              containerPort: 8443
+            - name: hiqlite-api
+              containerPort: 8300
+            - name: hiqlite-raft
+              containerPort: 8400
+          env:
+            - name: RAHI_POD_INDEX
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['apps.kubernetes.io/pod-index']
+            - name: RAHI_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          envFrom:
+            - configMapRef:
+                name: rahi-config
+            - secretRef:
+                name: rahi-s3
+                optional: true
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: keys
+              mountPath: /data/keys
+              readOnly: true
+            - name: rauthy-ca
+              mountPath: /etc/rahi/rauthy-ca
+              readOnly: true
+          # B-5: liveness and startup never consult Rauthy; readiness does,
+          # through B-1's address, and names `identity` when it fails (B-6).
+          startupProbe:
+            httpGet:
+              path: /startupz
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+      volumes:
+        - name: keys
+          secret:
+            secretName: rahi-keys
+            defaultMode: 0400
+        - name: rauthy-ca
+          secret:
+            secretName: rauthy-ca
+            defaultMode: 0444
+  # B-8: one ReadWriteOnce claim per replica, never shared, never a network
+  # filesystem.
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi

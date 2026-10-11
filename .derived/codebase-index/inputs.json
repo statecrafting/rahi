@@ -171,6 +171,33 @@
     "deploy/k8s/statefulset.yaml": {
       "contentHash": "685b64e901042baf490053adecea7ccab2564a3f53ee2a2ff2bfc497abacce9c"
     },
+    "deploy/n3-split/configmap.yaml": {
+      "contentHash": "2a16d3b892ba76ad4ae6502e6908f662d7a3beaddba143866f5dba7999339fe2"
+    },
+    "deploy/n3-split/disruption.yaml": {
+      "contentHash": "1c9a0dc08460ddea97b5615c3171b57a3250d5c695202bda06721665fa79b7ff"
+    },
+    "deploy/n3-split/ingress.yaml": {
+      "contentHash": "132bf9214b3c85bebfbb0b3ba7dcbe9b736a153dc2c9a54aec24fb314737720b"
+    },
+    "deploy/n3-split/kustomization.yaml": {
+      "contentHash": "a6b2e841033f13d800fdd8b3876796891eb6d09d4a9adb8b5b887de932c3e34e"
+    },
+    "deploy/n3-split/migrate-job.yaml": {
+      "contentHash": "e253a94ee3d21fe26580c388be92f0f928360d3742c83e0bf04c11b7abe8b9e0"
+    },
+    "deploy/n3-split/networkpolicies.yaml": {
+      "contentHash": "fe26eb923861e44c9063803526eb1c76eaa9efbc1d499d958bfa9f9b48f78ce4"
+    },
+    "deploy/n3-split/rahi.yaml": {
+      "contentHash": "3bc7882f095d5bf42225be3c7ecc86f1637f54c3e10398cb72dd828f811e81d3"
+    },
+    "deploy/n3-split/rauthy.yaml": {
+      "contentHash": "00b76b1dd73cce93e67c14299d9bd19629097434b00b5a2bf94697db0cab9142"
+    },
+    "deploy/n3-split/services.yaml": {
+      "contentHash": "09fce1bcf1f2db87548d4c4300a4166ff53c55336f41fef08c2b54980ce7b978"
+    },
     "deploy/n3/kustomization.yaml": {
       "contentHash": "6d88e3c333ad5ee8949fc93153f49c7fe74fbc4d1e8e76f5669729d511efb7a1"
     },
@@ -247,7 +274,7 @@
       "contentHash": "f29ecfab602778e37107e96e8e5dd9e5891529179d7f48669c41adea2954b89f"
     },
     "scripts/k8s-validate.sh": {
-      "contentHash": "33070c0b97ab5cf24dbbfe36d3de775ce3dd0cf9ec1d12b9d429ff4bf1637b2f"
+      "contentHash": "bb26160004ea8a9f4546d803e9762f701f718741eddc734ee99e7d054654b174"
     },
     "scripts/spec-dag.sh": {
       "contentHash": "84d4793c8a1a811ab25ce7d45b9a66d92364015883bd4a72c8741b9898ab1d05"

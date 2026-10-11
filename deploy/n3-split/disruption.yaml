@@ -1,0 +1,20 @@
+# B-8: one PodDisruptionBudget per StatefulSet, one pod at a time.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: rahi
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rahi
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: rauthy
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rauthy

@@ -38,7 +38,8 @@ refuses a render that names `:latest` or a cell image outside
 | `k8s/backup-cronjob.yaml` | the nightly `rahi backup --to s3://` against the leader, with the RBAC it needs |
 | `k8s/servicemonitor.yaml` | the in-cluster scrape of `/metrics` |
 | `k8s/secret.example.yaml` | the shape of `rahi-keys` and `rahi-s3`, which the operator custodies and applies by hand |
-| `n3/` | the three-replica patch: peers, replicas, anti-affinity, and the entrypoint wrapper |
+| `n3/` | the three-replica patch: peers, replicas, anti-affinity, and the entrypoint wrapper (co-located, unqualified) |
+| `n3-split/` | the split N=3 layout of spec 044: rahi and rauthy as two StatefulSets, `rauthy-internal`, NetworkPolicies, PodDisruptionBudgets, the migration Job (unqualified) |
 
 ## Choose N before the first rollout
 
@@ -47,8 +48,91 @@ clusters single-voter, the image's own entrypoint. At N=3 every replica is
 identical and each knows its two peers by stable pod DNS. The peer lists
 are Raft membership, and hiqlite reads them at the node's first start, so
 choose the topology before the first rollout: `deploy/k8s` for one
-replica, `deploy/n3` for three. Growing a running N=1 cell to three is not
-a procedure this repository has recorded.
+replica, `deploy/n3-split` for three (spec 044; `deploy/n3`, the co-located
+overlay, is kept and unqualified). Growing a running N=1 cell to three is
+not a procedure this repository has recorded.
+
+### The split N=3 layout (spec 044)
+
+`deploy/n3-split` is one namespace with two StatefulSets of three replicas
+each, `rahi` and `rauthy`, one hiqlite node per pod. **It is not
+qualified.** N=3 support follows only from recorded operator evidence on a
+named release (044 AC-3, AC-4), which has not been taken. What replaces
+each property the single container gave for free:
+
+- **Routing (B-1, B-2).** Rahi reaches Rauthy only at
+  `https://rauthy-internal.<namespace>.svc.cluster.local:8443`, a ClusterIP
+  Service, over Rauthy's native TLS. Rahi verifies the certificate against
+  the CA mounted from the `rauthy-ca` Secret and trusts nothing else on that
+  path. `RAHI_RAUTHY_MODE=remote`, `RAHI_RAUTHY_URL` and `RAHI_RAUTHY_CA` say
+  so; an `http` URL or a missing CA refuses the start. Users reach Rauthy
+  only through rahi's `/auth` proxy, on rahi's origin (P-2), so the public
+  URL is `https`.
+- **Access (B-3).** NetworkPolicies admit Rauthy's HTTPS port from rahi's
+  pods only, each hiqlite cluster's ports (rauthy 8100/8200, rahi
+  8300/8400) from its own pods only, and rahi's HTTP port from anywhere in
+  the cluster. NetworkPolicy is access control, not encryption: hiqlite's
+  traffic inside each StatefulSet is not encrypted by this layout
+  (proposal D-5, open).
+- **Die-together, replaced (B-4 to B-6).** Rahi starts without Rauthy. Its
+  liveness probe is `/healthz` and its startup probe is `/startupz` (the
+  store and the chain), and neither consults Rauthy. `/readyz` is `503`
+  with `component: identity` until an authenticated
+  `GET /auth/v1/ready` through `rauthy-internal` answers and identity is
+  composed, and again whenever Rauthy goes away. A Rauthy outage makes rahi
+  unready and restarts nothing. Identity is composed in the background,
+  with the OIDC client registered and its secret custodied on rahi's data
+  volume, and replaces the probes-only router without a restart.
+- **Peer discovery (B-7).** `rahi-hl` and `rauthy-hl` publish not-ready
+  addresses, so an unready pod stays addressable to its raft peers. The
+  client-facing `rahi` and `rauthy-internal` Services honor readiness.
+- **Disruption and storage (B-8).** One PodDisruptionBudget of
+  `maxUnavailable: 1` per StatefulSet, required anti-affinity across nodes,
+  zone spread when the cluster has zones, one `ReadWriteOnce` claim per
+  replica, node id equal to the ordinal plus one (Rauthy reads it as
+  `HQL_NODE_ID_FROM=k8s`), and Rauthy's cache on disk.
+  `podManagementPolicy: OrderedReady` holds for first bootstrap until
+  hiqlite F-118 is repaired (P-3). `terminationGracePeriodSeconds` is 60
+  on both, a placeholder: B-8 sets it from a measured single-node stop at
+  N=3 plus margin, and that measurement is AC-4's.
+- **Migrations (B-9).** The `rahi-migrate` Job runs `rahi migrate
+  --adopt-manifest` (manifest adoption, migrations and the epoch) before the
+  rahi StatefulSet rolls, as in the co-located layout.
+
+Before the first rollout, render the two Secrets from one key set and
+create the TLS pair:
+
+```sh
+RAHI_RAUTHY_MODE=remote RAHI_PUBLIC_URL=https://cell.example.com \
+RAHI_RAUTHY_HQL_NODES="1 rauthy-0.rauthy-hl:8100 rauthy-0.rauthy-hl:8200;2 rauthy-1.rauthy-hl:8100 rauthy-1.rauthy-hl:8200;3 rauthy-2.rauthy-hl:8100 rauthy-2.rauthy-hl:8200" \
+RAHI_RAUTHY_TRUSTED_PROXIES=<the pod network CIDR> \
+rahi first-boot --export > secrets.yaml   # rahi-keys and rauthy-env
+kubectl -n rahi apply -f secrets.yaml
+kubectl -n rahi create secret tls rauthy-tls --cert=rauthy.crt --key=rauthy.key
+kubectl -n rahi create secret generic rauthy-ca --from-file=ca.pem
+```
+
+The certificate in `rauthy-tls` names
+`rauthy-internal.rahi.svc.cluster.local` and is signed by the CA in
+`rauthy-ca`.
+
+The namespace `rahi` appears in three places that kustomize does not keep
+in step: the kustomization's `namespace:`, `RAHI_RAUTHY_URL` in
+`configmap.yaml`, and that certificate's name. A cell in another namespace
+changes all three together; changing only the first leaves rahi unready,
+because its back channel names a Service that does not exist.
+
+**Backups (B-10 to B-12).** The scheduled backup is the same verb against
+the rahi leader. It reaches Rauthy's backup through `rauthy-internal`.
+Under the split it is two snapshots taken at two instants, one per cluster,
+and the skew between them is part of the recovery point: a restore can hold
+Rauthy state up to that skew older or newer than the app's. A backup that
+must be coherent across both clusters (a migration out of a split cell, an
+offline DR archive) needs both StatefulSets scaled to 0 and an offline
+export of both volumes. That entry point is not in any published hiqlite
+release, so B-11 is held until one is adopted. The cell archive does not
+yet name both images and both clusters' applied log ids (B-12); that is
+owed.
 
 ## Keys: one Secret, custodied once
 
@@ -154,8 +238,8 @@ the image being deployed), the image it was told (`RAHI_ARTIFACT_IMAGE`),
 and the rollout's references (`RAHI_DEPLOYMENT_REFS`, one JSON object with
 optional `build`, `deployment` and `authority` members, each `{type,
 digest, id?}`). It appends one epoch only when one of those changed, and
-prints `epoch: appended epoch n (deploy)` or `epoch: the chain is at epoch
-n (...); nothing appended`. A malformed `RAHI_DEPLOYMENT_REFS` stops the
+prints `epoch: appended epoch n (deploy) as <hash>` or `epoch: the chain is
+at epoch n (<hash>); nothing appended`. A malformed `RAHI_DEPLOYMENT_REFS` stops the
 step before it appends anything; a missing reference never does. Nothing
 the references name is fetched or judged: an epoch is an observation, not a
 permission.

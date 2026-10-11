@@ -1,0 +1,55 @@
+# B-9: manifest adoption, migration cutover and the epoch run once per cell
+# as a Job before the rahi StatefulSet rolls, with `--adopt-manifest`
+# (proposal R-d). A pure client of rahi's peers: no volume, no node.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: rahi-migrate
+  labels:
+    app.kubernetes.io/name: rahi-migrate
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rahi-migrate
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      containers:
+        - name: migrate
+          image: ghcr.io/statecrafting/rahi
+          command: ["rahi", "migrate", "--adopt-manifest"]
+          env:
+            - name: RAHI_STORE_CLIENT
+              value: "true"
+            - name: RAHI_DATA_DIR
+              value: /data
+          envFrom:
+            - configMapRef:
+                name: rahi-config
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: keys
+              mountPath: /data/keys
+              readOnly: true
+            - name: rauthy-ca
+              mountPath: /etc/rahi/rauthy-ca
+              readOnly: true
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: keys
+          secret:
+            secretName: rahi-keys
+            defaultMode: 0400
+        - name: rauthy-ca
+          secret:
+            secretName: rauthy-ca
+            defaultMode: 0444
