@@ -656,9 +656,9 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "canonical-keysort-json"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05b39d732daeef9a1bff08849dfaa3217be9a9765024d494f6a5707e987e1043"
+checksum = "9c82715a11fa8831814a03d87bd4613961672cf905853a4464ad9424ce509500"
 dependencies = [
  "serde_json",
 ]
