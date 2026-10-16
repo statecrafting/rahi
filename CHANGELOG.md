@@ -10,6 +10,77 @@ Every chassis crate carries one version, and a release is an annotated tag
 `vX.Y.Z` on a `main` commit whose `make ci` passed. Pre-1.0, a minor bump may
 change the consumer contract and a patch bump may not.
 
+## 0.7.0, release candidate 2026-10-15
+
+Every change since `v0.6.0`. All nine chassis crates move together. It is a
+minor bump under 039 B-1: `rahi_ledger` gains the `epoch` module and
+`Ledger::current_epoch`, `rahi_kernel::KernelOptions` gains a `binding`
+field, the archive manifest gains an optional `epoch`, `rahi_idp` gains
+`back_channel`, and `rahi_edge` gains `router::switching` and the
+`/startupz` probe. A cell that calls only `rahi_cli::run` needs no code
+change. The N=1 supervised composition is unchanged and stays the only
+qualified topology; the split N=3 overlay ships for qualification, not as a
+supported layout. The hiqlite pin is unchanged, `0.15.0-patched.3`.
+
+- **Deployment epochs (spec 041).** `migrate --adopt-manifest` appends a
+  `deployment.epoch` record (`epoch:<n>`) when the manifest, the measured
+  binary, `RAHI_ARTIFACT_IMAGE` or `RAHI_DEPLOYMENT_REFS` changed, and after
+  a restore whose archive no restore epoch names. `serve` reads its epoch
+  before the kernel boots; `/binding` gains `epoch.ref`
+  (`rahi.epoch-ref/v0`) and `epoch.match` (`bound`, `mismatch`, `unknown`,
+  `unbound`), a mismatch is a warning and never refuses the boot, and two
+  metrics, `rahi_binding_epoch` and `rahi_binding_mismatch{kind}`, carry no
+  digest labels. Every decision names `epoch`, `epoch_number` and
+  `instance`. Each seal stamps `kernel_segments.current_epoch`, a column
+  added at open. The archive manifest records `epoch {number, hash}`
+  (absent from older archives; the format is unchanged). Malformed
+  `RAHI_DEPLOYMENT_REFS` or a malformed image is refused before anything
+  moves.
+- **`ledger verify` and `ledger export` beside a serving replica (spec
+  041 B-13, B-14).** Both open through `Booted::open_or_attach`, so they run
+  attached to `serve` or as a store client. `export` writes
+  `<path>.coverage.json` stating what the export does not contain; the
+  JSONL bytes are unchanged.
+- **Remote identity, readiness never liveness (spec 044).**
+  `RAHI_RAUTHY_MODE=remote` starts `serve` without Rauthy: it binds with
+  only the probes, `/metrics` and `/binding`, composes identity in the
+  background (including the idempotent client custody), and swaps the full
+  router in place. `/readyz` names `identity` until an authenticated
+  `GET /auth/v1/ready` through `rauthy-internal` answers; `/healthz` never
+  consults Rauthy; the new `/startupz` checks the store and the chain head.
+  Every client that reaches Rauthy is built from one back channel,
+  `RAHI_RAUTHY_URL` (https only) trusting only `RAHI_RAUTHY_CA`. Remote mode
+  refuses an http public URL. Without `RAHI_RAUTHY_MODE=remote` every client
+  is the N=1 loopback client, unchanged.
+- **The split N=3 overlay (spec 044, `deploy/n3-split`).** Two
+  three-replica StatefulSets (rahi and Rauthy), headless peer Services with
+  `publishNotReadyAddresses`, the ClusterIP-only `rauthy-internal`,
+  NetworkPolicies, a PDB `maxUnavailable: 1` and required anti-affinity per
+  StatefulSet, and the migrate Job with `--adopt-manifest`.
+  `scripts/k8s-validate.sh` checks it and refuses fifteen negative fixtures.
+  `first-boot --export` in remote mode also renders Rauthy's environment as
+  the `rauthy-env` Secret.
+- **A cluster syncs its raft log before acknowledging (spec 044 D-11).**
+  With more than one peer, `rahi-store` sets hiqlite's `wal_sync` to
+  `Immediate`; a single voter keeps `ImmediateAsync`, so N=1 append cost
+  does not move.
+- **attest-ledger primitives 0.2 (spec 013 D-11).** Record envelopes,
+  canonical hashes and signer verification are unchanged against the
+  committed fixtures.
+- **Dependencies.** `action-gate-core` `=0.3.0` (additive; an open gate's
+  config hash and the manifest hash are unchanged, 015 D-12);
+  `quinn-proto` 0.11.19 and `rustls` 0.23.46 for RUSTSEC-2026-0338,
+  -0340, -0343, -0346 and -0347.
+- **Known limitations.** N=3 is not supported by this release: spec 044's
+  AC-3 (no plaintext on the rahi-to-Rauthy path) and AC-4 (outage, drain
+  and stop on three nodes) are operator checks that qualify a named
+  release, B-8's 60 s grace is provisional until AC-4 measures a stop,
+  B-11's coherent offline export waits on a hiqlite release that carries
+  it, and B-12's archive identity waits on a hiqlite change that records
+  Rauthy's applied log id (044 D-12). Rauthy's own cluster keeps hiqlite's
+  `ImmediateAsync` until a hiqlite release reads the setting from its
+  environment. The 0.6.0 limits below are unchanged.
+
 ## 0.6.0, release candidate 2026-10-08
 
 Every change since `v0.5.0`. All nine chassis crates move together. It is a
