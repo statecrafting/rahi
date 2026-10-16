@@ -304,6 +304,22 @@ degradation (a later spec if a product needs them).
   change the roster and the hash and is a separate decision of this spec,
   not taken here.
 
+- **D-12 (2026-10-15, maintenance under the owner's grant of 2026-10-15
+  to fix what is outstanding in rahi; reads no B-n: a dependency pin).**
+  `action-gate-core` moves from exactly `=0.2.0` to exactly `=0.3.0`.
+  action-gate's 0.3.0 changelog states the release is additive (its spec
+  004): `Mode::Open` stays the default, an open gate's `config_hash` is
+  still taken over the fingerprint array, and `SecretsCheck`, the secret
+  registry and their golden vectors are unchanged; 0.3.0 only adds
+  `Mode::Closed`, `require`, `evaluate_exhaustive` and their reason codes,
+  none of which the kernel's roster uses. Checked rather than assumed:
+  `tests/manifest.rs`, which pins the manifest hash of
+  `testdata/manifests/valid.toml` (`sha256:f3407fd4...`), passes on 0.3.0
+  with the whole `rahi-kernel` suite, so no deployed cell's manifest hash
+  or chain root moves. `action-gate-types` stays `0.1`. Adopting the
+  closed mode would change the gate's hash and is a separate decision of
+  this spec, not taken here.
+
 ## Verification
 
 ```verify:cli
