@@ -191,20 +191,13 @@ fn ac2_remote_identity_is_readiness_never_liveness() {
         );
         return;
     };
-    let mut node = Node::with_rauthy(&bin);
-    let tls = tempfile::tempdir().unwrap();
-    let (ca, cert, key) = mint_tls(tls.path());
-    let https_port = free_port();
-    node.set_env("RAHI_RAUTHY_MODE", "remote");
-    node.set_env(
-        rahi_idp::back_channel::ENV_RAUTHY_URL,
-        &format!("https://localhost:{https_port}"),
-    );
-    node.set_env(rahi_idp::back_channel::ENV_RAUTHY_CA, ca.to_str().unwrap());
-    // The public origin is https, as behind a real ingress; this test reaches
-    // rahi's own listener directly, in plain HTTP, as that ingress would.
-    let public = node.var("RAHI_PUBLIC_URL").replace("http://", "https://");
-    node.set_env("RAHI_PUBLIC_URL", &public);
+    let Remote {
+        node,
+        _tls,
+        cert,
+        key,
+        https_port,
+    } = remote(&bin);
 
     // Rauthy stopped: serve starts, is live and started, and not ready.
     let mut cell = node.spawn("serve");
@@ -257,6 +250,79 @@ fn ac2_remote_identity_is_readiness_never_liveness() {
     cell.sigterm();
     let stopped = cell.wait(Duration::from_secs(60));
     assert_eq!(stopped.code, Some(0), "{}", stopped.logs());
+}
+
+/// B-10 with 037 B-1: a remote cell has no supervisor, so its composition
+/// provisions the passkey-only backup admin as `supervise` does, and `rahi
+/// backup` takes Rauthy's half through the back channel (D-13).
+#[test]
+fn b10_a_remote_cell_backs_rauthy_up() {
+    let Some(bin) = stop_fixture::test_rauthy() else {
+        eprintln!(
+            "B-10: the Rauthy leg did not execute (RAHI_TEST_RAUTHY is not set); \
+             RAHI_REQUIRE_RAUTHY=1 makes this a failure"
+        );
+        return;
+    };
+    let Remote {
+        node,
+        _tls,
+        cert,
+        key,
+        https_port,
+    } = remote(&bin);
+    let mut rauthy = start_rauthy(&node, &bin, &cert, &key, https_port);
+    let mut cell = node.spawn("serve");
+    wait_for(&node, &mut cell, READYZ_PATH, 200, RAUTHY_BUDGET);
+    assert!(
+        cell.logs().contains("backup admin provisioned"),
+        "{}",
+        cell.logs()
+    );
+
+    let out = tempfile::tempdir().unwrap();
+    let backup = node.run(&format!("backup --to {}", out.path().display()));
+    assert_eq!(backup.code, Some(0), "{}", backup.logs());
+
+    cell.sigterm();
+    let stopped = cell.wait(Duration::from_secs(60));
+    stop(&mut rauthy);
+    assert_eq!(stopped.code, Some(0), "{}", stopped.logs());
+}
+
+/// A node in remote identity mode, with the TLS Rauthy will serve.
+struct Remote {
+    node: Node,
+    _tls: tempfile::TempDir,
+    cert: PathBuf,
+    key: PathBuf,
+    https_port: u16,
+}
+
+/// Configure a node for remote identity: Rauthy at its own https address,
+/// trusted through a CA this test mints (B-1, B-2).
+fn remote(bin: &Path) -> Remote {
+    let mut node = Node::with_rauthy(bin);
+    let tls = tempfile::tempdir().unwrap();
+    let (ca, cert, key) = mint_tls(tls.path());
+    let https_port = free_port();
+    node.set_env("RAHI_RAUTHY_MODE", "remote");
+    node.set_env(
+        rahi_idp::back_channel::ENV_RAUTHY_URL,
+        &format!("https://localhost:{https_port}"),
+    );
+    node.set_env(rahi_idp::back_channel::ENV_RAUTHY_CA, ca.to_str().unwrap());
+    // The public origin is https, as behind a real ingress; this test reaches
+    // rahi's own listener directly, in plain HTTP, as that ingress would.
+    let public = node.var("RAHI_PUBLIC_URL").replace("http://", "https://");
+    node.set_env("RAHI_PUBLIC_URL", &public);
+    Remote {
+        node,
+        _tls: tls,
+        cert,
+        key,
+        https_port,
+    }
 }
 
 /// B-2: a remote back channel that is not https, or names no CA, refuses
