@@ -727,6 +727,28 @@ struct IdentityParts {
     operator_revoke: Router,
 }
 
+/// Make sure the remote Rauthy holds the backup admin this key set's passkey
+/// belongs to (spec 037 B-1, spec 044 D-13), through the back channel.
+async fn backup_admin(
+    config: &Config,
+    keys: &KeySet,
+) -> std::result::Result<Option<rahi_ops::rauthy_session::Provisioned>, String> {
+    let passkey = match keys.backup_passkey() {
+        Ok(Some(passkey)) => passkey,
+        Ok(None) => return Ok(None),
+        Err(err) => return Err(err.to_string()),
+    };
+    let token = keys.admin_token().map_err(|err| err.to_string())?;
+    rahi_ops::rauthy_session::ensure_backup_admin(
+        &rahi_idp::back_channel::base(config),
+        &token,
+        &passkey,
+    )
+    .await
+    .map(Some)
+    .map_err(|err| err.to_string())
+}
+
 /// Compose identity against Rauthy: discovery within `budget`, the key set,
 /// the session resolver, the resource server and the revocation surface.
 async fn identity(inputs: IdentityInputs, budget: Duration) -> Result<IdentityParts> {
@@ -750,6 +772,19 @@ async fn identity(inputs: IdentityInputs, budget: Duration) -> Result<IdentityPa
                 text => format!("; {text}"),
             }
         );
+        // The other half of what `supervise` does before its client
+        // bootstrap is 037 B-1's backup admin, without which `rahi backup`
+        // cannot take Rauthy's half. A remote cell provisions it here, and,
+        // as under `supervise`, an account that cannot be provisioned is
+        // reported rather than fatal (spec 044 D-13).
+        let provisioned = rahi_ops::supervise::ReadySteps {
+            rauthy_snapshot_applied: None,
+            backup_admin: backup_admin(&config, &keys).await,
+        };
+        let said = provisioned.render();
+        if !said.is_empty() {
+            eprintln!("serve: {said}");
+        }
     }
     // rauthy publishes its endpoints on the public origin, which is not
     // reachable from inside the cell; the key set is fetched over the same

@@ -481,6 +481,30 @@ establishes N=3 support.
   identity into the archive, because a manifest naming one cluster's log
   id beside nothing for the other reads as coherent when it is not.
 
+### Decisions (2026-10-16)
+
+- **D-13 (2026-10-16, the backup admin without a supervisor, B-10).**
+  D-5 carried `supervise`'s client bootstrap into the remote composition
+  and placed its two Rauthy-side settings in Rauthy's StatefulSet, but
+  missed the step `supervise` runs before both: 037 B-1's passkey-only
+  backup admin, which `ready_after_health` provisions. Running AC-3's
+  procedure on the 0.7.0 image found it: on a fresh split cell, `rahi
+  backup` on the leader was refused at `/auth/v1/oidc/authorize` because
+  Rauthy held no such account, so B-10 could not take Rauthy's half. The
+  remote composition now calls the same idempotent `ensure_backup_admin`
+  through the back channel right after `custody_client`, and, as under
+  `supervise`, an account that cannot be provisioned is reported on
+  stderr rather than failing the composition, so readiness keeps meaning
+  identity (B-6). Concurrent provisioning is not arbitrated: the
+  StatefulSet's `OrderedReady` policy starts a replica only after the
+  previous one is ready, which is after its composition, and every later
+  start finds the account already passkey only. `split.rs` gains a test
+  that composes a remote cell against a real Rauthy and takes a backup.
+  Rejected: provisioning only on the store leader, which adds a
+  leadership read to the composition for a race `OrderedReady` already
+  excludes; and failing the composition, which would hold a cell unready
+  over an account an operator can repair only through Rauthy's admin UI.
+
 ### Status (2026-10-10)
 
 The remote identity landed first (#136, with D-9's fix in #137); the
