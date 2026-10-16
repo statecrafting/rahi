@@ -30,6 +30,7 @@ extends:
   - { spec: "031-single-container-packaging", unit: "docker/Dockerfile", nature: additive }
   - { spec: "031-single-container-packaging", unit: "crates/rahi-ops/src/rauthy_env.rs", nature: additive }
   - { spec: "032-cluster-topology", unit: "deploy/k8s/kustomization.yaml", nature: additive }
+  - { spec: "044-n3-split-composition", unit: "deploy/n3-split/kustomization.yaml", nature: additive }
   - { spec: "032-cluster-topology", unit: "deploy/k8s/statefulset.yaml", nature: additive }
   - { spec: "032-cluster-topology", unit: "deploy/k8s/migrate-job.yaml", nature: additive }
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/serve.rs", nature: additive }
@@ -662,6 +663,19 @@ RH-05 and RH-06 of the revision-3 register), and approved the spec on
   AC-4 qualify on, so N=3 is stated as unqualified in the release record.
   The release lands as one pull request and the tag names its squash merge
   (D-18). No GitHub Release object is created.
+
+- **D-23 (2026-10-16, release coordination under B-1 and B-2; 0.7.1).**
+  The same grant ("0.7.0 release (and other as needed)") is taken as the
+  grant to prepare, merge, tag and publish 0.7.1. Running 044 AC-3's
+  procedure on the published 0.7.0 image found that a split cell never
+  provisioned 037 B-1's backup admin, so `rahi backup` could not take
+  Rauthy's half (044 D-13, fixed in #150); AC-3 and AC-4 must run on a
+  release that carries the fix. 0.7.1 also carries the lockfile-only
+  dependency bumps of #147. It is a patch bump: no public item, environment
+  variable, exit code or format changes, which B-1 requires of a patch.
+  `deploy/k8s` and `deploy/n3-split` move to `newTag: 0.7.1`. The release
+  lands as one pull request and the tag names its squash merge (D-18). No
+  GitHub Release object is created.
 
 ## Verification
 
