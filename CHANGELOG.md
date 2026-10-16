@@ -10,6 +10,25 @@ Every chassis crate carries one version, and a release is an annotated tag
 `vX.Y.Z` on a `main` commit whose `make ci` passed. Pre-1.0, a minor bump may
 change the consumer contract and a patch bump may not.
 
+## 0.7.1, release candidate 2026-10-16
+
+A patch release on 0.7.0. The consumer contract is unchanged: no public
+item, environment variable, exit code, archive or record format moves. All
+nine chassis crates move together, and the hiqlite pin is unchanged.
+
+- **A remote cell provisions the backup admin (spec 044 D-13).** Under
+  `RAHI_RAUTHY_MODE=remote`, `serve`'s background composition now
+  provisions spec 037 B-1's passkey-only backup admin through the back
+  channel right after the client bootstrap, as `supervise` does at N=1.
+  In 0.7.0 nothing provisioned it on a split cell, so `rahi backup` on the
+  leader was refused at `/auth/v1/oidc/authorize` and could not take
+  Rauthy's half. A failure is reported on stderr and never holds the cell
+  unready. Found by running 044 AC-3's procedure on the 0.7.0 image.
+- **Dependencies.** Lockfile-only: `opentelemetry` 0.33.1, `serde_json`
+  1.0.154 and `canonical-keysort-json` 0.1.1.
+- **Known limitations.** Those of 0.7.0, unchanged. N=3 is not supported
+  until 044's AC-3 and AC-4 run on a named release.
+
 ## 0.7.0, release candidate 2026-10-15
 
 Every change since `v0.6.0`. All nine chassis crates move together. It is a

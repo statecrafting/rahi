@@ -39,6 +39,6 @@ resources:
 
 images:
   # Spec 039 B-3: by version, never latest. Remote identity (spec 044) is
-  # first carried by 0.7.0.
+  # first carried by 0.7.0; a split cell's backup admin (044 D-13) by 0.7.1.
   - name: ghcr.io/statecrafting/rahi
-    newTag: 0.7.0
+    newTag: 0.7.1

@@ -158,6 +158,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "deploy/n3-split/kustomization.yaml",
+        "source": "spec-edge"
+      },
+      {
         "path": "docker/Dockerfile",
         "source": "spec-edge"
       },
@@ -663,6 +667,19 @@
       {
         "locations": [
           {
+            "file": "deploy/n3-split/kustomization.yaml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/n3-split/kustomization.yaml"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "docker/Dockerfile"
           }
         ],
@@ -779,5 +796,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "1bfa4b762fec0613211ad8f4d26248f2a270c121cb2f3d8c1307fc26b929bbad"
+  "shardHash": "2f06f2d8e988a74dcf31a809a45ecaae1bb21ee7f92f4d6cc781cd9c5538b855"
 }

@@ -1,10 +1,11 @@
 # The consumer contract, as built
 
-**Current release candidate, 2026-10-15:** 0.7.0 under approved spec 039.
+**Current release candidate, 2026-10-16:** 0.7.1 under approved spec 039.
 It carries spec **041** complete and spec **044**'s built half (remote
-identity and the split N=3 overlay, unqualified) on top of 0.6.0. Section
+identity and the split N=3 overlay, unqualified) on top of 0.6.0, and
+0.7.1 provisions a split cell's backup admin (044 D-13). Section
 2.0 is the current consumer guidance; the dated readings below remain
-historical evidence. The release identity is the annotated `v0.7.0` tag
+historical evidence. The release identity is the annotated `v0.7.1` tag
 once created: it names the tested squash merge
 on `main` (039 B-2, D-18), and
 this document is updated to that commit. A version declaration is not
@@ -77,10 +78,13 @@ nothing in the chassis distributes jobs to workers.
 
 ## 2. Consuming today
 
-### 2.0 The 0.7.0 release and its compatibility boundary
+### 2.0 The 0.7.1 release and its compatibility boundary
 
-All nine inherited chassis versions and internal requirements are 0.7.0.
-It is a minor bump under 039 B-1: `rahi_kernel::KernelOptions` gains the
+All nine inherited chassis versions and internal requirements are 0.7.1.
+0.7.1 is a patch on 0.7.0 and changes no part of the consumer contract: a
+remote cell now provisions spec 037's backup admin, so `rahi backup` takes
+Rauthy's half on a split cell (044 D-13). 0.7.0 is a minor bump under
+039 B-1: `rahi_kernel::KernelOptions` gains the
 public `binding` field (a struct literal must name it, `None` keeps the
 previous decisions), `rahi_ledger` gains the `epoch` module and
 `Ledger::current_epoch`, `rahi_idp` gains `back_channel`, and `rahi_edge`
@@ -92,23 +96,23 @@ deployment epoch on `/binding` and in every decision once `migrate
 selects spec 044's remote identity; without it every Rauthy client is the
 N=1 loopback client, unchanged. N=3 is not qualified by this release (044
 AC-3, AC-4). The full list is in
-[CHANGELOG.md](../../CHANGELOG.md#070-release-candidate-2026-10-15).
+[CHANGELOG.md](../../CHANGELOG.md#071-release-candidate-2026-10-16).
 
 Once `consumer-registry` passes for the tag, the registry stanza is:
 
 ```toml
 [dependencies]
-rahi-cli    = "=0.7.0"
-rahi-edge   = "=0.7.0"
-rahi-idp    = "=0.7.0"
-rahi-kernel = "=0.7.0"
-rahi-ledger = "=0.7.0"
-rahi-ops    = "=0.7.0"
-rahi-store  = "=0.7.0"
-rahi-types  = "=0.7.0"
+rahi-cli    = "=0.7.1"
+rahi-edge   = "=0.7.1"
+rahi-idp    = "=0.7.1"
+rahi-kernel = "=0.7.1"
+rahi-ledger = "=0.7.1"
+rahi-ops    = "=0.7.1"
+rahi-store  = "=0.7.1"
+rahi-types  = "=0.7.1"
 
 [dev-dependencies]
-rahi-harness = "=0.7.0"
+rahi-harness = "=0.7.1"
 ```
 
 The hiqlite pin and the limits of sections 2.0-0.6.0 and 2.0-0.5.0 below
