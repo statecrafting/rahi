@@ -653,6 +653,21 @@ impl StoreHandle {
     }
 }
 
+/// How the raft log reaches the disk (spec 044 D-11).
+///
+/// A single voter keeps hiqlite's default, `ImmediateAsync`, which 011 and
+/// 043 measured and shipped. A cluster syncs every append before it is
+/// acknowledged (`Immediate`), hiqlite's owner decision D-4 for N=3: a
+/// follower that acknowledged an entry it had not yet synced could count
+/// toward a quorum and then lose the entry in a crash.
+fn wal_sync(cfg: &StoreConfig) -> hiqlite::LogSync {
+    if cfg.effective_nodes().len() > 1 {
+        hiqlite::LogSync::Immediate
+    } else {
+        hiqlite::LogSync::ImmediateAsync
+    }
+}
+
 fn node_config(cfg: &StoreConfig) -> Result<NodeConfig, Error> {
     let nodes = cfg
         .effective_nodes()
@@ -701,6 +716,7 @@ fn node_config(cfg: &StoreConfig) -> Result<NodeConfig, Error> {
         secret_raft: secrets.secret_raft.clone(),
         secret_api: secrets.secret_api.clone(),
         backup_keep_days_local: cfg.backup_keep_days,
+        wal_sync: wal_sync(cfg),
         ..NodeConfig::default()
     };
     node_config.enc_keys.enc_key_active = secrets.enc_keys.active.clone();
@@ -725,4 +741,59 @@ fn node_config(cfg: &StoreConfig) -> Result<NodeConfig, Error> {
     }
     node_config.is_valid().map_err(map)?;
     Ok(node_config)
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use crate::config::{EncKey, EncKeys, Peer, StoreSecrets};
+
+    fn cfg(nodes: Vec<Peer>) -> StoreConfig {
+        StoreConfig {
+            node_id: 1,
+            nodes,
+            data_dir: std::path::PathBuf::from("/tmp/rahi-wal-sync"),
+            raft_addr: "127.0.0.1:8400".parse().unwrap(),
+            api_addr: "127.0.0.1:8300".parse().unwrap(),
+            secrets: StoreSecrets {
+                secret_raft: "raft-secret-0123456789".to_owned(),
+                secret_api: "api-secret-0123456789".to_owned(),
+                enc_keys: EncKeys {
+                    active: "test".to_owned(),
+                    keys: vec![EncKey {
+                        id: "test".to_owned(),
+                        key: vec![7u8; 32],
+                    }],
+                },
+            },
+            backup_keep_days: 1,
+            s3: None,
+        }
+    }
+
+    fn peer(id: u64) -> Peer {
+        Peer {
+            id,
+            raft_addr: format!("rahi-{}.rahi:8400", id - 1),
+            api_addr: format!("rahi-{}.rahi:8300", id - 1),
+        }
+    }
+
+    /// Spec 044 D-11: a single voter keeps `ImmediateAsync`; a cluster syncs
+    /// each append before acknowledging it.
+    #[test]
+    fn wal_sync_is_immediate_only_in_a_cluster() {
+        let single = node_config(&cfg(Vec::new())).unwrap();
+        assert!(matches!(single.wal_sync, hiqlite::LogSync::ImmediateAsync));
+
+        let one_peer = node_config(&cfg(vec![peer(1)])).unwrap();
+        assert!(matches!(
+            one_peer.wal_sync,
+            hiqlite::LogSync::ImmediateAsync
+        ));
+
+        let three = node_config(&cfg(vec![peer(1), peer(2), peer(3)])).unwrap();
+        assert!(matches!(three.wal_sync, hiqlite::LogSync::Immediate));
+    }
 }

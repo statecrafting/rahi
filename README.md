@@ -15,14 +15,16 @@ the chassis; it never forks it.
 The name is the lineage: enrahitu was Encore, Rauthy, Hiqlite, Turso. Drop
 Encore and Turso and what remains is what this is.
 
-## Status: v0.6.0 release candidate, recovery exercised at N=1
+## Status: v0.7.0 release candidate, recovery exercised at N=1
 
 This repository is a specification corpus, the harness that builds it, and
 the code it specifies. Spec ordinals are the build order, and each spec is
-bounded to one driven session's territory. Specs 036 to 040, 042, 043 and
-045 to 049 are `implementation: complete`, spec 043 with the owner's
-waivers recorded in its D-36. Specs 041 and 044 are approved and not yet
-built. Nine crates and the reference app exist
+bounded to one driven session's territory. Specs 036 to 043 and 045 to
+049 are `implementation: complete`, spec 043 with the owner's waivers
+recorded in its D-36. Spec 044 (the split N=3 composition) is built and
+`implementation: in-progress`: its operator qualification on a real
+three-node cluster, its coherent export and its archive identity remain.
+Nine crates and the reference app exist
 (`rahi-types`, `rahi-store`, `rahi-ledger`, `rahi-kernel`, `rahi-edge`,
 `rahi-idp`, `rahi-ops`, `rahi-cli`, `rahi-harness`, and `apps/hello-cell`),
 every source file claimed by the spec that built it. `spec-spine registry
@@ -33,7 +35,7 @@ Implementation, publication, and operational proof are separate:
 | | State |
 |---|---|
 | Implemented | `spec-spine registry list` reports each spec's lifecycle. A complete implementation does not imply every deployment procedure was exercised: the N=3 rollout check remains recorded rather than run (032 D-1). |
-| Released or installable | Versions 0.1.0 through 0.5.0 published all nine chassis crates. 0.6.0 adds managed services (047), cell-contributed preflight checks (049) and the binding document (040), and completes 043; the [release record](CHANGELOG.md#060-release-candidate-2026-10-08) names its behavior and limits. Publication and anonymous access are proven only after the tag workflows and fresh anonymous checks pass. |
+| Released or installable | Versions 0.1.0 through 0.6.0 published all nine chassis crates. 0.7.0 adds deployment epochs (041), remote identity and the split N=3 overlay for qualification (044), and syncs a cluster's raft log before acknowledging; the [release record](CHANGELOG.md#070-release-candidate-2026-10-15) names its behavior and limits. Publication and anonymous access are proven only after the tag workflows and fresh anonymous checks pass. |
 | Exercised against the pinned rauthy | spec 037's `live.yml` runs the whole suite against rauthy 0.36.2 pinned by digest, with gated skips refused. The proof covers login, audience and scope enforcement, fresh backups, restart, and restore with the original user, note, and ledger head. See spec 037's Status for the passing run and revision. |
 | Supported topology | N=1. Three replicas have run only as three processes on one host, without rauthy, in spec 035's test, which CI runs: each replica mints its own decision ids and none of thirty concurrent denials is lost. N=3 on Kubernetes has never run. |
 
@@ -50,7 +52,7 @@ not wake a waiter. Its operational proof is N=1;
 Kubernetes N=3 has never run. Publication changes no consumer rollout
 target.
 
-The declared 0.6.0 gaps are explicit. The transition has a backward-clock
+The declared 0.7.0 gaps are explicit. The transition has a backward-clock
 revocation gap and an old restore can revive refresh credentials. A SIGKILL
 or shutdown timeout before app-store shutdown completes can leave hiqlite's
 unclean marker, so the next boot refuses without a manual recovery decision;

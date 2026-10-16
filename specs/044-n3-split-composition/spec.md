@@ -53,6 +53,8 @@ extends:
   - { spec: "024-hardening", unit: "crates/rahi-edge/src/exposure.rs", nature: additive }
   - { spec: "023-observability", unit: "crates/rahi-edge/src/obs/layer.rs", nature: additive }
   - { spec: "023-observability", unit: "crates/rahi-edge/src/obs/metrics.rs", nature: additive }
+  # The raft log's sync policy in a cluster (D-11).
+  - { spec: "011-store-hiqlite", unit: "crates/rahi-store/src/store.rs", nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/01-consumer-contract.md" }, role: context }
   - { unit: { kind: file, path: "docs/design/02-operational-prerequisites.md" }, role: context }
@@ -442,6 +444,42 @@ establishes N=3 support.
   and refuses fixtures removing it, opening its Raft access, or adding a
   foreign client beside an allowed selector. It enumerates every selector
   in a rule so a later allowed selector cannot hide an earlier foreign one.
+
+### Decisions (2026-10-15)
+
+- **D-11 (2026-10-15, the raft log's sync policy at N>1, B-8).** B-8 is
+  silent on how a replica's raft log reaches its disk. hiqlite's owner
+  decision D-4, adopted for the production cluster on 2026-10-11
+  (Statecraft adoption register P-26 item 3) beside D-3, which B-8
+  already carries, takes `LogSync::Immediate` for the SQLite groups. The
+  pinned `0.15.0-patched.3` defaults to `ImmediateAsync`, under which a
+  follower can acknowledge an entry it has not synced, count toward a
+  quorum, and lose that entry in a crash. `rahi-store` now sets
+  `wal_sync` to `Immediate` when its effective peer set has more than one
+  node and leaves `ImmediateAsync` for a single voter, so 011's and 043's
+  measured N=1 behavior does not move (a unit test pins both). Rauthy's
+  StatefulSet is not covered: patched.3's `NodeConfig::from_env`, which
+  Rauthy uses, hard-codes `ImmediateAsync` and reads no environment
+  variable for it, so the Rauthy cluster gets D-4 only with a hiqlite
+  release that reads one, a dependency move this spec's section 6 puts
+  out of scope. Rejected: an environment switch on rahi's side, which
+  would let a cluster run without D-4 by omission; and `Immediate` at
+  N=1 too, which changes a complete spec's measured append cost for no
+  quorum to protect.
+- **D-12 (2026-10-15, the source of Rauthy's applied log id, B-12).** The
+  Status entry below left B-12 waiting on "a decision on its source".
+  Measured against the pinned sources, there is none rahi can read: (a)
+  the file Rauthy's `POST /backup` produces is hiqlite's `create_backup`
+  output, which writes `StateMachineData::default()` into the copy's
+  `_metadata` before naming it, so the archived snapshot carries no
+  applied log id; (b) the pinned patched Rauthy exposes no route that
+  returns its raft metrics; and (c) Rauthy's hiqlite API port, where
+  hiqlite serves its metrics, admits only Rauthy's pods under B-3. B-12
+  therefore needs a hiqlite fork change that records the applied log id
+  with each backup, which no hiqlite spec in `bartekus/hiqlite` yet
+  specifies, and then a release carrying it. B-12 stays owed; nothing here writes a partial
+  identity into the archive, because a manifest naming one cluster's log
+  id beside nothing for the other reads as coherent when it is not.
 
 ### Status (2026-10-10)
 

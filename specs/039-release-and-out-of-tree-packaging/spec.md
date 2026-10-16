@@ -648,6 +648,21 @@ RH-05 and RH-06 of the revision-3 register), and approved the spec on
   the tag names its squash merge (D-18). No GitHub Release object is
   created.
 
+- **D-22 (2026-10-15, release coordination under B-1 and B-2; 0.7.0).**
+  The owner's grant of 2026-10-15 ("build ship and shepherd any still
+  unfinished specs followed by 0.7.0 release") is taken as the grant to
+  prepare, merge, tag and publish 0.7.0, as D-21 did for 0.6.0. It carries
+  spec 041 complete, spec 044's built half at `implementation:
+  in-progress` (remote identity, the split overlay and its validation, and
+  044 D-11's raft log sync), spec 013 D-11's attest-ledger 0.2, 015 D-12's
+  `action-gate-core` `=0.3.0`, and the RUSTSEC lockfile fixes. The version
+  is 0.7.0, a minor bump: `rahi_kernel::KernelOptions` gains a public
+  field and `rahi_ledger`, `rahi_idp` and `rahi_edge` gain public items,
+  which B-1 allows only at a minor bump. A release is what 044's AC-3 and
+  AC-4 qualify on, so N=3 is stated as unqualified in the release record.
+  The release lands as one pull request and the tag names its squash merge
+  (D-18). No GitHub Release object is created.
+
 ## Verification
 
 ```verify:cli

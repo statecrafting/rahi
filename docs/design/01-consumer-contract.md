@@ -1,10 +1,11 @@
 # The consumer contract, as built
 
-**Current release candidate, 2026-10-08:** 0.6.0 under approved spec 039.
-It carries specs **040**, **047** and **049**, and spec 043 complete with
-the owner's waivers, on top of 0.5.0. Section 2.0 is the current consumer
-guidance; the dated readings below remain historical evidence. The release
-identity is the annotated `v0.6.0` tag once created: it names the tested squash merge
+**Current release candidate, 2026-10-15:** 0.7.0 under approved spec 039.
+It carries spec **041** complete and spec **044**'s built half (remote
+identity and the split N=3 overlay, unqualified) on top of 0.6.0. Section
+2.0 is the current consumer guidance; the dated readings below remain
+historical evidence. The release identity is the annotated `v0.7.0` tag
+once created: it names the tested squash merge
 on `main` (039 B-2, D-18), and
 this document is updated to that commit. A version declaration is not
 publication or downstream adoption: registry availability is proven only by
@@ -76,7 +77,44 @@ nothing in the chassis distributes jobs to workers.
 
 ## 2. Consuming today
 
-### 2.0 The 0.6.0 release and its compatibility boundary
+### 2.0 The 0.7.0 release and its compatibility boundary
+
+All nine inherited chassis versions and internal requirements are 0.7.0.
+It is a minor bump under 039 B-1: `rahi_kernel::KernelOptions` gains the
+public `binding` field (a struct literal must name it, `None` keeps the
+previous decisions), `rahi_ledger` gains the `epoch` module and
+`Ledger::current_epoch`, `rahi_idp` gains `back_channel`, and `rahi_edge`
+gains `router::switching` and the `/startupz` probe. The archive manifest
+gains an optional `epoch`; the format number is unchanged. A cell that
+calls only `rahi_cli::run` needs no code change; its replicas name their
+deployment epoch on `/binding` and in every decision once `migrate
+--adopt-manifest` has appended one (section 11). `RAHI_RAUTHY_MODE=remote`
+selects spec 044's remote identity; without it every Rauthy client is the
+N=1 loopback client, unchanged. N=3 is not qualified by this release (044
+AC-3, AC-4). The full list is in
+[CHANGELOG.md](../../CHANGELOG.md#070-release-candidate-2026-10-15).
+
+Once `consumer-registry` passes for the tag, the registry stanza is:
+
+```toml
+[dependencies]
+rahi-cli    = "=0.7.0"
+rahi-edge   = "=0.7.0"
+rahi-idp    = "=0.7.0"
+rahi-kernel = "=0.7.0"
+rahi-ledger = "=0.7.0"
+rahi-ops    = "=0.7.0"
+rahi-store  = "=0.7.0"
+rahi-types  = "=0.7.0"
+
+[dev-dependencies]
+rahi-harness = "=0.7.0"
+```
+
+The hiqlite pin and the limits of sections 2.0-0.6.0 and 2.0-0.5.0 below
+are unchanged.
+
+### 2.0-0.6.0 The 0.6.0 release and its compatibility boundary (historical)
 
 All nine inherited chassis versions and internal requirements are 0.6.0.
 It is a minor bump under 039 B-1. The `Cell` trait gains three methods,
@@ -107,7 +145,7 @@ rahi-types  = "=0.6.0"
 rahi-harness = "=0.6.0"
 ```
 
-The hiqlite pin and the limits of section 2.0-0.5.0 below are unchanged.
+The hiqlite pin and the limits of section 2.0-0.5.0 below were unchanged.
 
 ### 2.0-0.5.0 The 0.5.0 release and its compatibility boundary (historical)
 
