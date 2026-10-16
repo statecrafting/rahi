@@ -127,6 +127,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rahi-store/src/store.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "deploy/README.md",
         "source": "spec-edge"
       },
@@ -533,6 +537,19 @@
       {
         "locations": [
           {
+            "file": "crates/rahi-store/src/store.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-store/src/store.rs"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "deploy/README.md"
           }
         ],
@@ -587,5 +604,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "2dbdd015162fc7b8f59f2b3daa2d412e8a390707510bc42ce9c57ba3383ea1b8"
+  "shardHash": "bca58db42b0b551e3e240aacbd6470f2906d17f3007c62da285f288c8733da62"
 }
