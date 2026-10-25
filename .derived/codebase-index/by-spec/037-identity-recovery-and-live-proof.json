@@ -499,6 +499,6 @@
     "specId": "037-identity-recovery-and-live-proof",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "2c47a4a7f571e9aca949d85c531ed89ae57ac2e1ebf7be6f959c7ccd83e92086"
 }

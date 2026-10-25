@@ -304,6 +304,6 @@
     "specId": "011-store-hiqlite",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "fb3e527292d271021a7e2a39b7b26969fe40fc7ebc1c6fd6fd9a467618f70372"
 }

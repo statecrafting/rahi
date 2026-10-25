@@ -148,6 +148,6 @@
     "specId": "047-managed-service-lifecycle",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "57f2823c1e3aedc928836b114ef4c9c9ca63d54d33268bd15dce4ee9ec32455a"
 }

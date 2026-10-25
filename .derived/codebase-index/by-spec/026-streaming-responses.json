@@ -182,6 +182,6 @@
     "specId": "026-streaming-responses",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "89fe166f56952a18f305f1f67fb895136c41fe6e40c80307a5dfaa7bd769c5b9"
 }

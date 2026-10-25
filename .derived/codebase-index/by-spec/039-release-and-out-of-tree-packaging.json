@@ -795,6 +795,6 @@
     "specId": "039-release-and-out-of-tree-packaging",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "2f06f2d8e988a74dcf31a809a45ecaae1bb21ee7f92f4d6cc781cd9c5538b855"
 }

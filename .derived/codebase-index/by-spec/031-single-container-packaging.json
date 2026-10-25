@@ -321,6 +321,6 @@
     "specId": "031-single-container-packaging",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "14be8d2d38935340dae009ab4e2b9784f17fc245953d6c42f3956c078558d7ef"
 }

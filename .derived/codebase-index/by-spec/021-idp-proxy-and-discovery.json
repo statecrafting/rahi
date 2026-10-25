@@ -257,6 +257,6 @@
     "specId": "021-idp-proxy-and-discovery",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "b01c6b0d84bdedf201591f9ecc2f5d4ba113524de3a67d6b0f36d6fa496b13c8"
 }

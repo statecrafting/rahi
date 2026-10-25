@@ -382,6 +382,6 @@
     "specId": "041-deployment-epochs",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "0b9f93fb30e1e97fbc71d45dd2b2122bc996d892ba6c65fbbac008eff0e73e99"
 }

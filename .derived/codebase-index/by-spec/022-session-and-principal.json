@@ -283,6 +283,6 @@
     "specId": "022-session-and-principal",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "172e610e85eb187c355918a17ab52967630d05fed7c6170bb11a7549aa88fa40"
 }

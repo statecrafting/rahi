@@ -5,6 +5,6 @@
     "path": "crates/rahi-ledger",
     "specRef": "013-ledger-decision-chain"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "2201652321024957fd2b9172be370601a63ba66636b89ca56a8c89a9135a5e1e"
 }

@@ -326,6 +326,6 @@
     "specId": "034-hello-cell",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "59be1bffddec916c86a1a1bcd99cbdd4c4898f72161bdf87cd4650daf574078f"
 }

@@ -4,6 +4,6 @@
     "specId": "000-rahi-bootstrap",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "c5e95444b8bfedbd3b1fb2b92045b48147bda4f797fa473f377914e4257521ba"
 }

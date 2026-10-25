@@ -603,6 +603,6 @@
     "specId": "044-n3-split-composition",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "6723b7908428cf1bf956df5a3bf60e87850611503bc46171ef6d9525f90ea4a7"
 }

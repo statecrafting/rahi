@@ -291,6 +291,6 @@
     "specId": "020-edge-server",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "3329cc649dd08f57787c71eff8ec3be06909d1ca878bd7626f033a6e62ac43d1"
 }
