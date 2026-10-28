@@ -432,6 +432,6 @@
     "specId": "040-runtime-identity-and-binding-surface",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "1f036175fb831cf5e694d61c9249a05300666967d41718c71e3a796597a13779"
 }

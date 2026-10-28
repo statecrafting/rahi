@@ -1,5 +1,5 @@
-# Rendered by Statecraft from profile github-actions-rust revision 13
-# (identity 6167a12e110b30ec27d37909344c7de0178ba477d5ad1ab91a0053430a89e17b). A managed file and a member of this
+# Rendered by Statecraft from profile github-actions-rust revision 21
+# (identity 29183723d833fc7b8c332dbac0e83edfb15eafe2ffc50f01c817f89a70785217). A managed file and a member of this
 # repository's authority set: an edit here changes the gate that judges every
 # pull request, and `statecraft doctor` names it. The policy the aggregate gate
 # enforces is .statecraft/setup/github-actions-rust.json, read at the base.
@@ -15,12 +15,23 @@ on:
   # entry's pull request.
   merge_group:
 
+# Revision 18 (specs 058 and 059): a newer push to a pull request cancels the
+# work of that pull request's older run, job by job. Every job but
+# review-exception and ci-gate has a concurrency group of its pull request and
+# job; the two left out can wait on the owner exception, and a run waiting on
+# an Environment is never cancelled by a group, so a group it held would leave
+# the newer run pending behind it. A push to the default branch and a
+# merge-queue entry get groups of their own run, so neither is ever cancelled.
+
 permissions:
   contents: read
 
 jobs:
   governance:
     name: governance
+    concurrency:
+      group: statecraft-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-governance
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     # `pull-requests: read` is for the merge-queue steps, which read the
     # queued pull request's changed files, title and body. Nothing here
@@ -82,7 +93,7 @@ jobs:
           elif ! jq -e '.authority_rule' "${work}/policy.json" > /dev/null; then
             echo "the base's policy predates revision 5: ci-gate reports an authority change and does not block it"
           else
-            { jq -r '.files[].path, (.parameters.authored_content // empty)' "${work}/policy.json"; echo "$policy"; } | sort -u > "${work}/set"
+            { jq -r '.files[].path, (.parameters.authored_content // empty), (.parameters.code.script // empty)' "${work}/policy.json"; echo "$policy"; } | sort -u > "${work}/set"
             git diff --name-only "${BASE_SHA}...${HEAD_SHA}" | sort -u > "${work}/changed"
             { comm -12 "${work}/set" "${work}/changed"; grep '^scripts/statecraft/' "${work}/changed" || true; grep '^\.github/workflows/' "${work}/changed" || true; } | sort -u > "${work}/touched"
             if [ -s "${work}/touched" ]; then
@@ -182,8 +193,18 @@ jobs:
           GROUP_HEAD_REF: ${{ github.event.merge_group.head_ref }}
         run: sh "${STATECRAFT_GATE:?}" couple-group
 
-  code:
-    name: code
+  # Revision 18: the cheap checks that would fail an expensive job anyway,
+  # run first: a pull request's base, the committed artifacts' freshness and,
+  # for a Rust code selection, formatting. The code job and every declared
+  # extra job need it, so a stacked pull request skips them unless it carries
+  # the label statecraft:stacked-ci, an explicit request for full validation.
+  # Every check here also runs in governance or code; preflight only orders
+  # them, and a base gate.sh without the verb (the adoption) judges nothing.
+  preflight:
+    name: preflight
+    concurrency:
+      group: statecraft-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-preflight
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     steps:
       # The whole history, so the base commit the gate is read at is present.
@@ -227,10 +248,80 @@ jobs:
           key: spec-spine-${{ steps.pin.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
       - name: Install the pinned spec-spine
         run: sh "${STATECRAFT_INSTALL:?}"
-      # The two inputs that invalidate a build; a source edit hits the cache
-      # and recompiles only this workspace's crates.
-      - name: Cache cargo registry, git and target
+      - name: Preflight
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          STACKED_CI: ${{ contains(github.event.pull_request.labels.*.name, 'statecraft:stacked-ci') }}
+        run: |
+          if ! grep -q '^  preflight)' "${STATECRAFT_GATE:?}"; then
+            echo "the base's gate.sh predates revision 18 (the adoption): preflight judges nothing; governance and code still judge everything"
+            exit 0
+          fi
+          sh "${STATECRAFT_GATE:?}" preflight
+
+  code:
+    name: code
+    needs: [preflight]
+    concurrency:
+      group: statecraft-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-code
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    # Revision 18: a fresh runner never reuses incremental state, and line
+    # tables keep file:line in panics; both shrink the cache and the link.
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+    steps:
+      # The whole history, so the base commit the gate is read at is present.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # Revision 5, rule 1: a candidate never judges itself with its own gate.
+      # gate.sh and install-spec-spine.sh are read at the base, as ci-gate.sh
+      # is; the candidate's copies run only when the base carries none (the
+      # adoption), and the step says which ran. A base commit that cannot be
+      # read stops the job rather than falling back.
+      - name: Read the gate at the base
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+        run: |
+          dir="${RUNNER_TEMP}/statecraft"
+          mkdir -p "$dir"
+          case "$BASE_SHA" in 0000000000000000000000000000000000000000) BASE_SHA="" ;; esac
+          if [ -n "$BASE_SHA" ] && ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            echo "cannot read the base commit ${BASE_SHA}; the gate is never taken from the candidate in its place" >&2
+            exit 2
+          fi
+          for f in gate.sh install-spec-spine.sh; do
+            if [ -n "$BASE_SHA" ] && git show "${BASE_SHA}:scripts/statecraft/${f}" > "${dir}/${f}" 2>/dev/null; then
+              echo "${f}: read at the base ${BASE_SHA}"
+            else
+              cp "scripts/statecraft/${f}" "${dir}/${f}"
+              echo "${f}: the base carries none; the candidate's copy runs (adoption)"
+            fi
+          done
+          echo "STATECRAFT_GATE=${dir}/gate.sh" >> "$GITHUB_ENV"
+          echo "STATECRAFT_INSTALL=${dir}/install-spec-spine.sh" >> "$GITHUB_ENV"
+      - name: Read the spec-spine pin
+        id: pin
+        run: sh "${STATECRAFT_GATE:?}" pin >> "$GITHUB_OUTPUT"
+      - name: Cache spec-spine
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .bin/spec-spine
+          key: spec-spine-${{ steps.pin.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
+      - name: Install the pinned spec-spine
+        run: sh "${STATECRAFT_INSTALL:?}"
+      # The two inputs that invalidate a build; a source edit hits the cache
+      # and recompiles only this workspace's crates. Revision 18: restored on
+      # every event, saved only by a push to the default branch, because a
+      # pull request's cache is readable by no other pull request and its
+      # saves evicted the default branch's entry.
+      - name: Restore cargo registry, git and target
+        id: cargo-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry
@@ -241,14 +332,34 @@ jobs:
             cargo-${{ runner.os }}-
       - name: Build, test, clippy, fmt
         run: sh "${STATECRAFT_GATE:?}" code
+      # Revision 19 (spec 060): Cargo fingerprints a path dependency by its
+      # sources' modification times, which a fresh checkout resets, so the
+      # workspace's own artifacts are rebuilt in every run. Only the
+      # dependencies are worth their space under the repository's limit.
+      - name: Drop the workspace's own artifacts (default branch only)
+        if: github.event_name == 'push' && steps.cargo-cache.outputs.cache-hit != 'true'
+        run: cargo metadata --format-version 1 --no-deps | jq -r '.packages[].name' | sed 's/^/-p /' | xargs -r cargo clean
+      - name: Save cargo registry, git and target (default branch only)
+        if: github.event_name == 'push' && steps.cargo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ steps.cargo-cache.outputs.cache-primary-key }}
 
   ai-review:
     name: ai-review
     if: github.event_name == 'pull_request'
+    concurrency:
+      group: statecraft-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-ai-review
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     uses: ./.github/workflows/statecraft-ai-review.yml
     permissions:
       contents: read
       pull-requests: write
+      checks: write
     # Revision 8: both credentials, by name; the review prefers the API key.
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -277,10 +388,18 @@ jobs:
 
   govern:
     name: govern
+    needs: [preflight]
+    concurrency:
+      group: statecraft-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-govern
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     uses: ./.github/workflows/govern.yml
 
   supply-chain:
     name: supply-chain
+    needs: [preflight]
+    concurrency:
+      group: statecraft-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-supply-chain
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     uses: ./.github/workflows/ci.yml
 
   # Revision 7: every job the project declares in ci.extra_required_jobs is a
@@ -289,7 +408,7 @@ jobs:
   ci-gate:
     name: ci-gate
     if: always()
-    needs: [governance, code, ai-review, review-exception, govern, supply-chain]
+    needs: [governance, preflight, code, ai-review, review-exception, govern, supply-chain]
     runs-on: ubuntu-latest
     # Read-only: on merge_group the gate reads the recorded review (the
     # entry's pull request, its runs, their jobs and the evidence artifact).

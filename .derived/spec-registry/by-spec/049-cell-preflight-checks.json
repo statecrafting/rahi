@@ -97,5 +97,5 @@
     "title": "Let a cell contribute named, bounded, read-only checks to preflight"
   },
   "shardHash": "0bf2ae120d6c40cb22b2774345084030edc6e7b253280aba5c810f7e4a0758a6",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

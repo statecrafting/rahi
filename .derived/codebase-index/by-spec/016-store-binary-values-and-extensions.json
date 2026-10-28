@@ -148,6 +148,6 @@
     "specId": "016-store-binary-values-and-extensions",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "6e4eb66b935f8a866a037c11dc8e7d9cb14c042750aa3fc0781d3d3375f8a011"
 }

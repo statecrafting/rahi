@@ -253,6 +253,6 @@
     "specId": "023-observability",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "7ab5c3a0155a70c3f275d5c68ef0ae372b1063b45f3761b812e98a691a3a87aa"
 }

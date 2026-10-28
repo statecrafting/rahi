@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rendered by Statecraft from profile github-actions-rust revision 13.
+# Rendered by Statecraft from profile github-actions-rust revision 21.
 # The aggregate gate. It passes only when every job the TRUSTED policy names
 # as required ended the way its event requires:
 #
@@ -124,7 +124,7 @@ review_result="$(printf '%s' "$NEEDS_JSON" | jq -r '.["ai-review"].outputs.resul
 authority=no
 if [ "$trusted" = yes ]; then
   {
-    jq -r '.files[].path, (.parameters.authored_content // empty)' "$work/policy.json"
+    jq -r '.files[].path, (.parameters.authored_content // empty), (.parameters.code.script // empty)' "$work/policy.json"
     echo "$POLICY"
   } | sort -u > "$work/authority-set"
   git diff --name-only "${BASE_SHA}...${HEAD_SHA}" | sort -u > "$work/changed"
@@ -391,7 +391,87 @@ if [ "$ratification" = yes ]; then
   esac
 fi
 
+# Revision 19 (spec 060): a blocked gate names what failed. Best effort and
+# read-only: it never changes the verdict or the exit code. Job names, step
+# names and log lines are the candidate's text, so they go only to the step
+# summary inside a fence they cannot close, and to annotations with the
+# workflow-command escapes; never raw to standard output.
+annotate() {
+  local title="$1" message="$2"
+  message="${message//'%'/%25}"
+  message="${message//$'\r'/%0D}"
+  message="${message//$'\n'/%0A}"
+  title="${title//'%'/%25}"
+  title="${title//$'\r'/%0D}"
+  title="${title//$'\n'/%0A}"
+  title="${title//:/%3A}"
+  title="${title//,/%2C}"
+  printf '::error title=%s::%s\n' "$title" "$message"
+}
+
+failure_summary() (
+  set +eE
+  trap - ERR
+  run="${GITHUB_RUN_ID:-}"
+  attempt="${GITHUB_RUN_ATTEMPT:-1}"
+  if [ -z "${REPO:-}" ] || [ -z "${GH_TOKEN:-}" ] || [ -z "$run" ]; then
+    say "failure summary unavailable: REPO, GH_TOKEN or GITHUB_RUN_ID is not set"
+    return 0
+  fi
+  if ! gh api "repos/${REPO}/actions/runs/${run}/attempts/${attempt}/jobs?per_page=100" > "$work/jobs.json" 2> /dev/null; then
+    say "failure summary unavailable: the jobs of run ${run} could not be read"
+    return 0
+  fi
+  if ! jq -r '.jobs[] | select(.conclusion == "failure" and .name != "ci-gate")
+      | [.id, (.name | gsub("[\t\r\n]"; " ")),
+         ([(.steps // [])[] | select(.conclusion == "failure") | .name][0] // "" | gsub("[\t\r\n]"; " "))]
+      | @tsv' "$work/jobs.json" > "$work/failed.all" 2> /dev/null; then
+    say "failure summary unavailable: the jobs record of run ${run} did not parse"
+    return 0
+  fi
+  head -n 20 "$work/failed.all" > "$work/failed"
+  if [ ! -s "$work/failed" ]; then
+    say "failure summary: no other job of run ${run} ended failure"
+    return 0
+  fi
+  : > "$work/report"
+  annotations=0
+  while IFS=$'\t' read -r id name step; do
+    lines=""
+    if gh api "repos/${REPO}/actions/jobs/${id}/logs" > "$work/log" 2> /dev/null; then
+      lines="$(sed -e 's/\x1b\[[0-9;]*[A-Za-z]//g' -e 's/^[0-9]\{4\}-[0-9-]*T[0-9:.]*Z //' "$work/log" \
+        | grep -E '##\[error\]|error\[|error:|panicked at|FAILED|not ok|BLOCK:' \
+        | cut -c1-300 | head -n 5)"
+    else
+      lines="(the log could not be read)"
+    fi
+    {
+      printf 'job: %s\n' "$name"
+      printf 'failed step: %s\n' "${step:-(none recorded)}"
+      if [ -n "$lines" ]; then printf '%s\n' "$lines" | sed 's/^/  /'; fi
+      printf '\n'
+    } >> "$work/report"
+    if [ "$annotations" -lt 10 ]; then
+      first="$(printf '%s\n' "$lines" | head -n 1)"
+      annotate "$name" "${first:-failed at step: ${step:-(none recorded)}}"
+      annotations=$((annotations + 1))
+    fi
+  done < "$work/failed"
+  if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+    # A fence longer than any run of backticks in the report.
+    longest="$(grep -o '`*' "$work/report" | awk '{ if (length($0) > m) m = length($0) } END { print m + 0 }')"
+    fence="$(printf '%*s' "$(( longest < 3 ? 3 : longest + 1 ))" '' | tr ' ' '`')"
+    {
+      printf '### Failed jobs\n\n%s\n' "$fence"
+      cat "$work/report"
+      printf '%s\n\n' "$fence"
+    } >> "$GITHUB_STEP_SUMMARY"
+  fi
+  say "failure summary: $(wc -l < "$work/failed" | tr -d ' ') failed job(s), listed in the step summary and as annotations"
+)
+
 if [ "$blocked" -ne 0 ]; then
+  failure_summary || true
   say "ci-gate: blocked"
   exit 1
 fi
