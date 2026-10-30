@@ -142,7 +142,7 @@
       "contentHash": "b42cdcd91b2924570084da34d73ec3c3773f4c401a96fbc1b3561327ce5b24e3"
     },
     "deny.toml": {
-      "contentHash": "bc8d2802f8c4993a41f75faf2adf13100fd3acab12c6c049857d7b94d2ed4e89"
+      "contentHash": "7e27d71b3f010fd88f9df9b5a410c226bd96e5bf55952afef0c3ce63b8315f2b"
     },
     "deploy/k8s/backup-cronjob.yaml": {
       "contentHash": "3476fa2afae38edde1d0daf0d58823e1b47243866a723846ee32a7f9936bf524"
