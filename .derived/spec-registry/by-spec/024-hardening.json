@@ -4,6 +4,7 @@
       "Bartek Kus"
     ],
     "created": "2026-09-03",
+    "declaresAcceptance": true,
     "dependsOn": [
       "022-session-and-principal",
       "023-observability"
@@ -88,5 +89,5 @@
     "title": "Hardening: trusted client identity, the operator role gate, exposure review of every route"
   },
   "shardHash": "d8f6c0ca637de90843d228b752ffca1ac4872189cb545742a7c106579ee918ed",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

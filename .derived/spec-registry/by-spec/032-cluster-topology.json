@@ -4,6 +4,7 @@
       "Bartek Kus"
     ],
     "created": "2026-09-03",
+    "declaresAcceptance": true,
     "dependsOn": [
       "031-single-container-packaging"
     ],
@@ -229,5 +230,5 @@
     "title": "Cluster topology: N=1 primary, N=3 StatefulSet on Kubernetes, one key set, S3 backups"
   },
   "shardHash": "72fb28d3a0984e2907649318d0f16f619ec0c9a9064943e9f793160a08fdb76e",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

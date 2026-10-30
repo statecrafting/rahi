@@ -4,6 +4,7 @@
       "Bartek Kus"
     ],
     "created": "2026-09-03",
+    "declaresAcceptance": true,
     "dependsOn": [
       "015-kernel-manifest-and-adjudication"
     ],
@@ -116,5 +117,5 @@
     "title": "The edge: axum router, middleware chain, probes, static slot, error mapping"
   },
   "shardHash": "66cc739017bb1464e7404f3a656492a6f734a3597c9d165b7fba835256079bea",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

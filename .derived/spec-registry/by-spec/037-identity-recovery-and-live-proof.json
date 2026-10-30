@@ -4,6 +4,7 @@
       "Bartek Kus"
     ],
     "created": "2026-09-11",
+    "declaresAcceptance": true,
     "dependsOn": [
       "011-store-hiqlite",
       "030-operational-verbs",
@@ -263,5 +264,5 @@
     "title": "Identity recovery and the live proof: a backup a real rauthy answers, a restore that brings the users back, and CI that runs against the pinned release"
   },
   "shardHash": "2c47a4a7f571e9aca949d85c531ed89ae57ac2e1ebf7be6f959c7ccd83e92086",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

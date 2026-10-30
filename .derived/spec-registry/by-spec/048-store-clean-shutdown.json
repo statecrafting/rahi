@@ -4,6 +4,7 @@
       "Bartek Kus"
     ],
     "created": "2026-09-27",
+    "declaresAcceptance": true,
     "dependsOn": [
       "011-store-hiqlite",
       "030-operational-verbs",
@@ -166,5 +167,5 @@
     "title": "Make every exit of a program that opened the app node pass through its shutdown"
   },
   "shardHash": "2370d915e8e146c2df33aa94a9d76498962bdd77dbbc6b14945d8359a911cb4b",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

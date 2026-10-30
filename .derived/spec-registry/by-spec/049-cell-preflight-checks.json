@@ -4,6 +4,7 @@
       "Bartek Kus"
     ],
     "created": "2026-10-05",
+    "declaresAcceptance": true,
     "dependsOn": [
       "015-kernel-manifest-and-adjudication",
       "030-operational-verbs",
@@ -97,5 +98,5 @@
     "title": "Let a cell contribute named, bounded, read-only checks to preflight"
   },
   "shardHash": "0bf2ae120d6c40cb22b2774345084030edc6e7b253280aba5c810f7e4a0758a6",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }
