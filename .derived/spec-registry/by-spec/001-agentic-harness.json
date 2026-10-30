@@ -4,6 +4,7 @@
       "Bartek Kus"
     ],
     "created": "2026-09-03",
+    "declaresAcceptance": true,
     "dependsOn": [
       "000-rahi-bootstrap"
     ],
@@ -59,10 +60,6 @@
       },
       {
         "kind": "file",
-        "path": ".github/workflows/ci.yml"
-      },
-      {
-        "kind": "file",
         "path": ".github/workflows/govern.yml"
       },
       {
@@ -90,6 +87,32 @@
         "path": "scripts/spec-dag.sh"
       }
     ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/image.yml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "037-identity-recovery-and-live-proof",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/live.yml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "039-release-and-out-of-tree-packaging",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/release.yml"
+        }
+      }
+    ],
     "extraFrontmatter": {
       "wave": 1
     },
@@ -98,15 +121,15 @@
     "kind": "governance",
     "risk": "high",
     "sectionDigests": {
-      "001-agentic-engineering-harness": "86242ee61d42c5742ff0e08c1b1522644b6f416802e80579803b12bf47c57cf6",
+      "001-agentic-engineering-harness": "66fafca9f1d7276b5d1d502cc8226689c1a4bdf9ba821530cdf5af7edc0adff8",
       "1-purpose": "e2c3d5c8c5ff899830592aca1e93274ca6258d0e3dbdbf44b5e583a93c6989df",
       "2-territory": "2c6556e33dda9064ac36c1e516323c160b278646bc61c07f5a682992ce60ccd2",
       "3-behavior": "69c0e600ce2b45de1edcf3209eec4edb8e25c22cef989f190eec7dcd0d9b5b89",
       "4-functional-requirements": "473c984c5225be6de69e1583439d663851b0a4e5ce4352792dc8fd0579a649e7",
       "5-acceptance-criteria": "69b48dc42aba77f2401c876f3070094bc4ca54ab8ada781137005351e8672472",
       "6-out-of-scope": "210d10961c22c44e55da8c30ef14e7dbfd91b815fb854d716eaf058f79df8e91",
-      "7-resolved-decisions": "1419a4f5135211012c0c778ea01ad489b6bd5c6d37c56e79410a3a352cdf8c87",
-      "verification": "ebb3fae3ce67831df68e22db6228b465aebb84748ebcef314362748b5b53b5ab"
+      "7-resolved-decisions": "d97831765d5ace452e2666bee24528f1d1a6aa4b904ddfefc0ba74f21fa716ef",
+      "verification": "96d4d0dd5ff56719967abbe8c21035514689f673205b139ebdf3b828db8cba99"
     },
     "sectionHeadings": [
       "001: Agentic engineering harness",
@@ -124,6 +147,6 @@
     "summary": "The governed-development loop every human and every driven session runs inside: the cross-agent New Sessions protocol and the Working the backlog protocol in AGENTS.md, the Claude Code skills (the eight that sequence the backlog protocol, prime, setup, next, build, verify, spec, ship, shepherd, and the two it calls, commit and code-review), the four pipeline agents, the standing and path-scoped rules (including the chassis invariants checklist), the hooks that report derived-artifact freshness and block an ungated PR, the Makefile that is the one source of truth for what CI validates, and the CI workflow that re-runs the same gate. The harness is what makes the corpus buildable by claude-observatory.\n",
     "title": "Agentic engineering harness: session protocol, skills, agents, hooks, gate"
   },
-  "shardHash": "55b9aecde56cba4e2cc00f7dc66848720668eb0fefbf0107ea7b4c4552bb03b8",
-  "specVersion": "1.10.0"
+  "shardHash": "41729c0bfaca41e065a2a8bf9be446452a213d2af4114067148d9a69b784cd55",
+  "specVersion": "1.11.0"
 }

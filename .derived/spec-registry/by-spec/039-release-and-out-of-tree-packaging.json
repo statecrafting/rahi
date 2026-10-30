@@ -4,6 +4,7 @@
       "Bartek Kus"
     ],
     "created": "2026-09-11",
+    "declaresAcceptance": true,
     "dependsOn": [
       "010-workspace-and-core-types",
       "015-kernel-manifest-and-adjudication",
@@ -398,5 +399,5 @@
     "title": "Releases and out-of-tree packaging: a tagged version a consumer pins, images that exist under the names the manifests use, and a runtime image a cell in another repository builds on"
   },
   "shardHash": "d0f234092186da68640880407ac4e5830e154f46ea7794edaf07e46ca518070e",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

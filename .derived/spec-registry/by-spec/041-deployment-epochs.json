@@ -4,6 +4,7 @@
       "Bartek Kus"
     ],
     "created": "2026-09-11",
+    "declaresAcceptance": true,
     "dependsOn": [
       "013-ledger-decision-chain",
       "014-ledger-sealing-and-archive",
@@ -225,5 +226,5 @@
     "title": "Deployment epochs: the chain records each deployment it serves under, appended at the deploy step, linked to external build and deployment records it never rewrites"
   },
   "shardHash": "0b9f93fb30e1e97fbc71d45dd2b2122bc996d892ba6c65fbbac008eff0e73e99",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

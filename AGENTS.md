@@ -17,7 +17,7 @@ design, every ordinary spec is `approved` and `implementation: pending`, and
 spec ordinals are the build order. Code arrives one spec per session under
 `crates/`, `apps/`, `docker/`, and `deploy/`.
 
-Governance is `spec-spine` **0.31.0** on your `PATH` (CI pins the same
+Governance is `spec-spine` **0.32.0** on your `PATH` (CI pins the same
 version, read out of `spec-spine.toml`). All governed reads of `.derived/` go
 through its CLI.
 
@@ -72,7 +72,7 @@ to derive its plan; anything added here is picked up on the next prime.
 `spec-spine` subcommands.
 
 **Freshness:** `spec-spine check` reads both committed trees without
-writing and reports each separately. Under the pinned 0.31.0 exit family,
+writing and reports each separately. Under the pinned 0.32.0 exit family,
 `0` means pass, `1` means a finding (including stale artifacts or validation
 violations), `2` means a refused read, `3` means an invocation error, and
 `4` means an operational error.
@@ -222,13 +222,16 @@ add it here.
 
 ## Continuous integration
 
-CI is the Statecraft setup profile `github-actions-rust`, revision 21
-(spec 001 D-23). The one required check is `ci-gate` in
+CI is the Statecraft setup profile `github-actions-rust`, revision 22
+(spec 001 D-24). The one required check is `ci-gate` in
 `.github/workflows/statecraft-ci.yml`: governance, the cargo gate, an AI
-review of every pull request, and the two declared extra required jobs,
+review of every pull request, `supply-chain` (cargo-deny against
+`deny.toml`), `workflow-lint` (zizmor, and every action pinned by commit
+digest), `sg-scan`, `secret-scan`, and the one declared extra required job,
 `govern` (`govern.yml`: `make gate` with `scripts/spec-dag.sh`, the
-Kubernetes manifests, the corpus attestation) and `supply-chain` (`ci.yml`:
-cargo-deny). With `governance.require_ratified` at its default `true`, code
+Kubernetes manifests, the corpus attestation). A change to `deny.toml`, any
+`Cargo.toml` or `Cargo.lock`, or `spec-spine.toml` is its own pull request:
+governance refuses one that touches any other path beside them. With `governance.require_ratified` at its default `true`, code
 owned by a draft spec is refused. Ratification is a separate owner flow: a
 pull request that changes a spec from `draft` to `approved` needs approval of
 that run's `statecraft-review-exception` Environment before it can merge.

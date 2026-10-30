@@ -91,43 +91,53 @@
   },
   "files": [
     {
-      "digest": "d7be6ce1e172dfcc7d8bf9ab775117780dca220be63cfda625a333ca4550c431",
+      "digest": "579ce54520e826dee0edc6d176d2d308683753b576859f78ed5879f8fda85e96",
       "path": ".github/workflows/statecraft-ci.yml",
       "role": "workflow"
     },
     {
-      "digest": "ebc30842b947513c1c03661d9f3099bd77ea4a32efe4316582fd710788f90b14",
+      "digest": "1ffbbe2e0b6501c126134f0a5ab1a722fc4de76eb5d9549f25dcf15a91c0b31f",
       "path": ".github/workflows/statecraft-ai-review.yml",
       "role": "workflow"
     },
     {
-      "digest": "877615ece81661c570690ff7b074d25a058cdc5c3dcbac08af43b55969c2b18a",
+      "digest": "4540145e5f07b68b4d8f8c8fd521aff1084fc6c4425330ed0866f7cd04bea405",
       "path": "scripts/statecraft/install-spec-spine.sh",
       "role": "script"
     },
     {
-      "digest": "7124b361e0cffb5bcc5995c7177289dbf9ae664dc28444c1fdb292582a9b0764",
+      "digest": "74653a46e0bbb555013ba1e7e24ac031239383f54d90d0a1d4d708412c4e7710",
       "path": "scripts/statecraft/gate.sh",
       "role": "script"
     },
     {
-      "digest": "84106bca029ca1488f5bfaf4c4b0aaf7b853c55e379c27d2e384ff88c5b9e66e",
+      "digest": "12c6115f2ee77d8eed14048ad7030588ffd7ad80141c5e5e671ff83c7de1d859",
       "path": "scripts/statecraft/ci-gate.sh",
       "role": "script"
     },
     {
-      "digest": "9d44626cb44eb7809ff16da9b11b2d1a3bb1c2f7cd03b71e9a2d0a9c084bf108",
+      "digest": "fde72e83a50a87a3d5da7e452e4a1965e655d6297485c5ff5eac4350af0c876c",
       "path": "scripts/statecraft/ai-review.sh",
       "role": "script"
     },
     {
-      "digest": "eb9565493857d88589c5f745208a9a0540298a8edd67aa217012ffbea532546c",
+      "digest": "c8ad2c3453812bd67f568832f5553685cfb8f0cb60a49f13821c5dc01465e562",
+      "path": "scripts/statecraft/guard-policy-files.sh",
+      "role": "script"
+    },
+    {
+      "digest": "880de81106bf2415f3a3e59fd99f986064e1b36b1b9f1676c38c51138a25422d",
+      "path": "scripts/statecraft/verify-action-pins.sh",
+      "role": "script"
+    },
+    {
+      "digest": "4edce01d38ec008281df5206a100df0d9c72bb6a5eeb606c8c70af36e0d58b8c",
       "path": ".statecraft/setup/github-actions-rust.remote.json",
       "role": "remote-state"
     }
   ],
   "id": "github-actions-rust",
-  "identity": "29183723d833fc7b8c332dbac0e83edfb15eafe2ffc50f01c817f89a70785217",
+  "identity": "6da3ede78368133fe8f463ac341a8ea0ce8e959c0c059066f50c8a89253a4c88",
   "jobs": {
     "ai-review": {
       "merge_group": "recorded-review",
@@ -173,14 +183,33 @@
       "push": "inapplicable",
       "required": true
     },
-    "supply-chain": {
-      "declared": "ci.extra_required_jobs",
+    "secret-scan": {
       "merge_group": "required",
       "optional": false,
       "pull_request": "required",
       "push": "required",
-      "required": true,
-      "workflow": ".github/workflows/ci.yml"
+      "required": true
+    },
+    "sg-scan": {
+      "merge_group": "required",
+      "optional": false,
+      "pull_request": "required",
+      "push": "required",
+      "required": true
+    },
+    "supply-chain": {
+      "merge_group": "required",
+      "optional": false,
+      "pull_request": "required",
+      "push": "required",
+      "required": true
+    },
+    "workflow-lint": {
+      "merge_group": "required",
+      "optional": false,
+      "pull_request": "required",
+      "push": "required",
+      "required": true
     }
   },
   "parameters": {
@@ -205,10 +234,6 @@
       {
         "job": "govern",
         "workflow": ".github/workflows/govern.yml"
-      },
-      {
-        "job": "supply-chain",
-        "workflow": ".github/workflows/ci.yml"
       }
     ],
     "fail_on_unresolved": false,
@@ -252,6 +277,7 @@
     "revision 19: a blocked ci-gate reports failed jobs of its own run attempt, their first failed step and at most five error lines each in the step summary and as at most ten annotations; this is best effort, never changes the verdict or exit code, and fences or escapes candidate text; before saving the code job cache, the job drops workspace artifacts on the same default-branch condition (spec 060)",
     "revision 20: reviewer calls stream partial events; 180 seconds of silence stops a call and retries it once with fresh cwd and home, a second stall skips as transient, and the review job allows 20 minutes (spec 061)",
     "revision 21: every review or visible skip publishes a statecraft-ai-review check run after its evidence artifact, with the exact record and a success, failure or neutral conclusion; fork heads are excluded and publication failures fail the job (spec 062; 044 moves to 22)",
+    "revision 22: four more required jobs, each a need of ci-gate and none optional: supply-chain (cargo deny against the committed deny.toml, cargo audit when .cargo/audit.toml exists, cargo vet --locked when supply-chain/config.toml exists, each tool a digest-verified release at an exact version, with the candidate's .cargo/config.toml removed first), workflow-lint (zizmor offline over .github/workflows, then verify-action-pins.sh: every action by 40-hex commit digest with a `# <ref>` comment, a docker image by sha256, or a local path), sg-scan (ast-grep scan when sgconfig.yml exists) and secret-scan (gitleaks, digest-verified, over the change's commits, reporting rule and location and never the value). On a pull request governance runs guard-policy-files.sh: a change to deny.toml, .cargo/audit.toml, supply-chain/, any Cargo.toml or Cargo.lock, spec-spine.toml or docs/adoption/spec-spine.md beside any other path, apart from the generated .statecraft/derived/ and .statecraft/environment.json, fails and must be split, so an upgrade that also moves the spec-spine pin is two pull requests. A target needs a committed deny.toml to select this revision; the plan withholds the profile without one (spec 044)",
     "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)"
   ],
   "review": {
@@ -283,5 +309,5 @@
     "tool": "claude-code",
     "tool_version": "2.1.116"
   },
-  "revision": 21
+  "revision": 22
 }
