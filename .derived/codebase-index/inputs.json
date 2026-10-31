@@ -102,32 +102,29 @@
     ".github/publish-crate.sh": {
       "contentHash": "f797913c6842434b95f5e4904f12c24d9914fb1cc12ee57f76c4fbbe4b5ae32b"
     },
-    ".github/workflows/ci.yml": {
-      "contentHash": "41e2c0f3e7579559edff04f47b25871eb6bf7f168f241ca3981e06fb6922dee5"
-    },
     ".github/workflows/govern.yml": {
-      "contentHash": "e6b188537a0447867886bb2f2ec2c575e6b254613e4c509485d3eb7216e3ce0f"
+      "contentHash": "1c089327ed7cbf58b2d23b162aad905c735fd7ed797e55af72c856c8163e784a"
     },
     ".github/workflows/image.yml": {
-      "contentHash": "f8f615f76ca09211e6265b968e04796126121c7c4f4a3a160972779d4d74d21e"
+      "contentHash": "092ce1f865d8f14b66357447c6324bce497ef73f78a84f242e95acc23060718d"
     },
     ".github/workflows/live.yml": {
-      "contentHash": "09141dc8a782636091fac398cc2b8dadd81508ade7def0011e8873535db0bb2d"
+      "contentHash": "5384cec744c3b37ec9f67a20b9a8abbfb3775963259280f05807e2ded0fb49b9"
     },
     ".github/workflows/release.yml": {
-      "contentHash": "2c03ff36f7157bb914ef0ae52867c45c80051d373b5db7821b5f2a7829f8197f"
+      "contentHash": "c90d258e1e4aae6c03266d8891dee7704f2648c52b7a1c242f9168ed31244a72"
     },
     ".github/workflows/statecraft-ai-review.yml": {
-      "contentHash": "35676b9f4c20fe495fbdf4ef5a2a7944503d2002af96c92da34e0b7a1f2e4150"
+      "contentHash": "2312937dd0d14b500c3ca5d15c64fc33a59de4c66fd0bba199f343631ff3f116"
     },
     ".github/workflows/statecraft-ci.yml": {
-      "contentHash": "5f616585be99e7c73af1a25c357c69793d5a3e841cb68ec05800d791e443d1d2"
+      "contentHash": "3c0a280d80ce7f7cad7c132079d6b5c8658a0b4201b0ebe80e50c65a2231e1b1"
     },
     ".mcp.json": {
       "contentHash": "267962ad307e5707f2a025ce1fa40b80d52cd0cf3f8c8bdb25d03a6459366a1a"
     },
     "AGENTS.md": {
-      "contentHash": "85d6847bcc6a256b80813ae088b6af2d97614cdcde9ca44bdbc29c8f08b1a978"
+      "contentHash": "d8b63b064a6f484abf1901dc80304e845f066f7b5a6dcb170a7a5d877c08721a"
     },
     "CLAUDE.md": {
       "contentHash": "997855291507fa72d12eae573e5347266ce34be2d1e2bf7fad39b47067f46f77"

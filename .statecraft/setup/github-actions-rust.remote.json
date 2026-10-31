@@ -12,7 +12,9 @@
       "/scripts/statecraft/ai-review.sh",
       "/scripts/statecraft/ci-gate.sh",
       "/scripts/statecraft/gate.sh",
-      "/scripts/statecraft/install-spec-spine.sh"
+      "/scripts/statecraft/guard-policy-files.sh",
+      "/scripts/statecraft/install-spec-spine.sh",
+      "/scripts/statecraft/verify-action-pins.sh"
     ],
     "required": true
   },
@@ -23,17 +25,13 @@
       {
         "job": "govern",
         "workflow": ".github/workflows/govern.yml"
-      },
-      {
-        "job": "supply-chain",
-        "workflow": ".github/workflows/ci.yml"
       }
     ]
   },
   "profile": {
     "id": "github-actions-rust",
-    "identity": "29183723d833fc7b8c332dbac0e83edfb15eafe2ffc50f01c817f89a70785217",
-    "revision": 21
+    "identity": "6da3ede78368133fe8f463ac341a8ea0ce8e959c0c059066f50c8a89253a4c88",
+    "revision": 22
   },
   "requiredChecks": [
     {

@@ -24,7 +24,6 @@ establishes:
   - ".claude/rules/"
   - ".claude/skills/"
   - ".claude/skills.sha256"
-  - ".github/workflows/ci.yml"
   - ".github/workflows/govern.yml"
   - ".github/dependabot.yml"
   - "CODEOWNERS"
@@ -32,6 +31,10 @@ establishes:
   - ".githooks/"
   - "scripts/check-authored-content.sh"
   - "scripts/spec-dag.sh"
+extends:
+  - { spec: "031-single-container-packaging", unit: ".github/workflows/image.yml", nature: additive }
+  - { spec: "037-identity-recovery-and-live-proof", unit: ".github/workflows/live.yml", nature: additive }
+  - { spec: "039-release-and-out-of-tree-packaging", unit: ".github/workflows/release.yml", nature: additive }
 summary: >
   The governed-development loop every human and every driven session runs
   inside: the cross-agent New Sessions protocol and the Working the backlog
@@ -1040,6 +1043,44 @@ exit-family change, so D-20's contributor-hook contract holds. Historical
 decisions retain the versions they describe. This upgrade changes no spec
 approval or implementation state, and no crate version or lockfile entry.
 
+D-25 (2026-10-30, owner-directed rollout; profile upgrade). Adopt
+Statecraft profile revision 22 (renderer identity `6da3ede78368`, plan
+`spine-init:31ef82b8e3049ed1706fb64520312c74839d3616402559ce7e60285129d03cb7`)
+rendered by statecraft-cli `18fb8ecc`, over the 0.32.0 pin D-24 landed
+first. Revision 22 adds four required jobs, each a need
+of `ci-gate`: `supply-chain` (cargo deny against the committed
+`deny.toml`, cargo audit and cargo vet when configured), `workflow-lint`
+(zizmor offline, then every action pinned by commit digest), `sg-scan`
+and `secret-scan`; and, on a pull request, a guard that refuses a change
+to a policy path (`deny.toml`, `.cargo/audit.toml`, `supply-chain/`, any
+`Cargo.toml` or `Cargo.lock`, `spec-spine.toml`,
+`docs/adoption/spec-spine.md`) beside any other path, apart from the
+generated `.statecraft/derived/` and `.statecraft/environment.json`. Where the base carries no guard the candidate's
+copy judges the adoption, which is why D-24 moved the pin alone; this
+change touches no policy path, and every later change to one is its own
+pull request.
+
+Three consequences, taken in this change. First, the profile's
+`supply-chain` job replaces D-17's declared extra job of the same name:
+the plan refuses a declared job the profile renders, and both ran the same
+cargo-deny check. `.github/workflows/ci.yml` is removed and leaves this
+spec's `establishes`; `govern` stays the one declared extra required job.
+Second, `workflow-lint` judges every workflow, not only the rendered ones,
+so `govern.yml`, `image.yml` (spec 031), `live.yml` (spec 037) and
+`release.yml` (spec 039) pin each action by its 40-hex commit digest with
+the tag as a comment, check out with `persist-credentials: false` (none
+pushes with git), pass step outputs to `run` through `env` rather than
+template expansion, and `image.yml` grants `packages: write` per job
+instead of workflow-wide; the three foreign files are `extends` edges.
+Third, B-3's cargo-deny clause is now served by the profile's job. B-3's
+text and D-17 are left as written; this entry supersedes D-17's
+`supply-chain` declaration only. Alternatives rejected: keeping `ci.yml`
+under a new job name, which runs cargo deny twice; and a zizmor
+configuration that suppresses the findings, which weakens the control the
+revision adds. The registry and index are regenerated and committed with
+this adoption. This upgrade changes no spec approval or
+implementation state, and no crate version or lockfile entry.
+
 ## Verification
 
 ```verify:cli
@@ -1065,19 +1106,19 @@ sh -c '! grep -A7 "unwitnessed-claim count" AGENTS.md | grep -qE "[0-9]+ of [0-9
 sh -c '! test -e scripts/verify-spec.sh'
 sh -c 'sed -n "/^verify:/,/^$/p" Makefile | grep -q "SPEC_SPINE) verify"'
 # B-3 as D-17 carries it: exactly one aggregate gate, named ci-gate, in the
-# profile's triggered workflow, and none left in ci.yml.
+# profile's triggered workflow.
 grep -q '^  ci-gate:' .github/workflows/statecraft-ci.yml
-sh -c '! grep -q "^  ci-gate:" .github/workflows/ci.yml'
 # B-3: the governance chain is reusable only (no event triggers of its own).
 grep -q 'workflow_call' .github/workflows/govern.yml
 sh -c '! grep -qE "^  (push|pull_request|merge_group):" .github/workflows/govern.yml'
-# D-17: ci.yml (cargo-deny) is reusable only too.
-grep -q 'workflow_call' .github/workflows/ci.yml
-sh -c '! grep -qE "^  (push|pull_request|merge_group):" .github/workflows/ci.yml'
+# D-24: the profile renders supply-chain itself, so ci.yml is gone, and
+# every workflow passes the rendered action pin check.
+sh -c '! test -e .github/workflows/ci.yml'
+grep -q '^  supply-chain:' .github/workflows/statecraft-ci.yml
+sh scripts/statecraft/verify-action-pins.sh
 # D-17: the profile's workflow is the triggered entry point, calls both as
 # declared extra required jobs, and runs on the merge queue.
 grep -q 'uses: ./.github/workflows/govern.yml' .github/workflows/statecraft-ci.yml
-grep -q 'uses: ./.github/workflows/ci.yml' .github/workflows/statecraft-ci.yml
 grep -q '^  merge_group:' .github/workflows/statecraft-ci.yml
 # B-3: the coupling gate diffs the event's frozen SHAs, never the merge ref.
 grep -q 'HEAD_SHA: ..{ github.event.pull_request.head.sha }' .github/workflows/govern.yml
@@ -1105,7 +1146,7 @@ sh -c '! grep -rq -- "--include-uncommitted" .github/workflows/'
 # D-21: the exact released pin and profile revision are recorded once.
 grep -qx 'required_version = "=0.32.0"' spec-spine.toml
 sh -c "printf '%s\n' 'print-spine-version:;@echo \$(SPEC_SPINE_VERSION)' | make -s -f Makefile -f - print-spine-version | grep -qx '0.32.0'"
-grep -q 'statecraft-setup:github-actions-rust@21' .statecraft/environment.json
+grep -q 'statecraft-setup:github-actions-rust@22' .statecraft/environment.json
 grep -q '"require_ratified": true' .statecraft/setup/github-actions-rust.json
 python3 -c 'import json; a = json.load(open(".claude/settings.json"))["attribution"]; assert a == {"commit": "", "pr": "", "sessionUrl": False}, a'
 grep -q -- '--identity BASE HEAD' scripts/check-authored-content.sh

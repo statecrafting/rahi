@@ -36,8 +36,9 @@ jobs:
       has_cargo: ${{ steps.tree.outputs.has_cargo }}
       has_deny: ${{ steps.tree.outputs.has_deny }}
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           # Full history so the coupling gate can diff against the merge base.
           fetch-depth: 0
       # `hashFiles` is not allowed in a job-level `if` (GitHub rejects the
@@ -63,12 +64,15 @@ jobs:
       # skip as a pass. Say out loud which downstream gates this run will not
       # exercise, so green never silently means "never ran" (spec 001 D-9).
       - name: Announce inactive gates
+        env:
+          HAS_CARGO: ${{ steps.tree.outputs.has_cargo }}
+          HAS_DENY: ${{ steps.tree.outputs.has_deny }}
         run: |
           set -euo pipefail
-          if [ "${{ steps.tree.outputs.has_cargo }}" != "true" ]; then
+          if [ "${HAS_CARGO}" != "true" ]; then
             echo "::notice::cargo gate INACTIVE: no Cargo.toml (lands with spec 010)"
           fi
-          if [ "${{ steps.tree.outputs.has_deny }}" != "true" ]; then
+          if [ "${HAS_DENY}" != "true" ]; then
             echo "::notice::supply-chain gate INACTIVE: no deny.toml (lands with spec 010)"
           fi
       - name: Install spec-spine (pinned in the Makefile)
@@ -140,8 +144,9 @@ jobs:
     needs: spine
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
       - name: Install spec-spine (pinned in the Makefile)
         run: |
@@ -155,7 +160,7 @@ jobs:
       # (spec-spine spec 023): the repo's own ledger seal, published as a
       # build artifact so a later steward can `verify-attestation --recompute`.
       - run: spec-spine attest --with-coupling > corpus-attestation.json
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: corpus-attestation-${{ github.sha }}
           path: corpus-attestation.json
