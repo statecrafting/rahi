@@ -4,6 +4,7 @@
       "Bartek Kus"
     ],
     "created": "2026-09-03",
+    "declaresAcceptance": true,
     "dependsOn": [
       "002-chassis-thesis"
     ],
@@ -89,5 +90,5 @@
     "title": "Cargo workspace and the core types: Error, Principal, Revision, FenceToken, Config"
   },
   "shardHash": "936126ae58559099241f8be4cdb4ca007cc5083c379e27bbf68fedabda187947",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

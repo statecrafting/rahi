@@ -4,6 +4,7 @@
       "Bartek Kus"
     ],
     "created": "2026-09-03",
+    "declaresAcceptance": true,
     "dependsOn": [
       "011-store-hiqlite"
     ],
@@ -112,5 +113,5 @@
     "title": "Store coordination: fenced leases, local notify, the outbox, and the revision watermark"
   },
   "shardHash": "4635247819371874b685d6ddf3751383653a297c17b238ea489731fc8c19ece2",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

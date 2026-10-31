@@ -4,6 +4,7 @@
       "Bartek Kus"
     ],
     "created": "2026-09-03",
+    "declaresAcceptance": true,
     "dependsOn": [
       "033-dev-substrate-and-harness",
       "032-cluster-topology"
@@ -151,5 +152,5 @@
     "title": "hello-cell: the reference app that composes every crate and proves the chassis end to end"
   },
   "shardHash": "5b6c13d65cf33cf74c14af3d6486f11e3bb746e2527babcf3b895d922700b5d3",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

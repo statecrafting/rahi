@@ -4,6 +4,7 @@
       "Bartek Kus"
     ],
     "created": "2026-09-27",
+    "declaresAcceptance": true,
     "dependsOn": [
       "030-operational-verbs",
       "035-denials-survive-shutdown",
@@ -101,5 +102,5 @@
     "title": "Manage application background services through the cell lifecycle"
   },
   "shardHash": "57f2823c1e3aedc928836b114ef4c9c9ca63d54d33268bd15dce4ee9ec32455a",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }
