@@ -223,7 +223,7 @@ add it here.
 ## Continuous integration
 
 CI is the Statecraft setup profile `github-actions-rust`, revision 22
-(spec 001 D-24). The one required check is `ci-gate` in
+(spec 001 D-25). The one required check is `ci-gate` in
 `.github/workflows/statecraft-ci.yml`: governance, the cargo gate, an AI
 review of every pull request, `supply-chain` (cargo-deny against
 `deny.toml`), `workflow-lint` (zizmor, and every action pinned by commit

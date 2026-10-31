@@ -124,7 +124,7 @@
       "contentHash": "267962ad307e5707f2a025ce1fa40b80d52cd0cf3f8c8bdb25d03a6459366a1a"
     },
     "AGENTS.md": {
-      "contentHash": "e284613b5a78248dc2913ff6d9b64192ea2c74288d2d7d5c4637a604e7c16d30"
+      "contentHash": "f2ea069d0eb89751ea6416f76179ee8abd9285cb1d64e45b308ba4090ac8aa40"
     },
     "CLAUDE.md": {
       "contentHash": "997855291507fa72d12eae573e5347266ce34be2d1e2bf7fad39b47067f46f77"
@@ -139,7 +139,7 @@
       "contentHash": "b42cdcd91b2924570084da34d73ec3c3773f4c401a96fbc1b3561327ce5b24e3"
     },
     "deny.toml": {
-      "contentHash": "bc8d2802f8c4993a41f75faf2adf13100fd3acab12c6c049857d7b94d2ed4e89"
+      "contentHash": "7e27d71b3f010fd88f9df9b5a410c226bd96e5bf55952afef0c3ce63b8315f2b"
     },
     "deploy/k8s/backup-cronjob.yaml": {
       "contentHash": "3476fa2afae38edde1d0daf0d58823e1b47243866a723846ee32a7f9936bf524"

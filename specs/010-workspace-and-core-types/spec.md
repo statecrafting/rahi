@@ -175,6 +175,15 @@ token types (022); any I/O.
   a derived artifact of the dependency table, owned by the coupling
   floor, not by a spec. Alternative rejected: keeping the claim and the
   per-spec edges, which is friction with no governance gain.
+- **D-8 (2026-10-30, maintenance session).** `deny.toml` ignores
+  RUSTSEC-2026-0387 (crypto-bigint 0.5 timing variability). B-3 denies an
+  advisory with a known fix; this one's fix is crypto-bigint 0.7.6, which no
+  released `age` reaches, since age 0.12 pins elliptic-curve 0.13 through
+  `p256`. The vulnerable code is linked but never called: rahi-ops seals
+  and opens backups with `age::x25519` keys only, never a p256 recipient.
+  The ignore is removed when age moves off elliptic-curve 0.13.
+  Alternative rejected: dropping `p256` by feature selection, which age
+  0.12 cannot do: `p256` is an unconditional dependency of the crate.
 
 ## Verification
 

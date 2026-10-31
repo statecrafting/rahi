@@ -17,6 +17,12 @@ ignore = [
   # backup bucket (spec 011 D-9). Remove both when hiqlite lifts cryptr.
   { id = "RUSTSEC-2026-0194", reason = "quick-xml duplicate-attribute check; parses only the operator's own S3 listing" },
   { id = "RUSTSEC-2026-0195", reason = "quick-xml NsReader allocation; parses only the operator's own S3 listing" },
+  # crypto-bigint 0.5 under age 0.12 -> p256 (the age plugin and tag
+  # recipients). The fix is crypto-bigint 0.7.6, which no released age reaches.
+  # Backups are sealed to and opened with x25519 keys only (rahi-ops
+  # archive.rs), so the p256 code is linked but never called (spec 010 D-8).
+  # Remove when age moves off elliptic-curve 0.13.
+  { id = "RUSTSEC-2026-0387", reason = "crypto-bigint 0.5 timing; reached only through age -> p256, unused: backups are keyed with x25519" },
 ]
 
 [licenses]
