@@ -121,14 +121,14 @@
     "kind": "governance",
     "risk": "high",
     "sectionDigests": {
-      "001-agentic-engineering-harness": "f679e6074c1fc7870964f710238e669dd71ad45fd11862d66b7bd730770e6d1f",
+      "001-agentic-engineering-harness": "cea336e652b7466200c9b3d4d01edd2065e6275da4142f09b4050f9522eeabe6",
       "1-purpose": "e2c3d5c8c5ff899830592aca1e93274ca6258d0e3dbdbf44b5e583a93c6989df",
       "2-territory": "2c6556e33dda9064ac36c1e516323c160b278646bc61c07f5a682992ce60ccd2",
       "3-behavior": "69c0e600ce2b45de1edcf3209eec4edb8e25c22cef989f190eec7dcd0d9b5b89",
       "4-functional-requirements": "473c984c5225be6de69e1583439d663851b0a4e5ce4352792dc8fd0579a649e7",
       "5-acceptance-criteria": "69b48dc42aba77f2401c876f3070094bc4ca54ab8ada781137005351e8672472",
       "6-out-of-scope": "210d10961c22c44e55da8c30ef14e7dbfd91b815fb854d716eaf058f79df8e91",
-      "7-resolved-decisions": "013cbc775e7e85255ee09941741fa0350b889eafa053397e61b607678f37e405",
+      "7-resolved-decisions": "882abc22ab686179482739f75ed93c4b2b5e9b4c126407523ae7745b45d4c4d6",
       "verification": "96d4d0dd5ff56719967abbe8c21035514689f673205b139ebdf3b828db8cba99"
     },
     "sectionHeadings": [
@@ -147,6 +147,6 @@
     "summary": "The governed-development loop every human and every driven session runs inside: the cross-agent New Sessions protocol and the Working the backlog protocol in AGENTS.md, the Claude Code skills (the eight that sequence the backlog protocol, prime, setup, next, build, verify, spec, ship, shepherd, and the two it calls, commit and code-review), the four pipeline agents, the standing and path-scoped rules (including the chassis invariants checklist), the hooks that report derived-artifact freshness and block an ungated PR, the Makefile that is the one source of truth for what CI validates, and the CI workflow that re-runs the same gate. The harness is what makes the corpus buildable by claude-observatory.\n",
     "title": "Agentic engineering harness: session protocol, skills, agents, hooks, gate"
   },
-  "shardHash": "09ca568beb19b4b9295cfe052808779d99d00f1338f216ec72597bc8ef0c29a8",
+  "shardHash": "1ab2a99cd1b4e8b16dd4ec02954cc32034777d32249c22a9b02936dc8bfb4c63",
   "specVersion": "1.11.0"
 }

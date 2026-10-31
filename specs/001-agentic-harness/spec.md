@@ -1052,8 +1052,10 @@ of `ci-gate`: `supply-chain` (cargo deny against the committed
 `deny.toml`, cargo audit and cargo vet when configured), `workflow-lint`
 (zizmor offline, then every action pinned by commit digest), `sg-scan`
 and `secret-scan`; and, on a pull request, a guard that refuses a change
-to `deny.toml`, any `Cargo.toml` or `Cargo.lock`, or `spec-spine.toml`
-beside any other path. Where the base carries no guard the candidate's
+to a policy path (`deny.toml`, `.cargo/audit.toml`, `supply-chain/`, any
+`Cargo.toml` or `Cargo.lock`, `spec-spine.toml`,
+`docs/adoption/spec-spine.md`) beside any other path, apart from the
+generated `.statecraft/derived/` and `.statecraft/environment.json`. Where the base carries no guard the candidate's
 copy judges the adoption, which is why D-24 moved the pin alone; this
 change touches no policy path, and every later change to one is its own
 pull request.

@@ -229,9 +229,12 @@ review of every pull request, `supply-chain` (cargo-deny against
 `deny.toml`), `workflow-lint` (zizmor, and every action pinned by commit
 digest), `sg-scan`, `secret-scan`, and the one declared extra required job,
 `govern` (`govern.yml`: `make gate` with `scripts/spec-dag.sh`, the
-Kubernetes manifests, the corpus attestation). A change to `deny.toml`, any
-`Cargo.toml` or `Cargo.lock`, or `spec-spine.toml` is its own pull request:
-governance refuses one that touches any other path beside them. With `governance.require_ratified` at its default `true`, code
+Kubernetes manifests, the corpus attestation). A change to a policy path is
+its own pull request: governance refuses one that touches any other path
+beside them, apart from the generated `.statecraft/derived/` and
+`.statecraft/environment.json`. The policy paths are `deny.toml`,
+`.cargo/audit.toml`, anything under `supply-chain/`, any `Cargo.toml` or
+`Cargo.lock`, `spec-spine.toml`, and `docs/adoption/spec-spine.md`. With `governance.require_ratified` at its default `true`, code
 owned by a draft spec is refused. Ratification is a separate owner flow: a
 pull request that changes a spec from `draft` to `approved` needs approval of
 that run's `statecraft-review-exception` Environment before it can merge.
