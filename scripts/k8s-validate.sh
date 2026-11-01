@@ -468,7 +468,7 @@ patches:
         path: /metadata/annotations/nginx.ingress.kubernetes.io~1denylist-source-range
 YAML
   echo "k8s-validate: 040 D-8 fixture (an edge closure that denies no address must be refused)"
-  refused "rahi-edge-closed routes /binding"
+  refused "the Ingress rahi-edge-closed routes /"
 
   mkdir -p "$fixture"
   digest=0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9
