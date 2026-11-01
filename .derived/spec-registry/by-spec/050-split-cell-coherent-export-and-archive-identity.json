@@ -16,32 +16,6 @@
         "path": "crates/rahi-cli/tests/split_archive.rs"
       }
     ],
-    "extends": [
-      {
-        "nature": "additive",
-        "spec": "030-operational-verbs",
-        "unit": {
-          "kind": "file",
-          "path": "crates/rahi-ops/src/archive.rs"
-        }
-      },
-      {
-        "nature": "additive",
-        "spec": "030-operational-verbs",
-        "unit": {
-          "kind": "file",
-          "path": "crates/rahi-ops/src/backup.rs"
-        }
-      },
-      {
-        "nature": "additive",
-        "spec": "044-n3-split-composition",
-        "unit": {
-          "kind": "file",
-          "path": "deploy/n3-split/"
-        }
-      }
-    ],
     "extraFrontmatter": {
       "wave": 3
     },
@@ -55,18 +29,39 @@
           "kind": "file",
           "path": "docs/design/02-operational-prerequisites.md"
         }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/archive.rs"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/backup.rs"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "directory",
+          "path": "deploy/n3-split"
+        }
       }
     ],
     "risk": "high",
     "sectionDigests": {
-      "050-split-cell-coherent-export-and-archive-identity": "da99859c92b6c9a1e3b896d52b9a55264b720f768a7b90c0a51fa8d5961313dd",
+      "050-split-cell-coherent-export-and-archive-identity": "a63a0bfc3f7c5377c537600a00754808a869c6d3e5ace051012a45cba6e94bd4",
       "1-purpose": "b5c3ce631aae88c0649eefcdb46b18fa279e6c28ba948bce1d5f6aa0614140a7",
       "2-territory": "c2f0ee777c8209edb985ea6e0e8808e0962812f67858ed73cdb94baea135cb13",
       "3-behavior": "a0761b6b7ce8875949fe65ef1649a6229b89a1ba0a6245cc47138207bb922794",
       "4-functional-requirements": "fef9dded9993d7767798c17763d324d4eef5ebd2ea3b74ab31b89aa8c39a5d1c",
       "5-acceptance-criteria": "156f1dc6334c9bc4f16385abdcc9a2a1056799d27d43a4b1741326f2cd6177db",
       "6-out-of-scope": "ee973830034bd174ad013c85b457abfc7e21b6dcb311319b9ffec1bda2d7ca79",
-      "7-resolved-decisions": "43ceb2458b0c0e11ae57b916587f89ae05231bdcb0d243806d033e1ded595b4b",
+      "7-resolved-decisions": "48c28f0f5385fe9e91a31eb6b45e95990fd253f61e670e3a09e24ace429f0746",
       "verification": "49428cf163da8b649dbcb8c8e7260082f726d277fac7952a0eb2e89cf9df66e3"
     },
     "sectionHeadings": [
@@ -85,6 +80,6 @@
     "summary": "Takes over spec 044's B-11 (coherent offline export across the rahi and Rauthy clusters of a split N=3 cell) and B-12 (the cell archive names both images, both applied log ids and both digests in one manifest), which the owner split out on 2026-10-31 so 044 could complete on its operator evidence. Both need hiqlite fork changes that no release carries yet: the offline export entry point, and an applied log id recorded with each backup. This spec schedules nothing until a hiqlite release carrying both is adopted.\n",
     "title": "Split cell coherent export and archive identity: an offline export across both clusters, and one archive manifest naming both images and both applied log ids"
   },
-  "shardHash": "61c9796e08ba70640e311eb5a49f4dac82f97b93e789e1651e9c3ecb3df619aa",
+  "shardHash": "6dfd16763e4cec9c30cbd4f0da38939d960db40119264f78ef6fdb682f29d20e",
   "specVersion": "1.11.0"
 }
