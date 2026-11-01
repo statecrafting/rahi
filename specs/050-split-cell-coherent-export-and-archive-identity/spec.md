@@ -23,12 +23,11 @@ summary: >
   is adopted.
 establishes:
   - "crates/rahi-cli/tests/split_archive.rs"
-extends:
-  - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/archive.rs", nature: additive }
-  - { spec: "030-operational-verbs", unit: "crates/rahi-ops/src/backup.rs", nature: additive }
-  - { spec: "044-n3-split-composition", unit: "deploy/n3-split/", nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/02-operational-prerequisites.md" }, role: context }
+  - { unit: { kind: file, path: "crates/rahi-ops/src/archive.rs" }, role: context }
+  - { unit: { kind: file, path: "crates/rahi-ops/src/backup.rs" }, role: context }
+  - { unit: { kind: directory, path: "deploy/n3-split" }, role: context }
 ---
 
 # 050: Split cell coherent export and archive identity
@@ -113,6 +112,13 @@ own adoption under 043's rules.
   AC-3 and AC-4. This spec is born `draft` and stays unschedulable until a
   hiqlite release carrying both prerequisites exists; approval is a human
   flip.
+- **D-2 (2026-10-31; a draft claims no unit).** The three `extends` edges
+  this spec was born with (030's `archive.rs` and `backup.rs`, 044's
+  `deploy/n3-split/`) made it an owner of those units while `draft`, and
+  the ratification gate refuses any change to a unit a draft spec owns: it
+  blocked 040's edge closure and 044's completion, neither of which is this
+  spec's work. They are `references` edges until approval; the approving
+  change turns them back into the `extends` edges section 2 describes.
 
 ## Verification
 
