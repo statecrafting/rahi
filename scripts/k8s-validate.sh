@@ -469,6 +469,25 @@ patches:
 YAML
   echo "k8s-validate: 040 D-8 fixture (an edge closure that denies no address must be refused)"
   refused "the Ingress rahi-edge-closed routes /metrics; it is an in-cluster document only"
+  # The closure's annotation must not vouch for another Ingress: a path the
+  # main Ingress gains is judged on that Ingress's own annotations.
+  mkdir -p "$fixture"
+  cat > "$fixture/kustomization.yaml" <<'YAML'
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../k8s
+patches:
+  - target:
+      kind: Ingress
+      name: rahi
+    patch: |-
+      - op: add
+        path: /spec/rules/0/http/paths/-
+        value: {path: /binding, pathType: Exact, backend: {service: {name: rahi, port: {name: http}}}}
+YAML
+  echo "k8s-validate: 040 D-8 fixture (the main Ingress routing /binding must be refused)"
+  refused "the Ingress rahi routes /binding; it is an in-cluster document only"
 
   mkdir -p "$fixture"
   digest=0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9

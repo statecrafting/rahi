@@ -271,7 +271,7 @@
       "contentHash": "f29ecfab602778e37107e96e8e5dd9e5891529179d7f48669c41adea2954b89f"
     },
     "scripts/k8s-validate.sh": {
-      "contentHash": "31060b7814db2465d2311c7445c061ef5905bf804bb84dfbf17319539bb293d2"
+      "contentHash": "fc63b7d5f31619c0ff033959507128b42bc215894754b68c75b126c7dfdce90c"
     },
     "scripts/spec-dag.sh": {
       "contentHash": "84d4793c8a1a811ab25ce7d45b9a66d92364015883bd4a72c8741b9898ab1d05"
