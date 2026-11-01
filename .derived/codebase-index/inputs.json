@@ -271,7 +271,7 @@
       "contentHash": "f29ecfab602778e37107e96e8e5dd9e5891529179d7f48669c41adea2954b89f"
     },
     "scripts/k8s-validate.sh": {
-      "contentHash": "b770872977a09711d814943dabd67eec8915372eb17e2a891f411059bef48fa8"
+      "contentHash": "31060b7814db2465d2311c7445c061ef5905bf804bb84dfbf17319539bb293d2"
     },
     "scripts/spec-dag.sh": {
       "contentHash": "84d4793c8a1a811ab25ce7d45b9a66d92364015883bd4a72c8741b9898ab1d05"
@@ -283,7 +283,7 @@
       "contentHash": "4d61a25ddc4a913cc7a12da8b3ec0d8adb34e96794ec334c814981d0564fde0a"
     },
     "standards/spec/contract.md": {
-      "contentHash": "9727d864802c2ad73c5f95b8e1ae155110ec12f873f6f487cab99004dbae9881"
+      "contentHash": "23ac61073c0e4718f3dc6c4bf7e871bdf76387b21bed222584db649595489221"
     },
     "standards/spec/templates/constitution-template.md": {
       "contentHash": "9422c45aeea54a1765b9da797f6c7e958dd2e7d4e74a7e3b788f3ec281a97900"
