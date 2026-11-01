@@ -1,0 +1,99 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '050-split-cell-coherent-export-and-archive-identity' file unit 'crates/rahi-cli/tests/split_archive.rs' does not exist",
+        "path": "crates/rahi-cli/tests/split_archive.rs"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "030-operational-verbs",
+      "044-n3-split-composition"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/rahi-ops/src/archive.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/backup.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "deploy/n3-split/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/split_archive.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/archive.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/archive.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/backup.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/backup.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "deploy/n3-split/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "deploy/n3-split/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/02-operational-prerequisites.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-operational-prerequisites.md"
+        }
+      }
+    ],
+    "specId": "050-split-cell-coherent-export-and-archive-identity",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "61c9796e08ba70640e311eb5a49f4dac82f97b93e789e1651e9c3ecb3df619aa"
+}
