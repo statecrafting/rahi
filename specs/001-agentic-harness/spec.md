@@ -1081,6 +1081,14 @@ revision adds. The registry and index are regenerated and committed with
 this adoption. This upgrade changes no spec approval or
 implementation state, and no crate version or lockfile entry.
 
+D-26 (2026-10-31, reconciliation; the wave of ordinals past 039). The
+contract's `wave` entry said wave 3 is ordinals 030 to 039, but every
+spec from 040 to 049 declares `wave: 3`, and spec 002 §5 names three waves
+and no fourth. The entry now reads 030 and above, which matches the corpus
+and leaves every spec's frontmatter unchanged. Rejected: a fourth wave for
+040 onward, which would contradict 002's three-wave order and re-label ten
+approved specs.
+
 ## Verification
 
 ```verify:cli

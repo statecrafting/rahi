@@ -33,7 +33,8 @@ spec has a non-empty `depends_on` naming only lower-numbered specs.
 ## Extra keys (rahi-specific, declared in `frontmatter.extra_known_keys`)
 
 - `wave`: the build-order wave (1 to 3) from spec 002 §5. Wave 1 is ordinals
-  010 to 019, wave 2 is 020 to 029, wave 3 is 030 to 039.
+  010 to 019, wave 2 is 020 to 029, wave 3 is 030 and above (spec 001
+  D-26).
 
 ## Lifecycle in a specify-first corpus
 
