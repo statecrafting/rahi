@@ -187,10 +187,10 @@
       "contentHash": "fe26eb923861e44c9063803526eb1c76eaa9efbc1d499d958bfa9f9b48f78ce4"
     },
     "deploy/n3-split/rahi.yaml": {
-      "contentHash": "3bc7882f095d5bf42225be3c7ecc86f1637f54c3e10398cb72dd828f811e81d3"
+      "contentHash": "7c60c38c9c5782f24516ed508f33d1c0980222de8ef5cba5d77dab5e4bf79d26"
     },
     "deploy/n3-split/rauthy.yaml": {
-      "contentHash": "00b76b1dd73cce93e67c14299d9bd19629097434b00b5a2bf94697db0cab9142"
+      "contentHash": "35002768fb1d8e2451aabfbed682cddfa40a316aab7c4b07da74551bc415641a"
     },
     "deploy/n3-split/services.yaml": {
       "contentHash": "09fce1bcf1f2db87548d4c4300a4166ff53c55336f41fef08c2b54980ce7b978"
@@ -261,6 +261,9 @@
     "docs/design/evidence/043-probes/README.md": {
       "contentHash": "c3a1607eb56fd093ca39a758258e6c9abf2d02a2b4b520813202ea347b238ddd"
     },
+    "docs/design/evidence/044-qualification/README.md": {
+      "contentHash": "ba42d091ec49f99b9eab23d2e642ff39fbcc42c1bdd66523753f900b7e314f37"
+    },
     "docs/design/evidence/048-probes/README.md": {
       "contentHash": "c2bf67e41938adbc7c441214c9af5fcea3fe29b73c5f6d9e892e2abd15afb4e6"
     },
@@ -271,7 +274,7 @@
       "contentHash": "f29ecfab602778e37107e96e8e5dd9e5891529179d7f48669c41adea2954b89f"
     },
     "scripts/k8s-validate.sh": {
-      "contentHash": "bb26160004ea8a9f4546d803e9762f701f718741eddc734ee99e7d054654b174"
+      "contentHash": "211bb5580aef3d2a2143572eb47e59079a4cd6909c1927e7c2bc3bff0ce84208"
     },
     "scripts/spec-dag.sh": {
       "contentHash": "84d4793c8a1a811ab25ce7d45b9a66d92364015883bd4a72c8741b9898ab1d05"

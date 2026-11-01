@@ -1,0 +1,3 @@
+deviation: first apply used TRUSTED_PROXIES 10.42.0.0/16 (wrong pod CIDR); corrected to 10.244.0.0/16 and rauthy-0/rahi-0 deleted at 00:36:06
+workaround: rauthy sts deleted --cascade=orphan and re-applied with podManagementPolicy Parallel at 2026-11-01T00:53:26Z
+secrets.yaml and TLS private keys deleted after teardown
