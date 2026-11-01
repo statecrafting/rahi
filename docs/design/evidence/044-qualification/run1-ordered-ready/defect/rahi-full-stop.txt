@@ -1,0 +1,18 @@
+2026-11-01T01:05:14Z scale rahi 0
+statefulset.apps/rahi scaled
+2026-11-01T01:06:01Z rahi gone; scale 3
+statefulset.apps/rahi scaled
+2026-11-01T01:08:32Z
+NAME     READY   STATUS    RESTARTS   AGE     IP            NODE                             NOMINATED NODE   READINESS GATES
+rahi-0   0/1     Running   0          2m30s   10.244.3.18   statecraft-pool-worker-worker2   <none>           <none>
+first-boot: keys present and verified; nothing generated
+NAME     READY   STATUS    RESTARTS   AGE     IP            NODE                             NOMINATED NODE   READINESS GATES
+rahi-0   0/1     Running   0          3m32s   10.244.3.18   statecraft-pool-worker-worker2   <none>           <none>
+  Normal   SuccessfulAttachVolume  3m14s                attachdetach-controller  AttachVolume.Attach succeeded for volume "pvc-0e35829c-af6c-4a39-bdca-f98bd11908c9"
+  Normal   Pulled                  3m13s                kubelet                  spec.containers{rahi}: Container image "ghcr.io/statecrafting/rahi:0.7.1@sha256:cbbceea4e3f27fcc9422af48b1a09725d0f7deabf65d89ffd777e4321b77c3ac" already present on machine and can be accessed by the pod
+  Normal   Created                 3m13s                kubelet                  spec.containers{rahi}: Container created
+  Normal   Started                 3m13s                kubelet                  spec.containers{rahi}: Container started
+  Warning  Unhealthy               68s (x25 over 3m8s)  kubelet                  spec.containers{rahi}: Startup probe failed: Get "http://10.244.3.18:8443/startupz": dial tcp 10.244.3.18:8443: connect: connection refused
+  Normal   Killing                 13s                  kubelet                  spec.containers{rahi}: Container rahi failed startup probe, will be restarted
+Error from server (BadRequest): previous terminated container "rahi" in pod "rahi-0" not found
+{"availableReplicas":0,"collisionCount":0,"currentReplicas":1,"currentRevision":"rahi-9f59b4c85","observedGeneration":3,"replicas":1,"updateRevision":"rahi-9f59b4c85","updatedReplicas":1}

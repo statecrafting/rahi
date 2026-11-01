@@ -1,0 +1,82 @@
+LB 157.180.88.116
+https / xff=none -> 404
+https / xff=127.0.0.1 -> 404
+https /healthz xff=none -> 200
+https /healthz xff=127.0.0.1 -> 200
+https /binding xff=none -> 403
+https /binding xff=127.0.0.1 -> 403
+https /metrics xff=none -> 403
+https /metrics xff=127.0.0.1 -> 403
+https /binding/ xff=none -> 404
+https /binding/ xff=127.0.0.1 -> 404
+https /metrics?x=1 xff=none -> 403
+https /metrics?x=1 xff=127.0.0.1 -> 403
+https /BINDING xff=none -> 404
+https /BINDING xff=127.0.0.1 -> 404
+https /%62inding xff=none -> 403
+https /%62inding xff=127.0.0.1 -> 403
+http / xff=none -> 308
+http / xff=127.0.0.1 -> 308
+http /healthz xff=none -> 308
+http /healthz xff=127.0.0.1 -> 308
+http /binding xff=none -> 308
+http /binding xff=127.0.0.1 -> 308
+http /metrics xff=none -> 308
+http /metrics xff=127.0.0.1 -> 308
+http /binding/ xff=none -> 308
+http /binding/ xff=127.0.0.1 -> 308
+http /metrics?x=1 xff=none -> 308
+http /metrics?x=1 xff=127.0.0.1 -> 308
+http /BINDING xff=none -> 308
+http /BINDING xff=127.0.0.1 -> 308
+http /%62inding xff=none -> 308
+http /%62inding xff=127.0.0.1 -> 308
+== https / body:
+HTTP/2 404 
+date: Sun, 01 Nov 2026 00:43:03 GMT
+content-length: 0
+cache-control: no-cache
+set-cookie: __Host-csrf=54d3AdOHq9-vBJncgIPPmQLRw6pJfQj3GCWAwZDTAK8; Path=/; SameSite=Lax; Secure
+content-security-policy: default-src 'self'; frame-ancestors 'none'
+x-content-type-options: nosniff
+referrer-policy: strict-origin-when-cross-origin
+permissions-policy: camera=(), microphone=(), geolocati
+== https /binding/ body:
+HTTP/2 404 
+date: Sun, 01 Nov 2026 00:43:03 GMT
+content-length: 0
+cache-control: no-cache
+set-cookie: __Host-csrf=FALRyFtIWeczHZAOSYGb8LIxKlkX9scQm9eWI_t9RAw; Path=/; SameSite=Lax; Secure
+content-security-policy: default-src 'self'; frame-ancestors 'none'
+x-content-type-options: nosniff
+referrer-policy: strict-origin-when-cross-origin
+permissions-policy: camera=(), microphone=(), geolocati
+== https /BINDING body:
+HTTP/2 404 
+date: Sun, 01 Nov 2026 00:43:04 GMT
+content-length: 0
+cache-control: no-cache
+set-cookie: __Host-csrf=NSUM107Pit3u_dyipRK75QnHG3c0MMvXbA3BososC0c; Path=/; SameSite=Lax; Secure
+content-security-policy: default-src 'self'; frame-ancestors 'none'
+x-content-type-options: nosniff
+referrer-policy: strict-origin-when-cross-origin
+permissions-policy: camera=(), microphone=(), geolocati
+== https /binding body:
+HTTP/2 403 
+date: Sun, 01 Nov 2026 00:43:04 GMT
+content-type: text/html
+content-length: 146
+strict-transport-security: max-age=31536000; includeSubDomains
+
+<html>
+<head><title>403 Forbidden</title></head>
+<body>
+<center><h1>403 Forbidden</h1></center>
+<hr><center>nginx</center>
+</body>
+</html>
+
+== http /binding redirect:
+https://rahi-qual.invalid/binding
+== in-cluster /binding from rahi pod itself (control):
+200

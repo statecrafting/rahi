@@ -727,6 +727,14 @@ struct IdentityParts {
     operator_revoke: Router,
 }
 
+/// Whether this replica provisions the backup admin in a remote cell (spec
+/// 044 D-14). The StatefulSet always recreates ordinal 0, which is node 1,
+/// so the account is provisioned once a node 1 composes, and never by two
+/// replicas at once.
+fn provisions_backup_admin(node_id: u64) -> bool {
+    node_id == 1
+}
+
 /// Make sure the remote Rauthy holds the backup admin this key set's passkey
 /// belongs to (spec 037 B-1, spec 044 D-13), through the back channel.
 async fn backup_admin(
@@ -776,10 +784,21 @@ async fn identity(inputs: IdentityInputs, budget: Duration) -> Result<IdentityPa
         // bootstrap is 037 B-1's backup admin, without which `rahi backup`
         // cannot take Rauthy's half. A remote cell provisions it here, and,
         // as under `supervise`, an account that cannot be provisioned is
-        // reported rather than fatal (spec 044 D-13).
+        // reported rather than fatal (spec 044 D-13). Only node 1 does it:
+        // the replicas start in parallel, and two provisioning one account
+        // at once can strand it half converted (spec 044 D-14).
+        let backup_admin = if provisions_backup_admin(kernel.node_id()) {
+            backup_admin(&config, &keys).await
+        } else {
+            eprintln!(
+                "serve: the backup admin is provisioned by node 1; node {} leaves it",
+                kernel.node_id()
+            );
+            Ok(None)
+        };
         let provisioned = rahi_ops::supervise::ReadySteps {
             rauthy_snapshot_applied: None,
-            backup_admin: backup_admin(&config, &keys).await,
+            backup_admin,
         };
         let said = provisioned.render();
         if !said.is_empty() {
@@ -1724,5 +1743,13 @@ mod tests {
             err.message().contains("404"),
             "it says what the slot would do: {err}"
         );
+    }
+
+    #[test]
+    fn only_node_one_provisions_the_backup_admin() {
+        assert!(provisions_backup_admin(1));
+        for node in [2, 3, 4] {
+            assert!(!provisions_backup_admin(node), "node {node} leaves it");
+        }
     }
 }

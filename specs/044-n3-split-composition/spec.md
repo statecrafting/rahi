@@ -6,7 +6,7 @@ kind: feature
 domain: ops
 created: "2026-09-23"
 authors: ["Bartek Kus"]
-implementation: in-progress
+implementation: complete
 risk: critical
 wave: 3
 depends_on:
@@ -201,9 +201,10 @@ stays as written and governs N=1 unchanged.
   hiqlite proposal 034 in `bartekus/hiqlite`, not by rahi spec 034. It
   does not exist in any published release; B-11 is therefore an
   obligation this spec records and cannot satisfy until that release is
-  adopted.
+  adopted. Moved to spec 050 by D-15.
 - **B-12 (archive identity).** The cell archive names both images, both
   applied log ids and both digests in one manifest (proposal D-7, R-g).
+  Moved to spec 050 by D-15.
 
 ## 4. Functional requirements
 
@@ -505,6 +506,84 @@ establishes N=3 support.
   excludes; and failing the composition, which would hold a cell unready
   over an account an operator can repair only through Rauthy's admin UI.
 
+### Decisions (2026-10-31)
+
+- **D-14 (2026-10-31, owner decision; `Parallel` from the first boot,
+  P-3).** P-3 chose `OrderedReady` for first bootstrap until hiqlite F-118
+  is repaired, and `Parallel` afterwards. AC-4's run on v0.7.1 found that
+  under `OrderedReady` neither StatefulSet recovers from a full stop:
+  scaled to 0 and back to 3, pod 0 starts alone, its hiqlite waits for a
+  Raft leader that needs a quorum, pods 1 and 2 are never created because
+  pod 0 never becomes ready, and the startup probe kills pod 0 every
+  180 s. Rauthy and rahi both showed it. "Afterwards" also had no
+  mechanism: Kubernetes refuses a change of `podManagementPolicy` on a
+  live StatefulSet, and the only way across is deleting it with
+  `--cascade=orphan` and applying it again, which is how the cell was
+  recovered. Any full-cell restart reaches this state, including B-11's
+  scale-to-0 export. The owner decided on 2026-10-31 to ship `Parallel` on
+  both StatefulSets from the first boot. `scripts/k8s-validate.sh` refuses
+  a split render where either is not `Parallel`, and a fixture setting
+  Rauthy's back to `OrderedReady` must be refused.
+  D-13 relied on `OrderedReady` to keep two replicas from provisioning the
+  backup admin at once. Under `Parallel` that holds no longer, and an
+  interleaving of two `ensure_backup_admin` runs can leave the account
+  password-typed with a passkey this key set did not finish converting,
+  which `ensure_backup_admin` then refuses as a conflict that only
+  Rauthy's admin UI repairs. The remote composition now provisions it on
+  node 1 only (`provisions_backup_admin`, unit-tested), and every other
+  node says on stderr that it leaves it. The StatefulSet always recreates
+  ordinal 0, which is node 1, so the account is provisioned once that node
+  composes. The client registration and secret custody of D-5 stay on
+  every node: a replica that loses the creation race fails that attempt,
+  the composition retries it, and the retry reads the existing secret.
+  Rejected: a store lease around provisioning, which needs the
+  coordination tables a cell need not link (`Cell::migration_sets` is
+  empty by default, 046 B-13); and keeping
+  `OrderedReady` with a recovery runbook, which turns every full restart
+  into an operator procedure.
+- **D-15 (2026-10-31, owner decision; B-11 and B-12 move to spec 050).**
+  B-11 waits on hiqlite's offline export entry point and B-12 on an
+  applied log id recorded with each backup (D-12), and no hiqlite release
+  carries either. The owner decided on 2026-10-31 to move both into a
+  follow-up spec, so that this spec completes on what it can evidence.
+  Spec 050 carries them as its B-1 and B-2 without change of requirement.
+  B-11's and B-12's text stays here, marked moved, so the record shows
+  what was asked.
+
+- **D-16 (2026-11-01, AC-3, AC-4 and B-8's grace, evidenced).** Both
+  operator checks ran on release v0.7.1 (rahi
+  `sha256:cbbceea4e3f27fcc9422af48b1a09725d0f7deabf65d89ffd777e4321b77c3ac`,
+  Rauthy `0.36.2-patched.3`) on the five-node
+  Statecraft cluster; `docs/design/evidence/044-qualification/` holds the
+  captures, timings and procedure. AC-3: every stream on Rauthy's port,
+  captured at the rahi leader and at all three Rauthy pods through
+  discovery, JWKS, token, admin and backup requests, is TLS 1.3 under
+  Rauthy's native TLS with the mounted CA (P-1), and no capture holds
+  plaintext HTTP. AC-4: a Rauthy outage made every rahi pod unready on
+  `identity` and restarted none; each node was drained in turn with no PDB
+  refusal; and both StatefulSets recovered from a full stop once D-14's
+  `Parallel` applied. The drain was emulated per namespace (cordon, then
+  eviction of this cell's pods only), because the cluster is shared; the
+  eviction path is the one `kubectl drain` uses, so PDBs bound. The
+  cluster has one zone, so zone spread went unexercised. B-8's grace: the
+  measured single-node stop is 12 s for rahi and 20 s for Rauthy, every
+  exit clean, so `terminationGracePeriodSeconds` stays 60 on both, which
+  is above the measured maximum with 40 s of margin, and is no longer a
+  placeholder. One observation is recorded, not resolved: in the `Parallel`
+  rerun, one rahi replica took 043 B-7's terminal store exit (`raft
+  stopped`) 11 s into its first boot after a full stop and was ready 15 s
+  after the kubelet restarted it. B-4 is not at stake, since the exit is
+  the store's and not Rauthy's, and this spec does not change 043 B-7. Its
+  cause is undiagnosed.
+
+### Status (2026-11-01)
+
+Complete. AC-1 and AC-2 were verified with the overlay and the remote
+identity (status of 2026-10-10 below), AC-3 and AC-4 by D-16 on v0.7.1,
+and B-8's grace is measured. B-11 and B-12 moved to spec 050 (D-15). The
+obligations of 040, 041, 042 and 032 AC-2 that D-1 names stay with those
+specs.
+
 ### Status (2026-10-10)
 
 The remote identity landed first (#136, with D-9's fix in #137); the
@@ -529,10 +608,8 @@ session can close here:
 
 ## Verification
 
-These commands are the acceptance gate for a future implementation of this
-draft. The declared `crates/rahi-cli/tests/split.rs` is not implemented yet;
-merging this draft neither executes that future gate nor claims acceptance.
-AC-3 and AC-4 require separate operator evidence on a named release.
+These commands are the acceptance gate. AC-3 and AC-4 are operator
+evidence on a named release, recorded by D-16, and are not run here.
 
 ```verify:cli
 scripts/k8s-validate.sh

@@ -1,0 +1,77 @@
+== rahi-0
+ ascii HTTP markers in any TCP payload: 0
+ first payload byte per stream (16=TLS handshake, 17=TLS app data):
+   stream 0: 1703030022
+   stream 1: 16030105ed
+ TLS versions negotiated (server hello):       1 0x0304 
+ SNI in client hellos:       1 rauthy-internal.rahi-044-qual.svc.cluster.local 
+== rauthy-0
+ ascii HTTP markers in any TCP payload: 0
+ first payload byte per stream (16=TLS handshake, 17=TLS app data):
+   stream 0: 1703030022
+   stream 10: 16030105d8
+   stream 11: 160301011f
+   stream 12: 160301011f
+   stream 13: 160301011f
+   stream 14: 16030105d8
+   stream 15: 16030105d8
+   stream 16: 16030105d8
+   stream 17: 16030105d8
+   stream 18: 16030105d8
+   stream 1: 16030105d8
+   stream 2: 16030105d8
+   stream 3: 16030105d8
+   stream 4: 16030105d8
+   stream 5: 16030105d8
+   stream 6: 16030105d8
+   stream 7: 16030105d8
+   stream 8: 16030105d8
+   stream 9: 16030105d8
+ TLS versions negotiated (server hello):      18 0x0304 
+ SNI in client hellos:      15        3 rauthy-internal.rahi-044-qual.svc.cluster.local 
+== rauthy-1
+ ascii HTTP markers in any TCP payload: 0
+ first payload byte per stream (16=TLS handshake, 17=TLS app data):
+   stream 0: 16030105d8
+   stream 10: 16030105d8
+   stream 11: 16030105d8
+   stream 12: 16030105d8
+   stream 13: 160301011f
+   stream 14: 160301011f
+   stream 15: 16030105d8
+   stream 16: 16030105d8
+   stream 17: 16030105d8
+   stream 1: 16030105d8
+   stream 2: 1703030022
+   stream 3: 16030105d8
+   stream 4: 16030105d8
+   stream 5: 16030105d8
+   stream 6: 16030105d8
+   stream 7: 16030105d8
+   stream 8: 16030105d8
+   stream 9: 16030105d8
+ TLS versions negotiated (server hello):      17 0x0304 
+ SNI in client hellos:      15        2 rauthy-internal.rahi-044-qual.svc.cluster.local 
+== rauthy-2
+ ascii HTTP markers in any TCP payload: 0
+ first payload byte per stream (16=TLS handshake, 17=TLS app data):
+   stream 0: 1703030022
+   stream 10: 16030105d8
+   stream 11: 16030105d8
+   stream 12: 16030105d8
+   stream 13: 16030105d8
+   stream 14: 160301011f
+   stream 15: 16030105d8
+   stream 16: 16030105d8
+   stream 17: 16030105d8
+   stream 1: 16030105d8
+   stream 2: 16030105d8
+   stream 3: 46a0581160
+   stream 4: 16030105d8
+   stream 5: 16030105d8
+   stream 6: 16030105d8
+   stream 7: 16030105d8
+   stream 8: 16030105d8
+   stream 9: 16030105d8
+ TLS versions negotiated (server hello):      17 0x0304 
+ SNI in client hellos:      15        1 rauthy-internal.rahi-044-qual.svc.cluster.local 

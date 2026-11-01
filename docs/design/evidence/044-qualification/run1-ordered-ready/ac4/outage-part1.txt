@@ -1,0 +1,17 @@
+== 00:43:43 before
+rahi-0 healthz= readyz={"ledger":"verified","status":"ready","store":"up"} 200
+rahi-1 healthz= readyz={"ledger":"verified","status":"ready","store":"up"} 200
+rahi-2 healthz= readyz={"ledger":"verified","status":"ready","store":"up"} 200
+== 2026-11-01T00:43:53Z scale rauthy 0
+statefulset.apps/rauthy scaled
+rauthy gone at 00:46:46
+== 00:47:11 during
+rahi-0 healthz= readyz={"component":"identity","error":"upstream","message":"rauthy does not answer at https://rauthy-internal.rahi-044-qual.svc.cluster.local:8443/auth/v1/ready: error sending request for url (https://rauthy-internal.rahi-044-qual.svc.cluster.local:8443/auth/v1/ready)","status":"not_ready"} 503
+rahi-1 healthz= readyz={"component":"identity","error":"upstream","message":"rauthy does not answer at https://rauthy-internal.rahi-044-qual.svc.cluster.local:8443/auth/v1/ready: error sending request for url (https://rauthy-internal.rahi-044-qual.svc.cluster.local:8443/auth/v1/ready)","status":"not_ready"} 503
+rahi-2 healthz= readyz={"component":"identity","error":"upstream","message":"rauthy does not answer at https://rauthy-internal.rahi-044-qual.svc.cluster.local:8443/auth/v1/ready: error sending request for url (https://rauthy-internal.rahi-044-qual.svc.cluster.local:8443/auth/v1/ready)","status":"not_ready"} 503
+N        READY   RESTARTS   NODE                             START
+rahi-0   false   0          statecraft-master3               2026-11-01T00:36:12Z
+rahi-1   false   0          statecraft-pool-worker-worker2   2026-11-01T00:40:26Z
+rahi-2   false   0          statecraft-pool-worker-worker1   2026-11-01T00:37:46Z
+
+[exited with code 0]

@@ -1,0 +1,14 @@
+deletion_requested (deletionTimestamp - grace) | pod | node | grace | container_finished | stop_s | exit | reason
+2026-11-01T00:43:54+00:00 | rauthy-2 | statecraft-master2 | 60 | 2026-11-01T00:44:14Z | 20.0 | 0 | Completed
+2026-11-01T00:44:55+00:00 | rauthy-1 | statecraft-master1 | 60 | 2026-11-01T00:45:15Z | 20.0 | 0 | Completed
+2026-11-01T00:45:56+00:00 | rauthy-0 | statecraft-pool-worker-worker1 | 60 | 2026-11-01T00:46:16Z | 20.0 | 0 | Completed
+2026-11-01T00:54:53+00:00 | rahi-0 | statecraft-master3 | 60 | 2026-11-01T00:55:05Z | 12.0 | 0 | Completed
+2026-11-01T00:56:55+00:00 | rauthy-1 | None | 60 | 2026-11-01T00:57:15Z | 20.0 | 0 | Completed
+2026-11-01T00:58:00+00:00 | rahi-1 | statecraft-pool-worker-worker2 | 60 | 2026-11-01T00:58:12Z | 12.0 | 0 | Completed
+2026-11-01T00:59:11+00:00 | rahi-2 | statecraft-pool-worker-worker1 | 60 | 2026-11-01T00:59:23Z | 12.0 | 0 | Completed
+2026-11-01T01:00:24+00:00 | rauthy-1 | None | 60 | 2026-11-01T01:00:44Z | 20.0 | 0 | Completed
+2026-11-01T01:01:36+00:00 | rahi-0 | None | 60 | 2026-11-01T01:01:48Z | 12.0 | 0 | Completed
+2026-11-01T01:02:38+00:00 | rauthy-0 | None | 60 | 2026-11-01T01:02:58Z | 20.0 | 0 | Completed
+2026-11-01T01:03:43+00:00 | rauthy-2 | None | 60 | 2026-11-01T01:04:03Z | 20.0 | 0 | Completed
+rahi: n=4 max=12s min=12s (finishedAt has 1 s resolution)
+rauthy: n=7 max=20s min=20s (finishedAt has 1 s resolution)
