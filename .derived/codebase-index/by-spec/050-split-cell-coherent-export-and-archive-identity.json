@@ -14,20 +14,7 @@
       "030-operational-verbs",
       "044-n3-split-composition"
     ],
-    "implementingPaths": [
-      {
-        "path": "crates/rahi-ops/src/archive.rs",
-        "source": "spec-edge"
-      },
-      {
-        "path": "crates/rahi-ops/src/backup.rs",
-        "source": "spec-edge"
-      },
-      {
-        "path": "deploy/n3-split/",
-        "source": "spec-edge"
-      }
-    ],
+    "implementingPaths": [],
     "resolvedUnits": [
       {
         "locations": [],
@@ -41,11 +28,24 @@
       {
         "locations": [
           {
+            "file": "deploy/n3-split"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "directory",
+          "path": "deploy/n3-split"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rahi-ops/src/archive.rs"
           }
         ],
-        "ownership": true,
-        "sourceField": "extends",
+        "ownership": false,
+        "sourceField": "references",
         "unit": {
           "kind": "file",
           "path": "crates/rahi-ops/src/archive.rs"
@@ -57,24 +57,11 @@
             "file": "crates/rahi-ops/src/backup.rs"
           }
         ],
-        "ownership": true,
-        "sourceField": "extends",
+        "ownership": false,
+        "sourceField": "references",
         "unit": {
           "kind": "file",
           "path": "crates/rahi-ops/src/backup.rs"
-        }
-      },
-      {
-        "locations": [
-          {
-            "file": "deploy/n3-split/"
-          }
-        ],
-        "ownership": true,
-        "sourceField": "extends",
-        "unit": {
-          "kind": "file",
-          "path": "deploy/n3-split/"
         }
       },
       {
@@ -95,5 +82,5 @@
     "specStatus": "draft"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "61c9796e08ba70640e311eb5a49f4dac82f97b93e789e1651e9c3ecb3df619aa"
+  "shardHash": "6dfd16763e4cec9c30cbd4f0da38939d960db40119264f78ef6fdb682f29d20e"
 }
