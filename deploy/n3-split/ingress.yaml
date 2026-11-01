@@ -8,9 +8,6 @@ metadata:
     cert-manager.io/cluster-issuer: letsencrypt
     nginx.ingress.kubernetes.io/proxy-body-size: 16m
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-    nginx.ingress.kubernetes.io/server-snippet: |
-      location = /metrics { return 404; }
-      location = /binding { return 404; }
 spec:
   ingressClassName: nginx
   tls:
@@ -23,6 +20,43 @@ spec:
         paths:
           - path: /
             pathType: Prefix
+            backend:
+              service:
+                name: rahi
+                port:
+                  name: http
+---
+# /metrics and /binding answer 403 at the edge (spec 040 D-8). A second
+# Ingress with Exact paths outranks the `/` Prefix above on ingress-nginx,
+# and `denylist-source-range` covering every address refuses them whatever
+# client address the controller derives, so no forwarded header can reopen
+# them. It replaces a `server-snippet`, which ingress-nginx 1.9 and later
+# refuse by default; another ingress class needs its equivalent.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rahi-edge-closed
+  annotations:
+    nginx.ingress.kubernetes.io/denylist-source-range: "0.0.0.0/0,::/0"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - cell.example.com
+      secretName: rahi-tls
+  rules:
+    - host: cell.example.com
+      http:
+        paths:
+          - path: /metrics
+            pathType: Exact
+            backend:
+              service:
+                name: rahi
+                port:
+                  name: http
+          - path: /binding
+            pathType: Exact
             backend:
               service:
                 name: rahi

@@ -69,6 +69,32 @@ containers_per_pod() {
   ' "$1"
 }
 
+# Spec 040 B-12 and D-8: /metrics and /binding stay off the public edge.
+# An Ingress may name either only as an Exact path on an Ingress that denies
+# every source address, and a `/` prefix needs such an Ingress closing both.
+edge_closed() {
+  closes=""
+  for ing in $(awk '/^---/ { k = 0 } /^kind: Ingress$/ { k = 1 }
+                    k && /^  name: / { print $2; k = 0 }' "$out"); do
+    docs_of "$out" Ingress "$ing" > "$tmp/ing-$ing.yaml"
+    denies=""
+    grep -Eq "denylist-source-range: [\"']?0\.0\.0\.0/0,::/0[\"']?$" "$tmp/ing-$ing.yaml" && denies=1
+    both=1
+    for p in /metrics /binding; do
+      grep -q "path: $p$" "$tmp/ing-$ing.yaml" || { both=""; continue; }
+      [ -n "$denies" ] \
+        || fail "the Ingress $ing routes $p; it is an in-cluster document only"
+      awk -v p="$p" '$0 ~ "path: " p "$" { getline; if ($0 !~ /pathType: Exact$/) bad = 1 }
+                     END { exit bad }' "$tmp/ing-$ing.yaml" \
+        || fail "the Ingress $ing closes $p with a non-Exact path, which the / prefix outranks"
+    done
+    [ -n "$denies" ] && [ -n "$both" ] && closes=1
+  done
+  if grep -q "path: /$" "$tmp/ingress.yaml" && [ -z "$closes" ]; then
+    fail "the Ingress routes / and does not close /binding and /metrics at the edge"
+  fi
+}
+
 check_render() {
   dir=$1
   out=$tmp/$(echo "$dir" | tr '/' '_').yaml
@@ -128,22 +154,10 @@ check_render() {
        END { if (!found) exit 1 }' "$tmp/sts.yaml" \
     || fail "/data/keys is not mounted read-only"
 
-  # /metrics is off the Ingress (B-3).
+  # /metrics is off the Ingress (B-3), and so is /binding (spec 040 B-12).
   docs_of "$out" Ingress > "$tmp/ingress.yaml"
   [ -s "$tmp/ingress.yaml" ] || fail "no Ingress in the render"
-  if grep -q "path: /metrics" "$tmp/ingress.yaml"; then
-    fail "the Ingress routes /metrics; it is scraped in-cluster only"
-  fi
-
-  # Spec 040 B-12: /binding is off the Ingress like /metrics. A route that
-  # names it is refused, and so is a `/` prefix the edge does not close it on.
-  if grep -q "path: /binding" "$tmp/ingress.yaml"; then
-    fail "the Ingress routes /binding; it is an in-cluster document only"
-  fi
-  if grep -q "path: /$" "$tmp/ingress.yaml" \
-    && ! grep -q "location = /binding { return 404; }" "$tmp/ingress.yaml"; then
-    fail "the Ingress routes / and does not close /binding at the edge"
-  fi
+  edge_closed
 
   # Spec 040 B-12: a declared RAHI_ARTIFACT_IMAGE names the image the pods
   # run. Where a container image is pinned by digest, the declaration must
@@ -256,6 +270,7 @@ check_split() {
   if grep -q "name: rauthy" "$tmp/ingress.yaml"; then
     fail "an Ingress routes to rauthy; users reach it only through rahi's origin"
   fi
+  edge_closed
 
   # The back channel is https to rauthy-internal (B-1, B-2).
   url=$(grep "^  RAHI_RAUTHY_URL: " "$out" | awk '{print $2}')
@@ -437,6 +452,42 @@ patches:
 YAML
   echo "k8s-validate: FR-009 fixture (/binding routed publicly must be refused)"
   refused "routes /binding"
+
+  mkdir -p "$fixture"
+  cat > "$fixture/kustomization.yaml" <<'YAML'
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../k8s
+patches:
+  - target:
+      kind: Ingress
+      name: rahi-edge-closed
+    patch: |-
+      - op: remove
+        path: /metadata/annotations/nginx.ingress.kubernetes.io~1denylist-source-range
+YAML
+  echo "k8s-validate: 040 D-8 fixture (an edge closure that denies no address must be refused)"
+  refused "the Ingress rahi-edge-closed routes /metrics; it is an in-cluster document only"
+  # The closure's annotation must not vouch for another Ingress: a path the
+  # main Ingress gains is judged on that Ingress's own annotations.
+  mkdir -p "$fixture"
+  cat > "$fixture/kustomization.yaml" <<'YAML'
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../k8s
+patches:
+  - target:
+      kind: Ingress
+      name: rahi
+    patch: |-
+      - op: add
+        path: /spec/rules/0/http/paths/-
+        value: {path: /binding, pathType: Exact, backend: {service: {name: rahi, port: {name: http}}}}
+YAML
+  echo "k8s-validate: 040 D-8 fixture (the main Ingress routing /binding must be refused)"
+  refused "the Ingress rahi routes /binding; it is an in-cluster document only"
 
   mkdir -p "$fixture"
   digest=0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9

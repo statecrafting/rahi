@@ -41,6 +41,7 @@ extends:
   - { spec: "032-cluster-topology", unit: "deploy/k8s/ingress.yaml", nature: additive }
   - { spec: "032-cluster-topology", unit: "scripts/k8s-validate.sh", nature: additive }
   - { spec: "032-cluster-topology", unit: "deploy/README.md", nature: additive }
+  - { spec: "044-n3-split-composition", unit: "deploy/n3-split/", nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/01-consumer-contract.md" }, role: context }
   - { unit: { kind: file, path: "docs/design/02-operational-prerequisites.md" }, role: context }
@@ -957,6 +958,35 @@ itself.
   The step runs only on pushes to `main` and on tags, so AC-6 is first
   evidenced by the push build after this change merges; 040 flips to
   `complete` only after that run passes.
+
+- **D-8 (2026-10-31, owner decision; the edge closure answers 403).** B-12
+  says the Ingress answers `404` for `/binding` as it does for `/metrics`,
+  and 032's base got that `404` from an ingress-nginx `server-snippet`.
+  ingress-nginx 1.9 and later default `allow-snippet-annotations` to false,
+  and the admission webhook refuses the whole Ingress, which was measured on
+  2026-10-31 with a server-side dry run against ingress-nginx v1.15.1 on the
+  Statecraft cluster. The shipped manifests therefore could not be applied
+  there at all. No snippet-free mechanism on that controller answers `404`
+  without a second workload, which 032's single-container cell rules out.
+  The owner decided on 2026-10-31 that `403` satisfies B-12: what B-12
+  protects is that the document is unreachable from outside the cluster,
+  and the status code is incidental. Both `deploy/k8s/ingress.yaml` and
+  044's `deploy/n3-split/ingress.yaml` now carry a second Ingress,
+  `rahi-edge-closed`, that names `/metrics` and `/binding` as `Exact`
+  paths, which outrank the `/` prefix, under
+  `nginx.ingress.kubernetes.io/denylist-source-range: 0.0.0.0/0,::/0`.
+  The server-side dry run admits it. `scripts/k8s-validate.sh` refuses an
+  Ingress that names either path without that deny, a closure on a
+  non-`Exact` path, and a `/` prefix with no closure, and a new fixture
+  dropping the deny must be refused. B-12's text is left as written, so
+  the record shows what was asked. Rejected: `whitelist-source-range:
+  127.0.0.1/32`, the mechanism Statecraft's own cell uses, because a
+  controller run with `use-forwarded-headers` derives the client address
+  from a header the client writes, so the allow list can be satisfied from
+  outside. A deny over every address cannot be, whatever address the
+  controller derives. Also rejected: routing the paths to a Service with
+  no endpoints, which answers `503` and reads as an outage rather than a
+  refusal.
 
 ### Owner choices at ratification (resolved by D-3)
 
