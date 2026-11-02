@@ -97,7 +97,7 @@ each property the single container gave for free:
   policy cannot be changed on a live StatefulSet. Only node 1 provisions
   the backup admin, so parallel starts never provision it twice.
   `terminationGracePeriodSeconds` is 60 on both, set from AC-4's measured
-  single-node stop at N=3 (rahi 12 s, Rauthy about 21 s) plus margin.
+  single-node stop at N=3 (rahi 12 s, Rauthy 20 s) plus margin.
 - **Migrations (B-9).** The `rahi-migrate` Job runs `rahi migrate
   --adopt-manifest` (manifest adoption, migrations and the epoch) before the
   rahi StatefulSet rolls, as in the co-located layout.
