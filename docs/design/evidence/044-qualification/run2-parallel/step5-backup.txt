@@ -1,0 +1,11 @@
+== rahi-0
+error: stale: backup is leader-only; this node is a follower
+command terminated with exit code 2
+rc=0
+== rahi-1
+error: stale: backup is leader-only; this node is a follower
+command terminated with exit code 2
+rc=0
+== rahi-2
+backup: rahi-backup-20261101T033013Z.tar.age (831981 bytes, 9 parts) at /data/backups/rahi-backup-20261101T033013Z.tar.age
+rc=0

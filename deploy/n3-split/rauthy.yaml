@@ -10,7 +10,8 @@ metadata:
 spec:
   serviceName: rauthy-hl
   replicas: 3
-  podManagementPolicy: OrderedReady
+  # Parallel, for the same reason as rahi's (spec 044 D-14).
+  podManagementPolicy: Parallel
   selector:
     matchLabels:
       app.kubernetes.io/name: rauthy
@@ -65,8 +66,8 @@ spec:
               mountPath: /tls
               readOnly: true
           # Liveness waits for the first health answer: a pod still binding
-          # TLS and joining its hiqlite peers under OrderedReady is not dead,
-          # and killing it would hold the set at rauthy-0.
+          # TLS and joining its hiqlite peers is not dead, and killing it
+          # would hold the cluster below quorum.
           startupProbe:
             httpGet:
               path: /auth/v1/health

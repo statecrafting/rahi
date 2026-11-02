@@ -1,0 +1,8 @@
+== 00:49:10 outage held
+rahi-0 healthz=200 startupz=200 readyz=503
+rahi-1 healthz=200 startupz=200 readyz=503
+rahi-2 healthz=200 startupz=200 readyz=503
+N        READY   RESTARTS   NODE                             START
+rahi-0   false   0          statecraft-master3               2026-11-01T00:36:12Z
+rahi-1   false   0          statecraft-pool-worker-worker2   2026-11-01T00:40:26Z
+rahi-2   false   0          statecraft-pool-worker-worker1   2026-11-01T00:37:46Z

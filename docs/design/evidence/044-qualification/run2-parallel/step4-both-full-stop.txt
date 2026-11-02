@@ -1,0 +1,19 @@
+== 03:28:37 scale rahi 0 and rauthy 0
+statefulset.apps/rahi scaled
+statefulset.apps/rauthy scaled
+all terminated at 03:28:53
+== 03:28:53 scale both 3
+statefulset.apps/rahi scaled
+statefulset.apps/rauthy scaled
+rauthy 3/3 at 03:29:28, 35 s
+rahi=3/3 rauthy=3/3 at 03:29:53, 58 s after scale-up
+03:29:54 rahi-0 healthz=200 readyz={"ledger":"verified","status":"ready","store":"up"}
+03:29:55 rahi-1 healthz=200 readyz={"ledger":"verified","status":"ready","store":"up"}
+03:29:56 rahi-2 healthz=200 readyz={"ledger":"verified","status":"ready","store":"up"}
+rahi-0               true    0     statecraft-master3
+rahi-1               true    0     statecraft-master1
+rahi-2               true    0     statecraft-pool-worker-worker1
+rahi-migrate-gdxtc   false   0     statecraft-pool-worker-worker1
+rauthy-0             true    0     statecraft-pool-worker-worker2
+rauthy-1             true    0     statecraft-master2
+rauthy-2             true    0     statecraft-master3

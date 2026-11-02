@@ -226,6 +226,13 @@ check_split() {
   [ -s "$tmp/rahi.yaml" ] || fail "no StatefulSet named rahi in the split layout"
   [ -s "$tmp/rauthy.yaml" ] || fail "no StatefulSet named rauthy in the split layout"
 
+  # Both start their pods in parallel (D-14): under OrderedReady a full stop
+  # never recovers, since pod 0 waits for a quorum of peers never created.
+  for set in rahi rauthy; do
+    grep -q "^  podManagementPolicy: Parallel$" "$tmp/$set.yaml" \
+      || fail "the $set StatefulSet is not podManagementPolicy Parallel; a full stop would never recover"
+  done
+
   # One container per pod in each (no supervisor, no sidecar).
   for n in $(containers_per_pod "$out"); do
     [ "$n" -eq 1 ] || fail "a pod spec declares $n containers; each pod runs one"
@@ -566,6 +573,16 @@ YAML
       - op: add
         path: /spec/ingress/1/from/0
         value: {podSelector: {matchLabels: {app.kubernetes.io/name: rauthy}}}'
+  split_fixture "rahi StatefulSet is not podManagementPolicy Parallel" "an OrderedReady rahi" '  - target: {kind: StatefulSet, name: rahi}
+    patch: |-
+      - op: replace
+        path: /spec/podManagementPolicy
+        value: OrderedReady'
+  split_fixture "rauthy StatefulSet is not podManagementPolicy Parallel" "an OrderedReady rauthy" '  - target: {kind: StatefulSet, name: rauthy}
+    patch: |-
+      - op: replace
+        path: /spec/podManagementPolicy
+        value: OrderedReady'
   split_fixture "maxUnavailable 1" "a PDB of two" '  - target: {kind: PodDisruptionBudget, name: rauthy}
     patch: |-
       - op: replace

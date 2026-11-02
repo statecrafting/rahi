@@ -91,10 +91,13 @@ each property the single container gave for free:
   zone spread when the cluster has zones, one `ReadWriteOnce` claim per
   replica, node id equal to the ordinal plus one (Rauthy reads it as
   `HQL_NODE_ID_FROM=k8s`), and Rauthy's cache on disk.
-  `podManagementPolicy: OrderedReady` holds for first bootstrap until
-  hiqlite F-118 is repaired (P-3). `terminationGracePeriodSeconds` is 60
-  on both, a placeholder: B-8 sets it from a measured single-node stop at
-  N=3 plus margin, and that measurement is AC-4's.
+  `podManagementPolicy: Parallel` on both from the first boot (D-14): under
+  `OrderedReady` a full stop of either set never recovered, because pod 0
+  waits for a Raft quorum its peers are never created to give it, and the
+  policy cannot be changed on a live StatefulSet. Only node 1 provisions
+  the backup admin, so parallel starts never provision it twice.
+  `terminationGracePeriodSeconds` is 60 on both, set from AC-4's measured
+  single-node stop at N=3 (rahi 12 s, Rauthy 20 s) plus margin.
 - **Migrations (B-9).** The `rahi-migrate` Job runs `rahi migrate
   --adopt-manifest` (manifest adoption, migrations and the epoch) before the
   rahi StatefulSet rolls, as in the co-located layout.

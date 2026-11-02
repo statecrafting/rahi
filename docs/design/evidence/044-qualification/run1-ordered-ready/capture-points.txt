@@ -1,0 +1,7 @@
+rauthy-internal ClusterIP 10.43.227.46
+rahi-0 10.244.0.13 statecraft-master3
+rahi-1 10.244.3.15 statecraft-pool-worker-worker2
+rahi-2 10.244.4.12 statecraft-pool-worker-worker1
+rauthy-0 10.244.4.11 statecraft-pool-worker-worker1
+rauthy-1 10.244.1.16 statecraft-master1
+rauthy-2 10.244.2.5 statecraft-master2

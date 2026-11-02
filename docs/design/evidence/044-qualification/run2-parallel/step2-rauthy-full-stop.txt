@@ -1,0 +1,33 @@
+== before
+03:24:32 rahi-0 healthz=200 readyz={"ledger":"verified","status":"ready","store":"up"}
+03:24:34 rahi-1 healthz=200 readyz={"ledger":"verified","status":"ready","store":"up"}
+03:24:35 rahi-2 healthz=200 readyz={"ledger":"verified","status":"ready","store":"up"}
+== 03:24:35 scale rauthy 0
+statefulset.apps/rauthy scaled
+rauthy all terminated at 03:24:58
+== during
+03:25:19 rahi-0 healthz=200 readyz=Error from server (ServiceUnavailable): the server is currently unable to handle the request
+03:25:21 rahi-1 healthz=200 readyz=Error from server (ServiceUnavailable): the server is currently unable to handle the request
+03:25:22 rahi-2 healthz=200 readyz=Error from server (ServiceUnavailable): the server is currently unable to handle the request
+(eval):4: no matches found: custom-columns=N:.metadata.name,READY:.status.containerStatuses[0].ready,RESTARTS:.status.containerStatuses[0].restartCount
+03:25:39 rahi-0 readyz(direct)={"component":"identity","error":"upstream","message":"rauthy does not answer at https://rauthy-internal.rahi-044-qual.svc.cluster.local:8443/auth/v1/ready: error sending request for url (https://rauth healthz=200
+03:25:42 rahi-1 readyz(direct)={"component":"identity","error":"upstream","message":"rauthy does not answer at https://rauthy-internal.rahi-044-qual.svc.cluster.local:8443/auth/v1/ready: error sending request for url (https://rauth healthz=200
+03:25:45 rahi-2 readyz(direct)={"component":"identity","error":"upstream","message":"rauthy does not answer at https://rauthy-internal.rahi-044-qual.svc.cluster.local:8443/auth/v1/ready: error sending request for url (https://rauth healthz=200
+rahi-0   false   0
+rahi-1   false   0
+rahi-2   false   0
+== 03:25:47 scale rauthy 3
+statefulset.apps/rauthy scaled
+rauthy 3/3 ready at 03:26:18, 31 s after scale-up
+rahi 3/3 ready again at 03:26:19, 32 s after scale-up
+== after
+03:26:20 rahi-0 healthz=200 readyz={"ledger":"verified","status":"ready","store":"up"}
+03:26:21 rahi-1 healthz=200 readyz={"ledger":"verified","status":"ready","store":"up"}
+03:26:23 rahi-2 healthz=200 readyz={"ledger":"verified","status":"ready","store":"up"}
+rahi-0               true    0
+rahi-1               true    0
+rahi-2               true    0
+rahi-migrate-gdxtc   false   0
+rauthy-0             true    0
+rauthy-1             true    0
+rauthy-2             true    0

@@ -1,0 +1,16 @@
+== 03:26:33 scale rahi 0
+statefulset.apps/rahi scaled
+rahi all terminated at 03:26:48
+== 03:26:48 scale rahi 3
+statefulset.apps/rahi scaled
+rahi ready=3/3 at 03:27:59, 70 s after scale-up
+03:28:00 rahi-0 healthz=200 readyz={"ledger":"verified","status":"ready","store":"up"}
+03:28:01 rahi-1 healthz=200 readyz={"ledger":"verified","status":"ready","store":"up"}
+03:28:02 rahi-2 healthz=200 readyz={"ledger":"verified","status":"ready","store":"up"}
+rahi-0               true    0
+rahi-1               true    1
+rahi-2               true    0
+rahi-migrate-gdxtc   false   0
+rauthy-0             true    0
+rauthy-1             true    0
+rauthy-2             true    0

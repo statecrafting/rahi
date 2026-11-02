@@ -8,9 +8,10 @@ metadata:
 spec:
   serviceName: rahi-hl
   replicas: 3
-  # P-3: ordered first bootstrap until hiqlite F-118 (node-1 replacement) is
-  # repaired; Parallel afterwards.
-  podManagementPolicy: OrderedReady
+  # Parallel from the first boot (spec 044 D-14): under OrderedReady a full
+  # stop never recovers, because pod 0 waits for a quorum its peers are not
+  # created to give it, and the policy cannot change on a live StatefulSet.
+  podManagementPolicy: Parallel
   selector:
     matchLabels:
       app.kubernetes.io/name: rahi

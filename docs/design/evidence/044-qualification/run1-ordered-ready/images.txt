@@ -1,0 +1,3 @@
+ghcr.io/statecrafting/rahi:0.7.1 
+ghcr.io/statecrafting/rahi-runtime:0.7.1 
+ghcr.io/bartekus/rauthy-patched:0.36.2-patched.3 
