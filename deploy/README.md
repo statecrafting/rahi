@@ -620,6 +620,15 @@ container image pinned by digest, and `docker/compose.yml` publishes its
 port on the loopback only. Two more fixtures must be refused: a render
 that routes `/binding`, and one whose artifact image disagrees.
 
+The edge closes `/metrics` and `/binding` with a second Ingress,
+`rahi-edge-closed`, that names both as `Exact` paths and denies every
+source address (`denylist-source-range: 0.0.0.0/0,::/0`), so both answer
+`403` (spec 040 D-8). It replaces a `server-snippet`, which ingress-nginx
+1.9 and later refuse at admission. The script refuses an Ingress that
+names either path without that deny, a closure on a non-`Exact` path, and
+a `/` prefix with no closure; a fixture that drops the deny must be
+refused. Another ingress class needs its own equivalent.
+
 **Every other path.** `/binding` and `/metrics` carry no secret, but they
 are unguarded by design, so the deployment boundary is their only
 protection. On any path this repository does not ship (a container port
