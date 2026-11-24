@@ -1,0 +1,102 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '052-self-registered-client-tokens' file unit 'crates/rahi-idp/tests/self_registered.rs' does not exist",
+        "path": "crates/rahi-idp/tests/self_registered.rs"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "025-api-tokens-and-resource-server",
+      "031-single-container-packaging",
+      "038-native-clients-and-bearer-revocation",
+      "043-patched-dependency-adoption",
+      "051-anonymous-bearer-challenge"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/self_registered.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/bearer.rs"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/bearer.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/registration.rs"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/registration.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/resource.rs"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/resource.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/rauthy_env.rs"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_env.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docker/Dockerfile"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docker/Dockerfile"
+        }
+      }
+    ],
+    "specId": "052-self-registered-client-tokens",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "774715ab34bd33876e8f910d8ca8bd8ff01e98dd09d996fc4f4a73898e0a030c"
+}

@@ -1,0 +1,95 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-11-24",
+    "declaresAcceptance": true,
+    "dependsOn": [
+      "020-edge-server",
+      "022-session-and-principal",
+      "025-api-tokens-and-resource-server",
+      "030-operational-verbs",
+      "038-native-clients-and-bearer-revocation"
+    ],
+    "domain": "identity",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "crates/rahi-cli/tests/anonymous_challenge.rs"
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 3
+    },
+    "id": "051-anonymous-bearer-challenge",
+    "implementation": "pending",
+    "kind": "feature",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/bearer.rs"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/bearer.rs"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/middleware/csrf.rs"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/tests/middleware.rs"
+        }
+      }
+    ],
+    "risk": "high",
+    "sectionDigests": {
+      "051-anonymous-bearer-challenge": "33b0e77205678740f59ebdf225f9b5e22c5fd12b506a7a56f35f0ca7a1405359",
+      "1-purpose": "a0442b577b229fe73b08416d83b80b711262b22b882aa565695d42bd17320643",
+      "2-territory": "5c55bacba7b60f1abefd7b4c849d7bf74449d53abbd505f4869ac80f489caef5",
+      "3-behavior": "ae9b9d56d1b46762c2d76063f92c3d820865972189d3cd1779d1695dd6753aec",
+      "4-functional-requirements": "8fb3ebd8cdf8f76b90068e531bd32b120bffca117035f98616b0be12a6bd33b6",
+      "5-acceptance-criteria": "1eab4541ab032a340f92d79295e6f63b0e4b6ba0a8ce9192642f7b4da1607ae5",
+      "6-out-of-scope": "e8a1849ab80618a98be6155346bc7d8a3afc1691f2c66329b620542c1a16a616",
+      "7-resolved-decisions": "7d99446390a39f90d09eee341676d173207e0e3adcd971741a51e845f86e0b63",
+      "verification": "45ebd20f948f2e00dd8253e09db8da388bd15792291153741423d689d08f9d7d"
+    },
+    "sectionHeadings": [
+      "051: Anonymous bearer challenge",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/051-anonymous-bearer-challenge/spec.md",
+    "status": "draft",
+    "summary": "Spec 025 B-6 says an unauthenticated request to a bearer route answers 401 with the discovery challenge, and calls that challenge the entire bootstrap. Spec 038 B-1 wired the CSRF exemption for bearer routes only for a request that carries an Authorization header, so an anonymous POST meets the double-submit check first and is refused 403 csrf with no WWW-Authenticate. MCP clients open with exactly that request (the MCP authorization flow begins with an anonymous POST), so no MCP client can bootstrap against a cell. This spec makes the exemption depend on the absence of an ambient credential rather than the presence of a bearer one: a request on a declared bearer route that carries no session cookie is exempt, with or without an Authorization header.\n",
+    "title": "Anonymous bearer challenge: a declared bearer route exempts a request that carries no session cookie from CSRF, so an anonymous unsafe request is answered with the 401 discovery challenge instead of 403 csrf"
+  },
+  "shardHash": "329099c12fe19225540845f18121f277c5a213409eebcb9f3ea369885a4dc926",
+  "specVersion": "1.11.0"
+}
