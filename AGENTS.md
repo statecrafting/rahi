@@ -222,8 +222,8 @@ add it here.
 
 ## Continuous integration
 
-CI is the Statecraft setup profile `github-actions-rust`, revision 22
-(spec 001 D-25). The one required check is `ci-gate` in
+CI is the Statecraft setup profile `github-actions-rust`, revision 29
+(spec 001 D-27). The one required check is `ci-gate` in
 `.github/workflows/statecraft-ci.yml`: governance, the cargo gate, an AI
 review of every pull request, `supply-chain` (cargo-deny against
 `deny.toml`), `workflow-lint` (zizmor, and every action pinned by commit
@@ -234,7 +234,10 @@ its own pull request: governance refuses one that touches any other path
 beside them, apart from the generated `.statecraft/derived/` and
 `.statecraft/environment.json`. The policy paths are `deny.toml`,
 `.cargo/audit.toml`, anything under `supply-chain/`, any `Cargo.toml` or
-`Cargo.lock`, `spec-spine.toml`, and `docs/adoption/spec-spine.md`. With `governance.require_ratified` at its default `true`, code
+`Cargo.lock`, `spec-spine.toml`, and `docs/adoption/spec-spine.md`. The guard
+ignores a release bump that changes only workspace versions, a self-pin, the
+`spec.md` that owns a changed policy file, and a new workspace crate that adds
+no package (revisions 27 to 29). With `governance.require_ratified` at its default `true`, code
 owned by a draft spec is refused. Ratification is a separate owner flow: a
 pull request that changes a spec from `draft` to `approved` needs approval of
 that run's `statecraft-review-exception` Environment before it can merge.
