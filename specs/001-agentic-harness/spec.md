@@ -1104,6 +1104,24 @@ and a new workspace crate that adds no package (29). No recorded setup
 parameter changes, and the change touches no policy path. This upgrade
 changes no spec approval or implementation state.
 
+D-28 (2026-11-26, harness fix; a secret-scan false positive). gitleaks'
+`generic-api-key` rule reads a sha256 section digest in a compiled shard as
+a credential when the section's key contains a word like `tokens`: draft
+052's title heading did this, and the profile's secret-scan job refused
+pull request #173 on `.derived/spec-registry/by-spec/052-*.json`. The
+workflow names the project's committed gitleaks configuration as the only
+allowlist mechanism, so `.gitleaks.toml` extends the default ruleset with
+one allowlist that requires all three of: rule `generic-api-key`, a path
+under `.derived/`, and a secret of exactly 64 lowercase hex characters.
+Measured with gitleaks 8.30.1 over the repository history: 13 findings
+by default, 12 with the allowlist, the removed one being the 052 digest; a
+non-hex value under `.derived/` and a digest outside it both still fail.
+Rejected: a global path allowlist on `.derived/`, which gitleaks applies by
+skipping the file whole and so would hide any secret a shard ever carried;
+a regex-only allowlist, which would exempt hex-shaped secrets everywhere;
+renaming 052's heading, which leaves the next such title to fail the same
+way.
+
 ## Verification
 
 ```verify:cli

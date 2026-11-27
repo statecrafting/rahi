@@ -1,0 +1,20 @@
+# The project allowlist the statecraft-ci secret-scan job reads (001 D-28).
+# The default ruleset stays in force. The one exemption is a sha256 digest
+# spec-spine writes into a committed shard: generic-api-key reads a digest
+# keyed by a section name containing a word like "tokens" as a credential.
+# All three conditions must hold: rule generic-api-key, a path under
+# .derived/, and a secret that is exactly 64 lowercase hex characters. A
+# secret of any other shape in a shard, or any finding outside .derived/,
+# still fails. A global path allowlist is not used because gitleaks skips
+# an allowlisted path whole, without consulting the other conditions.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "sha256 digests in compiled spec-spine shards"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''(^|/)\.derived/''']
+regexTarget = "secret"
+regexes = ['''^[0-9a-f]{64}$''']
