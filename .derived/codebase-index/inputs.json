@@ -115,16 +115,16 @@
       "contentHash": "c90d258e1e4aae6c03266d8891dee7704f2648c52b7a1c242f9168ed31244a72"
     },
     ".github/workflows/statecraft-ai-review.yml": {
-      "contentHash": "2312937dd0d14b500c3ca5d15c64fc33a59de4c66fd0bba199f343631ff3f116"
+      "contentHash": "9d1d393c53fb4a24308914b267bf0da5727e3e0a5ef8e5ad0e1e2c476432ee32"
     },
     ".github/workflows/statecraft-ci.yml": {
-      "contentHash": "3c0a280d80ce7f7cad7c132079d6b5c8658a0b4201b0ebe80e50c65a2231e1b1"
+      "contentHash": "c320b955875936d0a0bf1b7cb50041d5076706aa035f9b4a93a3f9efb750bcdf"
     },
     ".mcp.json": {
       "contentHash": "267962ad307e5707f2a025ce1fa40b80d52cd0cf3f8c8bdb25d03a6459366a1a"
     },
     "AGENTS.md": {
-      "contentHash": "d8b63b064a6f484abf1901dc80304e845f066f7b5a6dcb170a7a5d877c08721a"
+      "contentHash": "bb089630472dcc05db92790cc6696d51df818b641a0bb1a18c92eb7e02728951"
     },
     "CLAUDE.md": {
       "contentHash": "997855291507fa72d12eae573e5347266ce34be2d1e2bf7fad39b47067f46f77"

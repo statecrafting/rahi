@@ -1089,6 +1089,21 @@ and leaves every spec's frontmatter unchanged. Rejected: a fourth wave for
 040 onward, which would contradict 002's three-wave order and re-label ten
 approved specs.
 
+D-27 (2026-11-26, owner-directed rollout; profile upgrade). Adopt
+Statecraft profile revision 29 (renderer identity `9d5bb0e25975`, plan
+`279765aed00717eb303bb63743d78ba94e2bf7b9aa624b6dc30fe8e8325a44a0`)
+rendered by statecraft-cli `68832a2a`, over the 0.32.0 pin D-24 landed.
+Revisions 23 to 29 arrive together: the managed reviewer guide
+`.statecraft/REVIEW.md` (23); post-merge push handling where a merge queue
+is declared, which this repository does not declare (24); the optional
+free-disk step, off (25); a severity and category on every AI review
+finding, and no owner exception for findings that are all low and
+answered (26); and policy-guard classes that ignore a workspace version
+bump (27), a self-pin and the spec that owns a changed policy file (28),
+and a new workspace crate that adds no package (29). No recorded setup
+parameter changes, and the change touches no policy path. This upgrade
+changes no spec approval or implementation state.
+
 ## Verification
 
 ```verify:cli
@@ -1154,7 +1169,7 @@ sh -c '! grep -rq -- "--include-uncommitted" .github/workflows/'
 # D-21: the exact released pin and profile revision are recorded once.
 grep -qx 'required_version = "=0.32.0"' spec-spine.toml
 sh -c "printf '%s\n' 'print-spine-version:;@echo \$(SPEC_SPINE_VERSION)' | make -s -f Makefile -f - print-spine-version | grep -qx '0.32.0'"
-grep -q 'statecraft-setup:github-actions-rust@22' .statecraft/environment.json
+grep -q 'statecraft-setup:github-actions-rust@29' .statecraft/environment.json
 grep -q '"require_ratified": true' .statecraft/setup/github-actions-rust.json
 python3 -c 'import json; a = json.load(open(".claude/settings.json"))["attribution"]; assert a == {"commit": "", "pr": "", "sessionUrl": False}, a'
 grep -q -- '--identity BASE HEAD' scripts/check-authored-content.sh

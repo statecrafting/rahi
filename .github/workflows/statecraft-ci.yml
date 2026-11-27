@@ -1,5 +1,5 @@
-# Rendered by Statecraft from profile github-actions-rust revision 22
-# (identity 6da3ede78368133fe8f463ac341a8ea0ce8e959c0c059066f50c8a89253a4c88). A managed file and a member of this
+# Rendered by Statecraft from profile github-actions-rust revision 29
+# (identity 9d5bb0e25975598a07bcb7ed7f0466a25dd725508cd050dbdbbec6f4950dcebe). A managed file and a member of this
 # repository's authority set: an edit here changes the gate that judges every
 # pull request, and `statecraft doctor` names it. The policy the aggregate gate
 # enforces is .statecraft/setup/github-actions-rust.json, read at the base.
@@ -7,7 +7,7 @@ name: statecraft-ci
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
   push:
     branches: [main]
   # Revision 3: a required merge queue judges each queued entry here. The
@@ -22,6 +22,24 @@ on:
 # an Environment is never cancelled by a group, so a group it held would leave
 # the newer run pending behind it. A push to the default branch and a
 # merge-queue entry get groups of their own run, so neither is ever cancelled.
+#
+# Revision 24 (spec 067): where the policy records a required merge queue
+# (remote.merge_queue), a push to the default branch is a post-merge push:
+# the queue already judged that exact commit. Every job that judges is skipped
+# on it; code runs only its cache steps, building only to fill a missed key;
+# a declared extra job is called with the input post_merge true, so it can
+# skip its own expensive steps; and ci-gate admits the skips by the
+# post-merge rule only when the commit passed ci-gate in the merge queue.
+#
+# Revision 25 (spec 069): where the setup parameter ci.code.free_disk is
+# true, the code job removes the runner's unused preinstalled toolchains
+# before it builds, and reports the free space before and after.
+#
+# Revision 26 (spec 068): a finding carries a severity, a category and an id.
+# A pull request whose findings are all low and other, each answered by a
+# `Review note (<sha8>): <id>` line of its body for that head, needs no owner
+# exception. An edited pull request runs again and keeps the review recorded
+# for its head, so the ids its notes name are the ones read.
 
 permissions:
   contents: read
@@ -149,7 +167,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
         run: sh "${STATECRAFT_GATE:?}" governance
-      # Revision 4, rule 3: the title and body become the merge commit's
+      # Revision 4, rule 3: the title and body become the landed commit's
       # message (governance.authored_content_text).
       - name: Authored-content rules (title and body)
         if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
@@ -572,8 +590,9 @@ jobs:
     # The owner exception (S-1): a release candidate whose review was skipped,
     # (revision 2, R2-1) any pull request whose review returned findings, and
     # (revision 5, rule 2) any pull request that changes the authority set,
-    # and (revision 12) any pull request that ratifies a spec.
-    if: always() && github.event_name == 'pull_request' && (needs.governance.outputs.authority_change == 'true' || needs.governance.outputs.ratification == 'true' || (needs.ai-review.outputs.release_candidate == 'true' && startsWith(needs.ai-review.outputs.result, 'skipped:')) || needs.ai-review.outputs.result == 'findings')
+    # and (revision 12) any pull request that ratifies a spec. Revision 26
+    # (spec 068): findings that are all low and answered need none.
+    if: always() && github.event_name == 'pull_request' && (needs.governance.outputs.authority_change == 'true' || needs.governance.outputs.ratification == 'true' || (needs.ai-review.outputs.release_candidate == 'true' && startsWith(needs.ai-review.outputs.result, 'skipped:')) || (needs.ai-review.outputs.result == 'findings' && needs.ai-review.outputs.answered != 'true'))
     runs-on: ubuntu-latest
     environment: statecraft-review-exception
     steps:
