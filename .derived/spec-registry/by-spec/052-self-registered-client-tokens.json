@@ -19,6 +19,40 @@
         "path": "crates/rahi-idp/tests/self_registered.rs"
       }
     ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "025-api-tokens-and-resource-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/registration.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "025-api-tokens-and-resource-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/bearer.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "025-api-tokens-and-resource-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/resource.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-single-container-packaging",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_env.rs"
+        }
+      }
+    ],
     "extraFrontmatter": {
       "wave": 3
     },
@@ -30,48 +64,20 @@
         "role": "context",
         "unit": {
           "kind": "file",
-          "path": "crates/rahi-idp/src/registration.rs"
-        }
-      },
-      {
-        "role": "context",
-        "unit": {
-          "kind": "file",
-          "path": "crates/rahi-idp/src/bearer.rs"
-        }
-      },
-      {
-        "role": "context",
-        "unit": {
-          "kind": "file",
-          "path": "crates/rahi-idp/src/resource.rs"
-        }
-      },
-      {
-        "role": "context",
-        "unit": {
-          "kind": "file",
-          "path": "crates/rahi-ops/src/rauthy_env.rs"
-        }
-      },
-      {
-        "role": "context",
-        "unit": {
-          "kind": "file",
           "path": "docker/Dockerfile"
         }
       }
     ],
     "risk": "critical",
     "sectionDigests": {
-      "052-self-registered-client-tokens": "af586b5bb10032f1cd07361f7036fda3376b79866d72422866588e34681e4572",
+      "052-self-registered-client-tokens": "bd1d2a7d33cf1e74e9b7add5c2be7c09dfd67ecff4a61c27eed8ead47e5254c7",
       "1-purpose": "6203861a8b2323616aa81787689778e5c12e26fd66c7635ada0c18ef89ff77a2",
-      "2-territory": "ae8cd37b4c9b7821bb37db15598b5bdc4abab72724fba11ccd8bd387a41b79af",
+      "2-territory": "db8a05603c8bdffd518ba53fcfb3be4a21c9b080025e9628e98e6f53186cd582",
       "3-behavior": "3d9bf9987b6b55b93b197534c279ab9d3d3b882f6280d8b231b9e31022e8eae7",
       "4-functional-requirements": "eb3becd6ba672694bd93306bfd1f173fda9cd6428feba62d848ed3cd17b99331",
       "5-acceptance-criteria": "70bf8c9637ea8a3e5e01541f429fb01ed80b6122856ad6d69aa3f2847607667f",
       "6-out-of-scope": "f22fe13dce8ca1676b29ad26f4c953f4116bad6f69953598fa8241cc276be4fc",
-      "7-resolved-decisions": "77447b853bd33f4cd3ecacf8f37f68f77ad3e2456ebeb999c5fca2d5436e3394",
+      "7-resolved-decisions": "e87f97537d26058d8651dd25e53bf8c74b9f999b140ad42ecde79aee92bc62d1",
       "verification": "73f98a229353207371ed1c6f97cb655cdd16d159c9b3e35e687356fd8bf5c02c"
     },
     "sectionHeadings": [
@@ -86,10 +92,10 @@
       "Verification"
     ],
     "specPath": "specs/052-self-registered-client-tokens/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Spec 025 B-7 offers rauthy's dynamic client registration, and B-3 and D-2 make the cell origin in `aud` mandatory. On the pinned rauthy those two cannot both hold for a client that registers itself: rauthy refuses any RFC 8707 `resource` from a dynamic client, and its only other route to an audience is `default_aud`, which only an administrator can set (025 D-12, 037 D-7). Three more defaults stand between a self-registered client and admission: rauthy signs its access tokens EdDSA where the chassis accepts RS256 only, grants it only `openid profile email groups`, and gives it a thirty-minute lifetime above the cell's ceiling; and the packaged cell passes none of rauthy's dynamic client settings at all. This spec makes the packaged cell configure rauthy so a standards-only client (RFC 7591 registration, RFC 8707 resource, PKCE) gets an admissible token, without relaxing the audience check.\n",
     "title": "Self-registered client tokens: a client that registers itself through dynamic registration and asks for this cell with an RFC 8707 resource indicator receives a token the resource server admits, with no administrator call"
   },
-  "shardHash": "774715ab34bd33876e8f910d8ca8bd8ff01e98dd09d996fc4f4a73898e0a030c",
+  "shardHash": "5ac662dc122e4b98ad79c5ac9e85abcbb8b1030e706b75015a20aa336d881838",
   "specVersion": "1.11.0"
 }

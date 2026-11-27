@@ -17,7 +17,28 @@
       "030-operational-verbs",
       "038-native-clients-and-bearer-revocation"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "crates/rahi-cli/src/serve.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/middleware/csrf.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/tests/middleware.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/bearer.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/tests/bearer.rs",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
         "locations": [],
@@ -34,8 +55,8 @@
             "file": "crates/rahi-cli/src/serve.rs"
           }
         ],
-        "ownership": false,
-        "sourceField": "references",
+        "ownership": true,
+        "sourceField": "extends",
         "unit": {
           "kind": "file",
           "path": "crates/rahi-cli/src/serve.rs"
@@ -47,8 +68,8 @@
             "file": "crates/rahi-edge/src/middleware/csrf.rs"
           }
         ],
-        "ownership": false,
-        "sourceField": "references",
+        "ownership": true,
+        "sourceField": "extends",
         "unit": {
           "kind": "file",
           "path": "crates/rahi-edge/src/middleware/csrf.rs"
@@ -60,8 +81,8 @@
             "file": "crates/rahi-edge/tests/middleware.rs"
           }
         ],
-        "ownership": false,
-        "sourceField": "references",
+        "ownership": true,
+        "sourceField": "extends",
         "unit": {
           "kind": "file",
           "path": "crates/rahi-edge/tests/middleware.rs"
@@ -73,8 +94,8 @@
             "file": "crates/rahi-idp/src/bearer.rs"
           }
         ],
-        "ownership": false,
-        "sourceField": "references",
+        "ownership": true,
+        "sourceField": "extends",
         "unit": {
           "kind": "file",
           "path": "crates/rahi-idp/src/bearer.rs"
@@ -86,8 +107,8 @@
             "file": "crates/rahi-idp/tests/bearer.rs"
           }
         ],
-        "ownership": false,
-        "sourceField": "references",
+        "ownership": true,
+        "sourceField": "extends",
         "unit": {
           "kind": "file",
           "path": "crates/rahi-idp/tests/bearer.rs"
@@ -95,8 +116,8 @@
       }
     ],
     "specId": "051-anonymous-bearer-challenge",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "329099c12fe19225540845f18121f277c5a213409eebcb9f3ea369885a4dc926"
+  "shardHash": "a3ad0b4996285b6ef509fd1743f1a44ff7a8932ed20b777445c5dffe6d95ffea"
 }

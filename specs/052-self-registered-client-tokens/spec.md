@@ -1,7 +1,7 @@
 ---
 id: "052-self-registered-client-tokens"
 title: "Self-registered client tokens: a client that registers itself through dynamic registration and asks for this cell with an RFC 8707 resource indicator receives a token the resource server admits, with no administrator call"
-status: draft
+status: approved
 kind: feature
 domain: identity
 created: "2026-11-24"
@@ -31,11 +31,12 @@ summary: >
   relaxing the audience check.
 establishes:
   - "crates/rahi-idp/tests/self_registered.rs"
+extends:
+  - { spec: "025-api-tokens-and-resource-server", unit: "crates/rahi-idp/src/registration.rs", nature: additive }
+  - { spec: "025-api-tokens-and-resource-server", unit: "crates/rahi-idp/src/bearer.rs", nature: amending }
+  - { spec: "025-api-tokens-and-resource-server", unit: "crates/rahi-idp/src/resource.rs", nature: amending }
+  - { spec: "031-single-container-packaging", unit: "crates/rahi-ops/src/rauthy_env.rs", nature: additive }
 references:
-  - { unit: { kind: file, path: "crates/rahi-idp/src/registration.rs" }, role: context }
-  - { unit: { kind: file, path: "crates/rahi-idp/src/bearer.rs" }, role: context }
-  - { unit: { kind: file, path: "crates/rahi-idp/src/resource.rs" }, role: context }
-  - { unit: { kind: file, path: "crates/rahi-ops/src/rauthy_env.rs" }, role: context }
   - { unit: { kind: file, path: "docker/Dockerfile" }, role: context }
 ---
 
@@ -115,17 +116,19 @@ algorithm.
 - `crates/rahi-idp/src/registration.rs` (025's): `Registration::rauthy_env`
   grows into the full set of B-1 to B-4 and is what `rauthy_env.rs` calls,
   so the setting 025 B-7 names reaches rauthy.
-- `crates/rahi-idp/src/bearer.rs` and `resource.rs` (025's): only if D-3 or
-  D-4 is decided toward the chassis; otherwise untouched.
+- `crates/rahi-idp/src/bearer.rs` and `resource.rs` (025's): the audience
+  comparison gains D-4's empty-path equivalence when FR-005 measures a
+  trailing `/`, and the validator gains `EdDSA` only under D-3's fallback
+  (a); otherwise untouched.
 - `docker/Dockerfile` (031's, pinned under 043): the rauthy image moves to
   a build carrying `dynamic_clients.allowed_resources`. That move is its own
   adoption under 043's rules and its own pull request; this spec names it as
   a prerequisite and does not perform it.
 - `crates/rahi-idp/tests/self_registered.rs` (new): the live proof.
 
-While `draft`, every unit but the new test is a `references` edge (050
-D-2); the approving change turns the ones the build touches into `extends`
-edges.
+The approving change (D-5) turned the units the build may touch into
+`extends` edges; `docker/Dockerfile` stays a `references` edge, because the
+image move is 043's adoption and not this spec's change.
 
 ## 3. Behavior
 
@@ -228,29 +231,45 @@ is 051.
   sends.
 - **D-2 (2026-11-24; a draft claims no unit).** As 050 D-2: section 2's
   existing units are `references` edges while this spec is `draft`.
-- **D-3 (2026-11-24; open, for the approving owner: the signature
-  algorithm).** B-3 needs one of three, and this draft does not choose.
-  (a) The resource server also verifies `EdDSA` (Ed25519) under a key
-  rauthy publishes, which widens a critical validator and amends 025 B-3's
-  "RS256 signature". (b) A rauthy setting giving dynamic clients a default
-  access token algorithm, which no upstream release has; it would be a
-  patch on `bartekus/rauthy` offered upstream, carried in the same rauthy
-  adoption as `allowed_resources`, and keeps the chassis validator
-  untouched. (c) Rauthy signing every token `RS256` by configuration, if a
-  global default exists in the adopted build; not found in `v0.37.0`. The
-  drafting session leans to (b): the chassis does not relax for a
-  dependency's default (025 D-2's reasoning), and the rauthy build has to
-  move for B-2 anyway.
-- **D-4 (2026-11-24; open, for the build session to measure: the resource
+- **D-3 (2026-11-24, decided 2026-11-26 by the owner; the signature
+  algorithm).** B-3 needs one of three: (a) the resource server also
+  verifies `EdDSA` (Ed25519) under a key rauthy publishes, which widens a
+  critical validator and amends 025 B-3's "RS256 signature"; (b) a rauthy
+  setting giving dynamic clients a default access token algorithm, which no
+  upstream release has; (c) rauthy signing every token `RS256` by
+  configuration, if a global default exists in the adopted build (not found
+  in `v0.37.0`). **Decision: (b), offered upstream first.** The build
+  proposes the setting to sebadob/rauthy and adopts it only from an
+  upstream release, carried in the same rauthy adoption as
+  `allowed_resources`; the chassis validator stays untouched. The owner
+  does not want a standing local rauthy patch: if upstream declines or does
+  not take the setting, the build does not carry it on `bartekus/rauthy`
+  and falls back to (c) if the adopted build offers a global default, else
+  to (a). Under (a) the validator MUST bind the accepted algorithm to the
+  published key's type (`OKP`/`Ed25519` for `EdDSA`, `RSA` for `RS256`),
+  keep B-3's refusals, and record the amendment of 025 B-3 on 025 in the
+  same change. Whichever lands is recorded in the Status note with the
+  upstream issue or pull request.
+- **D-4 (2026-11-24, decided 2026-11-26 by the owner; the resource
   string).** rauthy compares `resource` verbatim against the allow-list,
   and the chassis compares `aud` verbatim against the origin (bearer.rs
   line 396, `resource.rs` line 122). If a reference client sends
   `https://cell.example.com/` for a published `https://cell.example.com`,
-  B-2 fails on the string. FR-005 measures it. If it does, the choice is
-  between allow-listing both forms and having the audience check treat an
-  origin and the origin plus `/` as one resource (RFC 3986 section 6.2.3,
-  scheme-based normalization of an empty path), and nothing wider; that
-  amends 025 B-3 and is a human decision.
+  B-2 fails on the string. FR-005 measures it. **Decision: normalize the
+  empty path, pre-authorized.** If FR-005 measures a trailing `/`, both
+  forms go on rauthy's allow-list and the audience check treats an origin
+  and the origin plus `/` as one resource (RFC 3986 section 6.2.3,
+  scheme-based normalization of an empty path), and nothing wider: no other
+  path, no case folding beyond the scheme and host RFC 3986 already makes
+  case-insensitive, no prefix match. Allow-listing alone is not enough,
+  because the issued `aud` would still fail the verbatim comparison. The
+  change records the amendment of 025 B-3 on 025. If FR-005 measures no
+  trailing `/`, nothing changes.
+- **D-5 (2026-11-26; owner approval).** The owner approved this spec on
+  2026-11-26 with D-3 and D-4 decided as above. The approving change turns
+  the units the build may touch into `extends` edges (`bearer.rs` and
+  `resource.rs` `amending`, since D-3's fallback and D-4 change 025 B-3;
+  the rest `additive`).
 
 ## Verification
 

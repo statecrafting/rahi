@@ -1,7 +1,7 @@
 ---
 id: "051-anonymous-bearer-challenge"
 title: "Anonymous bearer challenge: a declared bearer route exempts a request that carries no session cookie from CSRF, so an anonymous unsafe request is answered with the 401 discovery challenge instead of 403 csrf"
-status: draft
+status: approved
 kind: feature
 domain: identity
 created: "2026-11-24"
@@ -29,12 +29,12 @@ summary: >
   exempt, with or without an Authorization header.
 establishes:
   - "crates/rahi-cli/tests/anonymous_challenge.rs"
-references:
-  - { unit: { kind: file, path: "crates/rahi-cli/src/serve.rs" }, role: context }
-  - { unit: { kind: file, path: "crates/rahi-idp/src/bearer.rs" }, role: context }
-  - { unit: { kind: file, path: "crates/rahi-idp/tests/bearer.rs" }, role: context }
-  - { unit: { kind: file, path: "crates/rahi-edge/src/middleware/csrf.rs" }, role: context }
-  - { unit: { kind: file, path: "crates/rahi-edge/tests/middleware.rs" }, role: context }
+extends:
+  - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/serve.rs", nature: amending }
+  - { spec: "025-api-tokens-and-resource-server", unit: "crates/rahi-idp/src/bearer.rs", nature: additive }
+  - { spec: "025-api-tokens-and-resource-server", unit: "crates/rahi-idp/tests/bearer.rs", nature: additive }
+  - { spec: "020-edge-server", unit: "crates/rahi-edge/src/middleware/csrf.rs", nature: amending }
+  - { spec: "020-edge-server", unit: "crates/rahi-edge/tests/middleware.rs", nature: additive }
 ---
 
 # 051: Anonymous bearer challenge
@@ -87,9 +87,8 @@ did not already have, and lets the authentication layers answer it.
   composition answering an anonymous unsafe request on a declared bearer
   route.
 
-While `draft`, every unit but the new test is a `references` edge, as 050
-D-2 settled for drafts; the approving change turns them into `extends`
-edges.
+The approving change (D-4) turned the drafts' `references` edges into
+`extends` edges on the owning specs' units.
 
 ## 3. Behavior
 
@@ -204,6 +203,11 @@ to the product that speaks MCP (025 section 6).
   spec is `draft`, so the ratification gate does not refuse other work on
   them. The approving change turns them into `extends` edges and records,
   on 038, that its B-1 clause is replaced by B-1 here.
+- **D-4 (2026-11-26; owner approval).** The owner approved this spec on
+  2026-11-26 as drafted. The approving change turns section 2's units into
+  `extends` edges (`serve.rs` and `csrf.rs`'s module comment `amending`,
+  because the exemption's stated rule changes; the rest `additive`) and
+  records on 038, as its D-14, that its B-1 clause is replaced by B-1 here.
 
 ## Verification
 
