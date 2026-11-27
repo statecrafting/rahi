@@ -164,30 +164,32 @@ async fn a_matching_pair_passes_and_a_mismatched_one_does_not() {
     cell.stop().await;
 }
 
-/// Spec 038 B-1 and FR-001: the composer's exemption lets a bearer write
-/// through with no CSRF pair, and declines everything else.
+/// Spec 038 B-1 as spec 051 B-1 replaced it, and 051 FR-003: the composer's
+/// exemption lets a bearer write and an anonymous write through with no CSRF
+/// pair, and declines everything else.
 ///
-/// The predicate here is the one `serve` passes, written out: a declared
-/// bearer route, an `Authorization` header, and no session cookie. The
-/// second clause matters as much as the first. A request carrying both
-/// credentials is not exempt, so it still meets this check; in a composed
-/// cell it never gets that far, because the bearer layer answers 400 first
-/// (spec 025 B-10, asserted in `rahi-idp`'s `bearer` test at FR-003).
+/// This crate cannot call the predicate `serve` passes,
+/// `rahi_idp::bearer::csrf_exempt`: spec 020 AC-2 keeps `rahi-idp` out of
+/// this crate's tree, dev-dependencies included. So the stand-in below is
+/// this test's fixture for the edge's half of the seam (an exempt request
+/// skips the check and is minted no cookie; a declined one is checked), and
+/// the predicate's own truth table is asserted where it lives, in
+/// `rahi-idp`'s `bearer` test (051 FR-002), and composed as `serve`
+/// composes it in `rahi-cli`'s `anonymous_challenge` test (051 FR-004).
 #[tokio::test]
-async fn a_bearer_write_needs_no_pair_and_nothing_else_is_exempt() {
+async fn a_write_without_a_session_cookie_needs_no_pair_and_nothing_else_is_exempt() {
     const SESSION_COOKIE: &str = "__Host-session";
 
     let cell = boot("https://cell.example.com").await;
     let exemption: rahi_edge::CsrfExemption =
         Arc::new(|path: &str, headers: &axum::http::HeaderMap| {
             let bearer_route = path.starts_with("/api/v1/");
-            let authorized = headers.contains_key(header::AUTHORIZATION);
             let session = headers
                 .get(header::COOKIE)
                 .and_then(|value| value.to_str().ok())
                 .and_then(|header| csrf::cookie_value(header, SESSION_COOKIE))
                 .is_some();
-            bearer_route && authorized && !session
+            bearer_route && !session
         });
     let router = Edge::builder(cell.state.clone())
         .mount("/api", app())
@@ -205,6 +207,12 @@ async fn a_bearer_write_needs_no_pair_and_nothing_else_is_exempt() {
         }
         request.body(Body::empty()).expect("a well-formed request")
     };
+    let session_cookie = || {
+        (
+            header::COOKIE.as_str(),
+            format!("{SESSION_COOKIE}=whatever"),
+        )
+    };
 
     let written = send(&router, bearer("/api/v1/notes", None)).await;
     assert_eq!(
@@ -214,17 +222,22 @@ async fn a_bearer_write_needs_no_pair_and_nothing_else_is_exempt() {
         written.body
     );
 
-    let both = send(
-        &router,
-        bearer(
-            "/api/v1/notes",
-            Some((
-                header::COOKIE.as_str(),
-                format!("{SESSION_COOKIE}=whatever"),
-            )),
-        ),
-    )
-    .await;
+    // 051 FR-003: the request an MCP client opens with, no credential at
+    // all, passes the check with no pair and is minted no cookie.
+    let anonymous = send(&router, post_request("/api/v1/notes")).await;
+    assert_eq!(
+        anonymous.status,
+        StatusCode::OK,
+        "an anonymous write on a declared route needs no pair: {}",
+        anonymous.body
+    );
+    assert_eq!(
+        anonymous.header(header::SET_COOKIE.as_str()),
+        None,
+        "an exempt request is minted no CSRF cookie"
+    );
+
+    let both = send(&router, bearer("/api/v1/notes", Some(session_cookie()))).await;
     assert_eq!(
         both.status,
         StatusCode::FORBIDDEN,
@@ -232,6 +245,25 @@ async fn a_bearer_write_needs_no_pair_and_nothing_else_is_exempt() {
         both.body
     );
     assert_eq!(both.json()["error"], "csrf");
+
+    let (name, value) = session_cookie();
+    let cookied = send(
+        &router,
+        Request::builder()
+            .method("POST")
+            .uri("/api/v1/notes")
+            .header(name, value)
+            .body(Body::empty())
+            .expect("a well-formed request"),
+    )
+    .await;
+    assert_eq!(
+        cookied.status,
+        StatusCode::FORBIDDEN,
+        "a session cookie without a pair is checked as before: {}",
+        cookied.body
+    );
+    assert_eq!(cookied.json()["error"], "csrf");
 
     let undeclared = send(&router, bearer("/api/notes", None)).await;
     assert_eq!(
@@ -241,12 +273,12 @@ async fn a_bearer_write_needs_no_pair_and_nothing_else_is_exempt() {
         undeclared.body
     );
 
-    let cookied = send(&router, post_request("/api/v1/notes")).await;
+    let undeclared_anonymous = send(&router, post_request("/api/notes")).await;
     assert_eq!(
-        cookied.status,
+        undeclared_anonymous.status,
         StatusCode::FORBIDDEN,
-        "a request with neither credential is checked as before: {}",
-        cookied.body
+        "an anonymous write to an undeclared route is checked as before: {}",
+        undeclared_anonymous.body
     );
 
     cell.stop().await;

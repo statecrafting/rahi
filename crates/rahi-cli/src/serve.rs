@@ -921,38 +921,56 @@ impl Assembly {
                 .mount("/", identity.resource)
                 .expose(Route::new(rahi_idp::METADATA_PATH, RouteClass::Public));
         }
-        // Spec 038 B-1: the CSRF check does not apply to a bearer write. The
-        // predicate is passed from here because the facts it reads are the
-        // composer's: which routes were declared bearer, and what this cell's
-        // session cookie is called. A request carrying both credentials is
-        // not exempt and never reaches the check anyway, because the bearer
-        // layer refuses it first (025 B-10).
-        let scheme = self.scheme;
-        edge = edge.csrf_exemption(std::sync::Arc::new(
-            move |path: &str, headers: &HeaderMap| {
-                rahi_idp::is_bearer_route(path)
-                    && headers.contains_key(axum::http::header::AUTHORIZATION)
-                    && !rahi_idp::bearer::both_credentials(headers, scheme)
-            },
-        ));
+        // Spec 051 B-1 (which replaces 038 B-1's clause): the CSRF check
+        // does not apply to a request on a declared bearer route that
+        // carries no session cookie, with or without a token. The predicate
+        // is passed from here because the facts it reads are the composer's:
+        // which routes were declared bearer, and what this cell's session
+        // cookie is called.
+        edge = edge.csrf_exemption(csrf_exemption(self.scheme));
 
         let router = edge.try_build().map_err(|err| err.0)?;
-        // Spec 022's layer, outermost: it opens the session cookie, renews
-        // the assertion, and leaves the `Principal` in the request extensions
-        // that `Authenticated` and the operator gate read. Outside it every
-        // authenticated route answers 401 (022 D-3).
-        let router = match resolver {
-            Some(sessions) => with_sessions(sessions, router),
-            None => router,
-        };
-        // Spec 025 B-11: outside the session layer, where the paths are
-        // whole. It resolves a token, refuses a request carrying two
-        // credentials, and strips any cookie a bearer-authenticated answer
-        // tried to set.
-        Ok(match bearer {
-            Some(gate) => rahi_idp::with_bearer(gate, router),
-            None => router,
-        })
+        Ok(with_identity_layers(router, resolver, bearer))
+    }
+}
+
+/// The CSRF exemption `serve` passes to the edge (spec 051 B-1, FR-001).
+///
+/// [`rahi_idp::bearer::csrf_exempt`] over this cell's cookie scheme; public
+/// so a test composes the edge exactly as `serve` does.
+#[must_use]
+pub fn csrf_exemption(scheme: rahi_types::CookieScheme) -> rahi_edge::CsrfExemption {
+    std::sync::Arc::new(move |path: &str, headers: &HeaderMap| {
+        rahi_idp::bearer::csrf_exempt(path, headers, scheme)
+    })
+}
+
+/// Wrap the edge's router in the identity layers, in `serve`'s order.
+///
+/// Public so a test drives the same composition (spec 051 FR-004): the
+/// session layer outside the edge, the bearer layer outside both. That
+/// order is why the edge's answer is what an anonymous request meets unless
+/// the CSRF exemption lets it through to the inner `401` the bearer layer
+/// decorates with its challenge (spec 025 B-6).
+pub fn with_identity_layers(
+    router: Router,
+    sessions: Option<rahi_idp::Sessions>,
+    bearer: Option<rahi_idp::RequireBearer>,
+) -> Router {
+    // Spec 022's layer, outermost of the edge: it opens the session cookie,
+    // renews the assertion, and leaves the `Principal` in the request
+    // extensions that `Authenticated` and the operator gate read. Outside it
+    // every authenticated route answers 401 (022 D-3).
+    let router = match sessions {
+        Some(sessions) => with_sessions(sessions, router),
+        None => router,
+    };
+    // Spec 025 B-11: outside the session layer, where the paths are whole.
+    // It resolves a token, refuses a request carrying two credentials, and
+    // strips any cookie a bearer-authenticated answer tried to set.
+    match bearer {
+        Some(gate) => rahi_idp::with_bearer(gate, router),
+        None => router,
     }
 }
 

@@ -443,6 +443,81 @@ async fn a_cookie_and_a_token_together_are_refused() {
     }
 }
 
+// ---------------------------------------------------- spec 051 FR-002
+
+/// Spec 051 FR-002: the CSRF exemption's truth table (051 B-1, B-3).
+///
+/// On a declared route, a request without a session cookie is exempt with
+/// or without a token; a session cookie makes it not exempt, and with a
+/// token as well the bearer layer refuses it 400 before the check is
+/// reached (B-10). On a route nobody declared, nothing is exempt.
+#[tokio::test]
+async fn the_csrf_exemption_turns_on_the_absence_of_a_session_cookie() {
+    let cell = oidc::boot().await;
+    let server = resource_server(&cell).await;
+    // Building the gate is what publishes the declaration `csrf_exempt` reads.
+    let app = app(&cell, &server);
+    let scheme = config(&cell).cookie_scheme;
+    let token = access_token(&cell);
+
+    let headers = |bearer: bool, session: bool| {
+        let mut headers = axum::http::HeaderMap::new();
+        if bearer {
+            headers.insert(
+                header::AUTHORIZATION,
+                HeaderValue::from_str(&format!("Bearer {token}")).expect("a header value"),
+            );
+        }
+        if session {
+            headers.insert(
+                header::COOKIE,
+                HeaderValue::from_str(&format!("{SESSION_COOKIE}=whatever"))
+                    .expect("a header value"),
+            );
+        }
+        headers
+    };
+
+    let declared = "/api/me";
+    let undeclared = "/elsewhere/me";
+    assert!(is_bearer_route(declared), "the declaration is published");
+    assert!(!is_bearer_route(undeclared));
+
+    let exempt = |path: &str, bearer: bool, session: bool| {
+        rahi_idp::bearer::csrf_exempt(path, &headers(bearer, session), scheme)
+    };
+    assert!(
+        exempt(declared, false, false),
+        "no credential: exempt, so the challenge can answer it"
+    );
+    assert!(exempt(declared, true, false), "a bearer token: exempt");
+    assert!(
+        !exempt(declared, false, true),
+        "a session cookie: not exempt, the pair is still demanded"
+    );
+    assert!(
+        !exempt(declared, true, true),
+        "both credentials: not exempt"
+    );
+    for (bearer, session) in [(false, false), (true, false), (false, true), (true, true)] {
+        assert!(
+            !exempt(undeclared, bearer, session),
+            "an undeclared route is never exempt (bearer {bearer}, session {session})"
+        );
+    }
+
+    // Both credentials never reach the check: the bearer layer answers 400.
+    let mut request = Request::builder()
+        .method("POST")
+        .uri(declared)
+        .body(Body::empty())
+        .expect("a request");
+    *request.headers_mut() = headers(true, true);
+    let refused = send(&app, request).await;
+    assert_eq!(refused.status, StatusCode::BAD_REQUEST, "{}", refused.body);
+    assert_eq!(refused.json()["error"], json!("validation"));
+}
+
 // ------------------------------------------------------------- FR-004
 
 /// FR-004: a deny-listed `jti` is refused inside the lag, and the entry

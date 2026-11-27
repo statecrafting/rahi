@@ -17,15 +17,21 @@
 //! those requests would be a second opinion about a question the IdP already
 //! answers (constitution VII).
 //!
-//! The composer may name a second exemption (spec 038 B-1). This check
-//! defends *ambient* credentials: a cookie the browser attaches to a
-//! cross-origin request the page never meant to make. A bearer token is not
-//! ambient, because the client that holds it attaches it deliberately and no
-//! other origin can cause it to be sent, so the pair proves nothing there
-//! that the token does not already prove. The predicate is the composer's
-//! and not this crate's: knowing which routes take a bearer credential, and
-//! what this cell's session cookie is called, belongs to the identity crate,
-//! which is a peer of the edge and never a dependency of it (spec 021 D-6).
+//! The composer may name a second exemption (spec 038 B-1, whose rule spec
+//! 051 B-1 replaced). This check defends *ambient* credentials: a cookie the
+//! browser attaches to a cross-origin request the page never meant to make.
+//! In this chassis the only ambient credential is the session cookie, so a
+//! request on a declared bearer route that carries no session cookie is
+//! exempt, whether it carries a bearer token or no credential at all. A
+//! bearer token is not ambient, because the client that holds it attaches it
+//! deliberately; a request with neither credential has nothing for the pair
+//! to protect, and exempting it lets the bearer layer answer it with its
+//! `401` challenge rather than this check answering `403` (spec 025 B-6).
+//! The exemption decides whether the proof is demanded, never whether the
+//! request is authenticated. The predicate is the composer's and not this
+//! crate's: knowing which routes take a bearer credential, and what this
+//! cell's session cookie is called, belongs to the identity crate, which is
+//! a peer of the edge and never a dependency of it (spec 021 D-6).
 
 use std::sync::Arc;
 

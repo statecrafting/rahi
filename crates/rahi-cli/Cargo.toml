@@ -34,6 +34,9 @@ ring = { workspace = true }
 base64 = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread"] }
+# Spec 051 FR-004: the anonymous_challenge test drives the composed router
+# in-process with `oneshot`, as rahi-edge and rahi-idp test theirs.
+tower = { workspace = true, features = ["util"] }
 
 [lints]
 workspace = true
