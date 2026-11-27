@@ -1,0 +1,119 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '052-self-registered-client-tokens' file unit 'crates/rahi-idp/tests/self_registered.rs' does not exist",
+        "path": "crates/rahi-idp/tests/self_registered.rs"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "025-api-tokens-and-resource-server",
+      "031-single-container-packaging",
+      "038-native-clients-and-bearer-revocation",
+      "043-patched-dependency-adoption",
+      "051-anonymous-bearer-challenge"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/rahi-idp/src/bearer.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/registration.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/resource.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-ops/src/rauthy_env.rs",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/self_registered.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/bearer.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/bearer.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/registration.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/registration.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/resource.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/resource.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-ops/src/rauthy_env.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-ops/src/rauthy_env.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docker/Dockerfile"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docker/Dockerfile"
+        }
+      }
+    ],
+    "specId": "052-self-registered-client-tokens",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "5ac662dc122e4b98ad79c5ac9e85abcbb8b1030e706b75015a20aa336d881838"
+}

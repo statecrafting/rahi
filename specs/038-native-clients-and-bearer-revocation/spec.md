@@ -376,6 +376,13 @@ this spec was silent on. None of them changes what the spec requires.
   which would weaken a security control of the IdP to make an assertion
   convenient, and would hide from every consumer that an early refresh ends
   their session.
+- **D-14 (2026-11-26, owner approval of 051; B-1's exemption clause is
+  replaced).** B-1's clause "that carries an `Authorization` header and no
+  session cookie" is replaced by spec 051 B-1, "that carries no session
+  cookie", so an anonymous unsafe request on a declared bearer route reaches
+  the bearer layer and is answered with 025 B-6's challenge rather than
+  `403 csrf`. The contradiction was between this B-1 and 025 B-6, and 051
+  resolves it in 025 B-6's favor (051 D-2). Everything else in B-1 holds.
 
 ### Evidence and proposals (2026-09-12)
 

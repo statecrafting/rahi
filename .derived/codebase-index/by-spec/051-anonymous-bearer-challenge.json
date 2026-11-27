@@ -1,0 +1,123 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '051-anonymous-bearer-challenge' file unit 'crates/rahi-cli/tests/anonymous_challenge.rs' does not exist",
+        "path": "crates/rahi-cli/tests/anonymous_challenge.rs"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "020-edge-server",
+      "022-session-and-principal",
+      "025-api-tokens-and-resource-server",
+      "030-operational-verbs",
+      "038-native-clients-and-bearer-revocation"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/rahi-cli/src/serve.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/src/middleware/csrf.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-edge/tests/middleware.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/src/bearer.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rahi-idp/tests/bearer.rs",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/tests/anonymous_challenge.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-cli/src/serve.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/src/middleware/csrf.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/middleware/csrf.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-edge/tests/middleware.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/tests/middleware.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/src/bearer.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/bearer.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rahi-idp/tests/bearer.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/bearer.rs"
+        }
+      }
+    ],
+    "specId": "051-anonymous-bearer-challenge",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "a3ad0b4996285b6ef509fd1743f1a44ff7a8932ed20b777445c5dffe6d95ffea"
+}

@@ -1,0 +1,100 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-11-24",
+    "declaresAcceptance": true,
+    "dependsOn": [
+      "020-edge-server",
+      "022-session-and-principal",
+      "025-api-tokens-and-resource-server",
+      "030-operational-verbs",
+      "038-native-clients-and-bearer-revocation"
+    ],
+    "domain": "identity",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "crates/rahi-cli/tests/anonymous_challenge.rs"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/src/serve.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "025-api-tokens-and-resource-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/src/bearer.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "025-api-tokens-and-resource-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-idp/tests/bearer.rs"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "020-edge-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/src/middleware/csrf.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "020-edge-server",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-edge/tests/middleware.rs"
+        }
+      }
+    ],
+    "extraFrontmatter": {
+      "wave": 3
+    },
+    "id": "051-anonymous-bearer-challenge",
+    "implementation": "pending",
+    "kind": "feature",
+    "risk": "high",
+    "sectionDigests": {
+      "051-anonymous-bearer-challenge": "27e7d4d1da682b4cbe52329925ee4f59ccd61c61d09b92e1a8985a6cef3579b1",
+      "1-purpose": "a0442b577b229fe73b08416d83b80b711262b22b882aa565695d42bd17320643",
+      "2-territory": "96d516a8dff6e605aa3a19344113c6f6d96baffcae0cce8270d99e24db3331d9",
+      "3-behavior": "ae9b9d56d1b46762c2d76063f92c3d820865972189d3cd1779d1695dd6753aec",
+      "4-functional-requirements": "8fb3ebd8cdf8f76b90068e531bd32b120bffca117035f98616b0be12a6bd33b6",
+      "5-acceptance-criteria": "1eab4541ab032a340f92d79295e6f63b0e4b6ba0a8ce9192642f7b4da1607ae5",
+      "6-out-of-scope": "e8a1849ab80618a98be6155346bc7d8a3afc1691f2c66329b620542c1a16a616",
+      "7-resolved-decisions": "e55c757ff88697ff4657187fe2cbf3226681e63a860824d762cc54197ff20681",
+      "verification": "45ebd20f948f2e00dd8253e09db8da388bd15792291153741423d689d08f9d7d"
+    },
+    "sectionHeadings": [
+      "051: Anonymous bearer challenge",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/051-anonymous-bearer-challenge/spec.md",
+    "status": "approved",
+    "summary": "Spec 025 B-6 says an unauthenticated request to a bearer route answers 401 with the discovery challenge, and calls that challenge the entire bootstrap. Spec 038 B-1 wired the CSRF exemption for bearer routes only for a request that carries an Authorization header, so an anonymous POST meets the double-submit check first and is refused 403 csrf with no WWW-Authenticate. MCP clients open with exactly that request (the MCP authorization flow begins with an anonymous POST), so no MCP client can bootstrap against a cell. This spec makes the exemption depend on the absence of an ambient credential rather than the presence of a bearer one: a request on a declared bearer route that carries no session cookie is exempt, with or without an Authorization header.\n",
+    "title": "Anonymous bearer challenge: a declared bearer route exempts a request that carries no session cookie from CSRF, so an anonymous unsafe request is answered with the 401 discovery challenge instead of 403 csrf"
+  },
+  "shardHash": "a3ad0b4996285b6ef509fd1743f1a44ff7a8932ed20b777445c5dffe6d95ffea",
+  "specVersion": "1.11.0"
+}
