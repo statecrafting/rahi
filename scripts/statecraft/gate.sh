@@ -1,5 +1,5 @@
 #!/bin/sh
-# Rendered by Statecraft from profile github-actions-rust revision 22.
+# Rendered by Statecraft from profile github-actions-rust revision 29.
 # The one definition of this repository's gate: `make gate` and `make code`
 # run it locally, and CI runs the same script, so the two cannot drift. Only
 # the repository-local .bin/spec-spine is used; a spec-spine elsewhere
@@ -433,8 +433,8 @@ case "$MODE" in
     judge_base
     ;;
   text)
-    # The pull request's title and body, which become the merge commit's
-    # message: from the event on pull_request, through the API on
+    # The pull request's title and body, which become the message of the
+    # commit it lands as, under a merge or a squash: from the event on pull_request, through the API on
     # merge_group, whose event carries neither (revision 4, rule 3).
     if [ "$AUTHORED_CONTENT_TEXT" != true ]; then
       echo "gate.sh: governance.authored_content_text is false; the title and body are not judged"
@@ -465,8 +465,8 @@ case "$MODE" in
     ;;
   commits)
     # Every commit in the change's base..head, not only its head (revision 4,
-    # rules 3 and 4): under merge commits each one lands on the default
-    # branch. A step of the governance job, never a job of its own, so it
+    # rules 3 and 4): under a merge or a rebase each one lands on the default
+    # branch, and the profile does not assume the method. A step of the governance job, never a job of its own, so it
     # cannot be skipped into a green gate.
     if [ "$GATE_EACH_COMMIT" != true ] && [ "$REQUIRE_SIGNED_COMMITS" != true ] && [ "$AUTHORED_CONTENT_TEXT" != true ]; then
       echo "gate.sh: no per-commit check is enabled (governance.gate_each_commit, governance.require_signed_commits, governance.authored_content_text)"

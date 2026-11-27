@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rendered by Statecraft from profile github-actions-rust revision 22.
+# Rendered by Statecraft from profile github-actions-rust revision 29.
 # The aggregate gate. It passes only when every job the TRUSTED policy names
 # as required ended the way its event requires:
 #
@@ -15,6 +15,10 @@
 #                     recorded for the entry's pull request at its head is
 #                     what admits it, with the owner exception for findings
 #   inapplicable      must be `skipped`, and the rule that admitted it is printed
+#   post-merge        a push to the default branch where the merge queue is
+#                     required (revision 24, spec 067): `skipped` or `success`,
+#                     and the pushed commit must have passed ci-gate in a
+#                     completed merge-queue run of statecraft-ci at that commit
 #
 # A required job missing from the needs record has vanished, and blocks. The
 # required set is read from the policy at the base commit, never from the
@@ -116,6 +120,9 @@ if [ -n "$pattern" ] && [ -n "$HEAD_REF" ]; then
 fi
 
 review_result="$(printf '%s' "$NEEDS_JSON" | jq -r '.["ai-review"].outputs.result // ""')"
+# Revision 26 (spec 068): true only when the review job read a review note for
+# this head naming every finding, each low and other.
+review_answered="$(printf '%s' "$NEEDS_JSON" | jq -r '.["ai-review"].outputs.answered // ""')"
 
 # The authority set is the base's, and the candidate's changes are read from
 # its fork point: three dots, as coupling reads them. Two would also list
@@ -172,6 +179,7 @@ esac
 
 blocked=0
 recorded=no
+post_merge=no
 block() {
   say "BLOCK: $*"
   blocked=1
@@ -210,9 +218,38 @@ recorded_review() {
     return 1
   fi
   recorded_result="$(jq -r '.result // ""' "$work/record/ai-review-evidence.json")"
-  recorded_exception="$(gh api "repos/${REPO}/actions/runs/${run}/jobs?per_page=100" 2> /dev/null \
-    | jq -r '[.jobs[]? | select(.name == "review-exception")][0].conclusion // "absent"' 2> /dev/null || echo absent)"
+  gh api "repos/${REPO}/actions/runs/${run}/jobs?per_page=100" > "$work/recorded-jobs.json" 2> /dev/null || echo '{}' > "$work/recorded-jobs.json"
+  recorded_exception="$(jq -r '[.jobs[]? | select(.name == "review-exception")][0].conclusion // "absent"' "$work/recorded-jobs.json" 2> /dev/null || echo absent)"
+  recorded_gate="$(jq -r '[.jobs[]? | select(.name == "ci-gate")][0].conclusion // "absent"' "$work/recorded-jobs.json" 2> /dev/null || echo absent)"
   say "recorded review: #${pr} at ${pr_head}, run ${run}: ${recorded_result} (exception: ${recorded_exception})"
+}
+
+# Revision 24 (spec 067): GitHub fast-forwards the default branch to the head
+# of a merge-queue entry that passed, so that entry's run and its ci-gate
+# check run sit on the pushed commit. A post-merge push is admitted only by
+# that record; a push that bypassed the queue was judged nowhere, and blocks.
+# Nothing here writes.
+queue_judged() {
+  local run gate
+  if ! gh api "repos/${REPO:-}/actions/runs?event=merge_group&head_sha=${HEAD_SHA}&status=completed&per_page=100" > "$work/queue-runs.json" 2> "$work/queue-runs.err"; then
+    block "post-merge push: cannot read the merge-queue runs of ${HEAD_SHA}: $(cat "$work/queue-runs.err")"
+    return 0
+  fi
+  run="$(jq -r --arg h "$HEAD_SHA" '[.workflow_runs[]? | select(.name == "statecraft-ci" and .event == "merge_group" and .head_sha == $h and .status == "completed")] | max_by(.id) | .id // empty' "$work/queue-runs.json" 2> /dev/null || true)"
+  if [ -z "$run" ]; then
+    block "post-merge push: ${HEAD_SHA} is the head of no completed merge-queue run of statecraft-ci, so it was judged nowhere"
+    return 0
+  fi
+  if ! gh api "repos/${REPO:-}/actions/runs/${run}/jobs?per_page=100" > "$work/queue-jobs.json" 2> "$work/queue-jobs.err"; then
+    block "post-merge push: cannot read the jobs of merge-queue run ${run}: $(cat "$work/queue-jobs.err")"
+    return 0
+  fi
+  gate="$(jq -r '[.jobs[]? | select(.name == "ci-gate")][0].conclusion // "absent"' "$work/queue-jobs.json" 2> /dev/null || echo unreadable)"
+  if [ "$gate" != success ]; then
+    block "post-merge push: ci-gate in merge-queue run ${run} at ${HEAD_SHA} ended '${gate}'"
+    return 0
+  fi
+  say "post-merge push: ${HEAD_SHA} passed ci-gate in merge-queue run ${run}; its checks are not re-run on the push"
 }
 
 # The required jobs and their rules, read into a file first: a read that
@@ -232,12 +269,16 @@ while IFS=$'\t' read -r job rule; do
       skipped:*)
         if [ "$release_candidate" = yes ]; then rule=required; else rule=inapplicable; fi ;;
       findings)
-        if [ "$exception_rule" = owner-exception ]; then rule=required; else rule=inapplicable; fi ;;
+        if [ "$exception_rule" = owner-exception ] && [ "$review_answered" != true ]; then rule=required; else rule=inapplicable; fi ;;
       *) rule=inapplicable ;;
     esac
+    if [ "$exception_rule" = owner-exception ] && [ "$review_result" = findings ] && [ "$review_answered" = true ]; then
+      say "review: findings, every one low and other and answered by a review note for this head (spec 068)"
+    fi
     # A findings verdict is the final approver's refusal: only the owner's
-    # exception, approved for this run, lets the head through.
-    if [ "$exception_rule" = owner-exception ] && [ "$review_result" = findings ] && [ "$result" != success ]; then
+    # exception, approved for this run, lets the head through, unless every
+    # finding is low and other and answered (revision 26, spec 068).
+    if [ "$exception_rule" = owner-exception ] && [ "$review_result" = findings ] && [ "$review_answered" != true ] && [ "$result" != success ]; then
       block "the AI review returned findings and the owner exception '${job}' was not approved for this run (it ended '${result}')"
       continue
     fi
@@ -300,9 +341,15 @@ while IFS=$'\t' read -r job rule; do
       case "$recorded_result" in
         no-findings) ;;
         findings)
+          # Revision 26 (spec 068): the pull request's own ci-gate passed
+          # with the exception skipped only when every finding was answered.
           if [ "$recorded_exception" != success ]; then
-            block "the review recorded for #${pr} returned findings and its owner exception was not approved (it ended '${recorded_exception}')"
-            continue
+            if [ "$recorded_exception" = skipped ] && [ "$recorded_gate" = success ]; then
+              say "the review recorded for #${pr} returned findings, every one answered by a review note when its ci-gate passed (spec 068)"
+            else
+              block "the review recorded for #${pr} returned findings and its owner exception was not approved (it ended '${recorded_exception}')"
+              continue
+            fi
           fi ;;
         skipped:draft | skipped:fork | skipped:dependabot | skipped:oversized | skipped:transient)
           if [ "$entry_rc" = yes ] && [ "$recorded_exception" != success ]; then
@@ -314,6 +361,15 @@ while IFS=$'\t' read -r job rule; do
           continue ;;
       esac
       say "ok: ${job} skipped in the merge queue, admitted by the review recorded for #${pr} at ${pr_head}: ${recorded_result}"
+      ;;
+    post-merge)
+      post_merge=yes
+      case "$result" in
+        success | skipped)
+          say "ok: ${job} ${result} on a post-merge push" ;;
+        *)
+          block "job '${job}' ended '${result}' on a post-merge push" ;;
+      esac
       ;;
     inapplicable)
       if [ "$result" = skipped ]; then
@@ -327,6 +383,10 @@ while IFS=$'\t' read -r job rule; do
       ;;
   esac
 done < "$work/required"
+
+if [ "$post_merge" = yes ]; then
+  queue_judged
+fi
 
 if [ "$release_candidate" = yes ]; then
   say "release candidate: ${HEAD_REF} matches ${pattern}"

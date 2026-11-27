@@ -1,5 +1,5 @@
-# Rendered by Statecraft from profile github-actions-rust revision 22
-# (identity 6da3ede78368133fe8f463ac341a8ea0ce8e959c0c059066f50c8a89253a4c88). A managed file and a member of this
+# Rendered by Statecraft from profile github-actions-rust revision 29
+# (identity 9d5bb0e25975598a07bcb7ed7f0466a25dd725508cd050dbdbbec6f4950dcebe). A managed file and a member of this
 # repository's authority set. Called by statecraft-ci.yml only; it declares
 # the two credentials it may use by name (revision 8: the API key when set,
 # else the OAuth token) and is never given `secrets: inherit`.
@@ -19,6 +19,9 @@ on:
       release_candidate:
         description: whether the head ref matches the release branch pattern
         value: ${{ jobs.review.outputs.release_candidate }}
+      answered:
+        description: true when every finding is low and other and answered by a review note for this head (spec 068)
+        value: ${{ jobs.review.outputs.answered }}
 
 permissions:
   contents: read
@@ -35,6 +38,7 @@ jobs:
     outputs:
       result: ${{ steps.review.outputs.result }}
       release_candidate: ${{ steps.review.outputs.release_candidate }}
+      answered: ${{ steps.answered.outputs.answered }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -63,7 +67,8 @@ jobs:
           EXCLUDE: '.statecraft/derived'
           RELEASE_PATTERN: 'release/*'
           CLAUDE_CLI_VERSION: '2.1.116'
-          PROFILE_IDENTITY: '6da3ede78368133fe8f463ac341a8ea0ce8e959c0c059066f50c8a89253a4c88'
+          PROFILE_IDENTITY: '9d5bb0e25975598a07bcb7ed7f0466a25dd725508cd050dbdbbec6f4950dcebe'
+          REUSE_RECORDED: ${{ github.event.action == 'edited' }}
         run: |
           script="${RUNNER_TEMP}/statecraft-ai-review.sh"
           # Revision 12: only a readable base without the script is the
@@ -101,3 +106,22 @@ jobs:
             exit 0
           fi
           bash "$script" publish-check
+      # Revision 26 (spec 068): whether every finding is low and other and
+      # answered by a review note for this head, read from the pull request's
+      # body now. A base script without the mode answers nothing.
+      - name: Read the review notes
+        id: answered
+        if: steps.review.outputs.result == 'findings'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVIDENCE_DIR: ${{ steps.review.outputs.evidence }}
+        run: |
+          script="${RUNNER_TEMP}/statecraft-ai-review.sh"
+          if ! grep -qxF '# statecraft-ai-review: answered' "$script"; then
+            echo "ai-review.sh at the base predates revision 26: no review note is read for this head"
+            exit 0
+          fi
+          bash "$script" answered
