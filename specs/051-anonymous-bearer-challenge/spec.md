@@ -6,7 +6,7 @@ kind: feature
 domain: identity
 created: "2026-11-24"
 authors: ["Bartek Kus"]
-implementation: pending
+implementation: in-progress
 risk: high
 wave: 3
 depends_on:

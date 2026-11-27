@@ -65,7 +65,7 @@
       "wave": 3
     },
     "id": "051-anonymous-bearer-challenge",
-    "implementation": "pending",
+    "implementation": "in-progress",
     "kind": "feature",
     "risk": "high",
     "sectionDigests": {
@@ -95,6 +95,6 @@
     "summary": "Spec 025 B-6 says an unauthenticated request to a bearer route answers 401 with the discovery challenge, and calls that challenge the entire bootstrap. Spec 038 B-1 wired the CSRF exemption for bearer routes only for a request that carries an Authorization header, so an anonymous POST meets the double-submit check first and is refused 403 csrf with no WWW-Authenticate. MCP clients open with exactly that request (the MCP authorization flow begins with an anonymous POST), so no MCP client can bootstrap against a cell. This spec makes the exemption depend on the absence of an ambient credential rather than the presence of a bearer one: a request on a declared bearer route that carries no session cookie is exempt, with or without an Authorization header.\n",
     "title": "Anonymous bearer challenge: a declared bearer route exempts a request that carries no session cookie from CSRF, so an anonymous unsafe request is answered with the 401 discovery challenge instead of 403 csrf"
   },
-  "shardHash": "a3ad0b4996285b6ef509fd1743f1a44ff7a8932ed20b777445c5dffe6d95ffea",
+  "shardHash": "ba1cde62c7c04158c978dce15c72768d6ce05b602f30bb9971f50150ccbef84f",
   "specVersion": "1.11.0"
 }
