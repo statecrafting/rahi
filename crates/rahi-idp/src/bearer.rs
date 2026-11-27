@@ -835,13 +835,42 @@ fn presented(headers: &HeaderMap) -> Presented {
 /// not depend on which of the two the app put outermost.
 #[must_use]
 pub fn both_credentials(headers: &HeaderMap, scheme: CookieScheme) -> bool {
-    let has_authorization = headers.contains_key(header::AUTHORIZATION);
-    let has_session = headers
+    headers.contains_key(header::AUTHORIZATION) && has_session_cookie(headers, scheme)
+}
+
+/// Whether spec 020's CSRF check does not apply to a request (spec 051 B-1).
+///
+/// True for a request on a declared bearer route ([`is_bearer_route`]) that
+/// carries no session cookie of this cell's `scheme`, whether or not it
+/// carries an `Authorization` header. The check defends an ambient
+/// credential, and in this chassis the only ambient credential is the
+/// session cookie (spec 022): a request without one carries nothing a
+/// cross-origin page could have caused the browser to attach. So the
+/// absence of the cookie is the fact the exemption turns on, not the
+/// presence of a token, and an anonymous unsafe request reaches this layer,
+/// which answers it with the challenge of B-6 instead of the edge answering
+/// `403 csrf` (spec 051 B-2).
+///
+/// The exemption decides only whether the double-submit proof is demanded,
+/// never whether the request is authenticated (spec 051 B-4). A request
+/// carrying both credentials is not exempt, and this layer refuses it `400`
+/// before the check is reached (B-10).
+///
+/// The composer passes this to `rahi_edge::Edge::csrf_exemption`; the edge
+/// cannot call it, because the identity crate is a peer of the edge and never
+/// a dependency of it (spec 020 AC-2).
+#[must_use]
+pub fn csrf_exempt(path: &str, headers: &HeaderMap, scheme: CookieScheme) -> bool {
+    is_bearer_route(path) && !has_session_cookie(headers, scheme)
+}
+
+/// Whether `headers` carry this cell's session cookie.
+fn has_session_cookie(headers: &HeaderMap, scheme: CookieScheme) -> bool {
+    headers
         .get(header::COOKIE)
         .and_then(|value| value.to_str().ok())
         .and_then(|header| cookie_value(header, Cookie::session(scheme).name()))
-        .is_some();
-    has_authorization && has_session
+        .is_some()
 }
 
 /// The refusal a request carrying two credentials gets (B-10).

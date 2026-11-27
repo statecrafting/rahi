@@ -30,6 +30,14 @@
       },
       {
         "nature": "additive",
+        "spec": "030-operational-verbs",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rahi-cli/Cargo.toml"
+        }
+      },
+      {
+        "nature": "additive",
         "spec": "025-api-tokens-and-resource-server",
         "unit": {
           "kind": "file",
@@ -65,18 +73,19 @@
       "wave": 3
     },
     "id": "051-anonymous-bearer-challenge",
-    "implementation": "pending",
+    "implementation": "complete",
     "kind": "feature",
     "risk": "high",
     "sectionDigests": {
-      "051-anonymous-bearer-challenge": "27e7d4d1da682b4cbe52329925ee4f59ccd61c61d09b92e1a8985a6cef3579b1",
+      "051-anonymous-bearer-challenge": "1fc2f69dd7944bed7f6c2e7b704c85b3528e6c5fb297c7e8b4569db9f1ae7c47",
       "1-purpose": "a0442b577b229fe73b08416d83b80b711262b22b882aa565695d42bd17320643",
       "2-territory": "96d516a8dff6e605aa3a19344113c6f6d96baffcae0cce8270d99e24db3331d9",
       "3-behavior": "ae9b9d56d1b46762c2d76063f92c3d820865972189d3cd1779d1695dd6753aec",
       "4-functional-requirements": "8fb3ebd8cdf8f76b90068e531bd32b120bffca117035f98616b0be12a6bd33b6",
       "5-acceptance-criteria": "1eab4541ab032a340f92d79295e6f63b0e4b6ba0a8ce9192642f7b4da1607ae5",
       "6-out-of-scope": "e8a1849ab80618a98be6155346bc7d8a3afc1691f2c66329b620542c1a16a616",
-      "7-resolved-decisions": "e55c757ff88697ff4657187fe2cbf3226681e63a860824d762cc54197ff20681",
+      "7-resolved-decisions": "f176d435bc0022c53003dce0e68e1952b6cbf798a80a08caba51bd70169292f0",
+      "status": "99db69ed500983e00b290c31abef5b8b7a42dfd6fe98a4956f395015eb58f707",
       "verification": "45ebd20f948f2e00dd8253e09db8da388bd15792291153741423d689d08f9d7d"
     },
     "sectionHeadings": [
@@ -88,6 +97,7 @@
       "5. Acceptance criteria",
       "6. Out of scope",
       "7. Resolved decisions",
+      "Status",
       "Verification"
     ],
     "specPath": "specs/051-anonymous-bearer-challenge/spec.md",
@@ -95,6 +105,6 @@
     "summary": "Spec 025 B-6 says an unauthenticated request to a bearer route answers 401 with the discovery challenge, and calls that challenge the entire bootstrap. Spec 038 B-1 wired the CSRF exemption for bearer routes only for a request that carries an Authorization header, so an anonymous POST meets the double-submit check first and is refused 403 csrf with no WWW-Authenticate. MCP clients open with exactly that request (the MCP authorization flow begins with an anonymous POST), so no MCP client can bootstrap against a cell. This spec makes the exemption depend on the absence of an ambient credential rather than the presence of a bearer one: a request on a declared bearer route that carries no session cookie is exempt, with or without an Authorization header.\n",
     "title": "Anonymous bearer challenge: a declared bearer route exempts a request that carries no session cookie from CSRF, so an anonymous unsafe request is answered with the 401 discovery challenge instead of 403 csrf"
   },
-  "shardHash": "a3ad0b4996285b6ef509fd1743f1a44ff7a8932ed20b777445c5dffe6d95ffea",
+  "shardHash": "61beadb16cf66cd672e3ade32f4dadfb4432875a9b74a6b552cbf44d4cb1d8d6",
   "specVersion": "1.11.0"
 }

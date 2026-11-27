@@ -6,7 +6,7 @@ kind: feature
 domain: identity
 created: "2026-11-24"
 authors: ["Bartek Kus"]
-implementation: pending
+implementation: complete
 risk: high
 wave: 3
 depends_on:
@@ -31,6 +31,7 @@ establishes:
   - "crates/rahi-cli/tests/anonymous_challenge.rs"
 extends:
   - { spec: "030-operational-verbs", unit: "crates/rahi-cli/src/serve.rs", nature: amending }
+  - { spec: "030-operational-verbs", unit: "crates/rahi-cli/Cargo.toml", nature: additive }
   - { spec: "025-api-tokens-and-resource-server", unit: "crates/rahi-idp/src/bearer.rs", nature: additive }
   - { spec: "025-api-tokens-and-resource-server", unit: "crates/rahi-idp/tests/bearer.rs", nature: additive }
   - { spec: "020-edge-server", unit: "crates/rahi-edge/src/middleware/csrf.rs", nature: amending }
@@ -208,6 +209,63 @@ to the product that speaks MCP (025 section 6).
   `extends` edges (`serve.rs` and `csrf.rs`'s module comment `amending`,
   because the exemption's stated rule changes; the rest `additive`) and
   records on 038, as its D-14, that its B-1 clause is replaced by B-1 here.
+
+- **D-5 (2026-11-27, build; how FR-004 drives `serve`'s composition
+  without restating it).** `serve`'s router is built by a private
+  `Assembly::build` whose identity parts need a live rauthy's client secret,
+  so a test cannot call it. The build splits its two seams into public
+  functions that `Assembly::build` itself calls: `serve::csrf_exemption`
+  (the edge's exemption over the cell's cookie scheme, wrapping
+  `rahi_idp::bearer::csrf_exempt`) and `serve::with_identity_layers` (the
+  session layer outside the edge, the bearer layer outside both). The test
+  composes with exactly those, over a loopback stub that answers discovery
+  and an empty key set, which is all the layers load and all three requests
+  need, since none presents a token for validation. It adds `tower` (already
+  in the tree under axum, rahi-edge and rahi-idp) as a dev-dependency for
+  `oneshot`, so the edge's `extends` grows by 030's `Cargo.toml`. Rejected:
+  including rahi-idp's 680-line OIDC stub by `#[path]` across crates, which
+  would ship a test whose source is outside the packaged crate (the trap
+  `cargo package` does not catch); and booting the binary against a real
+  rauthy, which belongs to AC-3's consumer check.
+- **D-6 (2026-11-27, build; FR-001's "no test restates it" against spec 020
+  AC-2).** The edge's exemption test (FR-003) cannot call
+  `rahi_idp::bearer::csrf_exempt`: 020 AC-2 keeps `rahi-idp` out of
+  `cargo tree -p rahi-edge`, which includes dev-dependencies. 020 is
+  complete, so its AC holds. The edge test keeps a stand-in exemption, now
+  "declared prefix and no session cookie", and its doc comment says it is
+  the fixture for the edge's half of the seam only; the predicate itself is
+  asserted where it lives (FR-002) and as `serve` composes it (FR-004), and
+  `serve` and those tests share the one definition FR-001 asks for.
+  Rejected: a dev-dependency on `rahi-idp`, which fails 020 AC-2; a
+  path-only stand-in, which would no longer show the session-cookie case
+  038's assertions already pin.
+
+- **D-7 (2026-11-27, build; AC-3 is discharged after the flip, by
+  construction).** AC-3 runs "against a cell built on the release carrying
+  this spec", and a release carries only a spec that has merged, so it
+  cannot be a condition of the flip; the spec says as much by keeping it out
+  of `verify:cli`. The flip rests on AC-1 and AC-2, and the Status section
+  holds AC-3 open until a consumer records the run. Rejected: holding the
+  spec `in-progress` until a release, which would block 052 (which depends
+  on this spec) on a release that cannot be cut until both land.
+- **D-8 (2026-11-27, build; a defect found, outside this territory).** The
+  FR-004 fixture first minted a session for a principal with no email, and
+  the next request panicked `capacity overflow` reading the assertion back
+  from the cache: `rahi_types::Principal.email` is skipped when absent
+  (`skip_serializing_if`), and the cache's codec is positional, so the
+  stored bytes are misread. That type is spec 010's and the defect is not
+  this spec's to fix; the fixture gives its principal an email, the shape
+  rauthy sends for a person, and the defect is reported for its own change.
+
+## Status
+
+- **2026-11-27 (implemented; AC-3 open).** AC-1 and AC-2 pass locally (the
+  `verify:cli` block). FR-004's test fails against the replaced predicate
+  with exactly the refusal an MCP client met, `403` `csrf`, and passes with
+  B-1's. AC-3 remains open until a cell built on a release carrying this
+  spec answers an MCP client's anonymous `initialize` `POST` with `401` and
+  the challenge; the client and its version are recorded here when it does
+  (aicortex 021 AC-2 is the expected first run).
 
 ## Verification
 
